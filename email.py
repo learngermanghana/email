@@ -25,11 +25,15 @@ def clean_phone(phone):
         phone_str = phone_str[:-2]
     return phone_str.replace(" ", "").replace("+", "")
 
-# === PDF GENERATORS ===
-def generate_receipt_and_contract_pdf(student_row, agreement_text, payment_amount, payment_date=None,
-                                      first_instalment=1500, second_instalment=balance, course_length=12):
+def generate_receipt_and_contract_pdf(
+        student_row, agreement_text, payment_amount, payment_date=None,
+        first_instalment=1500, course_length=12):
     if payment_date is None:
         payment_date = date.today()
+    # Second installment is the current balance (or Paid - first_instalment, as you like)
+    # Use float for math safety
+    balance = float(student_row["Balance"]) if "Balance" in student_row else 0.0
+    second_instalment = balance
     filled_agreement = (
         agreement_text
         .replace("[STUDENT_NAME]", student_row["Name"])
@@ -130,6 +134,7 @@ if not os.path.exists(expenses_file):
     exp = pd.DataFrame(columns=["Type", "Item", "Amount", "Date"])
     exp.to_csv(expenses_file, index=False)
 exp = pd.read_csv(expenses_file)
+
 
 
 # === GOOGLE SHEET: FORM RESPONSES ===
