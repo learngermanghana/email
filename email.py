@@ -26,7 +26,8 @@ def clean_phone(phone):
     return phone_str.replace(" ", "").replace("+", "")
 
 # === PDF GENERATORS ===
-def generate_receipt_and_contract_pdf(student_row, agreement_text, payment_amount, payment_date=None):
+def generate_receipt_and_contract_pdf(student_row, agreement_text, payment_amount, payment_date=None,
+                                      first_instalment=1500, second_instalment=1000, course_length=12):
     if payment_date is None:
         payment_date = date.today()
     filled_agreement = (
@@ -35,9 +36,9 @@ def generate_receipt_and_contract_pdf(student_row, agreement_text, payment_amoun
         .replace("[DATE]", str(payment_date))
         .replace("[CLASS]", student_row["Level"])
         .replace("[AMOUNT]", str(student_row["Paid"]))
-        .replace("[FIRST_INSTALMENT]", "1500")
-        .replace("[SECOND_INSTALMENT]", "balance")
-        .replace("[COURSE_LENGTH]", "12")
+        .replace("[FIRST_INSTALMENT]", str(first_instalment))
+        .replace("[SECOND_INSTALMENT]", str(second_instalment))
+        .replace("[COURSE_LENGTH]", str(course_length))
     )
     pdf = FPDF()
     pdf.add_page()
@@ -243,15 +244,17 @@ with open("preview_agreement.pdf", "rb") as f:
     preview_b64 = base64.b64encode(preview_bytes).decode()
     st.markdown(f'<a href="data:application/pdf;base64,{preview_b64}" download="Agreement_Preview.pdf">Download Agreement Preview PDF</a>', unsafe_allow_html=True)
 
-# === TABS ===
 tabs = st.tabs([
     "📝 Pending Registrations",
     "👩‍🎓 All Students",
     "➕ Add Student",
     "💵 Expenses",
     "📲 WhatsApp Reminders",
-    "📄 Generate Contract PDF"
+    "📄 Generate Contract PDF",
+    "📧 Send Email",
+    "📊 Analytics & Export"    # This is tab index 7
 ])
+
 
 # ============ PENDING REGISTRATIONS TAB ============
 with tabs[0]:
@@ -279,12 +282,15 @@ with tabs[0]:
             location = row.get('location', '')
             emergency = row.get('emergency_contact_phone_number', '')
             with st.expander(f"{fullname} ({phone})"):
-                st.write(f"**Email:** {email}")   # <--- Shows student email here
+                st.write(f"**Email:** {email}")
                 student_code = st.text_input("Assign Student Code", key=f"code_{i}")
                 contract_start = st.date_input("Contract Start", value=date.today(), key=f"start_{i}")
                 contract_end = st.date_input("Contract End", value=date.today(), key=f"end_{i}")
                 paid = st.number_input("Amount Paid (GHS)", min_value=0.0, step=1.0, key=f"paid_{i}")
                 balance = st.number_input("Balance Due (GHS)", min_value=0.0, step=1.0, key=f"bal_{i}")
+                first_instalment = st.number_input("First Instalment (GHS)", min_value=0.0, value=1500.0, key=f"firstinst_{i}")
+                second_instalment = st.number_input("Second Instalment (GHS)", min_value=0.0, value=1000.0, key=f"secondinst_{i}")
+                course_length = st.number_input("Course Length (weeks)", min_value=1, value=12, key=f"length_{i}")
 
                 attach_pdf = st.checkbox("Attach Receipt & Contract PDF to Email?", value=True, key=f"pdf_{i}")
 
@@ -306,7 +312,8 @@ with tabs[0]:
 
                     # --- Generate combined receipt + contract PDF ---
                     pdf_file = generate_receipt_and_contract_pdf(
-                        new_row.iloc[0], agreement_text, payment_amount=paid, payment_date=contract_start
+                        new_row.iloc[0], agreement_text, payment_amount=paid, payment_date=contract_start,
+                        first_instalment=first_instalment, second_instalment=second_instalment, course_length=course_length
                     )
                     attachment = None
                     if attach_pdf:
@@ -362,13 +369,25 @@ Best regards,<br>
 
                     st.success(f"Student {fullname} added to your dashboard (and emailed if address available)!")
 
-# ============ ALL STUDENTS TAB ============
 with tabs[1]:
     st.title("👩‍🎓 All Students (Edit & Update)")
-    if not df_main.empty:
-        for idx, row in df_main.iterrows():
+    today = datetime.today().date()
+    # Auto-calculate status
+    df_main['Status'] = df_main['ContractEnd'].apply(
+        lambda x: "Completed" if pd.to_datetime(str(x)).date() < today else "Enrolled"
+    )
+    statuses = ["All"] + df_main["Status"].unique().tolist()
+    selected_status = st.selectbox("Filter by Status", statuses)
+    if selected_status != "All":
+        view_df = df_main[df_main["Status"] == selected_status]
+    else:
+        view_df = df_main
+
+    if not view_df.empty:
+        for idx, row in view_df.iterrows():
             unique_id = f"{row['StudentCode']}_{idx}"
-            with st.expander(f"{row['Name']} (Code: {row['StudentCode']})"):
+            with st.expander(f"{row['Name']} (Code: {row['StudentCode']}) [{row['Status']}]"):
+                st.info(f"Status: {row['Status']}")
                 name = st.text_input("Name", value=row['Name'], key=f"name_{unique_id}")
                 phone = st.text_input("Phone", value=row['Phone'], key=f"phone_{unique_id}")
                 location = st.text_input("Location", value=row['Location'], key=f"loc_{unique_id}")
@@ -413,14 +432,13 @@ with tabs[1]:
                         st.markdown(href, unsafe_allow_html=True)
                     st.success("Standalone receipt generated!")
     else:
-        st.info("No students in the database.")
-
+        st.info("No students in the database for this filter.")
 # ============ ADD STUDENT MANUALLY ============
 with tabs[2]:
     st.title("➕ Add Student")
     with st.form("add_student"):
         name = st.text_input("Name")
-        phone = st.text_input("Phone Number or Email")
+        phone = st.text_input("Phone Number")
         location = st.text_input("Location")
         level = st.selectbox("Class/Level", ["A1", "A2", "B1", "B2", "C1", "C2"])
         paid = st.number_input("Amount Paid (GHS)", min_value=0.0, step=1.0)
@@ -495,7 +513,7 @@ with tabs[4]:
                 f"{SCHOOL_NAME} | {SCHOOL_PHONE}"
             )
             msg_encoded = urllib.parse.quote(whatsapp_msg)
-            phone_str = clean_phone(row['Phone'])  # Use robust cleaner!
+            phone_str = clean_phone(row['Phone'])  # Always use cleaner!
             wa_url = f"https://wa.me/{phone_str}?text={msg_encoded}"
             st.markdown(
                 f"**{row['Name']}** (GHS {row['Balance']} due) [Remind on WhatsApp](<{wa_url}>)"
@@ -522,3 +540,77 @@ with tabs[5]:
             st.success("PDF contract generated!")
     else:
         st.info("No students found.")
+
+with tabs[6]:
+    st.title("📧 Send Email to Student(s)")
+
+    # Ensure 'Email' column exists and is cleaned in your DataFrame
+    if "Email" not in df_main.columns:
+        # Try to clean columns if user loads with different casing
+        df_main.columns = [c.lower() for c in df_main.columns]
+    email_col = "email" if "email" in df_main.columns else "Email"
+
+    # List all students with a valid email address
+    email_names = [(row['Name'], row[email_col]) for _, row in df_main.iterrows()
+                   if isinstance(row.get(email_col, ''), str) and '@' in row.get(email_col, '')]
+    email_options = [f"{name} ({email})" for name, email in email_names]
+    email_dict = {f"{name} ({email})": email for name, email in email_names}
+
+    email_mode = st.radio("Send email to", ["Individual student", "All students with email"])
+
+    if email_mode == "Individual student":
+        selected = st.selectbox("Select student", email_options)
+        recipients = [email_dict[selected]] if selected else []
+    else:
+        recipients = [email for _, email in email_names]
+
+    subject = st.text_input("Subject", value="Information from Learn Language Education Academy")
+    message = st.text_area("Email Body (plain text or basic HTML)", height=200, value="Dear Student,\n\n...")
+    uploaded_file = st.file_uploader("Attach a file (optional)", type=["pdf", "doc", "docx", "jpg", "png", "jpeg"])
+
+    if st.button("Send Email"):
+        from sendgrid.helpers.mail import Attachment, FileContent, FileName, FileType, Disposition
+        sent, failed = 0, []
+        attachment = None
+        if uploaded_file is not None:
+            data = uploaded_file.read()
+            encoded = base64.b64encode(data).decode()
+            attachment = Attachment(
+                FileContent(encoded),
+                FileName(uploaded_file.name),
+                FileType(uploaded_file.type),
+                Disposition("attachment")
+            )
+        for email in recipients:
+            try:
+                msg = Mail(
+                    from_email=school_sender_email,
+                    to_emails=email,
+                    subject=subject,
+                    html_content=message.replace('\n', '<br>')
+                )
+                if attachment:
+                    msg.attachment = attachment
+                client = SendGridAPIClient(school_sendgrid_key)
+                client.send(msg)
+                sent += 1
+            except Exception as e:
+                failed.append(email)
+        st.success(f"Sent to {sent} student(s)!")
+        if failed:
+            st.warning(f"Failed to send to: {', '.join(failed)}")
+
+# ============ ANALYTICS & EXPORT TAB ============
+with tabs[7]:
+    st.title("📊 Analytics & Export")
+
+    st.subheader("Student Enrollment Over Time")
+    if not df_main.empty and "ContractStart" in df_main.columns:
+        df_main["EnrollDate"] = pd.to_datetime(df_main["ContractStart"], errors='coerce')
+        enroll_by_month = df_main.groupby(df_main["EnrollDate"].dt.to_period("M")).size().reset_index(name='Count')
+        enroll_by_month["EnrollDate"] = enroll_by_month["EnrollDate"].astype(str)
+        st.line_chart(enroll_by_month.set_index("EnrollDate")["Count"])
+
+    st.subheader("Export Data")
+    st.download_button("Download All Students CSV", df_main.to_csv(index=False), file_name="all_students.csv")
+    st.download_button("Download All Expenses CSV", exp.to_csv(index=False), file_name="all_expenses.csv")
