@@ -8,8 +8,18 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
 import urllib.parse
 
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+def get_gsheet():
+    scope = [
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    import json
+    service_account_info = json.loads(st.secrets["gspread_service_account"])
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(service_account_info, scope)
+    client = gspread.authorize(creds)
+    sheet = client.open(GOOGLE_SHEET_NAME)
+    worksheet = sheet.sheet1
+    return worksheet
 
 # === PAGE CONFIG FIRST! ===
 st.set_page_config(page_title="Learn Language Education Academy Dashboard", layout="wide")
