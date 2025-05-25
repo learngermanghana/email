@@ -30,64 +30,6 @@ def generate_receipt_and_contract_pdf(
         first_instalment=1500, course_length=12):
     if payment_date is None:
         payment_date = date.today()
-    # Second installment is the current balance (or Paid - first_instalment, as you like)
-    # Use float for math safety
-    balance = float(student_row["Balance"]) if "Balance" in student_row else 0.0
-    second_instalment = balance
-    filled_agreement = (
-        agreement_text
-        .replace("[STUDENT_NAME]", student_row["Name"])
-        .replace("[DATE]", str(payment_date))
-        .replace("[CLASS]", student_row["Level"])
-        .replace("[AMOUNT]", str(student_row["Paid"]))
-        .replace("[FIRST_INSTALMENT]", str(first_instalment))
-        .replace("[SECOND_INSTALMENT]", str(second_instalment))
-        .replace("[COURSE_LENGTH]", str(course_length))
-    )
-    pdf = FPDF()
-    pdf.add_page()
-    # RECEIPT FIRST
-    pdf.set_font("Arial", size=14)
-    pdf.cell(200, 10, f"{SCHOOL_NAME} Payment Receipt", ln=True, align="C")
-    pdf.set_font("Arial", size=12)
-    pdf.ln(10)
-    pdf.cell(200, 10, f"School: {SCHOOL_NAME}", ln=True)
-    pdf.cell(200, 10, f"Location: {SCHOOL_ADDRESS}", ln=True)
-    pdf.cell(200, 10, f"Phone: {SCHOOL_PHONE}", ln=True)
-    pdf.cell(200, 10, f"Email: {SCHOOL_EMAIL}", ln=True)
-    pdf.cell(200, 10, f"Website: {SCHOOL_WEBSITE}", ln=True)
-    pdf.ln(10)
-    pdf.cell(200, 10, f"Name: {student_row['Name']}", ln=True)
-    pdf.cell(200, 10, f"Student Code: {student_row['StudentCode']}", ln=True)
-    pdf.cell(200, 10, f"Phone: {student_row['Phone']}", ln=True)
-    pdf.cell(200, 10, f"Level: {student_row['Level']}", ln=True)
-    pdf.cell(200, 10, f"Amount Paid: GHS {payment_amount}", ln=True)
-    pdf.cell(200, 10, f"Balance Due: GHS {student_row['Balance']}", ln=True)
-    pdf.cell(200, 10, f"Contract Start: {student_row['ContractStart']}", ln=True)
-    pdf.cell(200, 10, f"Contract End: {student_row['ContractEnd']}", ln=True)
-    pdf.ln(10)
-    pdf.cell(200, 10, f"Receipt Date: {payment_date}", ln=True)
-    pdf.cell(0, 10, "Thank you for your payment!", ln=True)
-    pdf.cell(0, 10, "Signed: Felix Asadu", ln=True)
-    # AGREEMENT BELOW
-    pdf.ln(15)
-    pdf.set_font("Arial", size=14)
-    pdf.cell(200, 10, f"{SCHOOL_NAME} Student Contract", ln=True, align="C")
-    pdf.set_font("Arial", size=12)
-    pdf.ln(10)
-    for line in filled_agreement.split("\n"):
-        pdf.multi_cell(0, 10, line)
-    pdf.ln(10)
-    pdf.cell(0, 10, "Signed: Felix Asadu", ln=True)
-    pdf_name = f"{student_row['Name'].replace(' ', '_')}_receipt_and_contract.pdf"
-    pdf.output(pdf_name)
-    return pdf_name
-
-def generate_receipt_and_contract_pdf(
-        student_row, agreement_text, payment_amount, payment_date=None,
-        first_instalment=1500, course_length=12):
-    if payment_date is None:
-        payment_date = date.today()
     # Second installment is the current balance
     balance = 0.0
     try:
@@ -102,7 +44,6 @@ def generate_receipt_and_contract_pdf(
         .replace("[CLASS]", student_row["Level"])
         .replace("[AMOUNT]", str(student_row["Paid"]))
         .replace("[FIRST_INSTALMENT]", str(first_instalment))
-        .replace("[SECOND_INSTALMENT]", str(second_instalment))
         .replace("[COURSE_LENGTH]", str(course_length))
     )
     pdf = FPDF()
