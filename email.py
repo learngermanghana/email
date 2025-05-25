@@ -11,7 +11,6 @@ import urllib.parse
 # === PAGE CONFIG FIRST! ===
 st.set_page_config(page_title="Learn Language Education Academy Dashboard", layout="wide")
 
-
 # === SCHOOL INFO ===
 SCHOOL_NAME = "Learn Language Education Academy"
 SCHOOL_EMAIL = "Learngermanghana@gmail.com"
@@ -19,9 +18,9 @@ SCHOOL_WEBSITE = "www.learngermanghana.com"
 SCHOOL_PHONE = "233205706589"
 SCHOOL_ADDRESS = "Awoshie, Accra, Ghana"
 
+# === EMAIL CONFIG (secrets only, secure) ===
 school_sendgrid_key = st.secrets["general"].get("SENDGRID_API_KEY")
 school_sender_email = st.secrets["general"].get("SENDER_EMAIL", SCHOOL_EMAIL)
-
 
 # === PHONE NUMBER CLEANER ===
 def clean_phone(phone):
@@ -30,18 +29,16 @@ def clean_phone(phone):
         phone_str = phone_str[:-2]
     return phone_str.replace(" ", "").replace("+", "")
 
+# === PDF GENERATOR ===
 def generate_receipt_and_contract_pdf(
         student_row, agreement_text, payment_amount, payment_date=None,
         first_instalment=1500, course_length=12):
     if payment_date is None:
         payment_date = date.today()
-    # Second installment is the current balance
-    balance = 0.0
     try:
-        balance = float(student_row["Balance"])
+        second_instalment = float(student_row["Balance"])
     except Exception:
-        pass
-    second_instalment = balance
+        second_instalment = 0.0
     filled_agreement = (
         agreement_text
         .replace("[STUDENT_NAME]", student_row["Name"])
@@ -49,11 +46,12 @@ def generate_receipt_and_contract_pdf(
         .replace("[CLASS]", student_row["Level"])
         .replace("[AMOUNT]", str(student_row["Paid"]))
         .replace("[FIRST_INSTALMENT]", str(first_instalment))
+        .replace("[SECOND_INSTALMENT]", str(second_instalment))
         .replace("[COURSE_LENGTH]", str(course_length))
     )
     pdf = FPDF()
     pdf.add_page()
-    # Receipt first
+    # Receipt section
     pdf.set_font("Arial", size=14)
     pdf.cell(200, 10, f"{SCHOOL_NAME} Payment Receipt", ln=True, align="C")
     pdf.set_font("Arial", size=12)
@@ -69,14 +67,14 @@ def generate_receipt_and_contract_pdf(
     pdf.cell(200, 10, f"Phone: {student_row['Phone']}", ln=True)
     pdf.cell(200, 10, f"Level: {student_row['Level']}", ln=True)
     pdf.cell(200, 10, f"Amount Paid: GHS {payment_amount}", ln=True)
-    pdf.cell(200, 10, f"Balance Due: GHS {balance}", ln=True)
+    pdf.cell(200, 10, f"Balance Due: GHS {second_instalment}", ln=True)
     pdf.cell(200, 10, f"Contract Start: {student_row['ContractStart']}", ln=True)
     pdf.cell(200, 10, f"Contract End: {student_row['ContractEnd']}", ln=True)
     pdf.ln(10)
     pdf.cell(200, 10, f"Receipt Date: {payment_date}", ln=True)
     pdf.cell(0, 10, "Thank you for your payment!", ln=True)
     pdf.cell(0, 10, "Signed: Felix Asadu", ln=True)
-    # Agreement below
+    # Agreement section
     pdf.ln(15)
     pdf.set_font("Arial", size=14)
     pdf.cell(200, 10, f"{SCHOOL_NAME} Student Contract", ln=True, align="C")
@@ -89,7 +87,6 @@ def generate_receipt_and_contract_pdf(
     pdf_name = f"{student_row['Name'].replace(' ', '_')}_receipt_and_contract.pdf"
     pdf.output(pdf_name)
     return pdf_name
-
 
 # === FILES & DATABASE SETUP ===
 student_file = "students_simple.csv"
@@ -111,8 +108,6 @@ if not os.path.exists(expenses_file):
     exp = pd.DataFrame(columns=["Type", "Item", "Amount", "Date"])
     exp.to_csv(expenses_file, index=False)
 exp = pd.read_csv(expenses_file)
-
-
 
 # === GOOGLE SHEET: FORM RESPONSES ===
 sheet_url = "https://docs.google.com/spreadsheets/d/1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo/export?format=csv"
@@ -223,6 +218,7 @@ with open("preview_agreement.pdf", "rb") as f:
     preview_b64 = base64.b64encode(preview_bytes).decode()
     st.markdown(f'<a href="data:application/pdf;base64,{preview_b64}" download="Agreement_Preview.pdf">Download Agreement Preview PDF</a>', unsafe_allow_html=True)
 
+# === TABS ===
 tabs = st.tabs([
     "📝 Pending Registrations",
     "👩‍🎓 All Students",
@@ -231,9 +227,8 @@ tabs = st.tabs([
     "📲 WhatsApp Reminders",
     "📄 Generate Contract PDF",
     "📧 Send Email",
-    "📊 Analytics & Export"    # This is tab index 7
+    "📊 Analytics & Export"
 ])
-
 
 # ============ PENDING REGISTRATIONS TAB ============
 with tabs[0]:
@@ -346,3 +341,246 @@ Best regards,<br>
                         st.warning("Please enter SendGrid API Key and sender email in sidebar for auto-email.")
 
                     st.success(f"Student {fullname} added to your dashboard (and emailed if address available)!")
+
+with tabs[1]:
+    st.title("👩‍🎓 All Students (Edit & Update)")
+    today = datetime.today().date()
+    # Auto-calculate status
+    df_main['Status'] = df_main['ContractEnd'].apply(
+        lambda x: "Completed" if pd.to_datetime(str(x)).date() < today else "Enrolled"
+    )
+    statuses = ["All"] + df_main["Status"].unique().tolist()
+    selected_status = st.selectbox("Filter by Status", statuses)
+    if selected_status != "All":
+        view_df = df_main[df_main["Status"] == selected_status]
+    else:
+        view_df = df_main
+
+    if not view_df.empty:
+        for idx, row in view_df.iterrows():
+            unique_id = f"{row['StudentCode']}_{idx}"
+            with st.expander(f"{row['Name']} (Code: {row['StudentCode']}) [{row['Status']}]"):
+                st.info(f"Status: {row['Status']}")
+                name = st.text_input("Name", value=row['Name'], key=f"name_{unique_id}")
+                phone = st.text_input("Phone", value=row['Phone'], key=f"phone_{unique_id}")
+                location = st.text_input("Location", value=row['Location'], key=f"loc_{unique_id}")
+                level = st.text_input("Level", value=row['Level'], key=f"level_{unique_id}")
+                paid = st.number_input("Paid", value=float(row['Paid']), key=f"paid_{unique_id}")
+                balance = st.number_input("Balance", value=float(row['Balance']), key=f"bal_{unique_id}")
+                contract_start = st.text_input("Contract Start", value=str(row['ContractStart']), key=f"cs_{unique_id}")
+                contract_end = st.text_input("Contract End", value=str(row['ContractEnd']), key=f"ce_{unique_id}")
+                student_code = st.text_input("Student Code", value=row['StudentCode'], key=f"code_{unique_id}")
+
+                # Update Button
+                if st.button("Update Student", key=f"update_{unique_id}"):
+                    df_main.at[idx, "Name"] = name
+                    df_main.at[idx, "Phone"] = phone
+                    df_main.at[idx, "Location"] = location
+                    df_main.at[idx, "Level"] = level
+                    df_main.at[idx, "Paid"] = paid
+                    df_main.at[idx, "Balance"] = balance
+                    df_main.at[idx, "ContractStart"] = contract_start
+                    df_main.at[idx, "ContractEnd"] = contract_end
+                    df_main.at[idx, "StudentCode"] = student_code
+                    df_main.to_csv(student_file, index=False)
+                    st.success("Student updated!")
+                    st.rerun()
+
+                # Delete Button
+                if st.button("Delete Student", key=f"delete_{unique_id}"):
+                    df_main = df_main.drop(idx).reset_index(drop=True)
+                    df_main.to_csv(student_file, index=False)
+                    st.success("Student deleted!")
+                    st.rerun()
+
+                # Generate a new payment receipt (for new/extra payment)
+                if st.button("Generate Payment Receipt", key=f"genreceipt_{unique_id}"):
+                    pay_amt = st.number_input("Enter New Payment Amount", min_value=0.0, value=float(row["Paid"]), key=f"payamt_{unique_id}")
+                    pay_date = st.date_input("Enter Payment Date", value=date.today(), key=f"paydate_{unique_id}")
+                    receipt_pdf = generate_receipt_and_contract_pdf(row, agreement_text, payment_amount=pay_amt, payment_date=pay_date)
+                    with open(receipt_pdf, "rb") as f:
+                        pdf_bytes = f.read()
+                        b64 = base64.b64encode(pdf_bytes).decode()
+                        href = f'<a href="data:application/pdf;base64,{b64}" download="{row["Name"].replace(" ", "_")}_receipt.pdf">Download PDF Receipt</a>'
+                        st.markdown(href, unsafe_allow_html=True)
+                    st.success("Standalone receipt generated!")
+    else:
+        st.info("No students in the database for this filter.")
+# ============ ADD STUDENT MANUALLY ============
+with tabs[2]:
+    st.title("➕ Add Student")
+    with st.form("add_student"):
+        name = st.text_input("Name")
+        phone = st.text_input("Phone Number")
+        location = st.text_input("Location")
+        level = st.selectbox("Class/Level", ["A1", "A2", "B1", "B2", "C1", "C2"])
+        paid = st.number_input("Amount Paid (GHS)", min_value=0.0, step=1.0)
+        balance = st.number_input("Balance Due (GHS)", min_value=0.0, step=1.0)
+        contract_start = st.date_input("Contract Start", value=date.today())
+        contract_end = st.date_input("Contract End", value=date.today())
+        student_code = st.text_input("Student Code (unique, for software/app access)")
+        if st.form_submit_button("Add Student") and name and phone and student_code:
+            new_row = pd.DataFrame([{
+                "Name": name,
+                "Phone": phone,
+                "Location": location,
+                "Level": level,
+                "Paid": paid,
+                "Balance": balance,
+                "ContractStart": contract_start,
+                "ContractEnd": contract_end,
+                "StudentCode": student_code
+            }])
+            df_main = pd.concat([df_main, new_row], ignore_index=True)
+            df_main.to_csv(student_file, index=False)
+            st.success(f"Added {name} (Code: {student_code})")
+            st.rerun()
+
+# ============ EXPENSES TAB ============
+with tabs[3]:
+    st.title("💵 Expenses and Financial Summary")
+    with st.form("add_expense"):
+        exp_type = st.selectbox("Type", ["Bill", "Rent", "Salary", "Other"])
+        exp_item = st.text_input("Expense Item / Purpose")
+        exp_amount = st.number_input("Amount (GHS)", min_value=0.0, step=1.0)
+        exp_date = st.date_input("Date", value=date.today(), key="exp_date")
+        if st.form_submit_button("Add Expense") and exp_item and exp_amount > 0:
+            new_exp_row = pd.DataFrame([{"Type": exp_type, "Item": exp_item, "Amount": exp_amount, "Date": exp_date}])
+            exp = pd.concat([exp, new_exp_row], ignore_index=True)
+            exp.to_csv(expenses_file, index=False)
+            st.success(f"Added expense: {exp_type} - {exp_item}")
+            st.rerun()
+
+    st.write("### Expenses List")
+    st.dataframe(exp, use_container_width=True)
+
+    # Financial summary
+    total_paid = df_main["Paid"].sum() if not df_main.empty else 0.0
+    if not exp.empty:
+        exp["Date"] = pd.to_datetime(exp["Date"], errors='coerce')
+        exp["Year"] = exp["Date"].dt.year
+        exp["Month"] = exp["Date"].dt.strftime("%B %Y")
+        monthly_exp = exp.groupby("Month")["Amount"].sum().reset_index()
+        st.write("#### Expenses Per Month")
+        st.dataframe(monthly_exp)
+        yearly_exp = exp.groupby("Year")["Amount"].sum().reset_index()
+        st.write("#### Expenses Per Year")
+        st.dataframe(yearly_exp)
+        total_expenses = exp["Amount"].sum()
+        net_profit = total_paid - total_expenses
+        st.info(f"💰 **Total Money Collected:** GHS {total_paid:,.2f} | **Total Expenses:** GHS {total_expenses:,.2f} | **Net Profit:** GHS {net_profit:,.2f}")
+    else:
+        st.info(f"💰 **Total Money Collected:** GHS {total_paid:,.2f} | No expenses recorded yet.")
+
+# ============ WHATSAPP REMINDERS TAB ============
+with tabs[4]:
+    st.title("📲 WhatsApp Reminders for Debtors")
+    debtors = df_main[(df_main["Balance"].astype(float) > 0) & (~df_main["Phone"].astype(str).str.contains("@"))]
+    if not debtors.empty:
+        st.write("### Students Owing (Click WhatsApp to Remind)")
+        for idx, row in debtors.iterrows():
+            whatsapp_msg = (
+                f"Dear {row['Name']}, your current balance with {SCHOOL_NAME} is GHS {row['Balance']}. "
+                f"Your student code: {row['StudentCode']}. "
+                f"Please pay as soon as possible to maintain your active status. Thank you!\n"
+                f"{SCHOOL_NAME} | {SCHOOL_PHONE}"
+            )
+            msg_encoded = urllib.parse.quote(whatsapp_msg)
+            phone_str = clean_phone(row['Phone'])
+            wa_url = f"https://wa.me/{phone_str}?text={msg_encoded}"
+            st.markdown(
+                f"**{row['Name']}** (GHS {row['Balance']} due) [Remind on WhatsApp](<{wa_url}>)"
+            )
+    else:
+        st.info("No students currently owing.")
+
+# ============ PDF CONTRACT TAB ============
+with tabs[5]:
+    st.title("📄 Generate Contract PDF for Any Student")
+    if not df_main.empty:
+        student_names = df_main["Name"].tolist()
+        selected_for_pdf = st.selectbox("Select Student", student_names)
+        if st.button("Generate Contract PDF"):
+            student_row = df_main[df_main["Name"] == selected_for_pdf].iloc[0]
+            contract_pdf = generate_receipt_and_contract_pdf(
+                student_row, agreement_text, payment_amount=student_row["Paid"], payment_date=student_row["ContractStart"]
+            )
+            with open(contract_pdf, "rb") as f:
+                pdf_bytes = f.read()
+                b64 = base64.b64encode(pdf_bytes).decode()
+                href = f'<a href="data:application/pdf;base64,{b64}" download="{student_row["Name"].replace(" ", "_")}_contract.pdf">Download {student_row["Name"]} Contract & Receipt PDF</a>'
+                st.markdown(href, unsafe_allow_html=True)
+            st.success("PDF contract generated!")
+    else:
+        st.info("No students found.")
+with tabs[6]:
+    st.title("📧 Send Email to Student(s)")
+
+    # Ensure email column exists and is cleaned in your DataFrame
+    if "Email" not in df_main.columns:
+        # Try to clean columns if user loads with different casing
+        df_main.columns = [c.lower() for c in df_main.columns]
+    email_col = "email" if "email" in df_main.columns else "Email"
+
+    # List all students with a valid email address
+    email_names = [(row['Name'], row[email_col]) for _, row in df_main.iterrows()
+                   if isinstance(row.get(email_col, ''), str) and '@' in row.get(email_col, '')]
+    email_options = [f"{name} ({email})" for name, email in email_names]
+    email_dict = {f"{name} ({email})": email for name, email in email_names}
+
+    email_mode = st.radio("Send email to", ["Individual student", "All students with email"])
+
+    if email_mode == "Individual student":
+        selected = st.selectbox("Select student", email_options)
+        recipients = [email_dict[selected]] if selected else []
+    else:
+        recipients = [email for _, email in email_names]
+
+    subject = st.text_input("Subject", value="Information from Learn Language Education Academy")
+    message = st.text_area("Email Body (plain text or basic HTML)", height=200, value="Dear Student,\n\n...")
+    uploaded_file = st.file_uploader("Attach a file (optional)", type=["pdf", "doc", "docx", "jpg", "png", "jpeg"])
+
+    if st.button("Send Email"):
+        from sendgrid.helpers.mail import Attachment, FileContent, FileName, FileType, Disposition
+        sent, failed = 0, []
+        attachment = None
+        if uploaded_file is not None:
+            data = uploaded_file.read()
+            encoded = base64.b64encode(data).decode()
+            attachment = Attachment(
+                FileContent(encoded),
+                FileName(uploaded_file.name),
+                FileType(uploaded_file.type),
+                Disposition("attachment")
+            )
+        for email in recipients:
+            try:
+                msg = Mail(
+                    from_email=school_sender_email,
+                    to_emails=email,
+                    subject=subject,
+                    html_content=message.replace('\n', '<br>')
+                )
+                if attachment:
+                    msg.attachment = attachment
+                client = SendGridAPIClient(school_sendgrid_key)
+                client.send(msg)
+                sent += 1
+            except Exception as e:
+                failed.append(email)
+        st.success(f"Sent to {sent} student(s)!")
+        if failed:
+            st.warning(f"Failed to send to: {', '.join(failed)}")
+with tabs[7]:
+    st.title("📊 Analytics & Export")
+
+    st.subheader("Student Enrollment Over Time")
+    if not df_main.empty and "ContractStart" in df_main.columns:
+        df_main["EnrollDate"] = pd.to_datetime(df_main["ContractStart"], errors='coerce')
+        enroll_by_month = df_main.groupby(df_main["EnrollDate"].dt.to_period("M")).size().reset_index(name='Count')
+        enroll_by_month["EnrollDate"] = enroll_by_month["EnrollDate"].astype(str)
+        st.line_chart(enroll_by_month.set_index("EnrollDate")["Count"])
+
+    st.subheader("Export Data")
+    st.download_button("Download All Students CSV", df_main.to_csv(index=False), file_name="all_students.csv")
+    st.download_button("Download All Expenses CSV", exp.to_csv(index=False), file_name="all_expenses.csv")
