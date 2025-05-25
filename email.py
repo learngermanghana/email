@@ -414,26 +414,29 @@ with tabs[4]:
     st.title("📲 WhatsApp Reminders for Debtors")
     df_main = read_students()
 
-    # Filter students with outstanding balances and valid phone numbers
-    debtors = df_main[(df_main["Balance"].astype(float) > 0) & (~df_main["Phone"].astype(str).str.contains("@"))]
-
-    if not debtors.empty:
-        st.write("### Students Owing (Click WhatsApp to Remind)")
-        for idx, row in debtors.iterrows():
-            whatsapp_msg = (
-                f"Dear {row['Name']}, your current balance with {SCHOOL_NAME} is GHS {row['Balance']}. "
-                f"Your student code: {row['StudentCode']}. "
-                f"Please pay as soon as possible to maintain your active status. Thank you!\n"
-                f"{SCHOOL_NAME} | {SCHOOL_PHONE}"
-            )
-            msg_encoded = urllib.parse.quote(whatsapp_msg)
-            phone_str = clean_phone(row['Phone'])
-            wa_url = f"https://wa.me/{phone_str}?text={msg_encoded}"
-            st.markdown(
-                f"**{row['Name']}** (GHS {row['Balance']} due) → [Remind via WhatsApp](<{wa_url}>)"
-            )
+    required_cols = {"Name", "Phone", "Balance", "StudentCode"}
+    if not required_cols.issubset(df_main.columns):
+        st.error("❌ Missing required columns in Google Sheet: 'Name', 'Phone', 'Balance', 'StudentCode'")
     else:
-        st.info("✅ No students currently owing.")
+        # Only include students with outstanding balances and valid phone numbers
+        debtors = df_main[(df_main["Balance"].astype(float) > 0) & (~df_main["Phone"].astype(str).str.contains("@"))]
+
+        if not debtors.empty:
+            st.write("### Students Owing (Click WhatsApp to Remind)")
+            for idx, row in debtors.iterrows():
+                whatsapp_msg = (
+                    f"Dear {row['Name']}, your current balance with {SCHOOL_NAME} is GHS {row['Balance']}. "
+                    f"Your student code: {row['StudentCode']}. "
+                    f"Please pay as soon as possible to maintain your active status. Thank you!\n"
+                    f"{SCHOOL_NAME} | {SCHOOL_PHONE}"
+                )
+                msg_encoded = urllib.parse.quote(whatsapp_msg)
+                phone_str = clean_phone(row['Phone'])
+                wa_url = f"https://wa.me/{phone_str}?text={msg_encoded}"
+                st.markdown(f"**{row['Name']}** (GHS {row['Balance']} due) → [Remind via WhatsApp](<{wa_url}>)")
+        else:
+            st.info("✅ No students currently owe a balance.")
+
 
 # === TAB 5: GENERATE PDF FOR ANY STUDENT ===
 with tabs[5]:
