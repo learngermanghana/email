@@ -1,4 +1,4 @@
-# ✅ Stage 1 of 9: Imports, Config, Secrets, GSheet Setup
+# ✅ Stage 1: Imports, Config, Secrets, GSheet Setup
 import streamlit as st
 import pandas as pd
 import os
@@ -26,7 +26,7 @@ school_sendgrid_key = st.secrets["general"].get("SENDGRID_API_KEY")
 school_sender_email = st.secrets["general"].get("SENDER_EMAIL", SCHOOL_EMAIL)
 
 # === GOOGLE SHEET SETUP ===
-GOOGLE_SHEET_NAME = "YourStudentSheet"  # The name of the sheet file (not the tab)
+GOOGLE_SHEET_NAME = "YourStudentSheet"  # Change to your sheet name
 
 def get_gsheet():
     scope = [
@@ -40,19 +40,24 @@ def get_gsheet():
     worksheet = sheet.sheet1
     return worksheet
 
-# ✅ Stage 2 of 9: Student Helpers, Error Handling, PDF Generator
+# ✅ Stage 2: Student Helpers, Error Handling, PDF Generator
 
 def clean_phone(phone):
-    phone_str = str(phone)
-    if phone_str.endswith('.0'):
-        phone_str = phone_str[:-2]
-    return phone_str.replace(" ", "").replace("+", "")
+    phone_str = str(phone).strip().replace(" ", "").replace("+", "")
+    # Ghana default: if starts with 0, convert to 233...
+    if phone_str.startswith("0"):
+        phone_str = "233" + phone_str[1:]
+    return phone_str
 
 def read_students():
     try:
         worksheet = get_gsheet()
         records = worksheet.get_all_records()
-        return pd.DataFrame(records)
+        if records:
+            df = pd.DataFrame(records)
+        else:
+            df = pd.DataFrame()
+        return df
     except Exception as e:
         st.error(f"❌ Failed to read students from Google Sheets: {e}")
         return pd.DataFrame()
@@ -70,10 +75,10 @@ def generate_receipt_and_contract_pdf(
 
     if payment_date is None:
         payment_date = date.today()
-
+    # Get second instalment from student_row, fallback 0.0
     try:
         second_instalment = float(student_row.get("Balance", 0))
-    except:
+    except Exception:
         second_instalment = 0.0
 
     try:
@@ -85,12 +90,14 @@ def generate_receipt_and_contract_pdf(
     except Exception:
         second_due_date = ""
 
+    # Defensive: support both dict/Series or row
+    get_val = lambda x: student_row[x] if x in student_row else ""
     filled_agreement = (
         agreement_text
-        .replace("[STUDENT_NAME]", student_row["Name"])
+        .replace("[STUDENT_NAME]", get_val("Name"))
         .replace("[DATE]", str(payment_date))
-        .replace("[CLASS]", student_row["Level"])
-        .replace("[AMOUNT]", str(student_row["Paid"]))
+        .replace("[CLASS]", get_val("Level"))
+        .replace("[AMOUNT]", str(get_val("Paid")))
         .replace("[FIRST_INSTALMENT]", str(first_instalment))
         .replace("[SECOND_INSTALMENT]", str(second_instalment))
         .replace("[SECOND_DUE_DATE]", str(second_due_date))
@@ -109,14 +116,14 @@ def generate_receipt_and_contract_pdf(
     pdf.cell(200, 10, f"Email: {SCHOOL_EMAIL}", ln=True)
     pdf.cell(200, 10, f"Website: {SCHOOL_WEBSITE}", ln=True)
     pdf.ln(10)
-    pdf.cell(200, 10, f"Name: {student_row['Name']}", ln=True)
-    pdf.cell(200, 10, f"Student Code: {student_row['StudentCode']}", ln=True)
-    pdf.cell(200, 10, f"Phone: {student_row['Phone']}", ln=True)
-    pdf.cell(200, 10, f"Level: {student_row['Level']}", ln=True)
+    pdf.cell(200, 10, f"Name: {get_val('Name')}", ln=True)
+    pdf.cell(200, 10, f"Student Code: {get_val('StudentCode')}", ln=True)
+    pdf.cell(200, 10, f"Phone: {get_val('Phone')}", ln=True)
+    pdf.cell(200, 10, f"Level: {get_val('Level')}", ln=True)
     pdf.cell(200, 10, f"Amount Paid: GHS {payment_amount}", ln=True)
     pdf.cell(200, 10, f"Balance Due: GHS {second_instalment}", ln=True)
-    pdf.cell(200, 10, f"Contract Start: {student_row['ContractStart']}", ln=True)
-    pdf.cell(200, 10, f"Contract End: {student_row['ContractEnd']}", ln=True)
+    pdf.cell(200, 10, f"Contract Start: {get_val('ContractStart')}", ln=True)
+    pdf.cell(200, 10, f"Contract End: {get_val('ContractEnd')}", ln=True)
     pdf.cell(200, 10, f"Second Payment Due: {second_due_date}", ln=True)
     pdf.ln(10)
     pdf.cell(0, 10, "Thank you for your payment!", ln=True)
@@ -132,11 +139,11 @@ def generate_receipt_and_contract_pdf(
     pdf.ln(10)
     pdf.cell(0, 10, "Signed: Felix Asadu", ln=True)
 
-    pdf_name = f"{student_row['Name'].replace(' ', '_')}_receipt_and_contract.pdf"
+    pdf_name = f"{get_val('Name').replace(' ', '_')}_receipt_and_contract.pdf"
     pdf.output(pdf_name)
     return pdf_name
 
-# ✅ Stage 3 of 9: UI Header, Agreement Template Editor, Preview Download
+# ✅ Stage 3: UI Header, Agreement Template Editor, Preview Download
 sheet_url = "https://docs.google.com/spreadsheets/d/1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo/export?format=csv"
 st.title(f"\U0001F3EB {SCHOOL_NAME} Dashboard")
 st.caption(f"\U0001F4CD {SCHOOL_ADDRESS} | ✉️ {SCHOOL_EMAIL} | 🌐 {SCHOOL_WEBSITE} | 📞 {SCHOOL_PHONE}")
@@ -146,22 +153,18 @@ if "agreement_template" not in st.session_state:
 PAYMENT AGREEMENT
 
 This Payment Agreement is entered into on [DATE] for [CLASS] students of Learn Language Education Academy and Felix Asadu ("Teacher").
-
 Terms of Payment:
 1. Payment Amount: The student agrees to pay the teacher a total of [AMOUNT] cedis for the course.
 2. Payment Schedule: The payment can be made in full or in two installments: a minimum of [FIRST_INSTALMENT] cedis for the first installment and the remaining [SECOND_INSTALMENT] cedis for the second installment. The second installment must be paid by [SECOND_DUE_DATE].
 3. Late Payments: In the event of late payment, the school may revoke access to all learning platforms. No refund will be made.
 4. Refunds: Once a deposit is made and a receipt is issued, no refunds will be provided.
 5. Additional Service: The course lasts [COURSE_LENGTH] weeks. Free supervision for Goethe Exams is valid only if the student remains consistent.
-
 Cancellation and Refund Policy:
 1. If the teacher cancels a lesson, it will be rescheduled.
-
 Miscellaneous Terms:
 1. Attendance: The student agrees to attend lessons punctually.
 2. Communication: Both parties agree to communicate changes promptly.
 3. Termination: Either party may terminate this Agreement with written notice if the other party breaches any material term.
-
 Signatures:
 [STUDENT_NAME]
 Date: [DATE]
@@ -185,7 +188,6 @@ with open("preview_agreement.pdf", "rb") as f:
     preview_b64 = base64.b64encode(preview_bytes).decode()
     st.markdown(f'<a href="data:application/pdf;base64,{preview_b64}" download="Agreement_Preview.pdf">📄 Download Agreement Preview PDF</a>', unsafe_allow_html=True)
 
-# Tabs layout (navigation bar)
 tabs = st.tabs([
     "📝 Pending Registrations",
     "👩‍🎓 All Students",
@@ -197,7 +199,7 @@ tabs = st.tabs([
     "📊 Analytics & Export"
 ])
 
-# ✅ Stage 4 of 9: Pending Registrations Tab (Tab 0)
+# ✅ Stage 4: Pending Registrations Tab (Tab 0)
 with tabs[0]:
     st.title("📝 Pending Student Registrations (Approve & Auto-Email)")
     try:
@@ -224,15 +226,11 @@ with tabs[0]:
 
             if st.button("Approve & Add to Main List", key=f"approve_{i}") and student_code:
                 df_existing = read_students()
-                if "StudentCode" not in df_existing.columns:
-                    st.error("❌ 'StudentCode' column not found in the approved student sheet.")
-                    st.stop()
-
-                existing_codes = df_existing["StudentCode"].tolist()
-                if student_code in existing_codes:
-                    st.error("❌ This student code already exists. Please choose another.")
-                    st.stop()
-
+                if not df_existing.empty and "StudentCode" in df_existing.columns:
+                    existing_codes = df_existing["StudentCode"].tolist()
+                    if student_code in existing_codes:
+                        st.error("❌ This student code already exists. Please choose another.")
+                        st.stop()
                 student_dict = {
                     "Name": fullname,
                     "Phone": phone,
@@ -272,7 +270,7 @@ Best regards,<br>
 <a href='https://{SCHOOL_WEBSITE}'>{SCHOOL_WEBSITE}</a>
 """
                         )
-                        if attach_pdf:
+                        if attach_pdf and pdf_file:
                             with open(pdf_file, "rb") as f:
                                 encoded = base64.b64encode(f.read()).decode()
                                 msg.attachment = Attachment(
@@ -289,24 +287,25 @@ Best regards,<br>
                 else:
                     st.success(f"✅ Student {fullname} added to dashboard.")
 
-# ✅ Stage 5 of 9: All Students Tab (Tab 1)
+# ✅ Stage 5: All Students Tab (Tab 1)
 with tabs[1]:
     st.title("👩‍🎓 All Students (Edit & Generate Receipt)")
     df_main = read_students()
-
     if not df_main.empty:
         today = datetime.today().date()
-
         if "ContractEnd" in df_main.columns:
-            df_main["Status"] = df_main["ContractEnd"].apply(
-                lambda x: "Completed" if pd.to_datetime(str(x), errors='coerce').date() < today else "Enrolled"
-            )
+            # Defensive: Parse contract end as date
+            def parse_status(x):
+                try:
+                    d = pd.to_datetime(str(x), errors='coerce').date()
+                    return "Completed" if d < today else "Enrolled"
+                except:
+                    return "Unknown"
+            df_main["Status"] = df_main["ContractEnd"].apply(parse_status)
         else:
             df_main["Status"] = "Unknown"
-
         status_filter = st.selectbox("Filter by Status", ["All", "Enrolled", "Completed"])
         view_df = df_main if status_filter == "All" else df_main[df_main["Status"] == status_filter]
-
         for idx, row in view_df.iterrows():
             unique_id = f"{row.get('StudentCode', idx)}_{idx}"
             with st.expander(f"{row.get('Name')} (Code: {row.get('StudentCode')}) [{row.get('Status', '')}]"):
@@ -337,7 +336,7 @@ with tabs[1]:
     else:
         st.info("No student data available.")
 
-# ✅ Stage 6 of 9: Add Student Manually Tab (Tab 2)
+# ✅ Stage 6: Add Student Manually Tab (Tab 2)
 with tabs[2]:
     st.title("➕ Add Student Manually")
     with st.form("add_student_form"):
@@ -352,12 +351,10 @@ with tabs[2]:
         contract_end = contract_start + timedelta(weeks=int(course_length))
         student_code = st.text_input("Student Code (unique)")
         email = st.text_input("Email (optional)")
-
         submitted = st.form_submit_button("Add Student")
-
         if submitted:
             df_existing = read_students()
-            if "StudentCode" in df_existing.columns:
+            if not df_existing.empty and "StudentCode" in df_existing.columns:
                 existing_codes = df_existing["StudentCode"].tolist()
                 if student_code in existing_codes:
                     st.error("❌ This student code already exists.")
@@ -377,21 +374,20 @@ with tabs[2]:
             add_student_to_gsheet(student_dict)
             st.success(f"✅ Student {name} added successfully.")
             st.experimental_rerun()
-# ✅ Stage 7 of 9: Expenses Tab (Tab 3)
+
+# ✅ Stage 7: Expenses Tab (Tab 3)
 with tabs[3]:
     st.title("💵 Expenses (Manual for now)")
     st.info("🛠 Expense tracking via Google Sheets can be added later. Currently not wired.")
 
-# ✅ Stage 7 of 9: WhatsApp Reminders for Debtors (Tab 4)
+# ✅ Stage 8: WhatsApp Reminders for Debtors (Tab 4)
 with tabs[4]:
     st.title("📲 WhatsApp Reminders for Debtors")
     df_main = read_students()
-
-    if "Balance" in df_main.columns and "Phone" in df_main.columns:
+    if not df_main.empty and "Balance" in df_main.columns and "Phone" in df_main.columns:
         try:
-            df_main["Balance"] = df_main["Balance"].astype(float)
+            df_main["Balance"] = pd.to_numeric(df_main["Balance"], errors="coerce").fillna(0)
             debtors = df_main[(df_main["Balance"] > 0) & (~df_main["Phone"].astype(str).str.contains("@"))]
-
             if not debtors.empty:
                 st.write("### Debtors List")
                 for _, row in debtors.iterrows():
@@ -409,15 +405,14 @@ with tabs[4]:
             st.error(f"❌ Error while processing debtors: {e}")
     else:
         st.warning("⚠️ 'Balance' or 'Phone' column missing in Google Sheet.")
-# ✅ Stage 8 of 9: Generate Contract PDF (Tab 5)
+
+# ✅ Stage 9: Generate Contract PDF (Tab 5)
 with tabs[5]:
     st.title("📄 Generate Contract PDF for Any Student")
     df_main = read_students()
-
     if not df_main.empty and "Name" in df_main.columns:
         selected_name = st.selectbox("Select Student", df_main["Name"].unique())
         selected_row = df_main[df_main["Name"] == selected_name].iloc[0]
-
         if st.button("Generate PDF"):
             pdf_file = generate_receipt_and_contract_pdf(
                 selected_row,
@@ -433,70 +428,67 @@ with tabs[5]:
     else:
         st.warning("No students available.")
 
-# ✅ Stage 8 of 9: Send Email to Students (Tab 6)
+# ✅ Stage 10: Send Email to Students (Tab 6)
 with tabs[6]:
     st.title("📧 Send Email to Students")
     df_main = read_students()
-    df_main.columns = [col.strip().lower() for col in df_main.columns]
-
-    if "email" not in df_main.columns:
-        st.warning("⚠️ Column 'email' not found.")
-    else:
-        email_list = [(row["name"], row["email"]) for _, row in df_main.iterrows()
-                      if isinstance(row.get("email"), str) and "@" in row.get("email")]
-        options = [f"{n} ({e})" for n, e in email_list]
-        email_dict = {f"{n} ({e})": e for n, e in email_list}
-
-        if not options:
-            st.info("No students with valid email.")
+    if not df_main.empty:
+        df_main.columns = [col.strip().lower() for col in df_main.columns]
+        if "email" not in df_main.columns:
+            st.warning("⚠️ Column 'email' not found.")
         else:
-            mode = st.radio("Send To", ["Individual", "All with Email"])
-            if mode == "Individual":
-                selected = st.selectbox("Choose student", options)
-                recipients = [email_dict[selected]]
+            email_list = [(row["name"], row["email"]) for _, row in df_main.iterrows()
+                          if isinstance(row.get("email"), str) and "@" in row.get("email")]
+            options = [f"{n} ({e})" for n, e in email_list]
+            email_dict = {f"{n} ({e})": e for n, e in email_list}
+            if not options:
+                st.info("No students with valid email.")
             else:
-                recipients = [e for _, e in email_list]
-
-            subject = st.text_input("Email Subject", value="Info from Learn Language Education Academy")
-            message = st.text_area("Message Body", value="Dear student,\n\n...", height=200)
-            file = st.file_uploader("Attach file (optional)", type=["pdf", "doc", "jpg", "png"])
-
-            if st.button("Send Email"):
-                sent, failed = 0, []
-                attachment = None
-                if file:
-                    encoded = base64.b64encode(file.read()).decode()
-                    attachment = Attachment(
-                        FileContent(encoded),
-                        FileName(file.name),
-                        FileType(file.type),
-                        Disposition("attachment")
-                    )
-
-                for email in recipients:
-                    try:
-                        msg = Mail(
-                            from_email=school_sender_email,
-                            to_emails=email,
-                            subject=subject,
-                            html_content=message.replace("\n", "<br>")
+                mode = st.radio("Send To", ["Individual", "All with Email"])
+                if mode == "Individual":
+                    selected = st.selectbox("Choose student", options)
+                    recipients = [email_dict[selected]]
+                else:
+                    recipients = [e for _, e in email_list]
+                subject = st.text_input("Email Subject", value="Info from Learn Language Education Academy")
+                message = st.text_area("Message Body", value="Dear student,\n\n...", height=200)
+                file = st.file_uploader("Attach file (optional)", type=["pdf", "doc", "jpg", "png"])
+                if st.button("Send Email"):
+                    sent, failed = 0, []
+                    attachment = None
+                    if file:
+                        encoded = base64.b64encode(file.read()).decode()
+                        attachment = Attachment(
+                            FileContent(encoded),
+                            FileName(file.name),
+                            FileType(file.type),
+                            Disposition("attachment")
                         )
-                        if attachment:
-                            msg.attachment = attachment
-                        client = SendGridAPIClient(school_sendgrid_key)
-                        client.send(msg)
-                        sent += 1
-                    except Exception as e:
-                        failed.append(email)
+                    for email in recipients:
+                        try:
+                            msg = Mail(
+                                from_email=school_sender_email,
+                                to_emails=email,
+                                subject=subject,
+                                html_content=message.replace("\n", "<br>")
+                            )
+                            if attachment:
+                                msg.attachment = attachment
+                            client = SendGridAPIClient(school_sendgrid_key)
+                            client.send(msg)
+                            sent += 1
+                        except Exception as e:
+                            failed.append(email)
+                    st.success(f"✅ Sent to {sent} students.")
+                    if failed:
+                        st.warning(f"⚠️ Failed to send to: {', '.join(failed)}")
+    else:
+        st.warning("No students in database.")
 
-                st.success(f"✅ Sent to {sent} students.")
-                if failed:
-                    st.warning(f"⚠️ Failed to send to: {', '.join(failed)}")
-# ✅ Stage 9 of 9: Analytics & Export (Tab 7)
+# ✅ Stage 11: Analytics & Export (Tab 7)
 with tabs[7]:
     st.title("📊 Analytics & Export")
     df_main = read_students()
-
     st.subheader("📈 Enrollment Over Time")
     if not df_main.empty and "ContractStart" in df_main.columns:
         try:
@@ -508,7 +500,6 @@ with tabs[7]:
             st.warning(f"⚠️ Could not parse dates: {e}")
     else:
         st.info("No contract start dates to display.")
-
     st.subheader("⬇️ Export All Student Data")
     if not df_main.empty:
         csv = df_main.to_csv(index=False)
