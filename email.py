@@ -29,16 +29,25 @@ def clean_phone(phone):
         phone_str = phone_str[:-2]
     return phone_str.replace(" ", "").replace("+", "")
 
-# === PDF GENERATOR ===
 def generate_receipt_and_contract_pdf(
         student_row, agreement_text, payment_amount, payment_date=None,
         first_instalment=1500, course_length=12):
     if payment_date is None:
         payment_date = date.today()
+    # Second installment is the current balance
     try:
         second_instalment = float(student_row["Balance"])
     except Exception:
         second_instalment = 0.0
+    # Calculate due date (1 month after first payment/contract start)
+    try:
+        if hasattr(payment_date, 'date'):
+            payment_date_obj = payment_date.date()
+        else:
+            payment_date_obj = payment_date
+        second_due_date = payment_date_obj + timedelta(days=30)
+    except Exception:
+        second_due_date = ""
     filled_agreement = (
         agreement_text
         .replace("[STUDENT_NAME]", student_row["Name"])
@@ -47,6 +56,7 @@ def generate_receipt_and_contract_pdf(
         .replace("[AMOUNT]", str(student_row["Paid"]))
         .replace("[FIRST_INSTALMENT]", str(first_instalment))
         .replace("[SECOND_INSTALMENT]", str(second_instalment))
+        .replace("[SECOND_DUE_DATE]", str(second_due_date))
         .replace("[COURSE_LENGTH]", str(course_length))
     )
     pdf = FPDF()
@@ -88,7 +98,6 @@ def generate_receipt_and_contract_pdf(
     pdf.output(pdf_name)
     return pdf_name
 
-# === FILES & DATABASE SETUP ===
 student_file = "students_simple.csv"
 expenses_file = "expenses_all.csv"
 needed_cols = [
@@ -109,10 +118,7 @@ if not os.path.exists(expenses_file):
     exp.to_csv(expenses_file, index=False)
 exp = pd.read_csv(expenses_file)
 
-# === GOOGLE SHEET: FORM RESPONSES ===
 sheet_url = "https://docs.google.com/spreadsheets/d/1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo/export?format=csv"
-
-# === PAGE HEADER ===
 st.title(f"🏫 {SCHOOL_NAME} Dashboard")
 st.caption(f"📍 {SCHOOL_ADDRESS} | ✉️ {SCHOOL_EMAIL} | 🌐 {SCHOOL_WEBSITE} | 📞 {SCHOOL_PHONE}")
 
@@ -187,7 +193,7 @@ This Payment Agreement is entered into on [DATE] for [CLASS] students of Learn L
 
 Terms of Payment:
 1. Payment Amount: The student agrees to pay the teacher a total of [AMOUNT] cedis for the course.
-2. Payment Schedule: The payment can be made in full or in two installments: a minimum of [FIRST_INSTALMENT] cedis for the first installment and the remaining [SECOND_INSTALMENT] cedis for the second installment. The second installment must be paid within one month of the initial deposit.
+2. Payment Schedule: The payment can be made in full or in two installments: a minimum of [FIRST_INSTALMENT] cedis for the first installment and the remaining [SECOND_INSTALMENT] cedis for the second installment. The second installment must be paid by [SECOND_DUE_DATE].
 3. Late Payments: In the event of late payment, the school may revoke access to all learning platforms. No refund will be made.
 4. Refunds: Once a deposit is made and a receipt is issued, no refunds will be provided.
 5. Additional Service: The course lasts [COURSE_LENGTH] weeks. Free supervision for Goethe Exams is valid only if the student remains consistent.
@@ -230,7 +236,6 @@ tabs = st.tabs([
     "📊 Analytics & Export"
 ])
 
-# ============ PENDING REGISTRATIONS TAB ============
 with tabs[0]:
     st.title("📝 Pending Student Registrations (Approve & Auto-Email)")
     try:
@@ -406,6 +411,7 @@ with tabs[1]:
                     st.success("Standalone receipt generated!")
     else:
         st.info("No students in the database for this filter.")
+
 # ============ ADD STUDENT MANUALLY ============
 with tabs[2]:
     st.title("➕ Add Student")
@@ -513,10 +519,12 @@ with tabs[5]:
             st.success("PDF contract generated!")
     else:
         st.info("No students found.")
+
+# ============ SEND EMAIL TAB ============
 with tabs[6]:
     st.title("📧 Send Email to Student(s)")
 
-    # Ensure email column exists and is cleaned in your DataFrame
+    # Ensure 'Email' column exists and is cleaned in your DataFrame
     if "Email" not in df_main.columns:
         # Try to clean columns if user loads with different casing
         df_main.columns = [c.lower() for c in df_main.columns]
@@ -571,6 +579,8 @@ with tabs[6]:
         st.success(f"Sent to {sent} student(s)!")
         if failed:
             st.warning(f"Failed to send to: {', '.join(failed)}")
+
+# ============ ANALYTICS & EXPORT TAB ============
 with tabs[7]:
     st.title("📊 Analytics & Export")
 
