@@ -11,9 +11,6 @@ import urllib.parse
 # === PAGE CONFIG FIRST! ===
 st.set_page_config(page_title="Learn Language Education Academy Dashboard", layout="wide")
 
-school_sendgrid_key = st.secrets["general"].get("SENDGRID_API_KEY")
-school_sender_email = st.secrets["general"].get("SENDER_EMAIL", SCHOOL_EMAIL)
-
 
 # === SCHOOL INFO ===
 SCHOOL_NAME = "Learn Language Education Academy"
@@ -21,6 +18,10 @@ SCHOOL_EMAIL = "Learngermanghana@gmail.com"
 SCHOOL_WEBSITE = "www.learngermanghana.com"
 SCHOOL_PHONE = "233205706589"
 SCHOOL_ADDRESS = "Awoshie, Accra, Ghana"
+
+school_sendgrid_key = st.secrets["general"].get("SENDGRID_API_KEY")
+school_sender_email = st.secrets["general"].get("SENDER_EMAIL", SCHOOL_EMAIL)
+
 
 # === PHONE NUMBER CLEANER ===
 def clean_phone(phone):
