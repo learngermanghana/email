@@ -27,7 +27,7 @@ def clean_phone(phone):
 
 # === PDF GENERATORS ===
 def generate_receipt_and_contract_pdf(student_row, agreement_text, payment_amount, payment_date=None,
-                                      first_instalment=1500, second_instalment=1000, course_length=12):
+                                      first_instalment=1500, second_instalment=balance, course_length=12):
     if payment_date is None:
         payment_date = date.today()
     filled_agreement = (
@@ -131,9 +131,6 @@ if not os.path.exists(expenses_file):
     exp.to_csv(expenses_file, index=False)
 exp = pd.read_csv(expenses_file)
 
-# === EMAIL CONFIG (sidebar) ===
-school_sendgrid_key = st.sidebar.text_input("SendGrid API Key", type="password")
-school_sender_email = st.sidebar.text_input("Sender Email (verified in SendGrid)", value=SCHOOL_EMAIL)
 
 # === GOOGLE SHEET: FORM RESPONSES ===
 sheet_url = "https://docs.google.com/spreadsheets/d/1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo/export?format=csv"
