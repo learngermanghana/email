@@ -1,4 +1,4 @@
-# ✅ Stage 1: Imports, Config, Secrets, GSheet Setup
+# ✅ Imports, Config, Secrets, GSheet Setup
 import streamlit as st
 import pandas as pd
 import os
@@ -26,25 +26,24 @@ school_sendgrid_key = st.secrets["general"].get("SENDGRID_API_KEY")
 school_sender_email = st.secrets["general"].get("SENDER_EMAIL", SCHOOL_EMAIL)
 
 # === GOOGLE SHEET SETUP ===
-GOOGLE_SHEET_NAME = "YourStudentSheet"  # Change to your sheet name
+GOOGLE_SHEET_NAME = "YourStudentSheet"  # Change to your actual sheet file name
 
 def get_gsheet():
     scope = [
         "https://spreadsheets.google.com/feeds",
         "https://www.googleapis.com/auth/drive"
     ]
-    service_account_info = dict(st.secrets["gspread_service_account"])
+    service_account_info = st.secrets["gspread_service_account"]  # already a dict!
     creds = ServiceAccountCredentials.from_json_keyfile_dict(service_account_info, scope)
     client = gspread.authorize(creds)
     sheet = client.open(GOOGLE_SHEET_NAME)
     worksheet = sheet.sheet1
     return worksheet
 
-# ✅ Stage 2: Student Helpers, Error Handling, PDF Generator
+# ✅ Student Helpers, Error Handling, PDF Generator
 
 def clean_phone(phone):
     phone_str = str(phone).strip().replace(" ", "").replace("+", "")
-    # Ghana default: if starts with 0, convert to 233...
     if phone_str.startswith("0"):
         phone_str = "233" + phone_str[1:]
     return phone_str
@@ -53,10 +52,8 @@ def read_students():
     try:
         worksheet = get_gsheet()
         records = worksheet.get_all_records()
-        if records:
-            df = pd.DataFrame(records)
-        else:
-            df = pd.DataFrame()
+        df = pd.DataFrame(records)
+        df.columns = [col.strip() for col in df.columns]  # Clean headers
         return df
     except Exception as e:
         st.error(f"❌ Failed to read students from Google Sheets: {e}")
@@ -75,7 +72,6 @@ def generate_receipt_and_contract_pdf(
 
     if payment_date is None:
         payment_date = date.today()
-    # Get second instalment from student_row, fallback 0.0
     try:
         second_instalment = float(student_row.get("Balance", 0))
     except Exception:
@@ -90,7 +86,6 @@ def generate_receipt_and_contract_pdf(
     except Exception:
         second_due_date = ""
 
-    # Defensive: support both dict/Series or row
     get_val = lambda x: student_row[x] if x in student_row else ""
     filled_agreement = (
         agreement_text
@@ -143,7 +138,7 @@ def generate_receipt_and_contract_pdf(
     pdf.output(pdf_name)
     return pdf_name
 
-# ✅ Stage 3: UI Header, Agreement Template Editor, Preview Download
+# ✅ UI Header, Agreement Template Editor, Preview Download
 sheet_url = "https://docs.google.com/spreadsheets/d/1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo/export?format=csv"
 st.title(f"\U0001F3EB {SCHOOL_NAME} Dashboard")
 st.caption(f"\U0001F4CD {SCHOOL_ADDRESS} | ✉️ {SCHOOL_EMAIL} | 🌐 {SCHOOL_WEBSITE} | 📞 {SCHOOL_PHONE}")
@@ -199,7 +194,7 @@ tabs = st.tabs([
     "📊 Analytics & Export"
 ])
 
-# ✅ Stage 4: Pending Registrations Tab (Tab 0)
+# ✅ Pending Registrations Tab (Tab 0)
 with tabs[0]:
     st.title("📝 Pending Student Registrations (Approve & Auto-Email)")
     try:
@@ -287,14 +282,13 @@ Best regards,<br>
                 else:
                     st.success(f"✅ Student {fullname} added to dashboard.")
 
-# ✅ Stage 5: All Students Tab (Tab 1)
+# ✅ All Students Tab (Tab 1)
 with tabs[1]:
     st.title("👩‍🎓 All Students (Edit & Generate Receipt)")
     df_main = read_students()
     if not df_main.empty:
         today = datetime.today().date()
         if "ContractEnd" in df_main.columns:
-            # Defensive: Parse contract end as date
             def parse_status(x):
                 try:
                     d = pd.to_datetime(str(x), errors='coerce').date()
@@ -336,7 +330,7 @@ with tabs[1]:
     else:
         st.info("No student data available.")
 
-# ✅ Stage 6: Add Student Manually Tab (Tab 2)
+# ✅ Add Student Manually Tab (Tab 2)
 with tabs[2]:
     st.title("➕ Add Student Manually")
     with st.form("add_student_form"):
@@ -375,12 +369,12 @@ with tabs[2]:
             st.success(f"✅ Student {name} added successfully.")
             st.experimental_rerun()
 
-# ✅ Stage 7: Expenses Tab (Tab 3)
+# ✅ Expenses Tab (Tab 3)
 with tabs[3]:
     st.title("💵 Expenses (Manual for now)")
     st.info("🛠 Expense tracking via Google Sheets can be added later. Currently not wired.")
 
-# ✅ Stage 8: WhatsApp Reminders for Debtors (Tab 4)
+# ✅ WhatsApp Reminders for Debtors (Tab 4)
 with tabs[4]:
     st.title("📲 WhatsApp Reminders for Debtors")
     df_main = read_students()
@@ -406,7 +400,7 @@ with tabs[4]:
     else:
         st.warning("⚠️ 'Balance' or 'Phone' column missing in Google Sheet.")
 
-# ✅ Stage 9: Generate Contract PDF (Tab 5)
+# ✅ Generate Contract PDF (Tab 5)
 with tabs[5]:
     st.title("📄 Generate Contract PDF for Any Student")
     df_main = read_students()
@@ -428,7 +422,7 @@ with tabs[5]:
     else:
         st.warning("No students available.")
 
-# ✅ Stage 10: Send Email to Students (Tab 6)
+# ✅ Send Email to Students (Tab 6)
 with tabs[6]:
     st.title("📧 Send Email to Students")
     df_main = read_students()
@@ -485,7 +479,7 @@ with tabs[6]:
     else:
         st.warning("No students in database.")
 
-# ✅ Stage 11: Analytics & Export (Tab 7)
+# ✅ Analytics & Export (Tab 7)
 with tabs[7]:
     st.title("📊 Analytics & Export")
     df_main = read_students()
