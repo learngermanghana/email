@@ -50,17 +50,6 @@ def clean_phone(phone):
 
 GOOGLE_SHEET_NAME = "YourStudentSheet"  # Replace with your actual sheet name
 
-def get_gsheet():
-    scope = [
-        "https://spreadsheets.google.com/feeds",
-        "https://www.googleapis.com/auth/drive"
-    ]
-    creds = ServiceAccountCredentials.from_json_keyfile_name("gspread_service_account.json", scope)
-    client = gspread.authorize(creds)
-    sheet = client.open(GOOGLE_SHEET_NAME)
-    worksheet = sheet.sheet1
-    return worksheet
-
 def read_students():
     worksheet = get_gsheet()
     records = worksheet.get_all_records()
