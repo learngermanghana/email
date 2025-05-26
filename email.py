@@ -238,7 +238,7 @@ with tabs[0]:
                 df_main=pd.concat([df_main,new],ignore_index=True)
                 df_main.to_csv(student_file,index=False)
                 st.success("Approved & added!")
-                st.experimental_rerun()
+                st.rerun()
 
 # ============ 1. All Students ============
 with tabs[1]:
@@ -285,7 +285,29 @@ with tabs[1]:
                 if st.button("Delete",key=f"del_{uid}"):
                     df_main.drop(idx,inplace=True)
                     df_main.to_csv(student_file,index=False)
-                    st.success("Deleted!") and st.experimental_rerun()
+                    st.success("Deleted!") and st.rerun()
+
+# ── CSV UPLOAD / RESTORE SECTION ──
+with st.expander("🔄 Upload CSV Backup", expanded=False):
+    st.write("Upload your CSVs to restore or merge data.")
+
+    uploaded_students = st.file_uploader(
+        "📥 Upload students_simple.csv", type="csv", key="upload_students"
+    )
+    if uploaded_students:
+        df_up = pd.read_csv(uploaded_students)
+        # you can choose to merge or overwrite; here we overwrite:
+        df_up.to_csv(student_file, index=False)
+        st.success("✅ Student data restored from uploaded CSV. Please refresh to see changes.")
+
+    uploaded_expenses = st.file_uploader(
+        "📥 Upload expenses_all.csv", type="csv", key="upload_expenses"
+    )
+    if uploaded_expenses:
+        df_exp_up = pd.read_csv(uploaded_expenses)
+        df_exp_up.to_csv(expenses_file, index=False)
+        st.success("✅ Expense data restored from uploaded CSV. Please refresh to see changes.")
+
 
 # ============ 2. Add Student ============
 with tabs[2]:
