@@ -513,20 +513,51 @@ with tabs[2]:
 # ============ EXPENSES TAB ============
 with tabs[3]:
     st.title("💵 Expenses and Financial Summary")
+    # -- Add Expense Form --
     with st.form("add_expense"):
         exp_type = st.selectbox("Type", ["Bill", "Rent", "Salary", "Other"])
         exp_item = st.text_input("Expense Item / Purpose")
         exp_amount = st.number_input("Amount (GHS)", min_value=0.0, step=1.0)
         exp_date = st.date_input("Date", value=date.today(), key="exp_date")
         if st.form_submit_button("Add Expense") and exp_item and exp_amount > 0:
-            new_exp_row = pd.DataFrame([{"Type": exp_type, "Item": exp_item, "Amount": exp_amount, "Date": exp_date}])
+            new_exp_row = pd.DataFrame([{
+                "Type": exp_type,
+                "Item": exp_item,
+                "Amount": exp_amount,
+                "Date": exp_date
+            }])
             exp = pd.concat([exp, new_exp_row], ignore_index=True)
             exp.to_csv(expenses_file, index=False)
             st.success(f"Added expense: {exp_type} - {exp_item}")
-            st.rerun()
+            st.experimental_rerun()
 
     st.write("### Expenses List")
     st.dataframe(exp, use_container_width=True)
+
+    # -- Make sure Paid column is numeric --
+    df_main["Paid"] = pd.to_numeric(df_main["Paid"], errors="coerce").fillna(0.0)
+    # Safely compute total paid
+    total_paid = float(df_main["Paid"].sum())
+
+    if not exp.empty:
+        exp["Date"] = pd.to_datetime(exp["Date"], errors="coerce")
+        exp["Year"] = exp["Date"].dt.year
+        exp["Month"] = exp["Date"].dt.strftime("%B %Y")
+        monthly_exp = exp.groupby("Month")["Amount"].sum().reset_index()
+        st.write("#### Expenses Per Month")
+        st.dataframe(monthly_exp)
+        yearly_exp = exp.groupby("Year")["Amount"].sum().reset_index()
+        st.write("#### Expenses Per Year")
+        st.dataframe(yearly_exp)
+        total_expenses = float(exp["Amount"].sum())
+        net_profit = total_paid - total_expenses
+        st.info(
+            f"💰 **Total Money Collected:** GHS {total_paid:,.2f} | "
+            f"**Total Expenses:** GHS {total_expenses:,.2f} | "
+            f"**Net Profit:** GHS {net_profit:,.2f}"
+        )
+    else:
+        st.info(f"💰 **Total Money Collected:** GHS {total_paid:,.2f} | No expenses recorded yet.")
 
     # Financial summary
     total_paid = df_main["Paid"].sum() if not df_main.empty else 0.0
