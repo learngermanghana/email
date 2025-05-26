@@ -254,13 +254,23 @@ with st.expander("🔄 Admin: Upload Student/Expense CSV Backup", expanded=False
     
     if uploaded_students:
         df_new_students = pd.read_csv(uploaded_students)
-        df_new_students.to_csv(student_file, index=False)
-        st.success("Student records restored from uploaded CSV! Please refresh your app to load them.")
+        # Optional: check that your file has all the columns you need
+        missing = [c for c in needed_cols if c not in df_new_students.columns]
+        if missing:
+            st.error(f"Uploaded students CSV is missing columns: {missing}")
+        else:
+            # overwrite on‐disk and in‐memory
+            df_new_students.to_csv(student_file, index=False)
+            df_main[:] = df_new_students  # update the “live” df_main
+            st.success("Student records restored – please rerun to pick them up.")
+            st.experimental_rerun()
 
     if uploaded_expenses:
         df_new_expenses = pd.read_csv(uploaded_expenses)
         df_new_expenses.to_csv(expenses_file, index=False)
-        st.success("Expense records restored from uploaded CSV! Please refresh your app to load them.")
+        exp[:] = df_new_expenses
+        st.success("Expense records restored – please rerun to pick them up.")
+        st.experimental_rerun()
 
 # === PENDING REGISTRATIONS TAB ===
 with tabs[0]:
