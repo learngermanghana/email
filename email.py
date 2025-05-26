@@ -28,18 +28,20 @@ def clean_phone(phone):
     if phone_str.endswith('.0'):
         phone_str = phone_str[:-2]
     return phone_str.replace(" ", "").replace("+", "")
-
 def generate_receipt_and_contract_pdf(
         student_row, agreement_text, payment_amount, payment_date=None,
         first_instalment=1500, course_length=12):
     if payment_date is None:
         payment_date = date.today()
-    # Second installment is the current balance
+    # Calculate all key amounts and due date
     try:
-        second_instalment = float(student_row["Balance"])
+        paid = float(student_row["Paid"])
+        balance = float(student_row["Balance"])
+        total_amount = paid + balance
     except Exception:
-        second_instalment = 0.0
-    # Calculate due date (1 month after first payment/contract start)
+        paid = 0.0
+        balance = 0.0
+        total_amount = 0.0
     try:
         if hasattr(payment_date, 'date'):
             payment_date_obj = payment_date.date()
@@ -53,9 +55,9 @@ def generate_receipt_and_contract_pdf(
         .replace("[STUDENT_NAME]", student_row["Name"])
         .replace("[DATE]", str(payment_date))
         .replace("[CLASS]", student_row["Level"])
-        .replace("[AMOUNT]", str(student_row["Paid"]))
+        .replace("[AMOUNT]", str(total_amount))
         .replace("[FIRST_INSTALMENT]", str(first_instalment))
-        .replace("[SECOND_INSTALMENT]", str(second_instalment))
+        .replace("[SECOND_INSTALMENT]", str(balance))
         .replace("[SECOND_DUE_DATE]", str(second_due_date))
         .replace("[COURSE_LENGTH]", str(course_length))
     )
@@ -76,8 +78,8 @@ def generate_receipt_and_contract_pdf(
     pdf.cell(200, 10, f"Student Code: {student_row['StudentCode']}", ln=True)
     pdf.cell(200, 10, f"Phone: {student_row['Phone']}", ln=True)
     pdf.cell(200, 10, f"Level: {student_row['Level']}", ln=True)
-    pdf.cell(200, 10, f"Amount Paid: GHS {payment_amount}", ln=True)
-    pdf.cell(200, 10, f"Balance Due: GHS {second_instalment}", ln=True)
+    pdf.cell(200, 10, f"Amount Paid: GHS {paid}", ln=True)
+    pdf.cell(200, 10, f"Balance Due: GHS {balance}", ln=True)
     pdf.cell(200, 10, f"Contract Start: {student_row['ContractStart']}", ln=True)
     pdf.cell(200, 10, f"Contract End: {student_row['ContractEnd']}", ln=True)
     pdf.ln(10)
@@ -98,6 +100,7 @@ def generate_receipt_and_contract_pdf(
     pdf.output(pdf_name)
     return pdf_name
 
+# === FILES & DATABASE SETUP ===
 student_file = "students_simple.csv"
 expenses_file = "expenses_all.csv"
 needed_cols = [
@@ -118,7 +121,10 @@ if not os.path.exists(expenses_file):
     exp.to_csv(expenses_file, index=False)
 exp = pd.read_csv(expenses_file)
 
+# === GOOGLE SHEET: FORM RESPONSES ===
 sheet_url = "https://docs.google.com/spreadsheets/d/1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo/export?format=csv"
+
+# === PAGE HEADER ===
 st.title(f"🏫 {SCHOOL_NAME} Dashboard")
 st.caption(f"📍 {SCHOOL_ADDRESS} | ✉️ {SCHOOL_EMAIL} | 🌐 {SCHOOL_WEBSITE} | 📞 {SCHOOL_PHONE}")
 
@@ -402,7 +408,9 @@ with tabs[1]:
                 if st.button("Generate Payment Receipt", key=f"genreceipt_{unique_id}"):
                     pay_amt = st.number_input("Enter New Payment Amount", min_value=0.0, value=float(row["Paid"]), key=f"payamt_{unique_id}")
                     pay_date = st.date_input("Enter Payment Date", value=date.today(), key=f"paydate_{unique_id}")
-                    receipt_pdf = generate_receipt_and_contract_pdf(row, agreement_text, payment_amount=pay_amt, payment_date=pay_date)
+                    receipt_pdf = generate_receipt_and_contract_pdf(
+                        row, agreement_text, payment_amount=pay_amt, payment_date=pay_date
+                    )
                     with open(receipt_pdf, "rb") as f:
                         pdf_bytes = f.read()
                         b64 = base64.b64encode(pdf_bytes).decode()
@@ -411,6 +419,7 @@ with tabs[1]:
                     st.success("Standalone receipt generated!")
     else:
         st.info("No students in the database for this filter.")
+
 # ============ ADD STUDENT MANUALLY ============
 with tabs[2]:
     st.title("➕ Add Student")
@@ -593,4 +602,3 @@ with tabs[7]:
     st.subheader("Export Data")
     st.download_button("Download All Students CSV", df_main.to_csv(index=False), file_name="all_students.csv")
     st.download_button("Download All Expenses CSV", exp.to_csv(index=False), file_name="all_expenses.csv")
-
