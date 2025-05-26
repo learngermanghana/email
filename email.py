@@ -278,14 +278,14 @@ with st.expander("🔄 Admin: Upload Student/Expense CSV Backup", expanded=False
             df_new_students.to_csv(student_file, index=False)
             df_main[:] = df_new_students  # update the “live” df_main
             st.success("Student records restored – please rerun to pick them up.")
-            st.experimental_rerun()
+            st.rerun()
 
     if uploaded_expenses:
         df_new_expenses = pd.read_csv(uploaded_expenses)
         df_new_expenses.to_csv(expenses_file, index=False)
         exp[:] = df_new_expenses
         st.success("Expense records restored – please rerun to pick them up.")
-        st.experimental_rerun()
+        st.rerun()
 
 # === PENDING REGISTRATIONS TAB ===
 with tabs[0]:
