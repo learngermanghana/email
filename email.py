@@ -375,32 +375,45 @@ Best regards,<br>
                     st.success(f"Student {fullname} added to your dashboard (and emailed if address available)!")
 with tabs[1]:
     st.title("👩‍🎓 All Students (Edit & Update)")
+
+    # Parse ContractEnd once, coercing invalid/missing to NaT
+    df_main["ContractEnd"] = pd.to_datetime(df_main["ContractEnd"], errors="coerce")
+
     today = datetime.today().date()
-    # Auto-calculate status
-    df_main['Status'] = df_main['ContractEnd'].apply(
-        lambda x: "Completed" if pd.to_datetime(str(x)).date() < today else "Enrolled"
-    )
-    statuses = ["All"] + df_main["Status"].unique().tolist()
+
+    # Compute status, treating NaT as still “Enrolled”
+    def get_status(end_dt):
+        if pd.isna(end_dt):
+            return "Enrolled"
+        return "Completed" if end_dt.date() < today else "Enrolled"
+
+    df_main["Status"] = df_main["ContractEnd"].apply(get_status)
+
+    # Filter selector
+    statuses = ["All"] + sorted(df_main["Status"].unique())
     selected_status = st.selectbox("Filter by Status", statuses)
     if selected_status != "All":
         view_df = df_main[df_main["Status"] == selected_status]
     else:
         view_df = df_main
 
-    if not view_df.empty:
+    if view_df.empty:
+        st.info("No students in the database for this filter.")
+    else:
         for idx, row in view_df.iterrows():
             unique_id = f"{row['StudentCode']}_{idx}"
             with st.expander(f"{row['Name']} (Code: {row['StudentCode']}) [{row['Status']}]"):
                 st.info(f"Status: {row['Status']}")
-                name = st.text_input("Name", value=row['Name'], key=f"name_{unique_id}")
-                phone = st.text_input("Phone", value=row['Phone'], key=f"phone_{unique_id}")
-                location = st.text_input("Location", value=row['Location'], key=f"loc_{unique_id}")
-                level = st.text_input("Level", value=row['Level'], key=f"level_{unique_id}")
-                paid = st.number_input("Paid", value=float(row['Paid']), key=f"paid_{unique_id}")
-                balance = st.number_input("Balance", value=float(row['Balance']), key=f"bal_{unique_id}")
-                contract_start = st.text_input("Contract Start", value=str(row['ContractStart']), key=f"cs_{unique_id}")
-                contract_end = st.text_input("Contract End", value=str(row['ContractEnd']), key=f"ce_{unique_id}")
-                student_code = st.text_input("Student Code", value=row['StudentCode'], key=f"code_{unique_id}")
+
+                name = st.text_input("Name", value=row["Name"], key=f"name_{unique_id}")
+                phone = st.text_input("Phone", value=row["Phone"], key=f"phone_{unique_id}")
+                location = st.text_input("Location", value=row["Location"], key=f"loc_{unique_id}")
+                level = st.text_input("Level", value=row["Level"], key=f"level_{unique_id}")
+                paid = st.number_input("Paid", value=float(row["Paid"]), key=f"paid_{unique_id}")
+                balance = st.number_input("Balance", value=float(row["Balance"]), key=f"bal_{unique_id}")
+                contract_start = st.text_input("Contract Start", value=str(row["ContractStart"]), key=f"cs_{unique_id}")
+                contract_end = st.text_input("Contract End", value=str(row["ContractEnd"]), key=f"ce_{unique_id}")
+                student_code = st.text_input("Student Code", value=row["StudentCode"], key=f"code_{unique_id}")
 
                 # Update Button
                 if st.button("Update Student", key=f"update_{unique_id}"):
@@ -415,30 +428,42 @@ with tabs[1]:
                     df_main.at[idx, "StudentCode"] = student_code
                     df_main.to_csv(student_file, index=False)
                     st.success("Student updated!")
-                    st.rerun()
+                    st.experimental_rerun()
 
                 # Delete Button
                 if st.button("Delete Student", key=f"delete_{unique_id}"):
                     df_main = df_main.drop(idx).reset_index(drop=True)
                     df_main.to_csv(student_file, index=False)
                     st.success("Student deleted!")
-                    st.rerun()
+                    st.experimental_rerun()
 
-                # Generate a new payment receipt (for new/extra payment)
+                # Generate a new payment receipt (for extra payment)
                 if st.button("Generate Payment Receipt", key=f"genreceipt_{unique_id}"):
-                    pay_amt = st.number_input("Enter New Payment Amount", min_value=0.0, value=float(row["Paid"]), key=f"payamt_{unique_id}")
-                    pay_date = st.date_input("Enter Payment Date", value=date.today(), key=f"paydate_{unique_id}")
+                    pay_amt = st.number_input(
+                        "Enter New Payment Amount",
+                        min_value=0.0,
+                        value=0.0,
+                        key=f"payamt_{unique_id}"
+                    )
+                    pay_date = st.date_input(
+                        "Enter Payment Date",
+                        value=date.today(),
+                        key=f"paydate_{unique_id}"
+                    )
                     receipt_pdf = generate_receipt_and_contract_pdf(
                         row, agreement_text, payment_amount=pay_amt, payment_date=pay_date
                     )
                     with open(receipt_pdf, "rb") as f:
                         pdf_bytes = f.read()
                         b64 = base64.b64encode(pdf_bytes).decode()
-                        href = f'<a href="data:application/pdf;base64,{b64}" download="{row["Name"].replace(" ", "_")}_receipt.pdf">Download PDF Receipt</a>'
-                        st.markdown(href, unsafe_allow_html=True)
+                        st.markdown(
+                            f'<a href="data:application/pdf;base64,{b64}" '
+                            f'download="{row["Name"].replace(" ", "_")}_receipt.pdf">'
+                            "Download PDF Receipt</a>",
+                            unsafe_allow_html=True
+                        )
                     st.success("Standalone receipt generated!")
-    else:
-        st.info("No students in the database for this filter.")
+
 # ============ ADD STUDENT MANUALLY ============
 with tabs[2]:
     st.title("➕ Add Student")
