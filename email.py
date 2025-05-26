@@ -504,7 +504,11 @@ with tabs[3]:
 # ============ WHATSAPP REMINDERS TAB ============
 with tabs[4]:
     st.title("📲 WhatsApp Reminders for Debtors")
-    debtors = df_main[(df_main["Balance"].astype(float) > 0) & (~df_main["Phone"].astype(str).str.contains("@"))]
+
+    # Fix: Ensure Balance is numeric, treat bad values as zero
+    df_main["Balance"] = pd.to_numeric(df_main["Balance"], errors="coerce").fillna(0)
+
+    debtors = df_main[(df_main["Balance"] > 0) & (~df_main["Phone"].astype(str).str.contains("@"))]
     if not debtors.empty:
         st.write("### Students Owing (Click WhatsApp to Remind)")
         for idx, row in debtors.iterrows():
