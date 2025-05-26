@@ -429,36 +429,41 @@ with tabs[1]:
         lambda d: "Completed" if pd.notna(d) and d < today else "Enrolled"
     )
 
+    # Only one filter selectbox
     sel_status = st.selectbox("Filter by status", ["All", "Enrolled", "Completed"])
     view_df = df_main.copy()
     if sel_status != "All":
         view_df = view_df[view_df["Status"] == sel_status]
+
+    # Apply search
     if search:
-        view_df = view_df[
+        mask = (
             view_df["Name"].str.contains(search, case=False, na=False)
             | view_df["StudentCode"].str.contains(search, case=False, na=False)
-        ]
+        )
+        view_df = view_df[mask]
 
     if view_df.empty:
         st.info("No students match your filter.")
     else:
-        # use enumerate to guarantee each iteration key is unique
+        # Enumerate so each widget key is guaranteed unique
         for pos, (idx, row) in enumerate(view_df.iterrows()):
             uid = f"{row['StudentCode']}_{idx}_{pos}"
             with st.expander(f"{row['Name']} ({row['StudentCode']}) [{row['Status']}]"):
                 st.info(f"Status: {row['Status']}")
-                name    = st.text_input("Name", row["Name"], key=f"name_{uid}")
-                phone   = st.text_input("Phone", row["Phone"], key=f"phone_{uid}")
-                loc     = st.text_input("Location", row["Location"], key=f"loc_{uid}")
-                lvl     = st.text_input("Level", row["Level"], key=f"level_{uid}")
-                paid    = st.number_input("Paid", float(row["Paid"]), key=f"paid_{uid}")
-                bal     = st.number_input("Balance", float(row["Balance"]), key=f"bal_{uid}")
-                cs      = st.text_input("Contract Start", str(row["ContractStart"]), key=f"cs_{uid}")
-                ce      = st.text_input("Contract End", str(row["ContractEnd"]), key=f"ce_{uid}")
-                stcode  = st.text_input("Student Code", row["StudentCode"], key=f"code_{uid}")
+
+                name   = st.text_input("Name", row["Name"], key=f"name_{uid}")
+                phone  = st.text_input("Phone", row["Phone"], key=f"phone_{uid}")
+                loc    = st.text_input("Location", row["Location"], key=f"loc_{uid}")
+                lvl    = st.text_input("Level", row["Level"], key=f"level_{uid}")
+                paid   = st.number_input("Paid", float(row["Paid"]), key=f"paid_{uid}")
+                bal    = st.number_input("Balance", float(row["Balance"]), key=f"bal_{uid}")
+                cs     = st.text_input("Contract Start", str(row["ContractStart"]), key=f"cs_{uid}")
+                ce     = st.text_input("Contract End", str(row["ContractEnd"]), key=f"ce_{uid}")
+                stcode = st.text_input("Student Code", row["StudentCode"], key=f"code_{uid}")
 
                 if st.button("Update Student", key=f"upd_{uid}"):
-                    for col,val in [
+                    for col, val in [
                         ("Name", name), ("Phone", phone), ("Location", loc),
                         ("Level", lvl), ("Paid", paid), ("Balance", bal),
                         ("ContractStart", cs), ("ContractEnd", ce),
@@ -479,7 +484,7 @@ with tabs[1]:
                     amt = st.number_input(
                         "Payment amount", min_value=0.0, value=float(row["Paid"]), key=f"amt_{uid}"
                     )
-                    dt  = st.date_input(
+                    dt = st.date_input(
                         "Payment date", value=date.today(), key=f"dt_{uid}"
                     )
                     pdf_file = generate_receipt_and_contract_pdf(
