@@ -131,7 +131,10 @@ st.caption(f"📍 {SCHOOL_ADDRESS} | ✉️ {SCHOOL_EMAIL} | 🌐 {SCHOOL_WEBSIT
 today = datetime.today().date()
 notifications = []
 
-debtors = df_main[df_main["Balance"].astype(float) > 0]
+# Fix: Ensure "Balance" is numeric and safe for comparison
+df_main["Balance"] = pd.to_numeric(df_main["Balance"], errors="coerce").fillna(0)
+
+debtors = df_main[df_main["Balance"] > 0]
 for idx, row in debtors.iterrows():
     whatsapp_msg = (
         f"Dear {row['Name']}, your current balance with {SCHOOL_NAME} is GHS {row['Balance']}. "
@@ -149,6 +152,7 @@ for idx, row in debtors.iterrows():
     notifications.append(
         f"💰 Payment Due: <b>{row['Name']}</b> (GHS {row['Balance']} due) [{contact_links}]"
     )
+
 
 soon_threshold = today + timedelta(days=30)
 for idx, row in df_main.iterrows():
