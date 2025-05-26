@@ -475,7 +475,7 @@ with tabs[1]:
                     df_main = df_main.drop(idx).reset_index(drop=True)
                     df_main.to_csv(student_file, index=False)
                     st.success("Student deleted!")
-                    st.experimental_rerun()
+                    st.rerun()
 
                 # Generate a new payment receipt
                 if st.button("Generate Payment Receipt", key=f"genreceipt_{unique_id}"):
