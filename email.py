@@ -350,22 +350,73 @@ with tabs[5]:
 # ============ 6. Send Email ============
 with tabs[6]:
     st.title("📧 Send Email")
-    options=[f"{n} ({e})" for n,e in zip(df_main["Name"],df_main["Email"]) if e]
-    mode=st.radio("Mode",["Individual","All"])
-    recips = [options[0]] if mode=="Individual" and options else options
-    subj=st.text_input("Subject","")
-    body=st.text_area("Body","")
-    if st.button("Send"):
-        sent=0;failed=[]
+
+    # build list of “Name (email)” options
+    options = [
+        f"{n} ({e})"
+        for n, e in zip(df_main["Name"], df_main["Email"])
+        if e.strip()
+    ]
+
+    mode = st.radio("Mode", ["Individual", "All"])
+
+    # choose recipients
+    if mode == "Individual":
+        recips = st.multiselect("Select recipient(s)", options)
+    else:
+        recips = options.copy()
+
+    subj = st.text_input("Subject", "")
+    body = st.text_area("Body", "")
+
+    # allow multiple file attachments
+    attachments = st.file_uploader(
+        "Attachments",
+        type=["pdf", "docx", "jpg", "png"],
+        accept_multiple_files=True
+    )
+
+    if st.button("Send") and recips and subj and body:
+        sent = 0
+        failed = []
+
         for opt in recips:
-            _,email=opt.rsplit(" ",1)
-            msg=Mail(from_email=school_sender_email,to_emails=email,subject=subj,html_content=body.replace("\n","<br>"))
+            # extract email from "Name (email)"
+            _, email = opt.rsplit(" ", 1)
+            email = email.strip("()")
+
+            # create base message
+            msg = Mail(
+                from_email=school_sender_email,
+                to_emails=email,
+                subject=subj,
+                html_content=body.replace("\n", "<br>")
+            )
+
+            # attach any files
+            for uploaded_file in attachments:
+                data = uploaded_file.read()
+                encoded = base64.b64encode(data).decode()
+                attachment = Attachment(
+                    FileContent(encoded),
+                    FileName(uploaded_file.name),
+                    FileType(uploaded_file.type),
+                    Disposition("attachment")
+                )
+                msg.attachment = attachment
+
+            # send
             try:
                 SendGridAPIClient(school_sendgrid_key).send(msg)
-                sent+=1
-            except:
+                sent += 1
+            except Exception as e:
                 failed.append(email)
-        st.success(f"Sent {sent}")    
+
+        # report results
+        if sent:
+            st.success(f"✅ Sent to {sent} recipient(s).")
+        if failed:
+            st.error(f"Failed to send to: {', '.join(failed)}")
 
 # ============ 7. Analytics & Export ============
 with tabs[7]:
