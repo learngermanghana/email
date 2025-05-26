@@ -434,17 +434,17 @@ with tabs[1]:
     if sel_status != "All":
         view_df = view_df[view_df["Status"] == sel_status]
     if search:
-        mask = (
+        view_df = view_df[
             view_df["Name"].str.contains(search, case=False, na=False)
             | view_df["StudentCode"].str.contains(search, case=False, na=False)
-        )
-        view_df = view_df[mask]
+        ]
 
     if view_df.empty:
         st.info("No students match your filter.")
     else:
-        for idx, row in view_df.iterrows():
-            uid = f"{row['StudentCode']}_{idx}"
+        # use enumerate to guarantee each iteration key is unique
+        for pos, (idx, row) in enumerate(view_df.iterrows()):
+            uid = f"{row['StudentCode']}_{idx}_{pos}"
             with st.expander(f"{row['Name']} ({row['StudentCode']}) [{row['Status']}]"):
                 st.info(f"Status: {row['Status']}")
                 name    = st.text_input("Name", row["Name"], key=f"name_{uid}")
@@ -458,7 +458,7 @@ with tabs[1]:
                 stcode  = st.text_input("Student Code", row["StudentCode"], key=f"code_{uid}")
 
                 if st.button("Update Student", key=f"upd_{uid}"):
-                    for col, val in [
+                    for col,val in [
                         ("Name", name), ("Phone", phone), ("Location", loc),
                         ("Level", lvl), ("Paid", paid), ("Balance", bal),
                         ("ContractStart", cs), ("ContractEnd", ce),
@@ -495,34 +495,29 @@ with tabs[1]:
                     st.success("Receipt ready!")
 
     # ── Admin: Restore from CSV Backup ──
-    with st.expander("🔄 Admin: Upload Student/Expense CSV Backup", expanded=False):
-        st.write("Overwrite current records by uploading your CSVs:")
+    with st.expander("🔄 Admin: Upload CSV Backup (overwrite)", expanded=False):
+        st.write("Upload CSVs to overwrite all students or expenses.")
 
-        uploaded_students = st.file_uploader(
-            "Upload students_simple.csv", type="csv", key="upload_students"
-        )
-        uploaded_expenses = st.file_uploader(
-            "Upload expenses_all.csv", type="csv", key="upload_expenses"
-        )
+        up_s = st.file_uploader("students_simple.csv", type="csv", key="backup_students")
+        up_e = st.file_uploader("expenses_all.csv", type="csv", key="backup_expenses")
 
-        if uploaded_students:
-            df_new = pd.read_csv(uploaded_students)
+        if up_s:
+            df_new = pd.read_csv(up_s)
             missing = set(needed_cols) - set(df_new.columns)
             if missing:
-                st.error(f"Missing columns in students CSV: {missing}")
+                st.error(f"Students CSV missing columns: {missing}")
             else:
                 df_new[needed_cols].to_csv(student_file, index=False)
-                st.success("Student records restored. Refresh to reload.")
+                st.success("Students restored. Refresh to reload.")
 
-        if uploaded_expenses:
-            df_new_exp = pd.read_csv(uploaded_expenses)
-            exp_cols = {"Type", "Item", "Amount", "Date"}
-            if not exp_cols.issubset(df_new_exp.columns):
-                st.error(f"Missing columns in expenses CSV: {exp_cols - set(df_new_exp.columns)}")
+        if up_e:
+            df_exp = pd.read_csv(up_e)
+            exp_cols = {"Type","Item","Amount","Date"}
+            if not exp_cols.issubset(df_exp.columns):
+                st.error(f"Expenses CSV missing: {exp_cols - set(df_exp.columns)}")
             else:
-                df_new_exp.to_csv(expenses_file, index=False)
-                st.success("Expense records restored. Refresh to reload.")
-
+                df_exp.to_csv(expenses_file, index=False)
+                st.success("Expenses restored. Refresh to reload.")
 
     # Parse ContractEnd safely
     df_main["ContractEnd"] = pd.to_datetime(df_main["ContractEnd"], errors="coerce")
