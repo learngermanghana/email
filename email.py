@@ -450,29 +450,6 @@ with st.expander("🔄 Admin: Upload Student/Expense CSV Backup", expanded=False
         df_new_expenses.to_csv(expenses_file, index=False)
         st.success("Expense records restored from uploaded CSV! Please refresh your app to load them.")
 
-
-                # Update Button
-                if st.button("Update Student", key=f"update_{unique_id}"):
-                    df_main.at[idx, "Name"] = name
-                    df_main.at[idx, "Phone"] = phone
-                    df_main.at[idx, "Location"] = location
-                    df_main.at[idx, "Level"] = level
-                    df_main.at[idx, "Paid"] = paid
-                    df_main.at[idx, "Balance"] = balance
-                    df_main.at[idx, "ContractStart"] = contract_start
-                    df_main.at[idx, "ContractEnd"] = contract_end
-                    df_main.at[idx, "StudentCode"] = student_code
-                    df_main.to_csv(student_file, index=False)
-                    st.success("Student updated!")
-                    st.rerun()
-
-                # Delete Button
-                if st.button("Delete Student", key=f"delete_{unique_id}"):
-                    df_main = df_main.drop(idx).reset_index(drop=True)
-                    df_main.to_csv(student_file, index=False)
-                    st.success("Student deleted!")
-                    st.rerun()
-
                 # Generate a new payment receipt (for new/extra payment)
                 if st.button("Generate Payment Receipt", key=f"genreceipt_{unique_id}"):
                     pay_amt = st.number_input("Enter New Payment Amount", min_value=0.0, value=float(row["Paid"]), key=f"payamt_{unique_id}")
