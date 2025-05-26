@@ -376,26 +376,23 @@ Best regards,<br>
 with tabs[1]:
     st.title("👩‍🎓 All Students (Edit & Update)")
 
-    # Parse ContractEnd once, coercing invalid/missing to NaT
+    # Parse ContractEnd safely
     df_main["ContractEnd"] = pd.to_datetime(df_main["ContractEnd"], errors="coerce")
-
     today = datetime.today().date()
 
-    # Compute status, treating NaT as still “Enrolled”
     def get_status(end_dt):
         if pd.isna(end_dt):
             return "Enrolled"
         return "Completed" if end_dt.date() < today else "Enrolled"
 
     df_main["Status"] = df_main["ContractEnd"].apply(get_status)
-
-    # Filter selector
     statuses = ["All"] + sorted(df_main["Status"].unique())
     selected_status = st.selectbox("Filter by Status", statuses)
-    if selected_status != "All":
-        view_df = df_main[df_main["Status"] == selected_status]
-    else:
+
+    if selected_status == "All":
         view_df = df_main
+    else:
+        view_df = df_main[df_main["Status"] == selected_status]
 
     if view_df.empty:
         st.info("No students in the database for this filter.")
@@ -409,11 +406,29 @@ with tabs[1]:
                 phone = st.text_input("Phone", value=row["Phone"], key=f"phone_{unique_id}")
                 location = st.text_input("Location", value=row["Location"], key=f"loc_{unique_id}")
                 level = st.text_input("Level", value=row["Level"], key=f"level_{unique_id}")
-                paid = st.number_input("Paid", value=float(row["Paid"]), key=f"paid_{unique_id}")
-                balance = st.number_input("Balance", value=float(row["Balance"]), key=f"bal_{unique_id}")
-                contract_start = st.text_input("Contract Start", value=str(row["ContractStart"]), key=f"cs_{unique_id}")
-                contract_end = st.text_input("Contract End", value=str(row["ContractEnd"]), key=f"ce_{unique_id}")
-                student_code = st.text_input("Student Code", value=row["StudentCode"], key=f"code_{unique_id}")
+
+                # Safe defaults for Paid & Balance
+                try:
+                    paid_default = float(row.get("Paid", 0))
+                except Exception:
+                    paid_default = 0.0
+                paid = st.number_input("Paid", value=paid_default, key=f"paid_{unique_id}")
+
+                try:
+                    bal_default = float(row.get("Balance", 0))
+                except Exception:
+                    bal_default = 0.0
+                balance = st.number_input("Balance", value=bal_default, key=f"bal_{unique_id}")
+
+                contract_start = st.text_input(
+                    "Contract Start", value=str(row["ContractStart"]), key=f"cs_{unique_id}"
+                )
+                contract_end = st.text_input(
+                    "Contract End", value=str(row["ContractEnd"]), key=f"ce_{unique_id}"
+                )
+                student_code = st.text_input(
+                    "Student Code", value=row["StudentCode"], key=f"code_{unique_id}"
+                )
 
                 # Update Button
                 if st.button("Update Student", key=f"update_{unique_id}"):
@@ -437,7 +452,7 @@ with tabs[1]:
                     st.success("Student deleted!")
                     st.experimental_rerun()
 
-                # Generate a new payment receipt (for extra payment)
+                # Generate a new payment receipt
                 if st.button("Generate Payment Receipt", key=f"genreceipt_{unique_id}"):
                     pay_amt = st.number_input(
                         "Enter New Payment Amount",
@@ -463,6 +478,7 @@ with tabs[1]:
                             unsafe_allow_html=True
                         )
                     st.success("Standalone receipt generated!")
+
 
 # ============ ADD STUDENT MANUALLY ============
 with tabs[2]:
