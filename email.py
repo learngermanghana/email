@@ -495,7 +495,7 @@ with tabs[1]:
                     )
                     st.success("Receipt ready!")
 
-  # ============ ALL STUDENTS TAB ============
+# ============ ALL STUDENTS TAB ============
 with tabs[1]:
     st.title("👩‍🎓 All Students (Search, Filter, Edit & Update)")
 
@@ -556,7 +556,7 @@ with tabs[1]:
                     df_main.drop(idx, inplace=True)
                     df_main.to_csv(student_file, index=False)
                     st.success("Student deleted!")
-                    st.experimental_rerun()
+                    st.rerun()
 
                 if st.button("Generate Payment Receipt", key=f"rcpt_{uid}"):
                     amt = st.number_input(
