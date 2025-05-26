@@ -293,23 +293,57 @@ with tabs[0]:
                     }])
                     df_main = pd.concat([df_main, new_row], ignore_index=True)
                     df_main.to_csv(student_file, index=False)
-with st.expander("🔄 Admin: Upload Student/Expense CSV Backup", expanded=False):
-    st.write("Upload your CSV files to restore all students or expense data. This will overwrite the current records.")
-    uploaded_students = st.file_uploader("Upload students_simple.csv", type="csv", key="upload_students")
-    uploaded_expenses = st.file_uploader("Upload expenses_all.csv", type="csv", key="upload_expenses")
-    
-    if uploaded_students:
-        df_new_students = pd.read_csv(uploaded_students)
-        # Optionally merge or replace (here, we overwrite)
-        df_new_students.to_csv(student_file, index=False)
-        st.success("Student records restored from uploaded CSV! Please refresh your app to load them.")
+with tabs[0]:
+    st.title("📝 Pending Student Registrations (Approve & Auto-Email)")
+    try:
+        new_students = pd.read_csv(sheet_url)
+        def clean_col(c):
+            c = c.strip().lower()
+            c = c.replace("(", "").replace(")", "")
+            c = c.replace(",", "").replace("-", "")
+            c = c.replace(" ", "_")
+            return c
+        new_students.columns = [clean_col(c) for c in new_students.columns]
+        st.info(f"Columns: {', '.join(new_students.columns)}")
+    except Exception as e:
+        st.error(f"Could not load registrations: {e}")
+        new_students = pd.DataFrame()
 
-    if uploaded_expenses:
-        df_new_expenses = pd.read_csv(uploaded_expenses)
-        # Optionally merge or replace (here, we overwrite)
-        df_new_expenses.to_csv(expenses_file, index=False)
-        st.success("Expense records restored from uploaded CSV! Please refresh your app to load them.")
+    if not new_students.empty:
+        for i, row in new_students.iterrows():
+            fullname = row.get('full_name', '')
+            phone = row.get('phone_number', '')
+            email = row.get('email', '')
+            level = row.get('class_a1a2_etc', '')
+            location = row.get('location', '')
+            emergency = row.get('emergency_contact_phone_number', '')
+            with st.expander(f"{fullname} ({phone})"):
+                st.write(f"**Email:** {email}")
+                student_code = st.text_input("Assign Student Code", key=f"code_{i}")
+                contract_start = st.date_input("Contract Start", value=date.today(), key=f"start_{i}")
+                contract_end = st.date_input("Contract End", value=date.today(), key=f"end_{i}")
+                paid = st.number_input("Amount Paid (GHS)", min_value=0.0, step=1.0, key=f"paid_{i}")
+                balance = st.number_input("Balance Due (GHS)", min_value=0.0, step=1.0, key=f"bal_{i}")
+                first_instalment = st.number_input("First Instalment (GHS)", min_value=0.0, value=1500.0, key=f"firstinst_{i}")
+                course_length = st.number_input("Course Length (weeks)", min_value=1, value=12, key=f"length_{i}")
 
+                attach_pdf = st.checkbox("Attach Receipt & Contract PDF to Email?", value=True, key=f"pdf_{i}")
+
+                if st.button("Approve & Add to Main List", key=f"approve_{i}") and student_code:
+                    # --- Add to main dashboard CSV ---
+                    new_row = pd.DataFrame([{
+                        "Name": fullname,
+                        "Phone": phone,
+                        "Location": location,
+                        "Level": level,
+                        "Paid": paid,
+                        "Balance": balance,
+                        "ContractStart": contract_start,
+                        "ContractEnd": contract_end,
+                        "StudentCode": student_code
+                    }])
+                    df_main = pd.concat([df_main, new_row], ignore_index=True)
+                    df_main.to_csv(student_file, index=False)
 
                     # --- Generate combined receipt + contract PDF ---
                     pdf_file = generate_receipt_and_contract_pdf(
@@ -370,6 +404,7 @@ Best regards,<br>
 
                     st.success(f"Student {fullname} added to your dashboard (and emailed if address available)!")
 
+
 with tabs[1]:
     st.title("👩‍🎓 All Students (Edit & Update)")
     today = datetime.today().date()
@@ -398,6 +433,23 @@ with tabs[1]:
                 contract_start = st.text_input("Contract Start", value=str(row['ContractStart']), key=f"cs_{unique_id}")
                 contract_end = st.text_input("Contract End", value=str(row['ContractEnd']), key=f"ce_{unique_id}")
                 student_code = st.text_input("Student Code", value=row['StudentCode'], key=f"code_{unique_id}")
+
+with st.expander("🔄 Admin: Upload Student/Expense CSV Backup", expanded=False):
+    st.write("Upload your CSV files to restore all students or expense data. This will overwrite the current records.")
+
+    uploaded_students = st.file_uploader("Upload students_simple.csv", type="csv", key="upload_students")
+    uploaded_expenses = st.file_uploader("Upload expenses_all.csv", type="csv", key="upload_expenses")
+    
+    if uploaded_students:
+        df_new_students = pd.read_csv(uploaded_students)
+        df_new_students.to_csv(student_file, index=False)
+        st.success("Student records restored from uploaded CSV! Please refresh your app to load them.")
+
+    if uploaded_expenses:
+        df_new_expenses = pd.read_csv(uploaded_expenses)
+        df_new_expenses.to_csv(expenses_file, index=False)
+        st.success("Expense records restored from uploaded CSV! Please refresh your app to load them.")
+
 
                 # Update Button
                 if st.button("Update Student", key=f"update_{unique_id}"):
