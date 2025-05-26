@@ -98,7 +98,6 @@ def generate_receipt_and_contract_pdf(
     pdf_name = f"{student_row['Name'].replace(' ', '_')}_receipt_and_contract.pdf"
     pdf.output(pdf_name)
     return pdf_name
-
 # === FILES & DATABASE SETUP ===
 student_file = "students_simple.csv"
 expenses_file = "expenses_all.csv"
@@ -106,15 +105,31 @@ needed_cols = [
     "Name", "Phone", "Location", "Level", "Paid", "Balance",
     "ContractStart", "ContractEnd", "StudentCode"
 ]
+
+# Ensure the student CSV exists, then load it
 if not os.path.exists(student_file):
     df_main = pd.DataFrame(columns=needed_cols)
     df_main.to_csv(student_file, index=False)
+
 df_main = pd.read_csv(student_file)
+
+# --- Normalize column names by case-insensitive matching ---
+col_map = {}
+for needed in needed_cols:
+    for col in df_main.columns:
+        if col.strip().lower() == needed.lower():
+            col_map[col] = needed
+df_main = df_main.rename(columns=col_map)
+
+# Fill any missing needed columns
 for col in needed_cols:
     if col not in df_main.columns:
         df_main[col] = ""
+
+# Enforce column order
 df_main = df_main[needed_cols]
 
+# === EXPENSES SETUP ===
 if not os.path.exists(expenses_file):
     exp = pd.DataFrame(columns=["Type", "Item", "Amount", "Date"])
     exp.to_csv(expenses_file, index=False)
