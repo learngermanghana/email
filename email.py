@@ -424,18 +424,17 @@ with tabs[1]:
     # ── Search & Status Filter ──
     search = st.text_input("🔍 Search by name or code", "")
     today = datetime.today().date()
+    # Safely parse ContractEnd to dates
     df_main["_EndDate"] = pd.to_datetime(df_main["ContractEnd"], errors="coerce").dt.date
     df_main["Status"] = df_main["_EndDate"].apply(
         lambda d: "Completed" if pd.notna(d) and d < today else "Enrolled"
     )
 
-    # Only one filter selectbox
     sel_status = st.selectbox("Filter by status", ["All", "Enrolled", "Completed"])
     view_df = df_main.copy()
     if sel_status != "All":
         view_df = view_df[view_df["Status"] == sel_status]
 
-    # Apply search
     if search:
         mask = (
             view_df["Name"].str.contains(search, case=False, na=False)
@@ -446,7 +445,7 @@ with tabs[1]:
     if view_df.empty:
         st.info("No students match your filter.")
     else:
-        # Enumerate so each widget key is guaranteed unique
+        # Enumerate so each widget key is unique
         for pos, (idx, row) in enumerate(view_df.iterrows()):
             uid = f"{row['StudentCode']}_{idx}_{pos}"
             with st.expander(f"{row['Name']} ({row['StudentCode']}) [{row['Status']}]"):
@@ -481,16 +480,13 @@ with tabs[1]:
                     st.experimental_rerun()
 
                 if st.button("Generate Payment Receipt", key=f"rcpt_{uid}"):
-                    amt = st.number_input(
-                        "Payment amount", min_value=0.0, value=float(row["Paid"]), key=f"amt_{uid}"
-                    )
-                    dt = st.date_input(
-                        "Payment date", value=date.today(), key=f"dt_{uid}"
-                    )
-                    pdf_file = generate_receipt_and_contract_pdf(
+                    amt = st.number_input("Payment amount", min_value=0.0,
+                                         value=float(row["Paid"]), key=f"amt_{uid}")
+                    dt  = st.date_input("Payment date", value=date.today(), key=f"dt_{uid}")
+                    pdf = generate_receipt_and_contract_pdf(
                         row, agreement_text, payment_amount=amt, payment_date=dt
                     )
-                    with open(pdf_file, "rb") as f:
+                    with open(pdf, "rb") as f:
                         b64 = base64.b64encode(f.read()).decode()
                     st.markdown(
                         f'<a href="data:application/pdf;base64,{b64}" '
@@ -514,6 +510,15 @@ with tabs[1]:
             else:
                 df_new[needed_cols].to_csv(student_file, index=False)
                 st.success("Students restored. Refresh to reload.")
+
+        if up_e:
+            df_exp = pd.read_csv(up_e)
+            exp_cols = {"Type", "Item", "Amount", "Date"}
+            if not exp_cols.issubset(df_exp.columns):
+                st.error(f"Expenses CSV missing: {exp_cols - set(df_exp.columns)}")
+            else:
+                df_exp.to_csv(expenses_file, index=False)
+                st.success("Expenses restored. Refresh to reload.")
 
         if up_e:
             df_exp = pd.read_csv(up_e)
@@ -626,7 +631,6 @@ with tabs[1]:
                             unsafe_allow_html=True
                         )
                     st.success("Standalone receipt generated!")
-
 
 # ============ ADD STUDENT MANUALLY ============
 with tabs[2]:
