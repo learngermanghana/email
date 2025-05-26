@@ -480,13 +480,13 @@ with tabs[1]:
                         df_main.at[idx, col] = val
                     df_main.to_csv(student_file, index=False)
                     st.success("Student updated!")
-                    st.experimental_rerun()
+                    st.rerun()
 
                 if st.button("Delete Student", key=f"del_{uid}"):
                     df_main.drop(idx, inplace=True)
                     df_main.to_csv(student_file, index=False)
                     st.success("Student deleted!")
-                    st.experimental_rerun()
+                    st.rerun()
 
                 if st.button("Generate Payment Receipt", key=f"rcpt_{uid}"):
                     amt = st.number_input(
@@ -516,22 +516,37 @@ with tabs[1]:
                     )
                     st.success("Receipt ready!")
 
-    # ── Upload a students CSV to replace all data ──
-    with st.expander("🔄 Upload students CSV (overwrite all)", expanded=False):
-        uploaded = st.file_uploader(
-            "Choose a students_simple.csv file", type="csv", key="upload_students"
+    # ── Upload CSV Backup (overwrite all) ──
+    with st.expander("🔄 Upload CSV Backup (overwrite all)", expanded=False):
+        uploaded_students = st.file_uploader(
+            "Choose students_simple.csv", type="csv", key="upload_students"
         )
-        if uploaded is not None:
-            df_new = pd.read_csv(uploaded)
+        uploaded_expenses = st.file_uploader(
+            "Choose expenses_all.csv", type="csv", key="upload_expenses"
+        )
+
+        # Students overwrite
+        if uploaded_students is not None:
+            df_new = pd.read_csv(uploaded_students)
             missing = set(needed_cols) - set(df_new.columns)
             if missing:
-                st.error(f"Missing columns: {missing}")
+                st.error(f"Students CSV missing columns: {missing}")
             else:
-                # overwrite on disk and in-memory
                 df_new[needed_cols].to_csv(student_file, index=False)
-                df_main[:] = df_new[needed_cols]
-                st.success("Students data replaced! The table below will refresh.")
-                st.experimental_rerun()
+                st.success("students_simple.csv replaced! Reloading…")
+                st.rerun()
+
+        # Expenses overwrite
+        if uploaded_expenses is not None:
+            df_exp = pd.read_csv(uploaded_expenses)
+            exp_cols = {"Type", "Item", "Amount", "Date"}
+            missing = exp_cols - set(df_exp.columns)
+            if missing:
+                st.error(f"Expenses CSV missing columns: {missing}")
+            else:
+                df_exp.to_csv(expenses_file, index=False)
+                st.success("expenses_all.csv replaced! Reloading…")
+                st.rerun()
 
 # ============ ADD STUDENT MANUALLY ============
 with tabs[2]:
