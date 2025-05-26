@@ -516,6 +516,23 @@ with tabs[1]:
                     )
                     st.success("Receipt ready!")
 
+    # ── Upload a students CSV to replace all data ──
+    with st.expander("🔄 Upload students CSV (overwrite all)", expanded=False):
+        uploaded = st.file_uploader(
+            "Choose a students_simple.csv file", type="csv", key="upload_students"
+        )
+        if uploaded is not None:
+            df_new = pd.read_csv(uploaded)
+            missing = set(needed_cols) - set(df_new.columns)
+            if missing:
+                st.error(f"Missing columns: {missing}")
+            else:
+                # overwrite on disk and in-memory
+                df_new[needed_cols].to_csv(student_file, index=False)
+                df_main[:] = df_new[needed_cols]
+                st.success("Students data replaced! The table below will refresh.")
+                st.experimental_rerun()
+
 # ============ ADD STUDENT MANUALLY ============
 with tabs[2]:
     st.title("➕ Add Student")
