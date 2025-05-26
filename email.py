@@ -293,6 +293,23 @@ with tabs[0]:
                     }])
                     df_main = pd.concat([df_main, new_row], ignore_index=True)
                     df_main.to_csv(student_file, index=False)
+with st.expander("🔄 Admin: Upload Student/Expense CSV Backup", expanded=False):
+    st.write("Upload your CSV files to restore all students or expense data. This will overwrite the current records.")
+    uploaded_students = st.file_uploader("Upload students_simple.csv", type="csv", key="upload_students")
+    uploaded_expenses = st.file_uploader("Upload expenses_all.csv", type="csv", key="upload_expenses")
+    
+    if uploaded_students:
+        df_new_students = pd.read_csv(uploaded_students)
+        # Optionally merge or replace (here, we overwrite)
+        df_new_students.to_csv(student_file, index=False)
+        st.success("Student records restored from uploaded CSV! Please refresh your app to load them.")
+
+    if uploaded_expenses:
+        df_new_expenses = pd.read_csv(uploaded_expenses)
+        # Optionally merge or replace (here, we overwrite)
+        df_new_expenses.to_csv(expenses_file, index=False)
+        st.success("Expense records restored from uploaded CSV! Please refresh your app to load them.")
+
 
                     # --- Generate combined receipt + contract PDF ---
                     pdf_file = generate_receipt_and_contract_pdf(
