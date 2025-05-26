@@ -447,42 +447,45 @@ with tabs[1]:
             uid = f"{row['StudentCode']}_{idx}"
             with st.expander(f"{row['Name']} ({row['StudentCode']}) [{row['Status']}]"):
                 st.info(f"Status: {row['Status']}")
-                name           = st.text_input("Name", value=row["Name"], key=f"name_{uid}")
-                phone          = st.text_input("Phone", value=row["Phone"], key=f"phone_{uid}")
-                location       = st.text_input("Location", value=row["Location"], key=f"loc_{uid}")
-                level          = st.text_input("Level", value=row["Level"], key=f"level_{uid}")
-                paid           = st.number_input("Paid", value=float(row["Paid"]), key=f"paid_{uid}")
-                balance        = st.number_input("Balance", value=float(row["Balance"]), key=f"bal_{uid}")
-                cs             = st.text_input("Contract Start", value=str(row["ContractStart"]), key=f"cs_{uid}")
-                ce             = st.text_input("Contract End", value=str(row["ContractEnd"]), key=f"ce_{uid}")
-                stcode         = st.text_input("Student Code", value=row["StudentCode"], key=f"code_{uid}")
+                name    = st.text_input("Name", row["Name"], key=f"name_{uid}")
+                phone   = st.text_input("Phone", row["Phone"], key=f"phone_{uid}")
+                loc     = st.text_input("Location", row["Location"], key=f"loc_{uid}")
+                lvl     = st.text_input("Level", row["Level"], key=f"level_{uid}")
+                paid    = st.number_input("Paid", float(row["Paid"]), key=f"paid_{uid}")
+                bal     = st.number_input("Balance", float(row["Balance"]), key=f"bal_{uid}")
+                cs      = st.text_input("Contract Start", str(row["ContractStart"]), key=f"cs_{uid}")
+                ce      = st.text_input("Contract End", str(row["ContractEnd"]), key=f"ce_{uid}")
+                stcode  = st.text_input("Student Code", row["StudentCode"], key=f"code_{uid}")
 
-                if st.button("Update Student", key=f"update_{uid}"):
-                    for col,val in [("Name",name),("Phone",phone),("Location",location),
-                                    ("Level",level),("Paid",paid),("Balance",balance),
-                                    ("ContractStart",cs),("ContractEnd",ce),("StudentCode",stcode)]:
+                if st.button("Update Student", key=f"upd_{uid}"):
+                    for col, val in [
+                        ("Name", name), ("Phone", phone), ("Location", loc),
+                        ("Level", lvl), ("Paid", paid), ("Balance", bal),
+                        ("ContractStart", cs), ("ContractEnd", ce),
+                        ("StudentCode", stcode)
+                    ]:
                         df_main.at[idx, col] = val
                     df_main.to_csv(student_file, index=False)
-                    st.success("Updated!")
+                    st.success("Student updated!")
                     st.experimental_rerun()
 
                 if st.button("Delete Student", key=f"del_{uid}"):
                     df_main.drop(idx, inplace=True)
                     df_main.to_csv(student_file, index=False)
-                    st.success("Deleted!")
+                    st.success("Student deleted!")
                     st.experimental_rerun()
 
                 if st.button("Generate Payment Receipt", key=f"rcpt_{uid}"):
-                    pay_amt = st.number_input(
+                    amt = st.number_input(
                         "Payment amount", min_value=0.0, value=float(row["Paid"]), key=f"amt_{uid}"
                     )
-                    pay_dt  = st.date_input(
+                    dt  = st.date_input(
                         "Payment date", value=date.today(), key=f"dt_{uid}"
                     )
-                    pdf = generate_receipt_and_contract_pdf(
-                        row, agreement_text, payment_amount=pay_amt, payment_date=pay_dt
+                    pdf_file = generate_receipt_and_contract_pdf(
+                        row, agreement_text, payment_amount=amt, payment_date=dt
                     )
-                    with open(pdf, "rb") as f:
+                    with open(pdf_file, "rb") as f:
                         b64 = base64.b64encode(f.read()).decode()
                     st.markdown(
                         f'<a href="data:application/pdf;base64,{b64}" '
@@ -491,13 +494,9 @@ with tabs[1]:
                     )
                     st.success("Receipt ready!")
 
-with tabs[1]:
-    st.title("👩‍🎓 All Students (Edit & Update)")
-    # … your existing All Students code …
-
     # ── Admin: Restore from CSV Backup ──
     with st.expander("🔄 Admin: Upload Student/Expense CSV Backup", expanded=False):
-        st.write("Upload your CSV files to overwrite current records:")
+        st.write("Overwrite current records by uploading your CSVs:")
 
         uploaded_students = st.file_uploader(
             "Upload students_simple.csv", type="csv", key="upload_students"
@@ -508,7 +507,6 @@ with tabs[1]:
 
         if uploaded_students:
             df_new = pd.read_csv(uploaded_students)
-            # ensure required columns exist
             missing = set(needed_cols) - set(df_new.columns)
             if missing:
                 st.error(f"Missing columns in students CSV: {missing}")
@@ -518,12 +516,13 @@ with tabs[1]:
 
         if uploaded_expenses:
             df_new_exp = pd.read_csv(uploaded_expenses)
-            st_columns = {"Type", "Item", "Amount", "Date"}
-            if not st_columns.issubset(df_new_exp.columns):
-                st.error(f"Missing columns in expenses CSV: {st_columns - set(df_new_exp.columns)}")
+            exp_cols = {"Type", "Item", "Amount", "Date"}
+            if not exp_cols.issubset(df_new_exp.columns):
+                st.error(f"Missing columns in expenses CSV: {exp_cols - set(df_new_exp.columns)}")
             else:
                 df_new_exp.to_csv(expenses_file, index=False)
                 st.success("Expense records restored. Refresh to reload.")
+
 
     # Parse ContractEnd safely
     df_main["ContractEnd"] = pd.to_datetime(df_main["ContractEnd"], errors="coerce")
