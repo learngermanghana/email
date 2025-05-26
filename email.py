@@ -495,142 +495,87 @@ with tabs[1]:
                     )
                     st.success("Receipt ready!")
 
-    # ── Admin: Restore from CSV Backup ──
-    with st.expander("🔄 Admin: Upload CSV Backup (overwrite)", expanded=False):
-        st.write("Upload CSVs to overwrite all students or expenses.")
+  # ============ ALL STUDENTS TAB ============
+with tabs[1]:
+    st.title("👩‍🎓 All Students (Search, Filter, Edit & Update)")
 
-        up_s = st.file_uploader("students_simple.csv", type="csv", key="backup_students")
-        up_e = st.file_uploader("expenses_all.csv", type="csv", key="backup_expenses")
-
-        if up_s:
-            df_new = pd.read_csv(up_s)
-            missing = set(needed_cols) - set(df_new.columns)
-            if missing:
-                st.error(f"Students CSV missing columns: {missing}")
-            else:
-                df_new[needed_cols].to_csv(student_file, index=False)
-                st.success("Students restored. Refresh to reload.")
-
-        if up_e:
-            df_exp = pd.read_csv(up_e)
-            exp_cols = {"Type", "Item", "Amount", "Date"}
-            if not exp_cols.issubset(df_exp.columns):
-                st.error(f"Expenses CSV missing: {exp_cols - set(df_exp.columns)}")
-            else:
-                df_exp.to_csv(expenses_file, index=False)
-                st.success("Expenses restored. Refresh to reload.")
-
-        if up_e:
-            df_exp = pd.read_csv(up_e)
-            exp_cols = {"Type","Item","Amount","Date"}
-            if not exp_cols.issubset(df_exp.columns):
-                st.error(f"Expenses CSV missing: {exp_cols - set(df_exp.columns)}")
-            else:
-                df_exp.to_csv(expenses_file, index=False)
-                st.success("Expenses restored. Refresh to reload.")
-
-    # Parse ContractEnd safely
-    df_main["ContractEnd"] = pd.to_datetime(df_main["ContractEnd"], errors="coerce")
+    # ── Search & Status Filter ──
+    search = st.text_input("🔍 Search by name or code", "")
     today = datetime.today().date()
+    df_main["_EndDate"] = pd.to_datetime(df_main["ContractEnd"], errors="coerce").dt.date
+    df_main["Status"] = df_main["_EndDate"].apply(
+        lambda d: "Completed" if pd.notna(d) and d < today else "Enrolled"
+    )
 
-    def get_status(end_dt):
-        if pd.isna(end_dt):
-            return "Enrolled"
-        return "Completed" if end_dt.date() < today else "Enrolled"
+    # Single status filter
+    sel_status = st.selectbox("Filter by status", ["All", "Enrolled", "Completed"])
+    view_df = df_main.copy()
+    if sel_status != "All":
+        view_df = view_df[view_df["Status"] == sel_status]
 
-    df_main["Status"] = df_main["ContractEnd"].apply(get_status)
-    statuses = ["All"] + sorted(df_main["Status"].unique())
-    selected_status = st.selectbox("Filter by Status", statuses)
-
-    if selected_status == "All":
-        view_df = df_main
-    else:
-        view_df = df_main[df_main["Status"] == selected_status]
+    # Apply search
+    if search:
+        mask = (
+            view_df["Name"].str.contains(search, case=False, na=False)
+            | view_df["StudentCode"].str.contains(search, case=False, na=False)
+        )
+        view_df = view_df[mask]
 
     if view_df.empty:
-        st.info("No students in the database for this filter.")
+        st.info("No students match your filter.")
     else:
-        for idx, row in view_df.iterrows():
-            unique_id = f"{row['StudentCode']}_{idx}"
-            with st.expander(f"{row['Name']} (Code: {row['StudentCode']}) [{row['Status']}]"):
+        # Enumerate so each widget key is unique
+        for pos, (idx, row) in enumerate(view_df.iterrows()):
+            uid = f"{row['StudentCode']}_{idx}_{pos}"
+            with st.expander(f"{row['Name']} ({row['StudentCode']}) [{row['Status']}]"):
                 st.info(f"Status: {row['Status']}")
 
-                name = st.text_input("Name", value=row["Name"], key=f"name_{unique_id}")
-                phone = st.text_input("Phone", value=row["Phone"], key=f"phone_{unique_id}")
-                location = st.text_input("Location", value=row["Location"], key=f"loc_{unique_id}")
-                level = st.text_input("Level", value=row["Level"], key=f"level_{unique_id}")
+                name   = st.text_input("Name", row["Name"], key=f"name_{uid}")
+                phone  = st.text_input("Phone", row["Phone"], key=f"phone_{uid}")
+                loc    = st.text_input("Location", row["Location"], key=f"loc_{uid}")
+                lvl    = st.text_input("Level", row["Level"], key=f"level_{uid}")
+                paid   = st.number_input("Paid", float(row["Paid"]), key=f"paid_{uid}")
+                bal    = st.number_input("Balance", float(row["Balance"]), key=f"bal_{uid}")
+                cs     = st.text_input("Contract Start", str(row["ContractStart"]), key=f"cs_{uid}")
+                ce     = st.text_input("Contract End", str(row["ContractEnd"]), key=f"ce_{uid}")
+                stcode = st.text_input("Student Code", row["StudentCode"], key=f"code_{uid}")
 
-                # Safe defaults for Paid & Balance
-                try:
-                    paid_default = float(row.get("Paid", 0))
-                except Exception:
-                    paid_default = 0.0
-                paid = st.number_input("Paid", value=paid_default, key=f"paid_{unique_id}")
-
-                try:
-                    bal_default = float(row.get("Balance", 0))
-                except Exception:
-                    bal_default = 0.0
-                balance = st.number_input("Balance", value=bal_default, key=f"bal_{unique_id}")
-
-                contract_start = st.text_input(
-                    "Contract Start", value=str(row["ContractStart"]), key=f"cs_{unique_id}"
-                )
-                contract_end = st.text_input(
-                    "Contract End", value=str(row["ContractEnd"]), key=f"ce_{unique_id}"
-                )
-                student_code = st.text_input(
-                    "Student Code", value=row["StudentCode"], key=f"code_{unique_id}"
-                )
-
-                # Update Button
-                if st.button("Update Student", key=f"update_{unique_id}"):
-                    df_main.at[idx, "Name"] = name
-                    df_main.at[idx, "Phone"] = phone
-                    df_main.at[idx, "Location"] = location
-                    df_main.at[idx, "Level"] = level
-                    df_main.at[idx, "Paid"] = paid
-                    df_main.at[idx, "Balance"] = balance
-                    df_main.at[idx, "ContractStart"] = contract_start
-                    df_main.at[idx, "ContractEnd"] = contract_end
-                    df_main.at[idx, "StudentCode"] = student_code
+                if st.button("Update Student", key=f"upd_{uid}"):
+                    for col, val in [
+                        ("Name", name), ("Phone", phone), ("Location", loc),
+                        ("Level", lvl), ("Paid", paid), ("Balance", bal),
+                        ("ContractStart", cs), ("ContractEnd", ce),
+                        ("StudentCode", stcode)
+                    ]:
+                        df_main.at[idx, col] = val
                     df_main.to_csv(student_file, index=False)
                     st.success("Student updated!")
                     st.experimental_rerun()
 
-                # Delete Button
-                if st.button("Delete Student", key=f"delete_{unique_id}"):
-                    df_main = df_main.drop(idx).reset_index(drop=True)
+                if st.button("Delete Student", key=f"del_{uid}"):
+                    df_main.drop(idx, inplace=True)
                     df_main.to_csv(student_file, index=False)
                     st.success("Student deleted!")
-                    st.rerun()
+                    st.experimental_rerun()
 
-                # Generate a new payment receipt
-                if st.button("Generate Payment Receipt", key=f"genreceipt_{unique_id}"):
-                    pay_amt = st.number_input(
-                        "Enter New Payment Amount",
-                        min_value=0.0,
-                        value=0.0,
-                        key=f"payamt_{unique_id}"
+                if st.button("Generate Payment Receipt", key=f"rcpt_{uid}"):
+                    amt = st.number_input(
+                        "Payment amount", min_value=0.0, value=float(row["Paid"]), key=f"amt_{uid}"
                     )
-                    pay_date = st.date_input(
-                        "Enter Payment Date",
-                        value=date.today(),
-                        key=f"paydate_{unique_id}"
+                    dt = st.date_input(
+                        "Payment date", value=date.today(), key=f"dt_{uid}"
                     )
-                    receipt_pdf = generate_receipt_and_contract_pdf(
-                        row, agreement_text, payment_amount=pay_amt, payment_date=pay_date
+                    pdf_file = generate_receipt_and_contract_pdf(
+                        row, agreement_text, payment_amount=amt, payment_date=dt
                     )
-                    with open(receipt_pdf, "rb") as f:
-                        pdf_bytes = f.read()
-                        b64 = base64.b64encode(pdf_bytes).decode()
-                        st.markdown(
-                            f'<a href="data:application/pdf;base64,{b64}" '
-                            f'download="{row["Name"].replace(" ", "_")}_receipt.pdf">'
-                            "Download PDF Receipt</a>",
-                            unsafe_allow_html=True
-                        )
-                    st.success("Standalone receipt generated!")
+                    with open(pdf_file, "rb") as f:
+                        b64 = base64.b64encode(f.read()).decode()
+                    st.markdown(
+                        f'<a href="data:application/pdf;base64,{b64}" '
+                        f'download="{row["Name"].replace(" ","_")}_receipt.pdf">Download Receipt</a>',
+                        unsafe_allow_html=True
+                    )
+                    st.success("Receipt ready!")
 
 # ============ ADD STUDENT MANUALLY ============
 with tabs[2]:
