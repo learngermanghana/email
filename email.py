@@ -493,6 +493,37 @@ with tabs[1]:
 
 with tabs[1]:
     st.title("👩‍🎓 All Students (Edit & Update)")
+    # … your existing All Students code …
+
+    # ── Admin: Restore from CSV Backup ──
+    with st.expander("🔄 Admin: Upload Student/Expense CSV Backup", expanded=False):
+        st.write("Upload your CSV files to overwrite current records:")
+
+        uploaded_students = st.file_uploader(
+            "Upload students_simple.csv", type="csv", key="upload_students"
+        )
+        uploaded_expenses = st.file_uploader(
+            "Upload expenses_all.csv", type="csv", key="upload_expenses"
+        )
+
+        if uploaded_students:
+            df_new = pd.read_csv(uploaded_students)
+            # ensure required columns exist
+            missing = set(needed_cols) - set(df_new.columns)
+            if missing:
+                st.error(f"Missing columns in students CSV: {missing}")
+            else:
+                df_new[needed_cols].to_csv(student_file, index=False)
+                st.success("Student records restored. Refresh to reload.")
+
+        if uploaded_expenses:
+            df_new_exp = pd.read_csv(uploaded_expenses)
+            st_columns = {"Type", "Item", "Amount", "Date"}
+            if not st_columns.issubset(df_new_exp.columns):
+                st.error(f"Missing columns in expenses CSV: {st_columns - set(df_new_exp.columns)}")
+            else:
+                df_new_exp.to_csv(expenses_file, index=False)
+                st.success("Expense records restored. Refresh to reload.")
 
     # Parse ContractEnd safely
     df_main["ContractEnd"] = pd.to_datetime(df_main["ContractEnd"], errors="coerce")
