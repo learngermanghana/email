@@ -312,31 +312,71 @@ with tabs[5]:
 
 with tabs[6]:
     st.title("📧 Send Email")
-    mode = st.radio("To",["Individual","All"])
-    if mode=="Individual":
-        choices = [f"{r.Name} ({r.Email})" for _,r in df_main.iterrows() if "@" in str(r.Phone)]
-        sel = st.selectbox("Pick", choices)
-        rec = sel.split("(")[-1].rstrip(")")
+
+    # Build list of (display, email) pairs
+    email_list = [
+        (row["Name"], row["Email"])
+        for _, row in df_main.iterrows()
+        if isinstance(row.get("Email", ""), str) and "@" in row["Email"]
+    ]
+
+    mode = st.radio("Send to", ["Individual", "All"])
+    recipients = []
+
+    if mode == "Individual":
+        if email_list:
+            choices = [f"{name} <{email}>" for name, email in email_list]
+            sel = st.selectbox("Pick a student", choices, index=0)
+            # Only split if sel is non‐empty
+            if sel:
+                # extract the email between <> 
+                recipients = [ sel.split("<",1)[1].rstrip(">") ]
+        else:
+            st.info("No student emails on file.")
     else:
-        rec = [r for _,r in df_main["Email"].dropna().iteritems() if "@" in r]
-    subj = st.text_input("Subject")
-    body = st.text_area("Body",height=150)
-    attach = st.file_uploader("Attachment", type=["pdf"])
+        # all students
+        recipients = [email for _, email in email_list]
+
+    subject = st.text_input("Subject", value="Information from Learn Language Education Academy")
+    body    = st.text_area("Body (HTML allowed)", height=150, value="Dear Student,\n\n")
+    attach  = st.file_uploader("Attach a file (optional)", type=["pdf","jpg","png","docx"])
+
     if st.button("Send"):
-        att = None
-        if attach:
-            data = attach.read(); enc = base64.b64encode(data).decode()
-            att = Attachment(FileContent(enc),FileName(attach.name),FileType(attach.type),Disposition("attachment"))
-        sent=0; fail=[]
-        for e in ([rec] if isinstance(rec,str) else rec):
-            msg=Mail(from_email=school_sender_email,to_emails=e,subject=subj,html_content=body.replace("\n","<br>"))
-            if att: msg.attachment=att
-            try:
-                SendGridAPIClient(school_sendgrid_key).send(msg)
-                sent+=1
-            except:
-                fail.append(e)
-        st.success(f"Sent: {sent}, Fail: {fail}")
+        if not recipients:
+            st.error("No recipients selected.")
+        else:
+            # build attachment if any
+            attachment = None
+            if attach:
+                data = attach.read()
+                enc  = base64.b64encode(data).decode()
+                attachment = Attachment(
+                    FileContent(enc),
+                    FileName(attach.name),
+                    FileType(attach.type),
+                    Disposition("attachment")
+                )
+
+            sent, failed = 0, []
+            for to_addr in recipients:
+                msg = Mail(
+                    from_email=school_sender_email,
+                    to_emails=to_addr,
+                    subject=subject,
+                    html_content=body.replace("\n","<br>")
+                )
+                if attachment:
+                    msg.attachment = attachment
+
+                try:
+                    SendGridAPIClient(school_sendgrid_key).send(msg)
+                    sent += 1
+                except Exception:
+                    failed.append(to_addr)
+
+            st.success(f"Sent: {sent}")
+            if failed:
+                st.warning(f"Failed: {', '.join(failed)}")
 
 with tabs[7]:
     st.title("📊 Analytics & Export")
