@@ -517,36 +517,36 @@ with tabs[1]:
                     st.success("Receipt ready!")
 
     # ── Upload CSV Backup (overwrite all) ──
-    with st.expander("🔄 Upload CSV Backup (overwrite all)", expanded=False):
-        uploaded_students = st.file_uploader(
-            "Choose students_simple.csv", type="csv", key="upload_students"
-        )
-        uploaded_expenses = st.file_uploader(
-            "Choose expenses_all.csv", type="csv", key="upload_expenses"
-        )
+with st.expander("🔄 Upload CSV Backup (overwrite all)", expanded=False):
+    uploaded_students = st.file_uploader(
+        "Upload students_simple.csv", type="csv", key="upload_students"
+    )
+    uploaded_expenses = st.file_uploader(
+        "Upload expenses_all.csv", type="csv", key="upload_expenses"
+    )
 
-        # Students overwrite
-        if uploaded_students is not None:
-            df_new = pd.read_csv(uploaded_students)
-            missing = set(needed_cols) - set(df_new.columns)
-            if missing:
-                st.error(f"Students CSV missing columns: {missing}")
-            else:
-                df_new[needed_cols].to_csv(student_file, index=False)
-                st.success("students_simple.csv replaced! Reloading…")
-                st.rerun()
+    # Overwrite students file
+    if uploaded_students is not None:
+        df_new = pd.read_csv(uploaded_students)
+        missing = set(needed_cols) - set(df_new.columns)
+        if missing:
+            st.error(f"Students CSV missing columns: {missing}")
+        else:
+            df_new[needed_cols].to_csv(student_file, index=False)
+            st.success("students_simple.csv replaced! Reloading…")
+            st.rerun()
 
-        # Expenses overwrite
-        if uploaded_expenses is not None:
-            df_exp = pd.read_csv(uploaded_expenses)
-            exp_cols = {"Type", "Item", "Amount", "Date"}
-            missing = exp_cols - set(df_exp.columns)
-            if missing:
-                st.error(f"Expenses CSV missing columns: {missing}")
-            else:
-                df_exp.to_csv(expenses_file, index=False)
-                st.success("expenses_all.csv replaced! Reloading…")
-                st.rerun()
+    # Overwrite expenses file
+    if uploaded_expenses is not None:
+        df_new_exp = pd.read_csv(uploaded_expenses)
+        exp_cols = {"Type", "Item", "Amount", "Date"}
+        missing = exp_cols - set(df_new_exp.columns)
+        if missing:
+            st.error(f"Expenses CSV missing columns: {missing}")
+        else:
+            df_new_exp.to_csv(expenses_file, index=False)
+            st.success("expenses_all.csv replaced! Reloading…")
+            st.rerun()
 
 # ============ ADD STUDENT MANUALLY ============
 with tabs[2]:
