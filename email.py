@@ -386,7 +386,6 @@ For help, contact us at {SCHOOL_EMAIL} or {SCHOOL_PHONE}.
                     st.success(f"✅ {fullname} approved and saved.")
                     st.rerun()
 
-
 with tabs[1]:
     st.title("👩‍🎓 All Students (Edit, Update, Delete, Receipt)")
     today = date.today()
@@ -397,8 +396,8 @@ with tabs[1]:
     else:
         df_main = pd.DataFrame()
 
-    # Ensure required columns exist
-    required_cols = ["Name", "Phone", "Location", "Level", "Paid", "Balance", "ContractStart", "ContractEnd", "StudentCode"]
+    # ✅ Include Email in required columns
+    required_cols = ["Name", "Phone", "Email", "Location", "Level", "Paid", "Balance", "ContractStart", "ContractEnd", "StudentCode"]
     for col in required_cols:
         if col not in df_main.columns:
             df_main[col] = ""
@@ -418,6 +417,7 @@ with tabs[1]:
         for idx, row in view_df.iterrows():
             name = row.get("Name", "")
             phone = row.get("Phone", "")
+            email = row.get("Email", "")
             location = row.get("Location", "")
             level = row.get("Level", "")
             paid = float(row.get("Paid", 0))
@@ -432,6 +432,7 @@ with tabs[1]:
             with st.expander(f"{name} ({student_code}) [{status}]"):
                 name_input = st.text_input("Name", value=name, key=f"name_{unique_key}")
                 phone_input = st.text_input("Phone", value=phone, key=f"phone_{unique_key}")
+                email_input = st.text_input("Email", value=email, key=f"email_{unique_key}")  # ✅ Show email
                 location_input = st.text_input("Location", value=location, key=f"loc_{unique_key}")
                 level_input = st.text_input("Level", value=level, key=f"level_{unique_key}")
                 paid_input = st.number_input("Paid", value=paid, key=f"paid_{unique_key}")
@@ -446,6 +447,7 @@ with tabs[1]:
                     if st.button("💾 Update", key=f"update_{unique_key}"):
                         df_main.at[idx, "Name"] = name_input
                         df_main.at[idx, "Phone"] = phone_input
+                        df_main.at[idx, "Email"] = email_input  # ✅ Save email
                         df_main.at[idx, "Location"] = location_input
                         df_main.at[idx, "Level"] = level_input
                         df_main.at[idx, "Paid"] = paid_input
