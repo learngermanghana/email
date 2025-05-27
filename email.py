@@ -456,20 +456,22 @@ with tabs[1]:
     else:
         df_main["Status"] = "Unknown"
 
+    # 🔄 Live Search and Filters
+    search_term = st.text_input("🔍 Search Student by Name or Code")
+    selected_level = st.selectbox("📋 Filter by Class Level", ["All"] + sorted(df_main["Level"].dropna().unique().tolist()))
     status_filter = st.selectbox("Filter by Status", ["All", "Enrolled", "Completed"])
-    view_df = df_main if status_filter == "All" else df_main[df_main["Status"] == status_filter]
 
-    # 🔍 Add Search Bar
-    search_query = st.text_input("🔍 Search by name, student code, level, or phone")
-    if search_query:
-        query_lower = search_query.lower()
-        view_df = view_df[
-            view_df["Name"].str.lower().str.contains(query_lower)
-            | view_df["StudentCode"].str.lower().str.contains(query_lower)
-            | view_df["Phone"].astype(str).str.contains(query_lower)
-            | view_df["Level"].str.lower().str.contains(query_lower)
-        ]
+    view_df = df_main.copy()
 
+    if search_term:
+        view_df = view_df[view_df["Name"].str.contains(search_term, case=False, na=False) |
+                          view_df["StudentCode"].str.contains(search_term, case=False, na=False)]
+
+    if selected_level != "All":
+        view_df = view_df[view_df["Level"] == selected_level]
+
+    if status_filter != "All":
+        view_df = view_df[view_df["Status"] == status_filter]
 
     if not view_df.empty:
         for idx, row in view_df.iterrows():
@@ -487,8 +489,9 @@ with tabs[1]:
             status = row.get("Status", "Unknown")
 
             unique_key = f"{student_code}_{idx}"
+            status_color = "🟢" if status == "Enrolled" else "🔴"
 
-            with st.expander(f"{name} ({student_code}) [{status}]"):
+            with st.expander(f"{status_color} {name} ({student_code}) [{status}]"):
                 name_input = st.text_input("Name", value=name, key=f"name_{unique_key}")
                 phone_input = st.text_input("Phone", value=phone, key=f"phone_{unique_key}")
                 email_input = st.text_input("Email", value=email, key=f"email_{unique_key}")
@@ -546,6 +549,7 @@ with tabs[1]:
                             st.markdown(download_link, unsafe_allow_html=True)
     else:
         st.info("No students found in your database.")
+
 
 
 with tabs[2]:
