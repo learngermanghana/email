@@ -501,82 +501,85 @@ with tabs[5]:
             st.success("✅ PDF contract generated.")
     else:
         st.warning("No student data available.")
-
 with tabs[6]:
     st.title("📧 Send Email to Student(s)")
 
     # Normalize column names
     df_main.columns = [c.strip().lower() for c in df_main.columns]
 
-    # Ensure 'email' column exists
     if "email" not in df_main.columns:
-        st.warning("⚠️ Column 'email' not found in your data. Please add it manually or via form.")
+        st.warning("⚠️ Column 'email' not found in your data.")
+        recipients = []
     else:
+        # Build valid email entries
         email_entries = [(row["name"], row["email"]) for _, row in df_main.iterrows()
                          if isinstance(row.get("email", ""), str) and "@" in row.get("email", "")]
         email_options = [f"{name} ({email})" for name, email in email_entries]
         email_lookup = {f"{name} ({email})": email for name, email in email_entries}
 
-        # Show selection even if email_entries is empty
+        # Email mode selection
         mode = st.radio("Send email to:", ["Individual student", "All students with email"])
 
+        recipients = []
         if mode == "Individual student":
             if email_options:
                 selected = st.selectbox("Select student", email_options)
                 recipients = [email_lookup[selected]]
             else:
                 st.warning("⚠️ No valid student email addresses found.")
-                recipients = []
-        else:
+        elif mode == "All students with email":
             recipients = [email for _, email in email_entries]
 
-        subject = st.text_input("Subject", value="Information from Learn Language Education Academy")
-        message = st.text_area("Message Body (plain text or HTML)", value="Dear Student,\n\n...", height=200)
-        file_upload = st.file_uploader("Attach a file (optional)", type=["pdf", "doc", "jpg", "png", "jpeg"])
+    # Always show email composition controls
+    subject = st.text_input("Email Subject", value="Information from Learn Language Education Academy")
+    message = st.text_area("Message Body (plain text or HTML)", value="Dear Student,\n\n...", height=200)
+    file_upload = st.file_uploader("Attach a file (optional)", type=["pdf", "doc", "jpg", "png", "jpeg"])
 
-        if st.button("Send Email"):
-            if not recipients:
-                st.warning("❗ No recipients to send to.")
+    # Send button
+    if st.button("Send Email"):
+        if not recipients:
+            st.warning("❗ No recipients selected.")
+            st.stop()
+
+        sent = 0
+        failed = []
+        attachment = None
+
+        if file_upload:
+            try:
+                file_data = file_upload.read()
+                encoded = base64.b64encode(file_data).decode()
+                attachment = Attachment(
+                    FileContent(encoded),
+                    FileName(file_upload.name),
+                    FileType(file_upload.type),
+                    Disposition("attachment")
+                )
+            except Exception as e:
+                st.error(f"❌ Failed to process attachment: {e}")
                 st.stop()
 
-            sent = 0
-            failed = []
-            attachment = None
+        for email in recipients:
+            try:
+                msg = Mail(
+                    from_email=school_sender_email,
+                    to_emails=email,
+                    subject=subject,
+                    html_content=message.replace("\n", "<br>")
+                )
+                if attachment:
+                    msg.attachment = attachment
 
-            if file_upload:
-                try:
-                    file_data = file_upload.read()
-                    encoded = base64.b64encode(file_data).decode()
-                    attachment = Attachment(
-                        FileContent(encoded),
-                        FileName(file_upload.name),
-                        FileType(file_upload.type),
-                        Disposition("attachment")
-                    )
-                except Exception as e:
-                    st.error(f"❌ Failed to process attachment: {e}")
-                    st.stop()
+                client = SendGridAPIClient(school_sendgrid_key)
+                client.send(msg)
+                sent += 1
+            except Exception as e:
+                failed.append(email)
 
-            for email in recipients:
-                try:
-                    msg = Mail(
-                        from_email=school_sender_email,
-                        to_emails=email,
-                        subject=subject,
-                        html_content=message.replace("\n", "<br>")
-                    )
-                    if attachment:
-                        msg.attachment = attachment
+        st.success(f"✅ Sent to {sent} student(s).")
+        if failed:
+            st.warning(f"⚠️ Failed to send to: {', '.join(failed)}")
 
-                    client = SendGridAPIClient(school_sendgrid_key)
-                    client.send(msg)
-                    sent += 1
-                except Exception as e:
-                    failed.append(email)
-
-            st.success(f"✅ Sent to {sent} student(s)")
-            if failed:
-                st.warning(f"⚠️ Failed to send to: {', '.join(failed)}")
 
 with tabs[7]:
     st.title("📊 Analytics & Export")
