@@ -545,6 +545,7 @@ with tabs[2]:
         phone = st.text_input("Phone Number")
         email = st.text_input("Email Address")
         location = st.text_input("Location")
+        emergency = st.text_input("Emergency Contact (Phone Number)")
         level = st.selectbox("Class Level", ["A1", "A2", "B1", "B2", "C1", "C2"])
         paid = st.number_input("Amount Paid (GHS)", min_value=0.0, step=1.0)
         balance = st.number_input("Balance Due (GHS)", min_value=0.0, step=1.0)
@@ -564,7 +565,8 @@ with tabs[2]:
                     existing_df = pd.read_csv(student_file)
                 else:
                     existing_df = pd.DataFrame(columns=[
-                        "Name", "Phone", "Email", "Location", "Level", "Paid", "Balance", "ContractStart", "ContractEnd", "StudentCode"
+                        "Name", "Phone", "Email", "Location", "Level", "Paid", "Balance",
+                        "ContractStart", "ContractEnd", "StudentCode", "Emergency Contact (Phone Number)"
                     ])
 
                 if student_code in existing_df["StudentCode"].values:
@@ -581,7 +583,8 @@ with tabs[2]:
                     "Balance": balance,
                     "ContractStart": str(contract_start),
                     "ContractEnd": str(contract_end),
-                    "StudentCode": student_code
+                    "StudentCode": student_code,
+                    "Emergency Contact (Phone Number)": emergency
                 }])
 
                 updated_df = pd.concat([existing_df, new_row], ignore_index=True)
