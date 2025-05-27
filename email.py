@@ -252,12 +252,17 @@ For help, contact us at {SCHOOL_EMAIL} or {SCHOOL_PHONE}.
 
                 st.success(f"✅ {fullname} approved and saved.")
 
-
 with tabs[1]:
     st.title("👩‍🎓 All Students (Edit, Update, Delete, Receipt)")
     today = date.today()
 
-    # Status tagging based on ContractEnd
+    # Ensure required columns exist
+    required_cols = ["Name", "Phone", "Location", "Level", "Paid", "Balance", "ContractStart", "ContractEnd", "StudentCode"]
+    for col in required_cols:
+        if col not in df_main.columns:
+            df_main[col] = ""
+
+    # Status tagging
     if not df_main.empty and "ContractEnd" in df_main.columns:
         df_main["Status"] = df_main["ContractEnd"].apply(
             lambda x: "Completed" if pd.to_datetime(str(x), errors='coerce').date() < today else "Enrolled"
@@ -270,31 +275,44 @@ with tabs[1]:
 
     if not view_df.empty:
         for idx, row in view_df.iterrows():
-            unique_key = f"{row['StudentCode']}_{idx}"
-            with st.expander(f"{row['Name']} ({row['StudentCode']}) [{row['Status']}]"):
-                name = st.text_input("Name", value=row["Name"], key=f"name_{unique_key}")
-                phone = st.text_input("Phone", value=row["Phone"], key=f"phone_{unique_key}")
-                location = st.text_input("Location", value=row["Location"], key=f"loc_{unique_key}")
-                level = st.text_input("Level", value=row["Level"], key=f"level_{unique_key}")
-                paid = st.number_input("Paid", value=float(row["Paid"]), key=f"paid_{unique_key}")
-                balance = st.number_input("Balance", value=float(row["Balance"]), key=f"bal_{unique_key}")
-                contract_start = st.text_input("Contract Start", value=str(row["ContractStart"]), key=f"cs_{unique_key}")
-                contract_end = st.text_input("Contract End", value=str(row["ContractEnd"]), key=f"ce_{unique_key}")
-                student_code = st.text_input("Student Code", value=row["StudentCode"], key=f"code_{unique_key}")
+            # Safe fallback values
+            name = row.get("Name", "")
+            phone = row.get("Phone", "")
+            location = row.get("Location", "")
+            level = row.get("Level", "")
+            paid = float(row.get("Paid", 0))
+            balance = float(row.get("Balance", 0))
+            contract_start = str(row.get("ContractStart", ""))
+            contract_end = str(row.get("ContractEnd", ""))
+            student_code = row.get("StudentCode", "")
+            status = row.get("Status", "Unknown")
+
+            unique_key = f"{student_code}_{idx}"
+
+            with st.expander(f"{name} ({student_code}) [{status}]"):
+                name_input = st.text_input("Name", value=name, key=f"name_{unique_key}")
+                phone_input = st.text_input("Phone", value=phone, key=f"phone_{unique_key}")
+                location_input = st.text_input("Location", value=location, key=f"loc_{unique_key}")
+                level_input = st.text_input("Level", value=level, key=f"level_{unique_key}")
+                paid_input = st.number_input("Paid", value=paid, key=f"paid_{unique_key}")
+                balance_input = st.number_input("Balance", value=balance, key=f"bal_{unique_key}")
+                contract_start_input = st.text_input("Contract Start", value=contract_start, key=f"cs_{unique_key}")
+                contract_end_input = st.text_input("Contract End", value=contract_end, key=f"ce_{unique_key}")
+                student_code_input = st.text_input("Student Code", value=student_code, key=f"code_{unique_key}")
 
                 col1, col2, col3 = st.columns(3)
 
                 with col1:
                     if st.button("💾 Update", key=f"update_{unique_key}"):
-                        df_main.at[idx, "Name"] = name
-                        df_main.at[idx, "Phone"] = phone
-                        df_main.at[idx, "Location"] = location
-                        df_main.at[idx, "Level"] = level
-                        df_main.at[idx, "Paid"] = paid
-                        df_main.at[idx, "Balance"] = balance
-                        df_main.at[idx, "ContractStart"] = contract_start
-                        df_main.at[idx, "ContractEnd"] = contract_end
-                        df_main.at[idx, "StudentCode"] = student_code
+                        df_main.at[idx, "Name"] = name_input
+                        df_main.at[idx, "Phone"] = phone_input
+                        df_main.at[idx, "Location"] = location_input
+                        df_main.at[idx, "Level"] = level_input
+                        df_main.at[idx, "Paid"] = paid_input
+                        df_main.at[idx, "Balance"] = balance_input
+                        df_main.at[idx, "ContractStart"] = contract_start_input
+                        df_main.at[idx, "ContractEnd"] = contract_end_input
+                        df_main.at[idx, "StudentCode"] = student_code_input
                         df_main.to_csv(student_file, index=False)
                         st.success("✅ Student updated.")
                         st.rerun()
@@ -310,15 +328,18 @@ with tabs[1]:
                     if st.button("📄 Receipt", key=f"receipt_{unique_key}"):
                         pdf_path = generate_receipt_and_contract_pdf(
                             row,
-                            st.session_state["agreement_template"],
-                            payment_amount=paid,
-                            payment_date=date.today()
+                            st.session_state.get("agreement_template", ""),
+                            payment_amount=paid_input,
+                            payment_date=today
                         )
                         with open(pdf_path, "rb") as f:
                             pdf_bytes = f.read()
                             b64 = base64.b64encode(pdf_bytes).decode()
-                            href = f'<a href="data:application/pdf;base64,{b64}" download="{row["Name"].replace(" ", "_")}_receipt.pdf">Download PDF</a>'
-                            st.markdown(href, unsafe_allow_html=True)
+                            download_link = f'<a href="data:application/pdf;base64,{b64}" download="{name.replace(" ", "_")}_receipt.pdf">Download PDF</a>'
+                            st.markdown(download_link, unsafe_allow_html=True)
+    else:
+        st.info("No students found in your database.")
+
 
 with tabs[2]:
     st.title("➕ Add Student Manually")
