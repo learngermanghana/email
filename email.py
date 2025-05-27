@@ -31,7 +31,6 @@ school_sender_email = st.secrets["general"].get("SENDER_EMAIL", SCHOOL_EMAIL)
 # === SESSION STATE INIT ===
 if "emailed_expiries" not in st.session_state:
     st.session_state["emailed_expiries"] = set()
-
 def generate_receipt_and_contract_pdf(
     student_row,
     agreement_text,
@@ -48,81 +47,76 @@ def generate_receipt_and_contract_pdf(
     elif isinstance(payment_date, str):
         payment_date = pd.to_datetime(payment_date, errors="coerce").date()
 
-    # Parse Paid and Balance
     paid = float(student_row.get("Paid", 0))
     balance = float(student_row.get("Balance", 0))
     total_fee = paid + balance
 
+    second_due_date = ""
     try:
         second_due_date = payment_date + timedelta(days=30)
     except:
-        second_due_date = ""
+        pass
 
-    # Payment badge
-    if balance == 0:
-        payment_status = "FULLY PAID"
-    else:
-        payment_status = f"INSTALLMENT PLAN - GHS {balance:.2f} remaining"
+    payment_status = "FULLY PAID" if balance == 0 else "INSTALLMENT PLAN"
 
-    # Fill agreement text
+    # Replace placeholders in agreement
     filled = agreement_text.replace("[STUDENT_NAME]", student_row["Name"]) \
         .replace("[DATE]", str(payment_date)) \
         .replace("[CLASS]", student_row["Level"]) \
         .replace("[AMOUNT]", str(payment_amount)) \
         .replace("[FIRST_INSTALMENT]", str(first_instalment)) \
-        .replace("[SECOND_INSTALMENT]", str(balance)) \
+        .replace("[SECOND_INSTALMENT]", "your balance") \
         .replace("[SECOND_DUE_DATE]", str(second_due_date)) \
         .replace("[COURSE_LENGTH]", str(course_length))
 
-    # Create PDF
+    def safe(txt):
+        return str(txt).encode("latin-1", "replace").decode("latin-1")
+
     pdf = FPDF()
     pdf.add_page()
 
+    # Header
     pdf.set_font("Arial", size=14)
-    pdf.cell(200, 10, f"{SCHOOL_NAME} Payment Receipt".encode("latin-1", "replace").decode("latin-1"), ln=True, align="C")
+    pdf.cell(200, 10, safe(f"{SCHOOL_NAME} Payment Receipt"), ln=True, align="C")
 
-    # Badge
     pdf.set_font("Arial", 'B', size=12)
     pdf.set_text_color(0, 128, 0)
-    pdf.cell(200, 10, payment_status.encode("latin-1", "replace").decode("latin-1"), ln=True, align="C")
+    pdf.cell(200, 10, safe(payment_status), ln=True, align="C")
     pdf.set_text_color(0, 0, 0)
 
-    # Receipt Info
     pdf.set_font("Arial", size=12)
     pdf.ln(10)
-    pdf.cell(200, 10, f"Name: {student_row['Name']}".encode("latin-1", "replace").decode("latin-1"), ln=True)
-    pdf.cell(200, 10, f"Student Code: {student_row['StudentCode']}".encode("latin-1", "replace").decode("latin-1"), ln=True)
-    pdf.cell(200, 10, f"Phone: {student_row['Phone']}".encode("latin-1", "replace").decode("latin-1"), ln=True)
-    pdf.cell(200, 10, f"Level: {student_row['Level']}".encode("latin-1", "replace").decode("latin-1"), ln=True)
+    pdf.cell(200, 10, safe(f"Name: {student_row['Name']}"), ln=True)
+    pdf.cell(200, 10, safe(f"Student Code: {student_row['StudentCode']}"), ln=True)
+    pdf.cell(200, 10, safe(f"Phone: {student_row['Phone']}"), ln=True)
+    pdf.cell(200, 10, safe(f"Level: {student_row['Level']}"), ln=True)
     pdf.cell(200, 10, f"Amount Paid: GHS {paid:.2f}", ln=True)
     pdf.cell(200, 10, f"Balance Due: GHS {balance:.2f}", ln=True)
     pdf.cell(200, 10, f"Total Course Fee: GHS {total_fee:.2f}", ln=True)
-    pdf.cell(200, 10, f"Contract Start: {student_row['ContractStart']}", ln=True)
-    pdf.cell(200, 10, f"Contract End: {student_row['ContractEnd']}", ln=True)
+    pdf.cell(200, 10, safe(f"Contract Start: {student_row['ContractStart']}"), ln=True)
+    pdf.cell(200, 10, safe(f"Contract End: {student_row['ContractEnd']}"), ln=True)
     pdf.cell(200, 10, f"Receipt Date: {payment_date}", ln=True)
     pdf.ln(10)
-    pdf.cell(0, 10, "Thank you for your payment!", ln=True)
-    pdf.cell(0, 10, "Signed: Felix Asadu", ln=True)
+    pdf.cell(0, 10, safe("Thank you for your payment!"), ln=True)
+    pdf.cell(0, 10, safe("Signed: Felix Asadu"), ln=True)
 
-    # Contract section
     pdf.ln(15)
     pdf.set_font("Arial", size=14)
-    pdf.cell(200, 10, f"{SCHOOL_NAME} Student Contract".encode("latin-1", "replace").decode("latin-1"), ln=True, align="C")
+    pdf.cell(200, 10, safe(f"{SCHOOL_NAME} Student Contract"), ln=True, align="C")
 
     pdf.set_font("Arial", size=12)
     pdf.ln(10)
-    filled = filled.encode("latin-1", "replace").decode("latin-1")
     for line in filled.split("\n"):
-        pdf.multi_cell(0, 10, line)
+        pdf.multi_cell(0, 10, safe(line))
 
     pdf.ln(10)
-    pdf.cell(0, 10, "Signed: Felix Asadu", ln=True)
+    pdf.cell(0, 10, safe("Signed: Felix Asadu"), ln=True)
 
     # Footer timestamp
     pdf.set_y(-15)
     pdf.set_font("Arial", "I", 8)
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-    pdf.cell(0, 10, f"Generated on {now_str}".encode("latin-1", "replace").decode("latin-1"), align="C")
+    pdf.cell(0, 10, safe(f"Generated on {now_str}"), align="C")
 
     filename = f"{student_row['Name'].replace(' ', '_')}_receipt_contract.pdf"
     pdf.output(filename)
