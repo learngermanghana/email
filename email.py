@@ -229,6 +229,17 @@ else:
     </div>
     """, unsafe_allow_html=True)
 
+# ✅ Place this ABOVE any tab block
+tabs = st.tabs([
+    "📝 Pending Registrations",
+    "👩‍🎓 All Students",
+    "➕ Add Student",
+    "💵 Expenses",
+    "📲 WhatsApp Reminders",
+    "📄 Generate Contract PDF",
+    "📧 Send Email",
+    "📊 Analytics & Export"
+])
 
 # === TAB 0: PENDING REGISTRATIONS ===
 with tabs[0]:
