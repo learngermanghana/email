@@ -436,7 +436,6 @@ For help, contact us at {SCHOOL_EMAIL} or {SCHOOL_PHONE}.
                     st.success(f"✅ {fullname} approved and saved.")
                     st.session_state["should_rerun"] = True
  
-# === TAB 1: ALL STUDENTS ===
 with tabs[1]:
     st.title("👩‍🎓 All Students (Edit, Update, Delete, Receipt)")
     today = date.today()
@@ -446,7 +445,7 @@ with tabs[1]:
     else:
         df_main = pd.DataFrame()
 
-    required_cols = ["Name", "Phone", "Email", "Location", "Level", "Paid", "Balance", "ContractStart", "ContractEnd", "StudentCode"]
+    required_cols = ["Name", "Phone", "Email", "Location", "Level", "Paid", "Balance", "ContractStart", "ContractEnd", "StudentCode", "Emergency Contact (Phone Number)"]
     for col in required_cols:
         if col not in df_main.columns:
             df_main[col] = ""
@@ -473,6 +472,7 @@ with tabs[1]:
             contract_start = str(row.get("ContractStart", ""))
             contract_end = str(row.get("ContractEnd", ""))
             student_code = row.get("StudentCode", "")
+            emergency = row.get("Emergency Contact (Phone Number)", "")
             status = row.get("Status", "Unknown")
 
             unique_key = f"{student_code}_{idx}"
@@ -488,6 +488,7 @@ with tabs[1]:
                 contract_start_input = st.text_input("Contract Start", value=contract_start, key=f"cs_{unique_key}")
                 contract_end_input = st.text_input("Contract End", value=contract_end, key=f"ce_{unique_key}")
                 student_code_input = st.text_input("Student Code", value=student_code, key=f"code_{unique_key}")
+                emergency_input = st.text_input("Emergency Contact", value=emergency, key=f"em_{unique_key}")
 
                 col1, col2, col3 = st.columns(3)
 
@@ -503,6 +504,7 @@ with tabs[1]:
                         df_main.at[idx, "ContractStart"] = contract_start_input
                         df_main.at[idx, "ContractEnd"] = contract_end_input
                         df_main.at[idx, "StudentCode"] = student_code_input
+                        df_main.at[idx, "Emergency Contact (Phone Number)"] = emergency_input
                         df_main.to_csv(student_file, index=False)
                         st.success("✅ Student updated.")
                         st.rerun()
@@ -519,21 +521,8 @@ with tabs[1]:
                         total_fee = paid_input + balance_input
                         parsed_date = pd.to_datetime(contract_start_input, errors="coerce").date()
 
-                        student_dict = {
-                            "Name": name_input,
-                            "Phone": phone_input,
-                            "Email": email_input,
-                            "Location": location_input,
-                            "Level": level_input,
-                            "Paid": paid_input,
-                            "Balance": balance_input,
-                            "ContractStart": contract_start_input,
-                            "ContractEnd": contract_end_input,
-                            "StudentCode": student_code_input
-                        }
-
                         pdf_path = generate_receipt_and_contract_pdf(
-                            student_dict,
+                            row,
                             st.session_state.get("agreement_template", ""),
                             payment_amount=total_fee,
                             payment_date=parsed_date
