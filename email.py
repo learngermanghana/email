@@ -501,44 +501,59 @@ with tabs[5]:
             st.success("✅ PDF contract generated.")
     else:
         st.warning("No student data available.")
+
 with tabs[6]:
     st.title("📧 Send Email to Student(s)")
 
     # Normalize column names
     df_main.columns = [c.strip().lower() for c in df_main.columns]
 
+    # Ensure 'email' column exists
     if "email" not in df_main.columns:
-        st.warning("⚠️ Column 'email' not found in your data.")
-        recipients = []
-    else:
-        # Build valid email entries
-        email_entries = [(row["name"], row["email"]) for _, row in df_main.iterrows()
-                         if isinstance(row.get("email", ""), str) and "@" in row.get("email", "")]
-        email_options = [f"{name} ({email})" for name, email in email_entries]
-        email_lookup = {f"{name} ({email})": email for name, email in email_entries}
+        df_main["email"] = ""
 
-        # Email mode selection
-        mode = st.radio("Send email to:", ["Individual student", "All students with email"])
+    # Get students with valid emails
+    email_entries = [(row["name"], row["email"]) for _, row in df_main.iterrows()
+                     if isinstance(row.get("email", ""), str) and "@" in row.get("email", "")]
+    email_options = [f"{name} ({email})" for name, email in email_entries]
+    email_lookup = {f"{name} ({email})": email for name, email in email_entries}
 
-        recipients = []
-        if mode == "Individual student":
-            if email_options:
-                selected = st.selectbox("Select student", email_options)
-                recipients = [email_lookup[selected]]
-            else:
-                st.warning("⚠️ No valid student email addresses found.")
-        elif mode == "All students with email":
+    st.markdown("### 👤 Choose Recipients")
+
+    mode = st.radio("Send email to:", ["Individual student", "All students with email", "Manual entry"])
+
+    recipients = []
+
+    if mode == "Individual student":
+        if email_options:
+            selected = st.selectbox("Select student", email_options)
+            recipients = [email_lookup[selected]]
+        else:
+            st.warning("⚠️ No valid student emails found in your database.")
+
+    elif mode == "All students with email":
+        if email_entries:
             recipients = [email for _, email in email_entries]
+            st.info(f"✅ {len(recipients)} student(s) will receive this email.")
+        else:
+            st.warning("⚠️ No student emails found. Upload a proper student file or update emails.")
 
-    # Always show email composition controls
+    elif mode == "Manual entry":
+        manual_email = st.text_input("Enter email address manually")
+        if "@" in manual_email:
+            recipients = [manual_email]
+        else:
+            st.warning("Enter a valid email address to proceed.")
+
+    st.markdown("### ✍️ Compose Message")
     subject = st.text_input("Email Subject", value="Information from Learn Language Education Academy")
-    message = st.text_area("Message Body (plain text or HTML)", value="Dear Student,\n\n...", height=200)
-    file_upload = st.file_uploader("Attach a file (optional)", type=["pdf", "doc", "jpg", "png", "jpeg"])
+    message = st.text_area("Message Body (HTML or plain text)", value="Dear Student,\n\n...", height=200)
 
-    # Send button
+    file_upload = st.file_uploader("📎 Attach a file (optional)", type=["pdf", "doc", "jpg", "png", "jpeg"])
+
     if st.button("Send Email"):
         if not recipients:
-            st.warning("❗ No recipients selected.")
+            st.warning("❗ Please select or enter at least one email address.")
             st.stop()
 
         sent = 0
