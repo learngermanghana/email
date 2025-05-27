@@ -400,19 +400,16 @@ with tabs[1]:
     st.title("👩‍🎓 All Students (Edit, Update, Delete, Receipt)")
     today = date.today()
 
-    # ✅ Always reload from CSV
     if os.path.exists(student_file):
         df_main = pd.read_csv(student_file)
     else:
         df_main = pd.DataFrame()
 
-    # ✅ Include Email in required columns
     required_cols = ["Name", "Phone", "Email", "Location", "Level", "Paid", "Balance", "ContractStart", "ContractEnd", "StudentCode"]
     for col in required_cols:
         if col not in df_main.columns:
             df_main[col] = ""
 
-    # Status tagging
     if not df_main.empty and "ContractEnd" in df_main.columns:
         df_main["Status"] = df_main["ContractEnd"].apply(
             lambda x: "Completed" if pd.to_datetime(str(x), errors='coerce').date() < today else "Enrolled"
@@ -442,7 +439,7 @@ with tabs[1]:
             with st.expander(f"{name} ({student_code}) [{status}]"):
                 name_input = st.text_input("Name", value=name, key=f"name_{unique_key}")
                 phone_input = st.text_input("Phone", value=phone, key=f"phone_{unique_key}")
-                email_input = st.text_input("Email", value=email, key=f"email_{unique_key}")  # ✅ Show email
+                email_input = st.text_input("Email", value=email, key=f"email_{unique_key}")
                 location_input = st.text_input("Location", value=location, key=f"loc_{unique_key}")
                 level_input = st.text_input("Level", value=level, key=f"level_{unique_key}")
                 paid_input = st.number_input("Paid", value=paid, key=f"paid_{unique_key}")
@@ -457,7 +454,7 @@ with tabs[1]:
                     if st.button("💾 Update", key=f"update_{unique_key}"):
                         df_main.at[idx, "Name"] = name_input
                         df_main.at[idx, "Phone"] = phone_input
-                        df_main.at[idx, "Email"] = email_input  # ✅ Save email
+                        df_main.at[idx, "Email"] = email_input
                         df_main.at[idx, "Location"] = location_input
                         df_main.at[idx, "Level"] = level_input
                         df_main.at[idx, "Paid"] = paid_input
@@ -478,12 +475,17 @@ with tabs[1]:
 
                 with col3:
                     if st.button("📄 Receipt", key=f"receipt_{unique_key}"):
+                        # ✅ Calculate total fee
+                        total_fee = paid_input + balance_input
+                        parsed_date = pd.to_datetime(contract_start_input, errors="coerce").date()
+
                         pdf_path = generate_receipt_and_contract_pdf(
                             row,
                             st.session_state.get("agreement_template", ""),
-                            payment_amount=paid_input,
-                            payment_date=today
+                            payment_amount=total_fee,
+                            payment_date=parsed_date
                         )
+
                         with open(pdf_path, "rb") as f:
                             pdf_bytes = f.read()
                             b64 = base64.b64encode(pdf_bytes).decode()
