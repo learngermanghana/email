@@ -485,7 +485,7 @@ with tabs[6]:
                         )
                     except Exception as e:
                         st.error(f"❌ Failed to process attachment: {e}")
-                        return
+                        st.stop()
 
                 for email in recipients:
                     try:
