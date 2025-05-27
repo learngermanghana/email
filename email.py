@@ -474,7 +474,6 @@ with tabs[1]:
 
                 with col3:
                     if st.button("📄 Receipt", key=f"receipt_{unique_key}"):
-                        # ✅ Calculate total fee
                         total_fee = paid_input + balance_input
                         parsed_date = pd.to_datetime(contract_start_input, errors="coerce").date()
 
@@ -682,7 +681,7 @@ with tabs[5]:
             balance = float(student_row.get("Balance", 0))
             total_fee = paid + balance
 
-            # ✅ Convert ContractStart to date
+            # ✅ Parse ContractStart date safely
             raw_date = student_row.get("ContractStart", date.today())
             payment_date = pd.to_datetime(raw_date, errors="coerce").date()
 
