@@ -41,6 +41,7 @@ def generate_receipt_and_contract_pdf(
     course_length=12
 ):
     from datetime import date, timedelta, datetime
+    from fpdf import FPDF
 
     if payment_date is None:
         payment_date = date.today()
@@ -61,9 +62,9 @@ def generate_receipt_and_contract_pdf(
     if balance == 0:
         payment_status = "FULLY PAID"
     else:
-        payment_status = f"INSTALLMENT PLAN – GHS {balance:.2f} remaining"
+        payment_status = f"INSTALLMENT PLAN - GHS {balance:.2f} remaining"
 
-    # Fill in placeholders in the agreement
+    # Fill agreement text
     filled = agreement_text.replace("[STUDENT_NAME]", student_row["Name"]) \
         .replace("[DATE]", str(payment_date)) \
         .replace("[CLASS]", student_row["Level"]) \
@@ -73,28 +74,26 @@ def generate_receipt_and_contract_pdf(
         .replace("[SECOND_DUE_DATE]", str(second_due_date)) \
         .replace("[COURSE_LENGTH]", str(course_length))
 
-    # === Create PDF ===
+    # Create PDF
     pdf = FPDF()
     pdf.add_page()
 
-    # Header
     pdf.set_font("Arial", size=14)
-    pdf.cell(200, 10, f"{SCHOOL_NAME} Payment Receipt".encode('latin-1', 'replace').decode('latin-1'), ln=True, align="C")
+    pdf.cell(200, 10, f"{SCHOOL_NAME} Payment Receipt".encode("latin-1", "replace").decode("latin-1"), ln=True, align="C")
 
-    # Status badge
+    # Badge
     pdf.set_font("Arial", 'B', size=12)
     pdf.set_text_color(0, 128, 0)
-    safe_status = payment_status.encode("latin-1", "replace").decode("latin-1")
-    pdf.cell(200, 10, safe_status, ln=True, align="C")
+    pdf.cell(200, 10, payment_status.encode("latin-1", "replace").decode("latin-1"), ln=True, align="C")
     pdf.set_text_color(0, 0, 0)
 
-    # Receipt section
+    # Receipt Info
     pdf.set_font("Arial", size=12)
     pdf.ln(10)
-    pdf.cell(200, 10, f"Name: {student_row['Name']}".encode('latin-1', 'replace').decode('latin-1'), ln=True)
-    pdf.cell(200, 10, f"Student Code: {student_row['StudentCode']}".encode('latin-1', 'replace').decode('latin-1'), ln=True)
-    pdf.cell(200, 10, f"Phone: {student_row['Phone']}".encode('latin-1', 'replace').decode('latin-1'), ln=True)
-    pdf.cell(200, 10, f"Level: {student_row['Level']}".encode('latin-1', 'replace').decode('latin-1'), ln=True)
+    pdf.cell(200, 10, f"Name: {student_row['Name']}".encode("latin-1", "replace").decode("latin-1"), ln=True)
+    pdf.cell(200, 10, f"Student Code: {student_row['StudentCode']}".encode("latin-1", "replace").decode("latin-1"), ln=True)
+    pdf.cell(200, 10, f"Phone: {student_row['Phone']}".encode("latin-1", "replace").decode("latin-1"), ln=True)
+    pdf.cell(200, 10, f"Level: {student_row['Level']}".encode("latin-1", "replace").decode("latin-1"), ln=True)
     pdf.cell(200, 10, f"Amount Paid: GHS {paid:.2f}", ln=True)
     pdf.cell(200, 10, f"Balance Due: GHS {balance:.2f}", ln=True)
     pdf.cell(200, 10, f"Total Course Fee: GHS {total_fee:.2f}", ln=True)
@@ -110,26 +109,25 @@ def generate_receipt_and_contract_pdf(
     pdf.set_font("Arial", size=14)
     pdf.cell(200, 10, f"{SCHOOL_NAME} Student Contract".encode("latin-1", "replace").decode("latin-1"), ln=True, align="C")
 
-    # Safely encode agreement text
-    filled = filled.encode("latin-1", "replace").decode("latin-1")
     pdf.set_font("Arial", size=12)
     pdf.ln(10)
+    filled = filled.encode("latin-1", "replace").decode("latin-1")
     for line in filled.split("\n"):
         pdf.multi_cell(0, 10, line)
 
     pdf.ln(10)
     pdf.cell(0, 10, "Signed: Felix Asadu", ln=True)
 
-    # Timestamp footer
+    # Footer timestamp
     pdf.set_y(-15)
     pdf.set_font("Arial", "I", 8)
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-    footer_text = f"Generated on {now_str}".encode("latin-1", "replace").decode("latin-1")
-    pdf.cell(0, 10, footer_text, align="C")
+    pdf.cell(0, 10, f"Generated on {now_str}".encode("latin-1", "replace").decode("latin-1"), align="C")
 
     filename = f"{student_row['Name'].replace(' ', '_')}_receipt_contract.pdf"
     pdf.output(filename)
     return filename
+
 
 # === INITIALIZE STUDENT FILE ===
 student_file = "students_simple.csv"
