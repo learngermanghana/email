@@ -277,25 +277,25 @@ with tabs[0]:
             st.rerun()
         elif not os.path.exists("expenses_all.csv"):
             exp = pd.DataFrame(columns=["Type", "Item", "Amount", "Date"])
+            exp.to_csv("expenses_all.csv", index=False)
 
-# --- Helper function ---
-def clean_email(value):
-    return "" if pd.isna(value) else str(value).strip()
+    # --- Helper function ---
+    def clean_email(value):
+        return "" if pd.isna(value) else str(value).strip()
 
-# --- Show and approve pending students ---
-if not new_students.empty:
-    for i, row in new_students.iterrows():
-        fullname = row.get("full_name") or row.get("name") or f"Student {i}"
-        phone = row.get("phone_number") or row.get("phone") or ""
-        email = clean_email(row.get("email", ""))
-        level = row.get("class_a1a2_etc") or row.get("class") or row.get("level") or ""
-        location = row.get("location", "")
-        emergency = row.get("emergency_contact_phone_number") or row.get("emergency", "")
+    # --- Show and approve pending students ---
+    if not new_students.empty:
+        for i, row in new_students.iterrows():
+            fullname = row.get("full_name") or row.get("name") or f"Student {i}"
+            phone = row.get("phone_number") or row.get("phone") or ""
+            email = clean_email(row.get("email", ""))
+            level = row.get("class_a1a2_etc") or row.get("class") or row.get("level") or ""
+            location = row.get("location", "")
+            emergency = row.get("emergency_contact_phone_number") or row.get("emergency", "")
 
-        # This must be indented **inside the for loop**
-        with st.expander(f"{fullname} ({phone})"):
-            st.write(f"**Email:** {email if email else '—'}")
-            # your form elements...
+            with st.expander(f"{fullname} ({phone})"):
+                st.write(f"**Email:** {email if email else '—'}")
+                # (Insert form fields here)
 
             with st.expander(f"{fullname} ({phone})"):
                 st.write(f"**Email:** {email if email else '—'}")
