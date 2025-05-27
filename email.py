@@ -211,6 +211,17 @@ For help, contact us at {SCHOOL_EMAIL} or {SCHOOL_PHONE}.
 
                 st.success(f"✅ {fullname} added successfully.")
 
+tabs = st.tabs([
+    "📝 Pending Registrations",
+    "👩‍🎓 All Students",
+    "➕ Add Student",
+    "💵 Expenses",
+    "📲 WhatsApp Reminders",
+    "📄 Generate Contract PDF",
+    "📧 Send Email",
+    "📊 Analytics & Export"
+])
+
 with tabs[1]:
     st.title("👩‍🎓 All Students (Edit, Update, Delete, Receipt)")
     today = date.today()
