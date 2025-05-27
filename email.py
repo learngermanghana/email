@@ -115,9 +115,21 @@ Date: [DATE]
 Asadu Felix
 """
 
-# === PENDING REGISTRATIONS TAB ===
+# === TAB 0: PENDING REGISTRATIONS ===
 st.title("📝 Pending Student Registrations")
 
+tabs = st.tabs([
+    "📝 Pending Registrations",
+    "👩‍🎓 All Students",
+    "➕ Add Student",
+    "💵 Expenses",
+    "📲 WhatsApp Reminders",
+    "📄 Generate Contract PDF",
+    "📧 Send Email",
+    "📊 Analytics & Export"
+])
+
+# --- Load new pending students from form sheet ---
 try:
     new_students = pd.read_csv(sheet_url)
 
@@ -130,6 +142,26 @@ except Exception as e:
     st.error(f"❌ Could not load registration sheet: {e}")
     new_students = pd.DataFrame()
 
+# --- Upload CSV overrides ---
+with st.expander("📤 Upload Data"):
+    st.subheader("Upload Student CSV")
+    uploaded_student_csv = st.file_uploader("Upload students_simple.csv", type=["csv"])
+    if uploaded_student_csv:
+        df_main = pd.read_csv(uploaded_student_csv)
+        df_main.to_csv("students_simple.csv", index=False)
+        st.success("✅ Student file replaced.")
+
+    st.subheader("Upload Expenses CSV")
+    uploaded_expenses_csv = st.file_uploader("Upload expenses_all.csv", type=["csv"])
+    if uploaded_expenses_csv:
+        exp = pd.read_csv(uploaded_expenses_csv)
+        exp.to_csv("expenses_all.csv", index=False)
+        st.success("✅ Expenses file replaced.")
+    elif not os.path.exists("expenses_all.csv"):
+        exp = pd.DataFrame(columns=["Type", "Item", "Amount", "Date"])
+        exp.to_csv("expenses_all.csv", index=False)
+
+# --- Show and approve pending students ---
 if not new_students.empty:
     for i, row in new_students.iterrows():
         fullname = row.get("full_name") or row.get("name") or f"Student {i}"
@@ -140,7 +172,7 @@ if not new_students.empty:
         emergency = row.get("emergency_contact_phone_number") or row.get("emergency", "")
 
         with st.expander(f"{fullname} ({phone})"):
-            st.write(f"**Email:** {email}")
+            st.write(f"**Email:** {email if email else '—'}")
             student_code = st.text_input("Assign Student Code", key=f"code_{i}")
             contract_start = st.date_input("Contract Start", value=date.today(), key=f"start_{i}")
             course_length = st.number_input("Course Length (weeks)", min_value=1, value=12, key=f"length_{i}")
@@ -149,15 +181,17 @@ if not new_students.empty:
             balance = st.number_input("Balance Due (GHS)", min_value=0.0, step=1.0, key=f"bal_{i}")
             first_instalment = st.number_input("First Instalment", min_value=0.0, value=1500.0, key=f"firstinst_{i}")
             attach_pdf = st.checkbox("Attach PDF to Email?", value=True, key=f"pdf_{i}")
+            send_email = st.checkbox("Send Welcome Email?", value=bool(email), key=f"email_{i}")
 
             if st.button("Approve & Add", key=f"approve_{i}") and student_code:
                 if student_code in df_main["StudentCode"].values:
                     st.warning("❗ This Student Code already exists. Choose a unique one.")
-                    st.stop()  # ✅ fixed here
+                    st.stop()
 
                 student_dict = {
                     "Name": fullname,
                     "Phone": phone,
+                    "Email": email,
                     "Location": location,
                     "Level": level,
                     "Paid": paid,
@@ -167,15 +201,22 @@ if not new_students.empty:
                     "StudentCode": student_code
                 }
 
+                # Save to file
                 df_main = pd.concat([df_main, pd.DataFrame([student_dict])], ignore_index=True)
                 df_main.to_csv(student_file, index=False)
 
+                # Generate PDF
                 pdf_file = generate_receipt_and_contract_pdf(
-                    student_dict, st.session_state.get("agreement_template", ""), paid, contract_start,
-                    first_instalment, course_length
+                    student_dict,
+                    st.session_state.get("agreement_template", ""),
+                    paid,
+                    contract_start,
+                    first_instalment,
+                    course_length
                 )
 
-                if email and school_sendgrid_key:
+                # Optionally send email
+                if send_email and email and school_sendgrid_key:
                     try:
                         msg = Mail(
                             from_email=school_sender_email,
@@ -206,36 +247,11 @@ For help, contact us at {SCHOOL_EMAIL} or {SCHOOL_PHONE}.
                         st.success(f"📧 Email sent to {email}")
                     except Exception as e:
                         st.warning(f"⚠️ Email failed: {e}")
-                else:
-                    st.info("Student added. Email skipped.")
+                elif send_email:
+                    st.warning("⚠️ Email skipped. Address missing or SendGrid not configured.")
 
-                st.success(f"✅ {fullname} added successfully.")
+                st.success(f"✅ {fullname} approved and saved.")
 
-tabs = st.tabs([
-    "📝 Pending Registrations",
-    "👩‍🎓 All Students",
-    "➕ Add Student",
-    "💵 Expenses",
-    "📲 WhatsApp Reminders",
-    "📄 Generate Contract PDF",
-    "📧 Send Email",
-    "📊 Analytics & Export"
-])
-
-st.subheader("📤 Upload Student CSV (optional)")
-uploaded_student_csv = st.file_uploader("Upload students_simple.csv", type=["csv"])
-
-if uploaded_student_csv:
-    df_main = pd.read_csv(uploaded_student_csv)
-    df_main.to_csv("students_simple.csv", index=False)
-    st.success("✅ Uploaded student file and replaced local data.")
-st.subheader("📤 Upload Expenses CSV (optional)")
-uploaded_expenses_csv = st.file_uploader("Upload expenses_all.csv", type=["csv"])
-
-if uploaded_expenses_csv:
-    exp = pd.read_csv(uploaded_expenses_csv)
-    exp.to_csv("expenses_all.csv", index=False)
-    st.success("✅ Uploaded expenses file and replaced local data.")
 
 with tabs[1]:
     st.title("👩‍🎓 All Students (Edit, Update, Delete, Receipt)")
