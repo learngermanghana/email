@@ -32,45 +32,68 @@ school_sender_email = st.secrets["general"].get("SENDER_EMAIL", SCHOOL_EMAIL)
 if "emailed_expiries" not in st.session_state:
     st.session_state["emailed_expiries"] = set()
 
-# === PDF GENERATOR ===
-def generate_receipt_and_contract_pdf(student_row, agreement_text, payment_amount, payment_date=None, first_instalment=1500, course_length=12):
+def generate_receipt_and_contract_pdf(
+    student_row,
+    agreement_text,
+    payment_amount,  # ← This is total_fee (Paid + Balance)
+    payment_date=None,
+    first_instalment=1500,
+    course_length=12
+):
+    from datetime import date, timedelta
+
     if payment_date is None:
         payment_date = date.today()
+    elif isinstance(payment_date, str):
+        payment_date = pd.to_datetime(payment_date, errors="coerce").date()
+
     try:
-        second_instalment = float(student_row.get("Balance", 0))
+        second_due_date = payment_date + timedelta(days=30)
     except:
-        second_instalment = 0.0
-    second_due_date = payment_date + timedelta(days=30)
+        second_due_date = ""
+
+    # Still extract paid and balance for receipt
+    paid = float(student_row.get("Paid", 0))
+    balance = float(student_row.get("Balance", 0))
+
+    # ✅ Use payment_amount (which is total_fee) for [AMOUNT]
     filled = agreement_text.replace("[STUDENT_NAME]", student_row["Name"]) \
         .replace("[DATE]", str(payment_date)) \
         .replace("[CLASS]", student_row["Level"]) \
-        .replace("[AMOUNT]", str(student_row["Paid"])) \
+        .replace("[AMOUNT]", str(payment_amount)) \
         .replace("[FIRST_INSTALMENT]", str(first_instalment)) \
-        .replace("[SECOND_INSTALMENT]", str(second_instalment)) \
+        .replace("[SECOND_INSTALMENT]", str(balance)) \
         .replace("[SECOND_DUE_DATE]", str(second_due_date)) \
         .replace("[COURSE_LENGTH]", str(course_length))
 
     pdf = FPDF()
     pdf.add_page()
+
+    # Receipt section
     pdf.set_font("Arial", size=14)
     pdf.cell(200, 10, f"{SCHOOL_NAME} Payment Receipt", ln=True, align="C")
+
     pdf.set_font("Arial", size=12)
     pdf.ln(10)
     pdf.cell(200, 10, f"Name: {student_row['Name']}", ln=True)
     pdf.cell(200, 10, f"Student Code: {student_row['StudentCode']}", ln=True)
     pdf.cell(200, 10, f"Phone: {student_row['Phone']}", ln=True)
     pdf.cell(200, 10, f"Level: {student_row['Level']}", ln=True)
-    pdf.cell(200, 10, f"Amount Paid: GHS {payment_amount}", ln=True)
-    pdf.cell(200, 10, f"Balance Due: GHS {second_instalment}", ln=True)
+    pdf.cell(200, 10, f"Amount Paid: GHS {paid}", ln=True)
+    pdf.cell(200, 10, f"Balance Due: GHS {balance}", ln=True)
+    pdf.cell(200, 10, f"Total Course Fee: GHS {payment_amount}", ln=True)  # ✅ Shown on receipt
     pdf.cell(200, 10, f"Contract Start: {student_row['ContractStart']}", ln=True)
     pdf.cell(200, 10, f"Contract End: {student_row['ContractEnd']}", ln=True)
     pdf.cell(200, 10, f"Receipt Date: {payment_date}", ln=True)
     pdf.ln(10)
     pdf.cell(0, 10, "Thank you for your payment!", ln=True)
     pdf.cell(0, 10, "Signed: Felix Asadu", ln=True)
+
+    # Contract section
     pdf.ln(15)
     pdf.set_font("Arial", size=14)
     pdf.cell(200, 10, f"{SCHOOL_NAME} Student Contract", ln=True, align="C")
+
     pdf.set_font("Arial", size=12)
     pdf.ln(10)
     for line in filled.split("\n"):
