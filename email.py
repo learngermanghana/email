@@ -543,15 +543,16 @@ with tabs[2]:
 with tabs[3]:
     st.title("💵 Expenses and Financial Summary")
 
-    # Load or initialize expenses file
     expenses_file = "expenses_all.csv"
+
+    # ✅ Load or initialize expense data
     if os.path.exists(expenses_file):
         exp = pd.read_csv(expenses_file)
     else:
         exp = pd.DataFrame(columns=["Type", "Item", "Amount", "Date"])
         exp.to_csv(expenses_file, index=False)
 
-    # Add new expense
+    # ✅ Add new expense
     with st.form("add_expense_form"):
         exp_type = st.selectbox("Type", ["Bill", "Rent", "Salary", "Marketing", "Other"])
         exp_item = st.text_input("Expense Item")
@@ -568,16 +569,32 @@ with tabs[3]:
             }])
             exp = pd.concat([exp, new_exp], ignore_index=True)
             exp.to_csv(expenses_file, index=False)
+
+            # ✅ Reload fresh and convert date column
+            exp = pd.read_csv(expenses_file)
+            exp["Date"] = pd.to_datetime(exp["Date"], errors="coerce")
+            exp["Month"] = exp["Date"].dt.strftime("%B %Y")
+            exp["Year"] = exp["Date"].dt.year
+
             st.success(f"✅ Recorded: {exp_type} – {exp_item}")
-            st.rerun()
+            st.session_state["should_rerun"] = True
 
-    # Show full expense list
+    # ✅ Convert dates if not done
+    exp["Date"] = pd.to_datetime(exp["Date"], errors="coerce")
+    exp["Month"] = exp["Date"].dt.strftime("%B %Y")
+    exp["Year"] = exp["Date"].dt.year
+
     st.write("### All Expenses")
-    st.dataframe(exp, use_container_width=True)
+    st.dataframe(exp[["Type", "Item", "Amount", "Date"]], use_container_width=True)
 
-    # Summary Calculations
+    # ✅ Summary Section
     st.write("### Summary")
-    total_paid = df_main["Paid"].sum() if not df_main.empty else 0.0
+    if os.path.exists("students_simple.csv"):
+        df_main = pd.read_csv("students_simple.csv")
+        total_paid = df_main["Paid"].sum() if "Paid" in df_main.columns else 0.0
+    else:
+        total_paid = 0.0
+
     total_expenses = exp["Amount"].sum() if not exp.empty else 0.0
     net_profit = total_paid - total_expenses
 
@@ -585,17 +602,14 @@ with tabs[3]:
     st.info(f"💸 **Total Expenses:** GHS {total_expenses:,.2f}")
     st.success(f"📈 **Net Profit:** GHS {net_profit:,.2f}")
 
-    # Monthly & Yearly Breakdown
+    # ✅ Monthly and Yearly Groupings
     if not exp.empty:
-        exp["Date"] = pd.to_datetime(exp["Date"], errors='coerce')
-        exp["Year"] = exp["Date"].dt.year
-        exp["Month"] = exp["Date"].dt.strftime("%B %Y")
-
         st.write("### Expenses by Month")
         st.dataframe(exp.groupby("Month")["Amount"].sum().reset_index())
 
         st.write("### Expenses by Year")
         st.dataframe(exp.groupby("Year")["Amount"].sum().reset_index())
+
 with tabs[4]:
     st.title("📲 WhatsApp Reminders for Debtors")
 
