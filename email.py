@@ -660,6 +660,11 @@ with tabs[4]:
 with tabs[5]:
     st.title("📄 Generate Contract PDF for Any Student")
 
+    if os.path.exists("students_simple.csv"):
+        df_main = pd.read_csv("students_simple.csv")
+    else:
+        df_main = pd.DataFrame()
+
     if not df_main.empty and "Name" in df_main.columns:
         student_names = df_main["Name"].tolist()
         selected_name = st.selectbox("Select Student", student_names)
@@ -667,11 +672,15 @@ with tabs[5]:
         if st.button("Generate PDF"):
             student_row = df_main[df_main["Name"] == selected_name].iloc[0]
 
+            # ✅ Safely parse ContractStart as a date
+            raw_contract_start = student_row.get("ContractStart", date.today())
+            payment_date = pd.to_datetime(raw_contract_start, errors="coerce").date()
+
             pdf_file = generate_receipt_and_contract_pdf(
                 student_row,
                 st.session_state.get("agreement_template", ""),
                 payment_amount=student_row.get("Paid", 0),
-                payment_date=student_row.get("ContractStart", date.today())
+                payment_date=payment_date
             )
 
             with open(pdf_file, "rb") as f:
