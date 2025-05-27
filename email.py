@@ -436,6 +436,7 @@ For help, contact us at {SCHOOL_EMAIL} or {SCHOOL_PHONE}.
                     st.success(f"✅ {fullname} approved and saved.")
                     st.session_state["should_rerun"] = True
  
+# === TAB 1: ALL STUDENTS ===
 with tabs[1]:
     st.title("👩‍🎓 All Students (Edit, Update, Delete, Receipt)")
     today = date.today()
@@ -518,8 +519,21 @@ with tabs[1]:
                         total_fee = paid_input + balance_input
                         parsed_date = pd.to_datetime(contract_start_input, errors="coerce").date()
 
+                        student_dict = {
+                            "Name": name_input,
+                            "Phone": phone_input,
+                            "Email": email_input,
+                            "Location": location_input,
+                            "Level": level_input,
+                            "Paid": paid_input,
+                            "Balance": balance_input,
+                            "ContractStart": contract_start_input,
+                            "ContractEnd": contract_end_input,
+                            "StudentCode": student_code_input
+                        }
+
                         pdf_path = generate_receipt_and_contract_pdf(
-                            row,
+                            student_dict,
                             st.session_state.get("agreement_template", ""),
                             payment_amount=total_fee,
                             payment_date=parsed_date
@@ -532,6 +546,7 @@ with tabs[1]:
                             st.markdown(download_link, unsafe_allow_html=True)
     else:
         st.info("No students found in your database.")
+
 
 with tabs[2]:
     st.title("➕ Add Student Manually")
