@@ -294,7 +294,7 @@ with tabs[0]:
         )
         return "" if pd.isna(raw_email) else str(raw_email).strip()
 
-    # --- Show and approve pending students ---
+  # --- Show and approve pending students ---
     if not new_students.empty:
         for i, row in new_students.iterrows():
             fullname = row.get("full_name") or row.get("name") or f"Student {i}"
@@ -344,15 +344,19 @@ with tabs[0]:
                     approved_df = pd.concat([approved_df, pd.DataFrame([student_dict])], ignore_index=True)
                     approved_df.to_csv("students_simple.csv", index=False)
 
-                    # Generate PDF
+                    # ✅ Calculate total fee from paid + balance
+                    total_fee = paid + balance
+
+                    # ✅ Generate PDF using full fee
                     pdf_file = generate_receipt_and_contract_pdf(
                         student_dict,
                         st.session_state.get("agreement_template", ""),
-                        paid,
-                        contract_start,
-                        first_instalment,
-                        course_length
+                        payment_amount=total_fee,
+                        payment_date=contract_start,
+                        first_instalment=first_instalment,
+                        course_length=course_length
                     )
+
 
                     # Optionally send email
                     if send_email and email and school_sendgrid_key:
