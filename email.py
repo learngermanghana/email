@@ -379,10 +379,15 @@ For help, contact us at {SCHOOL_EMAIL} or {SCHOOL_PHONE}.
                 st.success(f"✅ {fullname} approved and saved.")
                 st.rerun()  # 🔁 Reload the app to update df_main properly
 
-
 with tabs[1]:
     st.title("👩‍🎓 All Students (Edit, Update, Delete, Receipt)")
     today = date.today()
+
+    # ✅ Always reload from CSV
+    if os.path.exists(student_file):
+        df_main = pd.read_csv(student_file)
+    else:
+        df_main = pd.DataFrame()
 
     # Ensure required columns exist
     required_cols = ["Name", "Phone", "Location", "Level", "Paid", "Balance", "ContractStart", "ContractEnd", "StudentCode"]
@@ -403,7 +408,6 @@ with tabs[1]:
 
     if not view_df.empty:
         for idx, row in view_df.iterrows():
-            # Safe fallback values
             name = row.get("Name", "")
             phone = row.get("Phone", "")
             location = row.get("Location", "")
@@ -468,14 +472,13 @@ with tabs[1]:
     else:
         st.info("No students found in your database.")
 
-
 with tabs[2]:
     st.title("➕ Add Student Manually")
 
     with st.form("add_student_form"):
         name = st.text_input("Full Name")
         phone = st.text_input("Phone Number")
-        email = st.text_input("Email Address")  # ✅ Added email input
+        email = st.text_input("Email Address")
         location = st.text_input("Location")
         level = st.selectbox("Class Level", ["A1", "A2", "B1", "B2", "C1", "C2"])
         paid = st.number_input("Amount Paid (GHS)", min_value=0.0, step=1.0)
@@ -490,13 +493,23 @@ with tabs[2]:
         if submit_btn:
             if not name or not phone or not student_code:
                 st.warning("❗ Name, Phone, and Student Code are required.")
-            elif student_code in df_main["StudentCode"].values:
-                st.error("❌ This Student Code already exists.")
             else:
+                # Always work with fresh CSV
+                if os.path.exists(student_file):
+                    existing_df = pd.read_csv(student_file)
+                else:
+                    existing_df = pd.DataFrame(columns=[
+                        "Name", "Phone", "Email", "Location", "Level", "Paid", "Balance", "ContractStart", "ContractEnd", "StudentCode"
+                    ])
+
+                if student_code in existing_df["StudentCode"].values:
+                    st.error("❌ This Student Code already exists.")
+                    st.stop()
+
                 new_row = pd.DataFrame([{
                     "Name": name,
                     "Phone": phone,
-                    "Email": email,  # ✅ Save email in DataFrame
+                    "Email": email,
                     "Location": location,
                     "Level": level,
                     "Paid": paid,
@@ -505,8 +518,9 @@ with tabs[2]:
                     "ContractEnd": str(contract_end),
                     "StudentCode": student_code
                 }])
-                df_main = pd.concat([df_main, new_row], ignore_index=True)
-                df_main.to_csv(student_file, index=False)
+
+                updated_df = pd.concat([existing_df, new_row], ignore_index=True)
+                updated_df.to_csv(student_file, index=False)
                 st.success(f"✅ Student '{name}' added successfully.")
                 st.rerun()
 
