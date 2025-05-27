@@ -277,7 +277,8 @@ with tabs[0]:
             st.rerun()
         elif not os.path.exists("expenses_all.csv"):
             exp = pd.DataFrame(columns=["Type", "Item", "Amount", "Date"])
-# --- Helper function to clean email safely ---
+
+# --- Helper function ---
 def clean_email(value):
     return "" if pd.isna(value) else str(value).strip()
 
@@ -291,13 +292,10 @@ if not new_students.empty:
         location = row.get("location", "")
         emergency = row.get("emergency_contact_phone_number") or row.get("emergency", "")
 
-        # Optional field sanitizing
-        fullname = str(fullname).strip()
-        phone = str(phone).strip()
-        level = str(level).strip()
-        location = str(location).strip()
-        emergency = str(emergency).strip()
-
+        # This must be indented **inside the for loop**
+        with st.expander(f"{fullname} ({phone})"):
+            st.write(f"**Email:** {email if email else '—'}")
+            # your form elements...
 
             with st.expander(f"{fullname} ({phone})"):
                 st.write(f"**Email:** {email if email else '—'}")
