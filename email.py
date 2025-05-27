@@ -35,28 +35,35 @@ if "emailed_expiries" not in st.session_state:
 def generate_receipt_and_contract_pdf(
     student_row,
     agreement_text,
-    payment_amount,  # ← This is total_fee (Paid + Balance)
+    payment_amount,
     payment_date=None,
     first_instalment=1500,
     course_length=12
 ):
-    from datetime import date, timedelta
+    from datetime import date, timedelta, datetime
 
     if payment_date is None:
         payment_date = date.today()
     elif isinstance(payment_date, str):
         payment_date = pd.to_datetime(payment_date, errors="coerce").date()
 
+    # Values from the student record
+    paid = float(student_row.get("Paid", 0))
+    balance = float(student_row.get("Balance", 0))
+    total_fee = paid + balance
+
     try:
         second_due_date = payment_date + timedelta(days=30)
     except:
         second_due_date = ""
 
-    # Still extract paid and balance for receipt
-    paid = float(student_row.get("Paid", 0))
-    balance = float(student_row.get("Balance", 0))
+    # ✅ Payment badge
+    if balance == 0:
+        payment_status = "✅ FULLY PAID"
+    else:
+        payment_status = f"💳 INSTALLMENT PLAN – GHS {balance:.2f} remaining"
 
-    # ✅ Use payment_amount (which is total_fee) for [AMOUNT]
+    # ✅ Fill placeholders in the agreement
     filled = agreement_text.replace("[STUDENT_NAME]", student_row["Name"]) \
         .replace("[DATE]", str(payment_date)) \
         .replace("[CLASS]", student_row["Level"]) \
@@ -66,12 +73,19 @@ def generate_receipt_and_contract_pdf(
         .replace("[SECOND_DUE_DATE]", str(second_due_date)) \
         .replace("[COURSE_LENGTH]", str(course_length))
 
+    # === PDF creation ===
     pdf = FPDF()
     pdf.add_page()
 
-    # Receipt section
+    # === Receipt Header ===
     pdf.set_font("Arial", size=14)
     pdf.cell(200, 10, f"{SCHOOL_NAME} Payment Receipt", ln=True, align="C")
+
+    # ✅ Badge (Fully Paid or Installment Plan)
+    pdf.set_font("Arial", 'B', size=12)
+    pdf.set_text_color(0, 128, 0)  # Green
+    pdf.cell(200, 10, payment_status, ln=True, align="C")
+    pdf.set_text_color(0, 0, 0)  # Reset to black
 
     pdf.set_font("Arial", size=12)
     pdf.ln(10)
@@ -79,9 +93,9 @@ def generate_receipt_and_contract_pdf(
     pdf.cell(200, 10, f"Student Code: {student_row['StudentCode']}", ln=True)
     pdf.cell(200, 10, f"Phone: {student_row['Phone']}", ln=True)
     pdf.cell(200, 10, f"Level: {student_row['Level']}", ln=True)
-    pdf.cell(200, 10, f"Amount Paid: GHS {paid}", ln=True)
-    pdf.cell(200, 10, f"Balance Due: GHS {balance}", ln=True)
-    pdf.cell(200, 10, f"Total Course Fee: GHS {payment_amount}", ln=True)  # ✅ Shown on receipt
+    pdf.cell(200, 10, f"Amount Paid: GHS {paid:.2f}", ln=True)
+    pdf.cell(200, 10, f"Balance Due: GHS {balance:.2f}", ln=True)
+    pdf.cell(200, 10, f"Total Course Fee: GHS {total_fee:.2f}", ln=True)
     pdf.cell(200, 10, f"Contract Start: {student_row['ContractStart']}", ln=True)
     pdf.cell(200, 10, f"Contract End: {student_row['ContractEnd']}", ln=True)
     pdf.cell(200, 10, f"Receipt Date: {payment_date}", ln=True)
@@ -89,7 +103,7 @@ def generate_receipt_and_contract_pdf(
     pdf.cell(0, 10, "Thank you for your payment!", ln=True)
     pdf.cell(0, 10, "Signed: Felix Asadu", ln=True)
 
-    # Contract section
+    # === Contract Section ===
     pdf.ln(15)
     pdf.set_font("Arial", size=14)
     pdf.cell(200, 10, f"{SCHOOL_NAME} Student Contract", ln=True, align="C")
@@ -98,9 +112,17 @@ def generate_receipt_and_contract_pdf(
     pdf.ln(10)
     for line in filled.split("\n"):
         pdf.multi_cell(0, 10, line)
+
     pdf.ln(10)
     pdf.cell(0, 10, "Signed: Felix Asadu", ln=True)
 
+    # ✅ Footer timestamp
+    pdf.set_y(-15)
+    pdf.set_font("Arial", "I", 8)
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    pdf.cell(0, 10, f"Generated on {now_str}", align="C")
+
+    # === Export file ===
     filename = f"{student_row['Name'].replace(' ', '_')}_receipt_contract.pdf"
     pdf.output(filename)
     return filename
@@ -127,7 +149,7 @@ This Payment Agreement is entered into on [DATE] for [CLASS] students of Learn L
 
 Terms of Payment:
 1. Payment Amount: The student agrees to pay the teacher a total of [AMOUNT] cedis for the course.
-2. Payment Schedule: The payment can be made in full or in two installments: a minimum of [FIRST_INSTALMENT] cedis for the first installment and the remaining [SECOND_INSTALMENT] cedis for the second installment. The second installment must be paid by [SECOND_DUE_DATE].
+2. Payment Schedule: The payment can be made in full or in two installments: GHS [FIRST_INSTALMENT] for the first installment, and the remaining GHS [SECOND_INSTALMENT] for the second installment. The second installment must be paid by [SECOND_DUE_DATE].
 3. Late Payments: In the event of late payment, the school may revoke access to all learning platforms. No refund will be made.
 4. Refunds: Once a deposit is made and a receipt is issued, no refunds will be provided.
 5. Additional Service: The course lasts [COURSE_LENGTH] weeks. Free supervision for Goethe Exams is valid only if the student remains consistent.
