@@ -149,7 +149,7 @@ This Payment Agreement is entered into on [DATE] for [CLASS] students of Learn L
 
 Terms of Payment:
 1. Payment Amount: The student agrees to pay the teacher a total of [AMOUNT] cedis for the course.
-2. Payment Schedule: The payment can be made in full or in two installments: GHS [FIRST_INSTALMENT] for the first installment, and the remaining GHS [SECOND_INSTALMENT] for the second installment. The second installment must be paid by [SECOND_DUE_DATE].
+2. Payment Schedule: The payment can be made in full or in two installments: GHS [FIRST_INSTALMENT] for the first installment, and the remaining balance for the second installment. The second installment must be paid by [SECOND_DUE_DATE].
 3. Late Payments: In the event of late payment, the school may revoke access to all learning platforms. No refund will be made.
 4. Refunds: Once a deposit is made and a receipt is issued, no refunds will be provided.
 5. Additional Service: The course lasts [COURSE_LENGTH] weeks. Free supervision for Goethe Exams is valid only if the student remains consistent.
