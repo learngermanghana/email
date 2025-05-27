@@ -117,6 +117,7 @@ Asadu Felix
 
 # === PENDING REGISTRATIONS TAB ===
 st.title("📝 Pending Student Registrations")
+
 try:
     new_students = pd.read_csv(sheet_url)
 
@@ -152,7 +153,7 @@ if not new_students.empty:
             if st.button("Approve & Add", key=f"approve_{i}") and student_code:
                 if student_code in df_main["StudentCode"].values:
                     st.warning("❗ This Student Code already exists. Choose a unique one.")
-                    st.stop()
+                    st.stop()  # ✅ fixed here
 
                 student_dict = {
                     "Name": fullname,
@@ -209,6 +210,7 @@ For help, contact us at {SCHOOL_EMAIL} or {SCHOOL_PHONE}.
                     st.info("Student added. Email skipped.")
 
                 st.success(f"✅ {fullname} added successfully.")
+
 with tabs[1]:
     st.title("👩‍🎓 All Students (Edit, Update, Delete, Receipt)")
     today = date.today()
