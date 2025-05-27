@@ -222,6 +222,21 @@ tabs = st.tabs([
     "📊 Analytics & Export"
 ])
 
+st.subheader("📤 Upload Student CSV (optional)")
+uploaded_student_csv = st.file_uploader("Upload students_simple.csv", type=["csv"])
+
+if uploaded_student_csv:
+    df_main = pd.read_csv(uploaded_student_csv)
+    df_main.to_csv("students_simple.csv", index=False)
+    st.success("✅ Uploaded student file and replaced local data.")
+st.subheader("📤 Upload Expenses CSV (optional)")
+uploaded_expenses_csv = st.file_uploader("Upload expenses_all.csv", type=["csv"])
+
+if uploaded_expenses_csv:
+    exp = pd.read_csv(uploaded_expenses_csv)
+    exp.to_csv("expenses_all.csv", index=False)
+    st.success("✅ Uploaded expenses file and replaced local data.")
+
 with tabs[1]:
     st.title("👩‍🎓 All Students (Edit, Update, Delete, Receipt)")
     today = date.today()
