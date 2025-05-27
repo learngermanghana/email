@@ -262,9 +262,10 @@ with st.expander("📤 Upload Data"):
     st.subheader("Upload Student CSV")
     uploaded_student_csv = st.file_uploader("Upload students_simple.csv", type=["csv"])
     if uploaded_student_csv:
-        df_main = pd.read_csv(uploaded_student_csv)
-        df_main.to_csv("students_simple.csv", index=False)
+        uploaded_df = pd.read_csv(uploaded_student_csv)
+        uploaded_df.to_csv("students_simple.csv", index=False)
         st.success("✅ Student file replaced.")
+        st.rerun()
 
     st.subheader("Upload Expenses CSV")
     uploaded_expenses_csv = st.file_uploader("Upload expenses_all.csv", type=["csv"])
@@ -272,6 +273,7 @@ with st.expander("📤 Upload Data"):
         exp = pd.read_csv(uploaded_expenses_csv)
         exp.to_csv("expenses_all.csv", index=False)
         st.success("✅ Expenses file replaced.")
+        st.rerun()
     elif not os.path.exists("expenses_all.csv"):
         exp = pd.DataFrame(columns=["Type", "Item", "Amount", "Date"])
         exp.to_csv("expenses_all.csv", index=False)
@@ -299,10 +301,19 @@ if not new_students.empty:
             send_email = st.checkbox("Send Welcome Email?", value=bool(email), key=f"email_{i}")
 
             if st.button("Approve & Add", key=f"approve_{i}") and student_code:
-                if student_code in df_main["StudentCode"].values:
+                # Load fresh student file
+                if os.path.exists("students_simple.csv"):
+                    existing_df = pd.read_csv("students_simple.csv")
+                else:
+                    existing_df = pd.DataFrame(columns=[
+                        "Name", "Phone", "Email", "Location", "Level", "Paid", "Balance", "ContractStart", "ContractEnd", "StudentCode"
+                    ])
+
+                if student_code in existing_df["StudentCode"].values:
                     st.warning("❗ This Student Code already exists. Choose a unique one.")
                     st.stop()
 
+                # Build new record
                 student_dict = {
                     "Name": fullname,
                     "Phone": phone,
@@ -316,9 +327,9 @@ if not new_students.empty:
                     "StudentCode": student_code
                 }
 
-                # Save to file
-                df_main = pd.concat([df_main, pd.DataFrame([student_dict])], ignore_index=True)
-                df_main.to_csv(student_file, index=False)
+                # Save to file (without updating df_main in memory)
+                updated_df = pd.concat([existing_df, pd.DataFrame([student_dict])], ignore_index=True)
+                updated_df.to_csv("students_simple.csv", index=False)
 
                 # Generate PDF
                 pdf_file = generate_receipt_and_contract_pdf(
@@ -366,6 +377,8 @@ For help, contact us at {SCHOOL_EMAIL} or {SCHOOL_PHONE}.
                     st.warning("⚠️ Email skipped. Address missing or SendGrid not configured.")
 
                 st.success(f"✅ {fullname} approved and saved.")
+                st.rerun()  # 🔁 Reload the app to update df_main properly
+
 
 with tabs[1]:
     st.title("👩‍🎓 All Students (Edit, Update, Delete, Receipt)")
