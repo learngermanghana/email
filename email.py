@@ -47,7 +47,7 @@ def generate_receipt_and_contract_pdf(
     elif isinstance(payment_date, str):
         payment_date = pd.to_datetime(payment_date, errors="coerce").date()
 
-    # Values from the student record
+    # Parse Paid and Balance
     paid = float(student_row.get("Paid", 0))
     balance = float(student_row.get("Balance", 0))
     total_fee = paid + balance
@@ -57,13 +57,13 @@ def generate_receipt_and_contract_pdf(
     except:
         second_due_date = ""
 
-    # ✅ Payment badge
+    # ✅ Plain text payment status badge (no emojis)
     if balance == 0:
-        payment_status = "✅ FULLY PAID"
+        payment_status = "FULLY PAID"
     else:
-        payment_status = f"💳 INSTALLMENT PLAN – GHS {balance:.2f} remaining"
+        payment_status = f"INSTALLMENT PLAN – GHS {balance:.2f} remaining"
 
-    # ✅ Fill placeholders in the agreement
+    # Fill in placeholders in the agreement
     filled = agreement_text.replace("[STUDENT_NAME]", student_row["Name"]) \
         .replace("[DATE]", str(payment_date)) \
         .replace("[CLASS]", student_row["Level"]) \
@@ -73,20 +73,21 @@ def generate_receipt_and_contract_pdf(
         .replace("[SECOND_DUE_DATE]", str(second_due_date)) \
         .replace("[COURSE_LENGTH]", str(course_length))
 
-    # === PDF creation ===
+    # === Create PDF ===
     pdf = FPDF()
     pdf.add_page()
 
-    # === Receipt Header ===
+    # Header
     pdf.set_font("Arial", size=14)
     pdf.cell(200, 10, f"{SCHOOL_NAME} Payment Receipt", ln=True, align="C")
 
-    # ✅ Badge (Fully Paid or Installment Plan)
+    # Status badge
     pdf.set_font("Arial", 'B', size=12)
-    pdf.set_text_color(0, 128, 0)  # Green
+    pdf.set_text_color(0, 128, 0)
     pdf.cell(200, 10, payment_status, ln=True, align="C")
-    pdf.set_text_color(0, 0, 0)  # Reset to black
+    pdf.set_text_color(0, 0, 0)
 
+    # Receipt section
     pdf.set_font("Arial", size=12)
     pdf.ln(10)
     pdf.cell(200, 10, f"Name: {student_row['Name']}", ln=True)
@@ -103,7 +104,7 @@ def generate_receipt_and_contract_pdf(
     pdf.cell(0, 10, "Thank you for your payment!", ln=True)
     pdf.cell(0, 10, "Signed: Felix Asadu", ln=True)
 
-    # === Contract Section ===
+    # Contract section
     pdf.ln(15)
     pdf.set_font("Arial", size=14)
     pdf.cell(200, 10, f"{SCHOOL_NAME} Student Contract", ln=True, align="C")
@@ -116,13 +117,12 @@ def generate_receipt_and_contract_pdf(
     pdf.ln(10)
     pdf.cell(0, 10, "Signed: Felix Asadu", ln=True)
 
-    # ✅ Footer timestamp
+    # ✅ Footer with timestamp (safe characters only)
     pdf.set_y(-15)
     pdf.set_font("Arial", "I", 8)
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
     pdf.cell(0, 10, f"Generated on {now_str}", align="C")
 
-    # === Export file ===
     filename = f"{student_row['Name'].replace(' ', '_')}_receipt_contract.pdf"
     pdf.output(filename)
     return filename
