@@ -109,6 +109,9 @@ def generate_receipt_and_contract_pdf(
     pdf.set_font("Arial", size=14)
     pdf.cell(200, 10, f"{SCHOOL_NAME} Student Contract", ln=True, align="C")
 
+    # ✅ Encode agreement content safely for Latin-1
+    filled = filled.encode("latin-1", "replace").decode("latin-1")
+
     pdf.set_font("Arial", size=12)
     pdf.ln(10)
     for line in filled.split("\n"):
@@ -117,12 +120,13 @@ def generate_receipt_and_contract_pdf(
     pdf.ln(10)
     pdf.cell(0, 10, "Signed: Felix Asadu", ln=True)
 
-    # ✅ Footer with timestamp (safe characters only)
+    # ✅ Footer timestamp
     pdf.set_y(-15)
     pdf.set_font("Arial", "I", 8)
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
     pdf.cell(0, 10, f"Generated on {now_str}", align="C")
 
+    # Output
     filename = f"{student_row['Name'].replace(' ', '_')}_receipt_contract.pdf"
     pdf.output(filename)
     return filename
