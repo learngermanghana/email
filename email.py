@@ -766,18 +766,48 @@ with tabs[6]:
 with tabs[7]:
     st.title("📊 Analytics & Export")
 
+    if os.path.exists("students_simple.csv"):
+        df_main = pd.read_csv("students_simple.csv")
+    else:
+        df_main = pd.DataFrame()
+
     st.subheader("📈 Enrollment Over Time")
+
     if not df_main.empty and "ContractStart" in df_main.columns:
-        try:
-            df_main["EnrollDate"] = pd.to_datetime(df_main["ContractStart"], errors="coerce")
-            monthly = df_main.groupby(df_main["EnrollDate"].dt.to_period("M")).size().reset_index(name="Count")
-            monthly["EnrollDate"] = monthly["EnrollDate"].astype(str)
-            st.line_chart(monthly.set_index("EnrollDate")["Count"])
-        except Exception as e:
-            st.warning(f"⚠️ Unable to generate chart: {e}")
+        df_main["EnrollDate"] = pd.to_datetime(df_main["ContractStart"], errors="coerce")
+
+        # ✅ Filter by year
+        valid_years = df_main["EnrollDate"].dt.year.dropna().unique()
+        valid_years = sorted([int(y) for y in valid_years if not pd.isna(y)])
+        selected_year = st.selectbox("📆 Filter by Year", valid_years) if valid_years else None
+
+        if df_main["EnrollDate"].notna().sum() == 0:
+            st.info("No valid enrollment dates found in 'ContractStart'. Please check your data.")
+        else:
+            try:
+                filtered_df = df_main[df_main["EnrollDate"].dt.year == selected_year] if selected_year else df_main
+                monthly = (
+                    filtered_df.groupby(filtered_df["EnrollDate"].dt.to_period("M"))
+                    .size()
+                    .reset_index(name="Count")
+                )
+                monthly["EnrollDate"] = monthly["EnrollDate"].astype(str)
+                st.line_chart(monthly.set_index("EnrollDate")["Count"])
+            except Exception as e:
+                st.warning(f"⚠️ Unable to generate enrollment chart: {e}")
     else:
         st.info("No enrollment data to visualize.")
 
+    # 📊 Pie Chart: Distribution by Level
+    st.subheader("📊 Students by Level")
+
+    if "Level" in df_main.columns and not df_main["Level"].dropna().empty:
+        level_counts = df_main["Level"].value_counts()
+        st.bar_chart(level_counts)
+    else:
+        st.info("No level information available to display.")
+
+    # ⬇️ Export Section
     st.subheader("⬇️ Export CSV Files")
 
     student_csv = df_main.to_csv(index=False)
