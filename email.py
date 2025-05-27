@@ -335,26 +335,27 @@ with tabs[0]:
         )
         return "" if pd.isna(raw_email) else str(raw_email).strip()
 # --- Show and approve pending students ---
-    if not new_students.empty:
-        for i, row in new_students.iterrows():
-            fullname = row.get("full_name") or row.get("name") or f"Student {i}"
-            phone = row.get("phone_number") or row.get("phone") or ""
-            email = get_clean_email(row)
-            level = row.get("class_a1a2_etc") or row.get("class") or row.get("level") or ""
-            location = row.get("location", "")
-            emergency = row.get("emergency_contact_phone_number") or row.get("emergency", "")
+if not new_students.empty:
+    for i, row in new_students.iterrows():
+        fullname = row.get("full_name") or row.get("name") or f"Student {i}"
+        phone = row.get("phone_number") or row.get("phone") or ""
+        email = get_clean_email(row)
+        level = row.get("class_a1a2_etc") or row.get("class") or row.get("level") or ""
+        location = row.get("location", "")
+        emergency = row.get("emergency_contact_phone_number") or row.get("emergency", "")
 
-            with st.expander(f"{fullname} ({phone})"):
-                st.write(f"**Email:** {email if email else '—'}")
-                student_code = st.text_input("Assign Student Code", key=f"code_{i}")
-                contract_start = st.date_input("Contract Start", value=date.today(), key=f"start_{i}")
-                course_length = st.number_input("Course Length (weeks)", min_value=1, value=12, key=f"length_{i}")
-                contract_end = st.date_input("Contract End", value=contract_start + timedelta(weeks=course_length), key=f"end_{i}")
-                paid = st.number_input("Amount Paid (GHS)", min_value=0.0, step=1.0, key=f"paid_{i}")
-                balance = st.number_input("Balance Due (GHS)", min_value=0.0, step=1.0, key=f"bal_{i}")
-                first_instalment = st.number_input("First Instalment", min_value=0.0, value=1500.0, key=f"firstinst_{i}")
-                attach_pdf = st.checkbox("Attach PDF to Email?", value=True, key=f"pdf_{i}")
-                send_email = st.checkbox("Send Welcome Email?", value=bool(email), key=f"email_{i}")
+        with st.expander(f"{fullname} ({phone})"):
+            st.write(f"**Email:** {email if email else '—'}")
+            emergency_input = st.text_input("Emergency Contact (optional)", value=emergency, key=f"emergency_{i}")
+            student_code = st.text_input("Assign Student Code", key=f"code_{i}")
+            contract_start = st.date_input("Contract Start", value=date.today(), key=f"start_{i}")
+            course_length = st.number_input("Course Length (weeks)", min_value=1, value=12, key=f"length_{i}")
+            contract_end = st.date_input("Contract End", value=contract_start + timedelta(weeks=course_length), key=f"end_{i}")
+            paid = st.number_input("Amount Paid (GHS)", min_value=0.0, step=1.0, key=f"paid_{i}")
+            balance = st.number_input("Balance Due (GHS)", min_value=0.0, step=1.0, key=f"bal_{i}")
+            first_instalment = st.number_input("First Instalment", min_value=0.0, value=1500.0, key=f"firstinst_{i}")
+            attach_pdf = st.checkbox("Attach PDF to Email?", value=True, key=f"pdf_{i}")
+            send_email = st.checkbox("Send Welcome Email?", value=bool(email), key=f"email_{i}")
 
                 if st.button("Approve & Add", key=f"approve_{i}") and student_code:
                     if os.path.exists("students_simple.csv"):
