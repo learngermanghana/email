@@ -678,14 +678,19 @@ with tabs[5]:
         if st.button("Generate PDF"):
             student_row = df_main[df_main["Name"] == selected_name].iloc[0]
 
-            # ✅ Safely parse ContractStart as a date
-            raw_contract_start = student_row.get("ContractStart", date.today())
-            payment_date = pd.to_datetime(raw_contract_start, errors="coerce").date()
+            # ✅ Calculate total fee
+            paid = float(student_row.get("Paid", 0))
+            balance = float(student_row.get("Balance", 0))
+            total_fee = paid + balance
+
+            # ✅ Convert ContractStart to date
+            raw_date = student_row.get("ContractStart", date.today())
+            payment_date = pd.to_datetime(raw_date, errors="coerce").date()
 
             pdf_file = generate_receipt_and_contract_pdf(
                 student_row,
                 st.session_state.get("agreement_template", ""),
-                payment_amount=student_row.get("Paid", 0),
+                payment_amount=total_fee,
                 payment_date=payment_date
             )
 
