@@ -599,9 +599,16 @@ with tabs[3]:
 with tabs[4]:
     st.title("📲 WhatsApp Reminders for Debtors")
 
+    # ✅ Always reload student data fresh
+    if os.path.exists("students_simple.csv"):
+        df_main = pd.read_csv("students_simple.csv")
+    else:
+        df_main = pd.DataFrame()
+
+    # ✅ Check if required columns exist
     if not df_main.empty and "Balance" in df_main.columns and "Phone" in df_main.columns:
-        # Ensure balance is numeric
         df_main["Balance"] = pd.to_numeric(df_main["Balance"], errors="coerce").fillna(0.0)
+        df_main["Phone"] = df_main["Phone"].astype(str)
 
         debtors = df_main[df_main["Balance"] > 0]
 
@@ -609,21 +616,22 @@ with tabs[4]:
             st.write("### Students with Outstanding Balances")
 
             for _, row in debtors.iterrows():
-                name = row["Name"]
-                balance = row["Balance"]
-                student_code = row["StudentCode"]
-                phone = row["Phone"]
+                name = row.get("Name", "Unknown")
+                balance = float(row.get("Balance", 0.0))
+                student_code = row.get("StudentCode", "")
+                phone = row.get("Phone", "")
 
                 message = (
                     f"Dear {name}, your current balance with {SCHOOL_NAME} is GHS {balance:.2f}. "
                     f"Your student code is {student_code}. "
                     f"Please pay as soon as possible to remain active. Thank you!"
                 )
-                encoded_msg = urllib.parse.quote(message)
-                phone_clean = str(phone).replace(" ", "").replace("+", "")
+
+                phone_clean = phone.replace(" ", "").replace("+", "")
                 if phone_clean.startswith("0"):
                     phone_clean = "233" + phone_clean[1:]
 
+                encoded_msg = urllib.parse.quote(message)
                 wa_url = f"https://wa.me/{phone_clean}?text={encoded_msg}"
 
                 st.markdown(
@@ -634,6 +642,7 @@ with tabs[4]:
             st.success("✅ No students with unpaid balances.")
     else:
         st.warning("⚠️ Required columns 'Balance' or 'Phone' are missing in your data.")
+
 with tabs[5]:
     st.title("📄 Generate Contract PDF for Any Student")
 
