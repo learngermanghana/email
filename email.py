@@ -1,5 +1,4 @@
 # ✅ FULL DASHBOARD CODE – With Pending Registrations Tab Fully Updated
-
 import streamlit as st
 import pandas as pd
 import os
@@ -23,6 +22,10 @@ SCHOOL_ADDRESS = "Awoshie, Accra, Ghana"
 # === EMAIL CONFIG ===
 school_sendgrid_key = st.secrets["general"].get("SENDGRID_API_KEY")
 school_sender_email = st.secrets["general"].get("SENDER_EMAIL", SCHOOL_EMAIL)
+
+# === SESSION STATE INIT ===
+if "emailed_expiries" not in st.session_state:
+    st.session_state["emailed_expiries"] = set()
 
 # === PDF GENERATOR ===
 def generate_receipt_and_contract_pdf(student_row, agreement_text, payment_amount, payment_date=None, first_instalment=1500, course_length=12):
@@ -80,7 +83,7 @@ if os.path.exists(student_file):
     df_main = pd.read_csv(student_file)
 else:
     df_main = pd.DataFrame(columns=[
-        "Name", "Phone", "Location", "Level", "Paid", "Balance", "ContractStart", "ContractEnd", "StudentCode"
+        "Name", "Phone", "Location", "Level", "Paid", "Balance", "ContractStart", "ContractEnd", "StudentCode", "Email"
     ])
     df_main.to_csv(student_file, index=False)
 
@@ -114,6 +117,118 @@ Signatures:
 Date: [DATE]
 Asadu Felix
 """
+
+st.title("🏫 Learn Language Education Academy Dashboard")
+st.caption(f"📍 {SCHOOL_ADDRESS} | ✉️ {SCHOOL_EMAIL} | 🌐 {SCHOOL_WEBSITE} | 📞 {SCHOOL_PHONE}")
+
+# 📊 Summary Stats
+total_students = len(df_main)
+total_paid = df_main["Paid"].sum() if "Paid" in df_main.columns else 0.0
+
+# Load expenses if available
+expenses_file = "expenses_all.csv"
+if os.path.exists(expenses_file):
+    exp_df = pd.read_csv(expenses_file)
+    total_expenses = exp_df["Amount"].sum() if "Amount" in exp_df.columns else 0.0
+else:
+    total_expenses = 0.0
+
+net_profit = total_paid - total_expenses
+
+# === SUMMARY BOX ===
+st.markdown(f"""
+<div style='background-color:#f9f9f9;border:1px solid #ccc;border-radius:10px;padding:15px;margin-top:10px'>
+    <h4>📋 Summary</h4>
+    <ul>
+        <li>👨‍🎓 <b>Total Students:</b> {total_students}</li>
+        <li>💰 <b>Total Collected:</b> GHS {total_paid:,.2f}</li>
+        <li>💸 <b>Total Expenses:</b> GHS {total_expenses:,.2f}</li>
+        <li>📈 <b>Net Profit:</b> GHS {net_profit:,.2f}</li>
+    </ul>
+</div>
+""", unsafe_allow_html=True)
+
+# === NOTIFICATIONS ===
+today = date.today()
+notifications = []
+
+# Normalize data
+df_main["ContractEnd"] = pd.to_datetime(df_main.get("ContractEnd"), errors="coerce")
+df_main["Balance"] = pd.to_numeric(df_main.get("Balance", 0), errors="coerce").fillna(0.0)
+
+def clean_phone(phone):
+    phone = str(phone).replace(" ", "").replace("+", "")
+    return "233" + phone[1:] if phone.startswith("0") else phone
+
+# 1. Debtors
+debtors = df_main[df_main["Balance"] > 0]
+for _, row in debtors.iterrows():
+    phone = clean_phone(row.get("Phone", ""))
+    name = row.get("Name", "Unknown")
+    balance = row["Balance"]
+    student_code = row.get("StudentCode", "")
+    msg = f"Dear {name}, you owe GHS {balance:.2f} for your course ({student_code}). Please settle it to remain active."
+    wa_url = f"https://wa.me/{phone}?text={urllib.parse.quote(msg)}"
+    notifications.append(
+        f"💰 <b>{name}</b> owes GHS {balance:.2f} [<a href='{wa_url}' target='_blank'>📲 WhatsApp</a>]"
+    )
+
+# 2. Expiring contracts (only email once)
+expiring = df_main[
+    (df_main["ContractEnd"].notnull()) &
+    (df_main["ContractEnd"].dt.date >= today) &
+    (df_main["ContractEnd"].dt.date <= today + timedelta(days=30))
+]
+for _, row in expiring.iterrows():
+    name = row.get("Name", "Unknown")
+    end_date = row["ContractEnd"].date()
+    email = row.get("Email", "")
+    student_code = row.get("StudentCode", "")
+    unique_key = f"{name}_{student_code}"
+
+    message = f"⏳ <b>{name}</b>'s contract ends on {end_date}"
+
+    if email and school_sendgrid_key and unique_key not in st.session_state["emailed_expiries"]:
+        try:
+            msg = Mail(
+                from_email=school_sender_email,
+                to_emails=email,
+                subject=f"Your contract with {SCHOOL_NAME} ends soon",
+                html_content=f"Dear {name},<br><br>Your contract ends on {end_date}. "
+                             f"Please contact us to extend it.<br><br>{SCHOOL_NAME}"
+            )
+            client = SendGridAPIClient(school_sendgrid_key)
+            client.send(msg)
+            message += " ✅ Email sent"
+            st.session_state["emailed_expiries"].add(unique_key)
+        except Exception as e:
+            message += f" ⚠️ Email failed: {e}"
+
+    notifications.append(message)
+
+# 3. Expired contracts
+expired = df_main[(df_main["ContractEnd"].notnull()) & (df_main["ContractEnd"].dt.date < today)]
+for _, row in expired.iterrows():
+    name = row.get("Name", "Unknown")
+    end_date = row["ContractEnd"].date()
+    notifications.append(f"❌ <b>{name}</b>'s contract expired on {end_date}")
+
+# Show notifications
+if notifications:
+    st.markdown(f"""
+    <div style='background-color:#fff3cd;border:1px solid #ffc107;border-radius:10px;padding:15px;margin-top:10px'>
+        <h4>🔔 <b>Notifications</b></h4>
+        <ul>{"".join([f"<li>{n}</li>" for n in notifications])}</ul>
+    </div>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown(f"""
+    <div style='background-color:#e8f5e9;border:1px solid #4caf50;border-radius:10px;padding:15px;margin-top:10px'>
+        <h4>🔔 <b>Notifications</b></h4>
+        <p>No urgent alerts. You're all caught up ✅</p>
+    </div>
+    """, unsafe_allow_html=True)
+
 
 # === TAB 0: PENDING REGISTRATIONS ===
 st.title("📝 Pending Student Registrations")
