@@ -12,6 +12,11 @@ import urllib.parse
 # === PAGE CONFIG ===
 st.set_page_config(page_title="Learn Language Education Academy Dashboard", layout="wide")
 
+if "should_rerun" in st.session_state and st.session_state["should_rerun"]:
+    st.session_state["should_rerun"] = False
+    st.rerun()
+
+
 # === SCHOOL INFO ===
 SCHOOL_NAME = "Learn Language Education Academy"
 SCHOOL_EMAIL = "Learngermanghana@gmail.com"
@@ -266,7 +271,7 @@ with tabs[0]:
             uploaded_df = pd.read_csv(uploaded_student_csv)
             uploaded_df.to_csv("students_simple.csv", index=False)
             st.success("✅ Student file replaced.")
-            st.rerun()
+            st.session_state["should_rerun"] = True  # instead of st.rerun()
 
         st.subheader("Upload Expenses CSV")
         uploaded_expenses_csv = st.file_uploader("Upload expenses_all.csv", type=["csv"])
@@ -385,7 +390,7 @@ For help, contact us at {SCHOOL_EMAIL} or {SCHOOL_PHONE}.
                         st.warning("⚠️ Email skipped. Address missing or SendGrid not configured.")
 
                     st.success(f"✅ {fullname} approved and saved.")
-                    st.rerun()
+                    st.session_state["should_rerun"] = True  # instead of st.rerun()
 
 with tabs[1]:
     st.title("👩‍🎓 All Students (Edit, Update, Delete, Receipt)")
