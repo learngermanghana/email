@@ -293,8 +293,7 @@ with tabs[0]:
             ""
         )
         return "" if pd.isna(raw_email) else str(raw_email).strip()
-
-  # --- Show and approve pending students ---
+# --- Show and approve pending students ---
     if not new_students.empty:
         for i, row in new_students.iterrows():
             fullname = row.get("full_name") or row.get("name") or f"Student {i}"
@@ -344,10 +343,10 @@ with tabs[0]:
                     approved_df = pd.concat([approved_df, pd.DataFrame([student_dict])], ignore_index=True)
                     approved_df.to_csv("students_simple.csv", index=False)
 
-                    # ✅ Calculate total fee from paid + balance
+                    # ✅ Calculate total fee
                     total_fee = paid + balance
 
-                    # ✅ Generate PDF using full fee
+                    # ✅ Generate PDF
                     pdf_file = generate_receipt_and_contract_pdf(
                         student_dict,
                         st.session_state.get("agreement_template", ""),
@@ -357,8 +356,7 @@ with tabs[0]:
                         course_length=course_length
                     )
 
-
-                    # Optionally send email
+                    # ✅ Send Email
                     if send_email and email and school_sendgrid_key:
                         try:
                             msg = Mail(
@@ -367,12 +365,13 @@ with tabs[0]:
                                 subject=f"Welcome to {SCHOOL_NAME}",
                                 html_content=f"""
 Dear {fullname},<br><br>
-Welcome to {SCHOOL_NAME}!<br>
-Student Code: <b>{student_code}</b><br>
-Class: {level}<br>
-Contract: {contract_start} to {contract_end}<br>
-Paid: GHS {paid}<br>
-Balance: GHS {balance}<br><br>
+Welcome to {SCHOOL_NAME}!<br><br>
+<b>Student Code:</b> {student_code}<br>
+<b>Class:</b> {level}<br>
+<b>Contract:</b> {contract_start} to {contract_end}<br>
+<b>Paid:</b> GHS {paid:.2f}<br>
+<b>Balance:</b> GHS {balance:.2f}<br>
+<b>Total Fee:</b> GHS {total_fee:.2f}<br><br>
 For help, contact us at {SCHOOL_EMAIL} or {SCHOOL_PHONE}.
 """
                             )
@@ -394,8 +393,8 @@ For help, contact us at {SCHOOL_EMAIL} or {SCHOOL_PHONE}.
                         st.warning("⚠️ Email skipped. Address missing or SendGrid not configured.")
 
                     st.success(f"✅ {fullname} approved and saved.")
-                    st.session_state["should_rerun"] = True  # instead of st.rerun()
-
+                    st.session_state["should_rerun"] = True
+ 
 with tabs[1]:
     st.title("👩‍🎓 All Students (Edit, Update, Delete, Receipt)")
     today = date.today()
