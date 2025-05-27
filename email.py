@@ -459,6 +459,18 @@ with tabs[1]:
     status_filter = st.selectbox("Filter by Status", ["All", "Enrolled", "Completed"])
     view_df = df_main if status_filter == "All" else df_main[df_main["Status"] == status_filter]
 
+    # 🔍 Add Search Bar
+    search_query = st.text_input("🔍 Search by name, student code, level, or phone")
+    if search_query:
+        query_lower = search_query.lower()
+        view_df = view_df[
+            view_df["Name"].str.lower().str.contains(query_lower)
+            | view_df["StudentCode"].str.lower().str.contains(query_lower)
+            | view_df["Phone"].astype(str).str.contains(query_lower)
+            | view_df["Level"].str.lower().str.contains(query_lower)
+        ]
+
+
     if not view_df.empty:
         for idx, row in view_df.iterrows():
             name = row.get("Name", "")
