@@ -284,8 +284,10 @@ tabs = st.tabs([
     "📄 Generate Contract PDF",
     "📧 Send Email",
     "📊 Analytics & Export",
-    "📆 A1 Course Schedule"  # 👈 Add this line for tab 8
+    "📆 A1 Course Schedule",  # Tab 8
+    "📨 Letters & Certification"  # ✅ Tab 9
 ])
+
 
 with tabs[0]:
     st.title("📝 Pending Student Registrations")
@@ -1044,5 +1046,92 @@ First Week: Begins {start_date.strftime('%A, %d %B %Y')}
             file_name="a1_course_schedule.pdf",
             mime="application/pdf"
         )
+
+with tabs[9]:
+    st.title("📨 Letters & Certification")
+
+    st.markdown("""
+    🛠️ **Generate official school letters:**
+    - Enrollment Certificate
+    - Editable Introduction Letter (e.g. for embassy, permit, employer)
+    """)
+
+    if os.path.exists("students_simple.csv"):
+        df_students = pd.read_csv("students_simple.csv")
+    else:
+        df_students = pd.DataFrame()
+
+    st.subheader("📄 Enrollment Certificate")
+
+    if not df_students.empty and "Name" in df_students.columns:
+        selected_cert_name = st.selectbox("Select Student", df_students["Name"].tolist(), key="cert_select")
+        selected_cert_level = st.text_input("Level of Course", value="A1", key="cert_level")
+        selected_cert_start = st.date_input("Start Date", key="cert_start")
+        selected_cert_end = st.date_input("End Date", key="cert_end")
+
+        cert_body = f"""
+This is to certify that {selected_cert_name} is enrolled as a full-time student for the {selected_cert_level} German Language Course with Learn Language Education Academy with Business Registration number BN173410224, viz according to the Registration of Business Names Act, 1962 (No.151).
+
+The student has been re-enrolled since {selected_cert_start.strftime('%B %d, %Y')} and is expected to complete the course by {selected_cert_end.strftime('%B %d, %Y')}.
+
+Issued by,
+Learn Language Education Academy
+Asadu Felix
+"""
+
+        st.text_area("📋 Certificate Preview", value=cert_body, height=300)
+
+        cert_pdf = FPDF()
+        cert_pdf.add_page()
+        cert_pdf.set_font("Arial", size=12)
+        for line in cert_body.split("\n"):
+            cert_pdf.multi_cell(0, 10, line)
+
+        cert_bytes = cert_pdf.output(dest='S').encode('latin-1')
+        st.download_button("⬇️ Download Certificate PDF", data=cert_bytes, file_name="enrollment_certificate.pdf", mime="application/pdf")
+    else:
+        st.warning("No student data available.")
+
+    st.markdown("---")
+    st.subheader("📨 Custom Introduction Letter for Ayodele David")
+
+    to_address = st.text_area("Receiver Address (e.g. Embassy Name, Contact Info)", placeholder="Enter the address here...")
+    custom_date = st.text_input("Insert Date", placeholder="e.g. June 12, 2025")
+    custom_name = st.text_input("Insert Student Name", value="Ayodele David")
+
+    intro_letter = f"""
+{to_address}
+
+{custom_date}
+
+Dear Sir/Madam,
+
+I am writing on behalf of Learn Language Education Academy to formally introduce {custom_name} (Nigerian), who has been enrolled into our institution for the study of German language B1-B2. The course is still continuing and runs until September 19th, 2025.
+
+{custom_name} has successfully met all the academic requirements for the language course and has demonstrated a keen interest in pursuing this educational opportunity. The program is a full-time course requiring the student’s physical presence in Accra, Ghana.
+
+As a recognized and accredited institution, Learn Language Education Academy supports {custom_name}’s application for a residence permit to enable their stay in Ghana for the duration of their studies. The student will be actively engaged in the academic curriculum and will have access to all necessary facilities and support provided by the school.
+
+We kindly request that you assist {custom_name} in obtaining the required student residence permit to facilitate their studies. Should you require additional documentation or information, please do not hesitate to contact us.
+
+Thank you for your attention to this matter. We appreciate your assistance in helping {custom_name} pursue their academic goals.
+
+Yours faithfully,
+
+Learn Language Education Academy
+Asadu Felix
+"""
+
+    st.text_area("📋 Letter Preview", value=intro_letter, height=400)
+
+    intro_pdf = FPDF()
+    intro_pdf.add_page()
+    intro_pdf.set_font("Arial", size=12)
+    for line in intro_letter.split("\n"):
+        intro_pdf.multi_cell(0, 10, line)
+
+    intro_bytes = intro_pdf.output(dest='S').encode('latin-1')
+    st.download_button("⬇️ Download Introduction Letter PDF", data=intro_bytes, file_name="introduction_letter.pdf", mime="application/pdf")
+
 
         
