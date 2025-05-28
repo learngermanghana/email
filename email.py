@@ -1,6 +1,6 @@
 # ✅ FULL DASHBOARD CODE – With Pending Registrations Tab Fully Updated
 import streamlit as st
-import pandas as pd                
+import pandas as pd
 import os
 import requests
 from datetime import date, datetime, timedelta
@@ -10,23 +10,25 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
 import urllib.parse
 
-# …
+# Download logo once at startup
 LOGO_URL  = "https://raw.githubusercontent.com/learngermanghana/email/main/logo.png"
 LOGO_FILE = "logo.png"
 
 if not os.path.exists(LOGO_FILE):
-    resp = requests.get(LOGO_URL)
-    if resp.status_code == 200:
-        with open(LOGO_FILE, "wb") as f:
-            f.write(resp.content)
+    try:
+        resp = requests.get(LOGO_URL)
+        if resp.status_code == 200:
+            with open(LOGO_FILE, "wb") as f:
+                f.write(resp.content)
+    except Exception as e:
+        st.warning(f"⚠️ Could not download logo: {e}")
 
 # === PAGE CONFIG ===
 st.set_page_config(page_title="Learn Language Education Academy Dashboard", layout="wide")
 
-if "should_rerun" in st.session_state and st.session_state["should_rerun"]:
+if st.session_state.get("should_rerun"):
     st.session_state["should_rerun"] = False
-    st.rerun()
-
+    st.experimental_rerun()
 
 # === SCHOOL INFO ===
 SCHOOL_NAME = "Learn Language Education Academy"
