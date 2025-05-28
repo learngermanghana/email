@@ -911,5 +911,138 @@ with tabs[7]:
     else:
         st.info("No expenses file found to export.")
 
+with tabs[8]:
+    st.title("Generate A1 Course Schedule")
+
+    st.markdown("""
+    🛠️ **Create and download a personalized A1 course schedule.**
+
+    Choose a start date and class days. The schedule will follow the official classroom structure (Lesen & Hören, Schreiben & Sprechen).
+    """)
+
+    from datetime import datetime, timedelta
+    import calendar
+    from fpdf import FPDF
+
+    # User inputs
+    st.subheader("🗓️ Configuration")
+    start_date = st.date_input("Select Start Date", value=date.today())
+    selected_days = st.multiselect(
+        "Select Class Days",
+        options=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+        default=["Monday", "Tuesday", "Wednesday"]
+    )
+
+    # Schedule structure (fixed)
+    raw_schedule = [
+        ("Week One", ["Chapter 0.1 - Lesen & Horen"]),
+        ("Week Two", [
+            "Chapters 0.2 and 1.1 - Lesen & Horen",
+            "Chapter 1.1 - Schreiben & Sprechen and Chapter 1.2 - Lesen & Horen",
+            "Chapter 2 - Lesen & Horen"
+        ]),
+        ("Week Three", [
+            "Chapter 1.2 - Schreiben & Sprechen (Recap)",
+            "Chapter 2.3 - Schreiben & Sprechen",
+            "Chapter 3 - Lesen & Horen"
+        ]),
+        ("Week Four", [
+            "Chapter 4 - Lesen & Horen",
+            "Chapter 5 - Lesen & Horen",
+            "Chapter 6 - Lesen & Horen and Chapter 2.4 - Schreiben & Sprechen"
+        ]),
+        ("Week Five", [
+            "Chapter 7 - Lesen & Horen",
+            "Chapter 8 - Lesen & Horen",
+            "Chapter 3.5 - Schreiben & Sprechen"
+        ]),
+        ("Week Six", [
+            "Chapter 3.6 - Schreiben & Sprechen",
+            "Chapter 4.7 - Schreiben & Sprechen",
+            "Chapter 9 and 10 - Lesen & Horen"
+        ]),
+        ("Week Seven", [
+            "Chapter 11 - Lesen & Horen",
+            "Chapter 12.1 - Lesen & Horen and Schreiben & Sprechen (including 5.8)",
+            "Chapter 5.9 - Schreiben & Sprechen"
+        ]),
+        ("Week Eight", [
+            "Chapter 6.10 - Schreiben & Sprechen (Intro to letter writing)",
+            "Chapter 13 - Lesen & Horen and Chapter 6.11 - Schreiben & Sprechen",
+            "Chapter 14.1 - Lesen & Horen and Chapter 7.12 - Schreiben & Sprechen"
+        ]),
+        ("Week Nine", [
+            "Chapter 14.2 - Lesen & Horen and Chapter 7.12 - Schreiben & Sprechen",
+            "Chapter 8.13 - Schreiben & Sprechen",
+            "Exam tips - Schreiben & Sprechen recap"
+        ])
+    ]
+
+    def sanitize(text):
+        return text.encode('latin-1', 'replace').decode('latin-1')
+
+    def generate_schedule(start_date, weekdays, raw_schedule):
+        output = []
+        current_date = start_date
+        day_number = 1
+
+        day_map = {day: i for i, day in enumerate(calendar.day_name)}
+        selected_indices = sorted([day_map[day] for day in weekdays])
+
+        for week_label, sessions in raw_schedule:
+            output.append(f"\n{week_label.upper()}")
+            for session in sessions:
+                while current_date.weekday() not in selected_indices:
+                    current_date += timedelta(days=1)
+                session_day = calendar.day_name[current_date.weekday()]
+                session_date = current_date.strftime("%d %B %Y")
+                output.append(f"Day {day_number} ({session_date}, {session_day}): {session}")
+                current_date += timedelta(days=1)
+                day_number += 1
+        return output
+
+    if st.button("📅 Generate Schedule"):
+        schedule_lines = generate_schedule(start_date, selected_days, raw_schedule)
+        schedule_text = f"""
+Learn Language Education Academy
+Contact: 0205706589 | Website: www.learngermanghana.com
+Course Schedule: Auto-generated
+Meeting Days: {', '.join(selected_days)}
+First Week: Begins {start_date.strftime('%A, %d %B %Y')}
+
+""" + "\n".join(schedule_lines)
+
+        st.text_area("📄 Schedule Preview", value=schedule_text, height=600)
+
+        # TXT download
+        st.download_button(
+            label="📁 Download as TXT",
+            data=schedule_text,
+            file_name="a1_course_schedule.txt",
+            mime="text/plain"
+        )
+
+        # PDF download
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", size=12)
+
+        for line in schedule_text.split("\n"):
+            safe_line = sanitize(line)
+            if safe_line.strip().startswith("WEEK"):
+                pdf.set_font("Arial", "B", 12)
+                pdf.cell(0, 10, safe_line.strip(), ln=True)
+                pdf.set_font("Arial", size=12)
+            else:
+                pdf.multi_cell(0, 10, safe_line)
+
+        pdf_bytes = pdf.output(dest='S').encode('latin-1')
+
+        st.download_button(
+            label="📄 Download as PDF",
+            data=pdf_bytes,
+            file_name="a1_course_schedule.pdf",
+            mime="application/pdf"
+        )
 
 
