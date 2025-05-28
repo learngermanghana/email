@@ -912,7 +912,6 @@ with tabs[7]:
         st.download_button("📁 Download Expenses CSV", data=expense_csv, file_name="expenses_data.csv")
     else:
         st.info("No expenses file found to export.")
-
 with tabs[8]:
     st.title("📅 Generate A1 Course Schedule")
 
@@ -922,14 +921,16 @@ with tabs[8]:
 
     from datetime import datetime, timedelta
     import calendar
+    from fpdf import FPDF
+    import io
 
     # User inputs
     start_date = st.date_input("📅 Select Start Date", value=date.today())
     selected_days = st.multiselect(
-    "📌 Select Class Days (e.g. Monday, Tuesday, etc.)",
-    options=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-    default=["Monday", "Tuesday", "Wednesday"]
-)
+        "📌 Select Class Days (e.g. Monday, Tuesday, etc.)",
+        options=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+        default=["Monday", "Tuesday", "Wednesday"]
+    )
 
     # Schedule structure (fixed)
     raw_schedule = [
@@ -982,7 +983,6 @@ with tabs[8]:
         current_date = start_date
         day_number = 1
 
-        # Convert day names to weekday numbers
         day_map = {day: i for i, day in enumerate(calendar.day_name)}
         selected_indices = sorted([day_map[day] for day in weekdays])
 
@@ -1012,10 +1012,31 @@ First Week: Begins {start_date.strftime('%A, %d %B %Y')}
 
         st.text_area("📄 Preview Schedule", value=schedule_text, height=600)
 
-        # Download
+        # Download TXT
         st.download_button(
             label="📥 Download Schedule as TXT",
             data=schedule_text,
             file_name="a1_course_schedule.txt",
             mime="text/plain"
         )
+
+        # Download PDF
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", size=12)
+
+        for line in schedule_text.split("\n"):
+            pdf.multi_cell(0, 10, line)
+
+        pdf_output = io.BytesIO()
+        pdf.output(pdf_output)
+        pdf_output.seek(0)
+
+        st.download_button(
+            label="📄 Download as PDF",
+            data=pdf_output,
+            file_name="a1_course_schedule.pdf",
+            mime="application/pdf"
+        )
+
+
