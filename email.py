@@ -1,31 +1,31 @@
 import streamlit as st
 import pandas as pd
 import os
+import urllib.request
 from datetime import date, datetime, timedelta
 from fpdf import FPDF
 import base64
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
 import urllib.parse
-import urllib.request    # ← use this instead of requests
 
-# Download logo once at startup
-LOGO_URL  = "https://raw.githubusercontent.com/learngermanghana/email/main/logo.png"
+# ——— PAGE CONFIG: must be the very first Streamlit command ———
+st.set_page_config(page_title="Learn Language Education Academy Dashboard", layout="wide")
+
+# ——— Download logo once at startup ———
+LOGO_URL  = "https://raw.githubusercontent.com/learngermanghana/email/main/logo.png.png"  # note “.png.png”
 LOGO_FILE = "logo.png"
 
 if not os.path.exists(LOGO_FILE):
     try:
         urllib.request.urlretrieve(LOGO_URL, LOGO_FILE)
     except Exception as e:
-        st.warning(f"⚠️ Could not download logo: {e}")
+        st.warning(f"⚠️ Could not download logo (404? check filename): {e}")
 
-# === PAGE CONFIG ===
-st.set_page_config(page_title="Learn Language Education Academy Dashboard", layout="wide")
-
+# ——— Handle rerun flag ———
 if st.session_state.get("should_rerun"):
     st.session_state["should_rerun"] = False
-    st.experimental_rerun()
-
+    st.rerun()
 
 # === PAGE CONFIG ===
 st.set_page_config(page_title="Learn Language Education Academy Dashboard", layout="wide")
