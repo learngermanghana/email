@@ -724,6 +724,20 @@ with tabs[4]:
     else:
         st.warning("⚠️ Required columns 'Balance' or 'Phone' are missing in your data.")
 
+import requests
+
+LOGO_URL = "https://raw.githubusercontent.com/learngermanghana/email/main/logo.png"
+LOGO_FILE = "logo.png"
+
+if not os.path.exists(LOGO_FILE):
+    try:
+        response = requests.get(LOGO_URL)
+        if response.status_code == 200:
+            with open(LOGO_FILE, "wb") as f:
+                f.write(response.content)
+    except Exception as e:
+        st.warning(f"⚠️ Could not download logo: {e}")
+
 with tabs[5]:
     st.title("📄 Generate Contract PDF for Any Student")
 
@@ -746,18 +760,64 @@ with tabs[5]:
             balance = float(student_row.get("Balance", 0))
             total_fee = paid + balance
 
-            pdf_file = generate_receipt_and_contract_pdf(
-                student_row,
-                st.session_state.get("agreement_template", ""),
-                payment_amount=total_fee,
-                payment_date=payment_date
-            )
+            pdf = FPDF()
+            pdf.add_page()
 
-            with open(pdf_file, "rb") as f:
-                pdf_bytes = f.read()
-                b64 = base64.b64encode(pdf_bytes).decode()
-                download_link = f'<a href="data:application/pdf;base64,{b64}" download="{selected_name.replace(" ", "_")}_contract.pdf">📄 Download PDF</a>'
-                st.markdown(download_link, unsafe_allow_html=True)
+            # ✅ Insert logo at the top
+            if os.path.exists("logo.png"):
+                pdf.image("logo.png", x=80, y=10, w=50)
+                pdf.ln(30)
+
+            pdf.set_font("Arial", size=14)
+            pdf.cell(200, 10, f"{SCHOOL_NAME} Payment Receipt", ln=True, align="C")
+
+            pdf.set_font("Arial", size=12)
+            pdf.ln(10)
+            pdf.cell(200, 10, f"Name: {student_row['Name']}", ln=True)
+            pdf.cell(200, 10, f"Student Code: {student_row['StudentCode']}", ln=True)
+            pdf.cell(200, 10, f"Phone: {student_row['Phone']}", ln=True)
+            pdf.cell(200, 10, f"Level: {student_row['Level']}", ln=True)
+            pdf.cell(200, 10, f"Amount Paid: GHS {paid:.2f}", ln=True)
+            pdf.cell(200, 10, f"Balance Due: GHS {balance:.2f}", ln=True)
+            pdf.cell(200, 10, f"Total Course Fee: GHS {total_fee:.2f}", ln=True)
+            pdf.cell(200, 10, f"Contract Start: {student_row['ContractStart']}", ln=True)
+            pdf.cell(200, 10, f"Contract End: {student_row['ContractEnd']}", ln=True)
+            pdf.cell(200, 10, f"Receipt Date: {payment_date}", ln=True)
+            pdf.ln(10)
+            pdf.cell(0, 10, "Thank you for your payment!", ln=True)
+            pdf.cell(0, 10, "Signed: Felix Asadu", ln=True)
+
+            # Contract section
+            pdf.ln(15)
+            pdf.set_font("Arial", size=14)
+            pdf.cell(200, 10, f"{SCHOOL_NAME} Student Contract", ln=True, align="C")
+
+            pdf.set_font("Arial", size=12)
+            pdf.ln(10)
+            contract_text = st.session_state.get("agreement_template", "")
+            filled = contract_text.replace("[STUDENT_NAME]", student_row["Name"]) \
+                .replace("[DATE]", str(payment_date)) \
+                .replace("[CLASS]", student_row["Level"]) \
+                .replace("[AMOUNT]", str(total_fee)) \
+                .replace("[FIRST_INSTALMENT]", "1500") \
+                .replace("[SECOND_INSTALMENT]", str(balance)) \
+                .replace("[SECOND_DUE_DATE]", str(payment_date + timedelta(days=30))) \
+                .replace("[COURSE_LENGTH]", "12")
+
+            for line in filled.split("\n"):
+                safe_line = line.encode("latin-1", "replace").decode("latin-1")
+                pdf.multi_cell(0, 10, safe_line)
+
+            pdf.ln(10)
+            pdf.cell(0, 10, "Signed: Felix Asadu", ln=True)
+
+            pdf_bytes = pdf.output(dest='S').encode('latin-1', errors='replace')
+            st.download_button(
+                "📄 Download PDF",
+                data=pdf_bytes,
+                file_name=f"{selected_name.replace(' ', '_')}_contract.pdf",
+                mime="application/pdf"
+            )
             st.success("✅ PDF contract generated.")
     else:
         st.warning("No student data available.")
