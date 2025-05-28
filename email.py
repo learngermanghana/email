@@ -935,7 +935,6 @@ with tabs[8]:
     # Schedule structure (fixed)
     raw_schedule = [
         ("Week One", ["Chapter 0.1 - Lesen & Horen"]),
-        ("Break", ["Break"]),
         ("Week Two", [
             "Chapters 0.2 and 1.1 - Lesen & Horen",
             "Chapter 1.1 - Schreiben & Sprechen and Chapter 1.2 - Lesen & Horen",
