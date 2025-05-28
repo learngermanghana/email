@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import os
-import urllib.request
 from datetime import date, datetime, timedelta
 from fpdf import FPDF
 import base64
@@ -12,22 +11,13 @@ import urllib.parse
 # 1) MUST be the very first Streamlit call in your script
 st.set_page_config(page_title="Learn Language Education Academy Dashboard", layout="wide")
 
-# 2) Download logo once at startup (no st.* calls here)
-LOGO_URL  = "https://raw.githubusercontent.com/learngermanghana/email/main/logo.png.png"
-LOGO_FILE = "logo.png"
-if not os.path.exists(LOGO_FILE):
-    try:
-        urllib.request.urlretrieve(LOGO_URL, LOGO_FILE)
-    except Exception:
-        pass  # silently fail if logo can't be fetched
-
-# 3) SESSION STATE INIT
+# === SESSION STATE INIT ===
 if "should_rerun" not in st.session_state:
     st.session_state["should_rerun"] = False
 if "emailed_expiries" not in st.session_state:
     st.session_state["emailed_expiries"] = set()
 
-# 4) HANDLE RERUN FLAG
+# 2) HANDLE RERUN FLAG
 if st.session_state["should_rerun"]:
     st.session_state["should_rerun"] = False
     st.experimental_rerun()
@@ -84,11 +74,6 @@ def generate_receipt_and_contract_pdf(
     pdf = FPDF()
     pdf.add_page()
 
-    # Logo (optional)
-    if os.path.exists(LOGO_FILE):
-        pdf.image(LOGO_FILE, x=80, y=10, w=50)
-        pdf.ln(30)
-
     # Header
     pdf.set_font("Arial", size=14)
     pdf.cell(200, 10, safe(f"{SCHOOL_NAME} Payment Receipt"), ln=True, align="C")
@@ -136,6 +121,7 @@ def generate_receipt_and_contract_pdf(
     filename = f"{student_row.get('Name','').replace(' ', '_')}_receipt_contract.pdf"
     pdf.output(filename)
     return filename
+
 
 # === INITIALIZE STUDENT FILE ===
 student_file = "students_simple.csv"
