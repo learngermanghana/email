@@ -890,7 +890,6 @@ with tabs[7]:
     else:
         st.info("No enrollment data to visualize.")
 
-    # 📊 Pie Chart: Distribution by Level
     st.subheader("📊 Students by Level")
 
     if "Level" in df_main.columns and not df_main["Level"].dropna().empty:
@@ -899,7 +898,6 @@ with tabs[7]:
     else:
         st.info("No level information available to display.")
 
-    # ⬇️ Export Section
     st.subheader("⬇️ Export CSV Files")
 
     student_csv = df_main.to_csv(index=False)
@@ -912,11 +910,6 @@ with tabs[7]:
         st.download_button("📁 Download Expenses CSV", data=expense_csv, file_name="expenses_data.csv")
     else:
         st.info("No expenses file found to export.")
-        
-        data=pdf_bytes,
-            file_name="a1_course_schedule.pdf",
-            mime="application/pdf"
-        )
 
 with tabs[8]:
     st.title("\ud83d\uddd3\ufe0f Generate A1 Course Schedule")
