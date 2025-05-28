@@ -757,32 +757,41 @@ with tabs[5]:
         selected_name = st.selectbox("Select Student", student_names)
 
         if st.button("Generate PDF"):
+            # Fetch the student row
             student_row = df_main[df_main["Name"] == selected_name].iloc[0]
 
-            # ✅ Parse ContractStart date safely
+            # Parse ContractStart date safely
             raw_date = student_row.get("ContractStart", date.today())
-            payment_date = pd.to_datetime(raw_date, errors="coerce")
-            if pd.isnull(payment_date):
-                payment_date = date.today()
-            else:
-                payment_date = payment_date.date()
+            pd_date = pd.to_datetime(raw_date, errors="coerce")
+            payment_date = pd_date.date() if not pd.isnull(pd_date) else date.today()
 
+            # Amounts
             paid = float(student_row.get("Paid", 0))
             balance = float(student_row.get("Balance", 0))
             total_fee = paid + balance
 
+            # Create PDF
             pdf = FPDF()
             pdf.add_page()
 
-            # ✅ Insert logo at the top
+            # Insert logo
             if os.path.exists(LOGO_FILE):
                 pdf.image(LOGO_FILE, x=80, y=10, w=50)
                 pdf.ln(30)
+
+            # Payment status banner
+            payment_status = "FULLY PAID" if balance == 0 else "INSTALLMENT PLAN"
+            pdf.set_font("Arial", 'B', 12)
+            pdf.set_text_color(0, 128, 0)
+            pdf.cell(200, 10, payment_status, ln=True, align="C")
+            pdf.set_text_color(0, 0, 0)
+            pdf.ln(5)
 
             # Receipt header
             pdf.set_font("Arial", size=14)
             pdf.cell(200, 10, f"{SCHOOL_NAME} Payment Receipt", ln=True, align="C")
 
+            # Receipt details
             pdf.set_font("Arial", size=12)
             pdf.ln(10)
             pdf.cell(200, 10, f"Name: {student_row['Name']}", ln=True)
@@ -795,6 +804,8 @@ with tabs[5]:
             pdf.cell(200, 10, f"Contract Start: {student_row['ContractStart']}", ln=True)
             pdf.cell(200, 10, f"Contract End: {student_row['ContractEnd']}", ln=True)
             pdf.cell(200, 10, f"Receipt Date: {payment_date}", ln=True)
+
+            # Thank-you and signature
             pdf.ln(10)
             pdf.cell(0, 10, "Thank you for your payment!", ln=True)
             pdf.cell(0, 10, "Signed: Felix Asadu", ln=True)
@@ -818,7 +829,6 @@ with tabs[5]:
                 .replace("[SECOND_DUE_DATE]", str(payment_date + timedelta(days=30)))
                 .replace("[COURSE_LENGTH]", "12")
             )
-
             for line in filled.split("\n"):
                 safe_line = line.encode("latin-1", "replace").decode("latin-1")
                 pdf.multi_cell(0, 10, safe_line)
