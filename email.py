@@ -923,7 +923,6 @@ with tabs[8]:
     from datetime import datetime, timedelta
     import calendar
     from fpdf import FPDF
-    import io
 
     # User inputs
     start_date = st.date_input("📅 Select Start Date", value=date.today())
@@ -1021,7 +1020,7 @@ First Week: Begins {start_date.strftime('%A, %d %B %Y')}
             mime="text/plain"
         )
 
-        # Download PDF
+        # ✅ Generate and download PDF safely
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", size=12)
@@ -1029,15 +1028,11 @@ First Week: Begins {start_date.strftime('%A, %d %B %Y')}
         for line in schedule_text.split("\n"):
             pdf.multi_cell(0, 10, line)
 
-        pdf_output = io.BytesIO()
-        pdf.output(pdf_output)
-        pdf_output.seek(0)
+        pdf_bytes = pdf.output(dest='S').encode('latin-1')
 
         st.download_button(
             label="📄 Download as PDF",
-            data=pdf_output,
+            data=pdf_bytes,
             file_name="a1_course_schedule.pdf",
             mime="application/pdf"
         )
-
-
