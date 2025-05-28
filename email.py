@@ -989,7 +989,7 @@ with tabs[8]:
         selected_indices = sorted([day_map[day] for day in weekdays])
 
         for week_label, sessions in raw_schedule:
-            output.append(f"\n📘 **{week_label}**")
+            output.append(f"\n\033[1m{week_label}\033[0m")
             for session in sessions:
                 while current_date.weekday() not in selected_indices:
                     current_date += timedelta(days=1)
@@ -1027,7 +1027,13 @@ First Week: Begins {start_date.strftime('%A, %d %B %Y')}
         pdf.set_font("Arial", size=12)
 
         for line in schedule_text.split("\n"):
-            pdf.multi_cell(0, 10, line)
+            if line.startswith("\033[1m") and line.endswith("\033[0m"):
+                week_header = line.replace("\033[1m", "").replace("\033[0m", "")
+                pdf.set_font("Arial", "B", 12)
+                pdf.cell(0, 10, week_header, ln=True)
+                pdf.set_font("Arial", size=12)
+            else:
+                pdf.multi_cell(0, 10, line)
 
         pdf_bytes = pdf.output(dest='S').encode('latin-1')
 
@@ -1037,3 +1043,4 @@ First Week: Begins {start_date.strftime('%A, %d %B %Y')}
             file_name="a1_course_schedule.pdf",
             mime="application/pdf"
         )
+
