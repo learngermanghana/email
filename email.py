@@ -745,6 +745,7 @@ with tabs[4]:
     else:
         st.warning("⚠️ Required columns 'Balance' or 'Phone' are missing in your data.")
 
+
 with tabs[5]:
     st.title("📄 Generate Contract PDF for Any Student")
 
