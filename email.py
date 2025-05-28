@@ -926,10 +926,10 @@ with tabs[8]:
     # User inputs
     start_date = st.date_input("📅 Select Start Date", value=date.today())
     selected_days = st.multiselect(
-        "📌 Select Class Days (e.g. Monday, Tuesday, etc.)",
-        options=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-        default=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday","Sunday"]
-    )
+    "📌 Select Class Days (e.g. Monday, Tuesday, etc.)",
+    options=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+    default=["Monday", "Tuesday", "Wednesday"]
+)
 
     # Schedule structure (fixed)
     raw_schedule = [
@@ -1019,4 +1019,3 @@ First Week: Begins {start_date.strftime('%A, %d %B %Y')}
             file_name="a1_course_schedule.txt",
             mime="text/plain"
         )
-
