@@ -284,7 +284,7 @@ tabs = st.tabs([
     "📄 Generate Contract PDF",
     "📧 Send Email",
     "📊 Analytics & Export",
-    "📆 A1 Course Schedule",  
+    "📆 A1 Course Schedule"  
 ])
 
 with tabs[0]:
