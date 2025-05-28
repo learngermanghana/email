@@ -1,7 +1,6 @@
 # ✅ FULL DASHBOARD CODE – With Pending Registrations Tab Fully Updated
 import streamlit as st
-import pandas as pd
-import requests                   
+import pandas as pd                
 import os
 from datetime import date, datetime, timedelta
 from fpdf import FPDF
@@ -9,16 +8,6 @@ import base64
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
 import urllib.parse
-
-LOGO_URL  = "https://raw.githubusercontent.com/learngermanghana/email/main/logo.png"
-LOGO_FILE = "logo.png"
-
-# …download if missing…
-if not os.path.exists(LOGO_FILE):
-    resp = requests.get(LOGO_URL)
-    if resp.status_code == 200:
-        with open(LOGO_FILE, "wb") as f:
-            f.write(resp.content)
 
 # === PAGE CONFIG ===
 st.set_page_config(page_title="Learn Language Education Academy Dashboard", layout="wide")
