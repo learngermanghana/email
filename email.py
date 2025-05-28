@@ -917,7 +917,9 @@ with tabs[8]:
     st.title("📅 Generate A1 Course Schedule")
 
     st.markdown("""
-    This tool creates a downloadable A1 course schedule based on your start date and preferred class days. The structure follows the official classroom schedule (Lesen & Hören, Schreiben & Sprechen).
+    🛠️ **Create and download a personalized A1 course schedule.**
+
+    Choose a start date and class days. The schedule will follow the official classroom structure (Lesen & Hören, Schreiben & Sprechen).
     """)
 
     from datetime import datetime, timedelta
@@ -925,9 +927,10 @@ with tabs[8]:
     from fpdf import FPDF
 
     # User inputs
-    start_date = st.date_input("📅 Select Start Date", value=date.today())
+    st.subheader("🗓️ Configuration")
+    start_date = st.date_input("Select Start Date", value=date.today())
     selected_days = st.multiselect(
-        "📌 Select Class Days (e.g. Monday, Tuesday, etc.)",
+        "Select Class Days",
         options=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
         default=["Monday", "Tuesday", "Wednesday"]
     )
@@ -986,11 +989,10 @@ with tabs[8]:
         selected_indices = sorted([day_map[day] for day in weekdays])
 
         for week_label, sessions in raw_schedule:
-            output.append(f"\n**{week_label}**")
+            output.append(f"\n📘 **{week_label}**")
             for session in sessions:
                 while current_date.weekday() not in selected_indices:
                     current_date += timedelta(days=1)
-
                 session_day = calendar.day_name[current_date.weekday()]
                 session_date = current_date.strftime("%d %B %Y")
                 output.append(f"Day {day_number} ({session_date}, {session_day}): {session}")
@@ -998,7 +1000,7 @@ with tabs[8]:
                 day_number += 1
         return output
 
-    if st.button("Generate Schedule"):
+    if st.button("📅 Generate Schedule"):
         schedule_lines = generate_schedule(start_date, selected_days, raw_schedule)
         schedule_text = f"""
 Learn Language Education Academy
@@ -1009,17 +1011,17 @@ First Week: Begins {start_date.strftime('%A, %d %B %Y')}
 
 """ + "\n".join(schedule_lines)
 
-        st.text_area("📄 Preview Schedule", value=schedule_text, height=600)
+        st.text_area("📄 Schedule Preview", value=schedule_text, height=600)
 
-        # Download TXT
+        # TXT download
         st.download_button(
-            label="📥 Download Schedule as TXT",
+            label="📥 Download as TXT",
             data=schedule_text,
             file_name="a1_course_schedule.txt",
             mime="text/plain"
         )
 
-        # ✅ Generate and download PDF safely
+        # PDF download
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", size=12)
