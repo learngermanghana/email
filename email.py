@@ -855,6 +855,66 @@ with tabs[6]:
         if failed:
             st.warning(f"⚠️ Failed to send to: {', '.join(failed)}")
 
+
+
+with tabs[7]:
+    st.title("📊 Analytics & Export")
+
+    if os.path.exists("students_simple.csv"):
+        df_main = pd.read_csv("students_simple.csv")
+    else:
+        df_main = pd.DataFrame()
+
+    st.subheader("📈 Enrollment Over Time")
+
+    if not df_main.empty and "ContractStart" in df_main.columns:
+        df_main["EnrollDate"] = pd.to_datetime(df_main["ContractStart"], errors="coerce")
+
+        # ✅ Filter by year
+        valid_years = df_main["EnrollDate"].dt.year.dropna().unique()
+        valid_years = sorted([int(y) for y in valid_years if not pd.isna(y)])
+        selected_year = st.selectbox("📆 Filter by Year", valid_years) if valid_years else None
+
+        if df_main["EnrollDate"].notna().sum() == 0:
+            st.info("No valid enrollment dates found in 'ContractStart'. Please check your data.")
+        else:
+            try:
+                filtered_df = df_main[df_main["EnrollDate"].dt.year == selected_year] if selected_year else df_main
+                monthly = (
+                    filtered_df.groupby(filtered_df["EnrollDate"].dt.to_period("M"))
+                    .size()
+                    .reset_index(name="Count")
+                )
+                monthly["EnrollDate"] = monthly["EnrollDate"].astype(str)
+                st.line_chart(monthly.set_index("EnrollDate")["Count"])
+            except Exception as e:
+                st.warning(f"⚠️ Unable to generate enrollment chart: {e}")
+    else:
+        st.info("No enrollment data to visualize.")
+
+    # 📊 Pie Chart: Distribution by Level
+    st.subheader("📊 Students by Level")
+
+    if "Level" in df_main.columns and not df_main["Level"].dropna().empty:
+        level_counts = df_main["Level"].value_counts()
+        st.bar_chart(level_counts)
+    else:
+        st.info("No level information available to display.")
+
+    # ⬇️ Export Section
+    st.subheader("⬇️ Export CSV Files")
+
+    student_csv = df_main.to_csv(index=False)
+    st.download_button("📁 Download Students CSV", data=student_csv, file_name="students_data.csv")
+
+    expenses_file = "expenses_all.csv"
+    if os.path.exists(expenses_file):
+        exp_data = pd.read_csv(expenses_file)
+        expense_csv = exp_data.to_csv(index=False)
+        st.download_button("📁 Download Expenses CSV", data=expense_csv, file_name="expenses_data.csv")
+    else:
+        st.info("No expenses file found to export.")
+
 with tabs[8]:
     st.title("📅 Generate A1 Course Schedule")
 
@@ -948,61 +1008,3 @@ with tabs[8]:
         pdf.output(pdf_output)
         with open(pdf_output, "rb") as f:
             st.download_button("📄 Download Schedule as PDF", f.read(), file_name=pdf_output)
-
-with tabs[7]:
-    st.title("📊 Analytics & Export")
-
-    if os.path.exists("students_simple.csv"):
-        df_main = pd.read_csv("students_simple.csv")
-    else:
-        df_main = pd.DataFrame()
-
-    st.subheader("📈 Enrollment Over Time")
-
-    if not df_main.empty and "ContractStart" in df_main.columns:
-        df_main["EnrollDate"] = pd.to_datetime(df_main["ContractStart"], errors="coerce")
-
-        # ✅ Filter by year
-        valid_years = df_main["EnrollDate"].dt.year.dropna().unique()
-        valid_years = sorted([int(y) for y in valid_years if not pd.isna(y)])
-        selected_year = st.selectbox("📆 Filter by Year", valid_years) if valid_years else None
-
-        if df_main["EnrollDate"].notna().sum() == 0:
-            st.info("No valid enrollment dates found in 'ContractStart'. Please check your data.")
-        else:
-            try:
-                filtered_df = df_main[df_main["EnrollDate"].dt.year == selected_year] if selected_year else df_main
-                monthly = (
-                    filtered_df.groupby(filtered_df["EnrollDate"].dt.to_period("M"))
-                    .size()
-                    .reset_index(name="Count")
-                )
-                monthly["EnrollDate"] = monthly["EnrollDate"].astype(str)
-                st.line_chart(monthly.set_index("EnrollDate")["Count"])
-            except Exception as e:
-                st.warning(f"⚠️ Unable to generate enrollment chart: {e}")
-    else:
-        st.info("No enrollment data to visualize.")
-
-    # 📊 Pie Chart: Distribution by Level
-    st.subheader("📊 Students by Level")
-
-    if "Level" in df_main.columns and not df_main["Level"].dropna().empty:
-        level_counts = df_main["Level"].value_counts()
-        st.bar_chart(level_counts)
-    else:
-        st.info("No level information available to display.")
-
-    # ⬇️ Export Section
-    st.subheader("⬇️ Export CSV Files")
-
-    student_csv = df_main.to_csv(index=False)
-    st.download_button("📁 Download Students CSV", data=student_csv, file_name="students_data.csv")
-
-    expenses_file = "expenses_all.csv"
-    if os.path.exists(expenses_file):
-        exp_data = pd.read_csv(expenses_file)
-        expense_csv = exp_data.to_csv(index=False)
-        st.download_button("📁 Download Expenses CSV", data=expense_csv, file_name="expenses_data.csv")
-    else:
-        st.info("No expenses file found to export.")
