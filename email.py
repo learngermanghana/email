@@ -711,10 +711,10 @@ with tabs[4]:
                 student_code = row.get("StudentCode", "")
                 phone = row.get("Phone", "")
 
+                # --- FRIENDLY MESSAGE ---
                 message = (
-                    f"Dear {name}, your current balance with {SCHOOL_NAME} is GHS {balance:.2f}. "
-                    f"Your student code is {student_code}. "
-                    f"Please pay as soon as possible to remain active. Thank you!"
+                    f"Dear {name} , your current balance with {SCHOOL_NAME} is GHS {balance:.2f}. "
+                    f"Your student code is {student_code}. Please pay as soon as possible to remain active. Thank you!"
                 )
 
                 phone_clean = phone.replace(" ", "").replace("+", "")
