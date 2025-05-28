@@ -8,8 +8,17 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
 import urllib.parse
 
-# 1) MUST be the very first Streamlit call in your script
-st.set_page_config(page_title="Learn Language Education Academy Dashboard", layout="wide")
+# ===== PAGE CONFIG (must be first Streamlit command!) =====
+st.set_page_config(
+    page_title="Learn Language Education Academy Dashboard",
+    layout="wide"
+)
+
+# --- Session State Initialization ---
+if "should_rerun" not in st.session_state:
+    st.session_state["should_rerun"] = False
+if "emailed_expiries" not in st.session_state:
+    st.session_state["emailed_expiries"] = set()
 
 # === SESSION STATE INIT ===
 if "should_rerun" not in st.session_state:
