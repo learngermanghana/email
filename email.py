@@ -855,8 +855,6 @@ with tabs[6]:
         if failed:
             st.warning(f"⚠️ Failed to send to: {', '.join(failed)}")
 
-
-
 with tabs[7]:
     st.title("📊 Analytics & Export")
 
@@ -915,8 +913,6 @@ with tabs[7]:
     else:
         st.info("No expenses file found to export.")
 
-' added successfully.")
-                st.rerun()
 
 with tabs[8]:
     st.title("📅 Generate A1 Course Schedule")
