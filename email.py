@@ -14,6 +14,30 @@ st.set_page_config(
     layout="wide"
 )
 
+st.markdown(
+    f"""
+    <div style='
+        background: linear-gradient(90deg, #1e3c72 0%, #2a5298 100%);
+        color: white;
+        border-radius: 12px;
+        padding: 24px 32px;
+        margin-bottom: 16px;
+        box-shadow: 0 4px 16px rgba(30,60,114,0.08);
+    '>
+        <h1 style='margin-bottom:0; font-size:2.4rem;'>🏫 {SCHOOL_NAME}</h1>
+        <div style='font-size:1.25rem; margin-top:0.5rem;'>
+            <b>Contact:</b> {SCHOOL_PHONE} &nbsp; | &nbsp; 
+            <b>Email:</b> {SCHOOL_EMAIL} &nbsp; | &nbsp;
+            <b>Website:</b> <a href='https://{SCHOOL_WEBSITE}' style='color:#FFEB3B;' target='_blank'>{SCHOOL_WEBSITE}</a>
+        </div>
+        <div style='font-size:1rem; margin-top:0.25rem; opacity:0.85;'>
+            <b>Location:</b> {SCHOOL_ADDRESS}
+        </div>
+    </div>
+    """, unsafe_allow_html=True
+)
+
+
 # --- Session State Initialization ---
 if "should_rerun" not in st.session_state:
     st.session_state["should_rerun"] = False
