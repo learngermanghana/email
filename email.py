@@ -913,91 +913,109 @@ with tabs[7]:
     else:
         st.info("No expenses file found to export.")
 
-
 with tabs[8]:
     st.title("📅 Generate A1 Course Schedule")
 
+    st.markdown("""
+    This tool creates a downloadable A1 course schedule based on your start date and preferred class days. The structure follows the official classroom schedule (Lesen & Hören, Schreiben & Sprechen).
+    """)
+
+    from datetime import datetime, timedelta
     import calendar
-    import io
-    from fpdf import FPDF
 
-    # Input controls
-    start_date = st.date_input("Select course start date")
-    selected_days = st.multiselect("Select class days", ["Monday", "Tuesday", "Wednesday"], default=["Monday", "Tuesday", "Wednesday"])
-    generate_btn = st.button("Generate Schedule")
+    # User inputs
+    start_date = st.date_input("📅 Select Start Date", value=date.today())
+    selected_days = st.multiselect(
+        "📌 Select Class Days (e.g. Monday, Tuesday, etc.)",
+        options=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+        default=["Monday", "Tuesday", "Wednesday"]
+    )
 
-    if generate_btn and start_date and selected_days:
-        day_name_to_index = {day: i for i, day in enumerate(calendar.day_name)}
-        selected_day_indexes = [day_name_to_index[day] for day in selected_days]
-
-        structure = [
-            "Learn Language Education Academy",
-            "Contact: 0205706589 | Website: www.learngermanghana.com",
-            "Course Schedule: Auto-generated",
-            f"Meeting Days: {', '.join(selected_days)}",
-            f"First Week: Begins {start_date.strftime('%A, %d %B %Y')}",
-            "Break: 29th May 2025 - 6th June 2025 (No Classes)",
-            "",
-        ]
-
-        # Course outline details (titles only)
-        course_days = [
-            "Chapter 0.1 - Lesen & Horen",
+    # Schedule structure (fixed)
+    raw_schedule = [
+        ("Week One", ["Chapter 0.1 - Lesen & Horen"]),
+        ("Break", ["Break"]),
+        ("Week Two", [
             "Chapters 0.2 and 1.1 - Lesen & Horen",
             "Chapter 1.1 - Schreiben & Sprechen and Chapter 1.2 - Lesen & Horen",
-            "Chapter 2 - Lesen & Horen",
+            "Chapter 2 - Lesen & Horen"
+        ]),
+        ("Week Three", [
             "Chapter 1.2 - Schreiben & Sprechen (Recap)",
             "Chapter 2.3 - Schreiben & Sprechen",
-            "Chapter 3 - Lesen & Horen",
+            "Chapter 3 - Lesen & Horen"
+        ]),
+        ("Week Four", [
             "Chapter 4 - Lesen & Horen",
             "Chapter 5 - Lesen & Horen",
-            "Chapter 6 - Lesen & Horen and Chapter 2.4 - Schreiben & Sprechen",
+            "Chapter 6 - Lesen & Horen and Chapter 2.4 - Schreiben & Sprechen"
+        ]),
+        ("Week Five", [
             "Chapter 7 - Lesen & Horen",
             "Chapter 8 - Lesen & Horen",
-            "Chapter 3.5 - Schreiben & Sprechen",
+            "Chapter 3.5 - Schreiben & Sprechen"
+        ]),
+        ("Week Six", [
             "Chapter 3.6 - Schreiben & Sprechen",
             "Chapter 4.7 - Schreiben & Sprechen",
-            "Chapter 9 and 10 - Lesen & Horen",
+            "Chapter 9 and 10 - Lesen & Horen"
+        ]),
+        ("Week Seven", [
             "Chapter 11 - Lesen & Horen",
             "Chapter 12.1 - Lesen & Horen and Schreiben & Sprechen (including 5.8)",
-            "Chapter 5.9 - Schreiben & Sprechen",
+            "Chapter 5.9 - Schreiben & Sprechen"
+        ]),
+        ("Week Eight", [
             "Chapter 6.10 - Schreiben & Sprechen (Intro to letter writing)",
             "Chapter 13 - Lesen & Horen and Chapter 6.11 - Schreiben & Sprechen",
-            "Chapter 14.1 - Lesen & Horen and Chapter 7.12 - Schreiben & Sprechen",
+            "Chapter 14.1 - Lesen & Horen and Chapter 7.12 - Schreiben & Sprechen"
+        ]),
+        ("Week Nine", [
             "Chapter 14.2 - Lesen & Horen and Chapter 7.12 - Schreiben & Sprechen",
             "Chapter 8.13 - Schreiben & Sprechen",
-            "Exam tips - Schreiben & Sprechen recap",
-        ]
+            "Exam tips - Schreiben & Sprechen recap"
+        ])
+    ]
 
-        # Schedule computation
-        from datetime import timedelta
-        scheduled = []
+    def generate_schedule(start_date, weekdays, raw_schedule):
+        output = []
         current_date = start_date
-        count = 0
+        day_number = 1
 
-        while len(scheduled) < len(course_days):
-            if current_date.weekday() in selected_day_indexes:
-                day_label = f"Day {len(scheduled)+1} ({current_date.strftime('%d %B %Y, %A')}): {course_days[len(scheduled)]}"
-                scheduled.append(day_label)
-            current_date += timedelta(days=1)
+        # Convert day names to weekday numbers
+        day_map = {day: i for i, day in enumerate(calendar.day_name)}
+        selected_indices = sorted([day_map[day] for day in weekdays])
 
-        # Weekwise labeling
-        output_lines = []
-        for i, entry in enumerate(scheduled):
-            if i % len(selected_day_indexes) == 0:
-                output_lines.append(f"Week {i // len(selected_day_indexes) + 1}")
-            output_lines.append(entry)
+        for week_label, sessions in raw_schedule:
+            output.append(f"\n**{week_label}**")
+            for session in sessions:
+                while current_date.weekday() not in selected_indices:
+                    current_date += timedelta(days=1)
 
-        full_schedule = structure + output_lines
-        st.write("\n".join(full_schedule))
+                session_day = calendar.day_name[current_date.weekday()]
+                session_date = current_date.strftime("%d %B %Y")
+                output.append(f"Day {day_number} ({session_date}, {session_day}): {session}")
+                current_date += timedelta(days=1)
+                day_number += 1
+        return output
 
-        # PDF export
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", size=12)
-        for line in full_schedule:
-            pdf.multi_cell(0, 10, line)
-        pdf_output = io.BytesIO()
-        pdf.output(pdf_output)
-        st.download_button("📥 Download Schedule PDF", data=pdf_output.getvalue(), file_name="A1_Course_Schedule.pdf")
+    if st.button("Generate Schedule"):
+        schedule_lines = generate_schedule(start_date, selected_days, raw_schedule)
+        schedule_text = f"""
+Learn Language Education Academy
+Contact: 0205706589 | Website: www.learngermanghana.com
+Course Schedule: Auto-generated
+Meeting Days: {', '.join(selected_days)}
+First Week: Begins {start_date.strftime('%A, %d %B %Y')}
 
+""" + "\n".join(schedule_lines)
+
+        st.text_area("📄 Preview Schedule", value=schedule_text, height=600)
+
+        # Download
+        st.download_button(
+            label="📥 Download Schedule as TXT",
+            data=schedule_text,
+            file_name="a1_course_schedule.txt",
+            mime="text/plain"
+        )
