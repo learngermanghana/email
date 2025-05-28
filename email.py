@@ -12,46 +12,38 @@ import urllib.parse
 # 1) MUST be the very first Streamlit call in your script
 st.set_page_config(page_title="Learn Language Education Academy Dashboard", layout="wide")
 
-# 2) Download logo once (no st.* calls here)
+# 2) Download logo once at startup (no st.* calls here)
 LOGO_URL  = "https://raw.githubusercontent.com/learngermanghana/email/main/logo.png.png"
 LOGO_FILE = "logo.png"
 if not os.path.exists(LOGO_FILE):
     try:
         urllib.request.urlretrieve(LOGO_URL, LOGO_FILE)
     except Exception:
-        pass  # silently fail—no st.warning before config
+        pass  # silently fail if logo can't be fetched
 
-# 3) handle your rerun flag
-if st.session_state.get("should_rerun"):
+# 3) SESSION STATE INIT
+if "should_rerun" not in st.session_state:
     st.session_state["should_rerun"] = False
-    st.experimental_rerun()
+if "emailed_expiries" not in st.session_state:
+    st.session_state["emailed_expiries"] = set()
 
-# ——— Handle rerun flag ———
-if st.session_state.get("should_rerun"):
-    st.session_state["should_rerun"] = False
-    st.rerun()
-
-# === PAGE CONFIG ===
-st.set_page_config(page_title="Learn Language Education Academy Dashboard", layout="wide")
-
-if st.session_state.get("should_rerun"):
+# 4) HANDLE RERUN FLAG
+if st.session_state["should_rerun"]:
     st.session_state["should_rerun"] = False
     st.experimental_rerun()
 
 # === SCHOOL INFO ===
-SCHOOL_NAME = "Learn Language Education Academy"
-SCHOOL_EMAIL = "Learngermanghana@gmail.com"
+SCHOOL_NAME    = "Learn Language Education Academy"
+SCHOOL_EMAIL   = "Learngermanghana@gmail.com"
 SCHOOL_WEBSITE = "www.learngermanghana.com"
-SCHOOL_PHONE = "233205706589"
+SCHOOL_PHONE   = "233205706589"
 SCHOOL_ADDRESS = "Awoshie, Accra, Ghana"
 
 # === EMAIL CONFIG ===
-school_sendgrid_key = st.secrets["general"].get("SENDGRID_API_KEY")
-school_sender_email = st.secrets["general"].get("SENDER_EMAIL", SCHOOL_EMAIL)
+school_sendgrid_key = st.secrets.get("general", {}).get("SENDGRID_API_KEY")
+school_sender_email = st.secrets.get("general", {}).get("SENDER_EMAIL", SCHOOL_EMAIL)
 
-# === SESSION STATE INIT ===
-if "emailed_expiries" not in st.session_state:
-    st.session_state["emailed_expiries"] = set()
+# === PDF GENERATION FUNCTION ===
 def generate_receipt_and_contract_pdf(
     student_row,
     agreement_text,
@@ -60,9 +52,6 @@ def generate_receipt_and_contract_pdf(
     first_instalment=1500,
     course_length=12
 ):
-    from datetime import date, timedelta, datetime
-    from fpdf import FPDF
-
     if payment_date is None:
         payment_date = date.today()
     elif isinstance(payment_date, str):
@@ -72,21 +61,20 @@ def generate_receipt_and_contract_pdf(
     balance = float(student_row.get("Balance", 0))
     total_fee = paid + balance
 
-    second_due_date = ""
     try:
         second_due_date = payment_date + timedelta(days=30)
-    except:
-        pass
+    except Exception:
+        second_due_date = payment_date
 
     payment_status = "FULLY PAID" if balance == 0 else "INSTALLMENT PLAN"
 
     # Replace placeholders in agreement
-    filled = agreement_text.replace("[STUDENT_NAME]", student_row["Name"]) \
+    filled = agreement_text.replace("[STUDENT_NAME]", str(student_row.get("Name", ""))) \
         .replace("[DATE]", str(payment_date)) \
-        .replace("[CLASS]", student_row["Level"]) \
+        .replace("[CLASS]", str(student_row.get("Level", ""))) \
         .replace("[AMOUNT]", str(payment_amount)) \
         .replace("[FIRST_INSTALMENT]", str(first_instalment)) \
-        .replace("[SECOND_INSTALMENT]", "your balance") \
+        .replace("[SECOND_INSTALMENT]", str(balance)) \
         .replace("[SECOND_DUE_DATE]", str(second_due_date)) \
         .replace("[COURSE_LENGTH]", str(course_length))
 
@@ -95,6 +83,11 @@ def generate_receipt_and_contract_pdf(
 
     pdf = FPDF()
     pdf.add_page()
+
+    # Logo (optional)
+    if os.path.exists(LOGO_FILE):
+        pdf.image(LOGO_FILE, x=80, y=10, w=50)
+        pdf.ln(30)
 
     # Header
     pdf.set_font("Arial", size=14)
@@ -107,20 +100,21 @@ def generate_receipt_and_contract_pdf(
 
     pdf.set_font("Arial", size=12)
     pdf.ln(10)
-    pdf.cell(200, 10, safe(f"Name: {student_row['Name']}"), ln=True)
-    pdf.cell(200, 10, safe(f"Student Code: {student_row['StudentCode']}"), ln=True)
-    pdf.cell(200, 10, safe(f"Phone: {student_row['Phone']}"), ln=True)
-    pdf.cell(200, 10, safe(f"Level: {student_row['Level']}"), ln=True)
+    pdf.cell(200, 10, safe(f"Name: {student_row.get('Name','')}"), ln=True)
+    pdf.cell(200, 10, safe(f"Student Code: {student_row.get('StudentCode','')}"), ln=True)
+    pdf.cell(200, 10, safe(f"Phone: {student_row.get('Phone','')}"), ln=True)
+    pdf.cell(200, 10, safe(f"Level: {student_row.get('Level','')}"), ln=True)
     pdf.cell(200, 10, f"Amount Paid: GHS {paid:.2f}", ln=True)
     pdf.cell(200, 10, f"Balance Due: GHS {balance:.2f}", ln=True)
     pdf.cell(200, 10, f"Total Course Fee: GHS {total_fee:.2f}", ln=True)
-    pdf.cell(200, 10, safe(f"Contract Start: {student_row['ContractStart']}"), ln=True)
-    pdf.cell(200, 10, safe(f"Contract End: {student_row['ContractEnd']}"), ln=True)
+    pdf.cell(200, 10, safe(f"Contract Start: {student_row.get('ContractStart','')}"), ln=True)
+    pdf.cell(200, 10, safe(f"Contract End: {student_row.get('ContractEnd','')}"), ln=True)
     pdf.cell(200, 10, f"Receipt Date: {payment_date}", ln=True)
     pdf.ln(10)
     pdf.cell(0, 10, safe("Thank you for your payment!"), ln=True)
     pdf.cell(0, 10, safe("Signed: Felix Asadu"), ln=True)
 
+    # Contract Section
     pdf.ln(15)
     pdf.set_font("Arial", size=14)
     pdf.cell(200, 10, safe(f"{SCHOOL_NAME} Student Contract"), ln=True, align="C")
@@ -139,10 +133,9 @@ def generate_receipt_and_contract_pdf(
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
     pdf.cell(0, 10, safe(f"Generated on {now_str}"), align="C")
 
-    filename = f"{student_row['Name'].replace(' ', '_')}_receipt_contract.pdf"
+    filename = f"{student_row.get('Name','').replace(' ', '_')}_receipt_contract.pdf"
     pdf.output(filename)
     return filename
-
 
 # === INITIALIZE STUDENT FILE ===
 student_file = "students_simple.csv"
