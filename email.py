@@ -2,12 +2,23 @@
 import streamlit as st
 import pandas as pd                
 import os
+import request
 from datetime import date, datetime, timedelta
 from fpdf import FPDF
 import base64
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
 import urllib.parse
+
+# …
+LOGO_URL  = "https://raw.githubusercontent.com/learngermanghana/email/main/logo.png"
+LOGO_FILE = "logo.png"
+
+if not os.path.exists(LOGO_FILE):
+    resp = requests.get(LOGO_URL)
+    if resp.status_code == 200:
+        with open(LOGO_FILE, "wb") as f:
+            f.write(resp.content)
 
 # === PAGE CONFIG ===
 st.set_page_config(page_title="Learn Language Education Academy Dashboard", layout="wide")
@@ -724,20 +735,6 @@ with tabs[4]:
     else:
         st.warning("⚠️ Required columns 'Balance' or 'Phone' are missing in your data.")
 
-import requests
-
-LOGO_URL = "https://raw.githubusercontent.com/learngermanghana/email/main/logo.png"
-LOGO_FILE = "logo.png"
-
-if not os.path.exists(LOGO_FILE):
-    try:
-        response = requests.get(LOGO_URL)
-        if response.status_code == 200:
-            with open(LOGO_FILE, "wb") as f:
-                f.write(response.content)
-    except Exception as e:
-        st.warning(f"⚠️ Could not download logo: {e}")
-
 with tabs[5]:
     st.title("📄 Generate Contract PDF for Any Student")
 
@@ -746,7 +743,7 @@ with tabs[5]:
         selected_name = st.selectbox("Select Student", student_names)
 
         if st.button("Generate PDF"):
-            # Fetch the student row
+            # Fetch student data
             student_row = df_main[df_main["Name"] == selected_name].iloc[0]
 
             # Parse ContractStart date safely
@@ -754,7 +751,7 @@ with tabs[5]:
             pd_date = pd.to_datetime(raw_date, errors="coerce")
             payment_date = pd_date.date() if not pd.isnull(pd_date) else date.today()
 
-            # Amounts
+            # Calculate amounts
             paid = float(student_row.get("Paid", 0))
             balance = float(student_row.get("Balance", 0))
             total_fee = paid + balance
@@ -763,24 +760,24 @@ with tabs[5]:
             pdf = FPDF()
             pdf.add_page()
 
-            # Insert logo
+            # 1) Insert logo if available
             if os.path.exists(LOGO_FILE):
                 pdf.image(LOGO_FILE, x=80, y=10, w=50)
                 pdf.ln(30)
 
-            # Payment status banner
+            # 2) Payment status banner
             payment_status = "FULLY PAID" if balance == 0 else "INSTALLMENT PLAN"
-            pdf.set_font("Arial", 'B', 12)
+            pdf.set_font("Arial", "B", 12)
             pdf.set_text_color(0, 128, 0)
             pdf.cell(200, 10, payment_status, ln=True, align="C")
             pdf.set_text_color(0, 0, 0)
             pdf.ln(5)
 
-            # Receipt header
+            # 3) Receipt header
             pdf.set_font("Arial", size=14)
             pdf.cell(200, 10, f"{SCHOOL_NAME} Payment Receipt", ln=True, align="C")
 
-            # Receipt details
+            # 4) Receipt details
             pdf.set_font("Arial", size=12)
             pdf.ln(10)
             pdf.cell(200, 10, f"Name: {student_row['Name']}", ln=True)
@@ -794,12 +791,12 @@ with tabs[5]:
             pdf.cell(200, 10, f"Contract End: {student_row['ContractEnd']}", ln=True)
             pdf.cell(200, 10, f"Receipt Date: {payment_date}", ln=True)
 
-            # Thank-you and signature
+            # 5) Thank-you and signature
             pdf.ln(10)
             pdf.cell(0, 10, "Thank you for your payment!", ln=True)
             pdf.cell(0, 10, "Signed: Felix Asadu", ln=True)
 
-            # Contract section
+            # 6) Contract section
             pdf.ln(15)
             pdf.set_font("Arial", size=14)
             pdf.cell(200, 10, f"{SCHOOL_NAME} Student Contract", ln=True, align="C")
@@ -825,8 +822,8 @@ with tabs[5]:
             pdf.ln(10)
             pdf.cell(0, 10, "Signed: Felix Asadu", ln=True)
 
-            # Download button
-            pdf_bytes = pdf.output(dest='S').encode('latin-1', errors='replace')
+            # 7) Download button
+            pdf_bytes = pdf.output(dest="S").encode("latin-1", errors="replace")
             st.download_button(
                 "📄 Download PDF",
                 data=pdf_bytes,
@@ -836,6 +833,7 @@ with tabs[5]:
             st.success("✅ PDF contract generated.")
     else:
         st.warning("No student data available.")
+
 
 
 with tabs[6]:
