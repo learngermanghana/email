@@ -689,13 +689,11 @@ with tabs[3]:
 with tabs[4]:
     st.title("📲 WhatsApp Reminders for Debtors")
 
-    # ✅ Always reload student data fresh
     if os.path.exists("students_simple.csv"):
         df_main = pd.read_csv("students_simple.csv")
     else:
         df_main = pd.DataFrame()
 
-    # ✅ Check if required columns exist
     if not df_main.empty and "Balance" in df_main.columns and "Phone" in df_main.columns:
         df_main["Balance"] = pd.to_numeric(df_main["Balance"], errors="coerce").fillna(0.0)
         df_main["Phone"] = df_main["Phone"].astype(str)
@@ -707,14 +705,26 @@ with tabs[4]:
 
             for _, row in debtors.iterrows():
                 name = row.get("Name", "Unknown")
+                level = row.get("Level", "")
                 balance = float(row.get("Balance", 0.0))
-                student_code = row.get("StudentCode", "")
                 phone = row.get("Phone", "")
 
-                # --- FRIENDLY MESSAGE ---
+                due_date = row.get("ContractEnd", "")
+                if due_date and not pd.isnull(due_date):
+                    due_date_fmt = pd.to_datetime(due_date, errors="coerce").strftime("%d %B %Y")
+                else:
+                    due_date_fmt = "soon"
+
                 message = (
-                    f"Dear {name} , your current balance with {SCHOOL_NAME} is GHS {balance:.2f}. "
-                    f"Your student code is {student_code}. Please pay as soon as possible to remain active. Thank you!"
+                    f"Dear {name}, this is a reminder that your balance for your {level} class is GHS {balance:.2f} and is due by {due_date_fmt}. "
+                    f"Kindly make the payment to continue learning with us. Thank you!\n\n"
+                    "Payment Methods:\n"
+                    "1. Mobile Money\n"
+                    "   Number: 0245022743\n"
+                    "   Name: Felix Asadu\n"
+                    "2. Access Bank (Cedis)\n"
+                    "   Account Number: 1050000008017\n"
+                    "   Name: Learn Language Education Academy"
                 )
 
                 phone_clean = phone.replace(" ", "").replace("+", "")
@@ -732,6 +742,7 @@ with tabs[4]:
             st.success("✅ No students with unpaid balances.")
     else:
         st.warning("⚠️ Required columns 'Balance' or 'Phone' are missing in your data.")
+
 
 with tabs[5]:
     st.title("📄 Generate Contract PDF for Any Student")
