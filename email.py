@@ -745,16 +745,11 @@ with tabs[5]:
             balance = float(student_row.get("Balance", 0))
             total_fee = paid + balance
 
-            # Create PDF
+            # Create PDF (no logo)
             pdf = FPDF()
             pdf.add_page()
 
-            # 1) Insert logo if available
-            if os.path.exists(LOGO_FILE):
-                pdf.image(LOGO_FILE, x=80, y=10, w=50)
-                pdf.ln(30)
-
-            # 2) Payment status banner
+            # 1) Payment status banner
             payment_status = "FULLY PAID" if balance == 0 else "INSTALLMENT PLAN"
             pdf.set_font("Arial", "B", 12)
             pdf.set_text_color(0, 128, 0)
@@ -762,30 +757,30 @@ with tabs[5]:
             pdf.set_text_color(0, 0, 0)
             pdf.ln(5)
 
-            # 3) Receipt header
+            # 2) Receipt header
             pdf.set_font("Arial", size=14)
             pdf.cell(200, 10, f"{SCHOOL_NAME} Payment Receipt", ln=True, align="C")
 
-            # 4) Receipt details
+            # 3) Receipt details
             pdf.set_font("Arial", size=12)
             pdf.ln(10)
-            pdf.cell(200, 10, f"Name: {student_row['Name']}", ln=True)
-            pdf.cell(200, 10, f"Student Code: {student_row['StudentCode']}", ln=True)
-            pdf.cell(200, 10, f"Phone: {student_row['Phone']}", ln=True)
-            pdf.cell(200, 10, f"Level: {student_row['Level']}", ln=True)
+            pdf.cell(200, 10, f"Name: {student_row.get('Name','')}", ln=True)
+            pdf.cell(200, 10, f"Student Code: {student_row.get('StudentCode','')}", ln=True)
+            pdf.cell(200, 10, f"Phone: {student_row.get('Phone','')}", ln=True)
+            pdf.cell(200, 10, f"Level: {student_row.get('Level','')}", ln=True)
             pdf.cell(200, 10, f"Amount Paid: GHS {paid:.2f}", ln=True)
             pdf.cell(200, 10, f"Balance Due: GHS {balance:.2f}", ln=True)
             pdf.cell(200, 10, f"Total Course Fee: GHS {total_fee:.2f}", ln=True)
-            pdf.cell(200, 10, f"Contract Start: {student_row['ContractStart']}", ln=True)
-            pdf.cell(200, 10, f"Contract End: {student_row['ContractEnd']}", ln=True)
+            pdf.cell(200, 10, f"Contract Start: {student_row.get('ContractStart','')}", ln=True)
+            pdf.cell(200, 10, f"Contract End: {student_row.get('ContractEnd','')}", ln=True)
             pdf.cell(200, 10, f"Receipt Date: {payment_date}", ln=True)
 
-            # 5) Thank-you and signature
+            # 4) Thank-you and signature
             pdf.ln(10)
             pdf.cell(0, 10, "Thank you for your payment!", ln=True)
             pdf.cell(0, 10, "Signed: Felix Asadu", ln=True)
 
-            # 6) Contract section
+            # 5) Contract section
             pdf.ln(15)
             pdf.set_font("Arial", size=14)
             pdf.cell(200, 10, f"{SCHOOL_NAME} Student Contract", ln=True, align="C")
@@ -795,9 +790,9 @@ with tabs[5]:
             contract_text = st.session_state.get("agreement_template", "")
             filled = (
                 contract_text
-                .replace("[STUDENT_NAME]", student_row["Name"])
+                .replace("[STUDENT_NAME]", str(student_row.get("Name","")))
                 .replace("[DATE]", str(payment_date))
-                .replace("[CLASS]", student_row["Level"])
+                .replace("[CLASS]", str(student_row.get("Level","")))
                 .replace("[AMOUNT]", str(total_fee))
                 .replace("[FIRST_INSTALMENT]", "1500")
                 .replace("[SECOND_INSTALMENT]", str(balance))
@@ -811,7 +806,7 @@ with tabs[5]:
             pdf.ln(10)
             pdf.cell(0, 10, "Signed: Felix Asadu", ln=True)
 
-            # 7) Download button
+            # 6) Download button
             pdf_bytes = pdf.output(dest="S").encode("latin-1", errors="replace")
             st.download_button(
                 "📄 Download PDF",
@@ -822,8 +817,6 @@ with tabs[5]:
             st.success("✅ PDF contract generated.")
     else:
         st.warning("No student data available.")
-
-
 
 with tabs[6]:
     st.title("📧 Send Email to Student(s)")
