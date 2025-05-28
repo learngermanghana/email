@@ -709,15 +709,17 @@ with tabs[4]:
                 balance = float(row.get("Balance", 0.0))
                 phone = row.get("Phone", "")
 
-                due_date = row.get("ContractEnd", "")
-                if due_date and not pd.isnull(due_date):
-                    due_date_fmt = pd.to_datetime(due_date, errors="coerce").strftime("%d %B %Y")
+                contract_start = row.get("ContractStart", "")
+                if contract_start and not pd.isnull(contract_start):
+                    contract_start_dt = pd.to_datetime(contract_start, errors="coerce")
+                    due_date_dt = contract_start_dt + timedelta(days=30)
+                    due_date_fmt = due_date_dt.strftime("%d %B %Y")
                 else:
                     due_date_fmt = "soon"
 
                 message = (
-                    f"Dear {name}, this is a reminder that your balance for your {level} class is GHS {balance:.2f} and is due by {due_date_fmt}. "
-                    f"Kindly make the payment to continue learning with us. Thank you!\n\n"
+                    f"Dear {name}, this is a reminder that your balance for your {level} class is GHS {balance:.2f} "
+                    f"and is due by {due_date_fmt}. Kindly make the payment to continue learning with us. Thank you!\n\n"
                     "Payment Methods:\n"
                     "1. Mobile Money\n"
                     "   Number: 0245022743\n"
@@ -742,7 +744,6 @@ with tabs[4]:
             st.success("✅ No students with unpaid balances.")
     else:
         st.warning("⚠️ Required columns 'Balance' or 'Phone' are missing in your data.")
-
 
 with tabs[5]:
     st.title("📄 Generate Contract PDF for Any Student")
