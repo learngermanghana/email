@@ -1087,7 +1087,7 @@ Asadu Felix
         for line in cert_body.split("\n"):
             cert_pdf.multi_cell(0, 10, line)
 
-        cert_bytes = cert_pdf.output(dest='S').encode('latin-1')
+        cert_bytes = cert_pdf.output(dest='S').encode('latin-1', errors='replace')
         st.download_button("⬇️ Download Certificate PDF", data=cert_bytes, file_name="enrollment_certificate.pdf", mime="application/pdf")
     else:
         st.warning("No student data available.")
@@ -1130,7 +1130,7 @@ Asadu Felix
     for line in intro_letter.split("\n"):
         intro_pdf.multi_cell(0, 10, line)
 
-    intro_bytes = intro_pdf.output(dest='S').encode('latin-1')
+    intro_bytes = intro_pdf.output(dest='S').encode('latin-1', errors='replace')
     st.download_button("⬇️ Download Introduction Letter PDF", data=intro_bytes, file_name="introduction_letter.pdf", mime="application/pdf")
 
 
