@@ -775,10 +775,11 @@ with tabs[5]:
             pdf.add_page()
 
             # ✅ Insert logo at the top
-            if os.path.exists("logo.png"):
-                pdf.image("logo.png", x=80, y=10, w=50)
+            if os.path.exists(LOGO_FILE):
+                pdf.image(LOGO_FILE, x=80, y=10, w=50)
                 pdf.ln(30)
 
+            # Receipt header
             pdf.set_font("Arial", size=14)
             pdf.cell(200, 10, f"{SCHOOL_NAME} Payment Receipt", ln=True, align="C")
 
@@ -806,14 +807,17 @@ with tabs[5]:
             pdf.set_font("Arial", size=12)
             pdf.ln(10)
             contract_text = st.session_state.get("agreement_template", "")
-            filled = contract_text.replace("[STUDENT_NAME]", student_row["Name"]) \
-                .replace("[DATE]", str(payment_date)) \
-                .replace("[CLASS]", student_row["Level"]) \
-                .replace("[AMOUNT]", str(total_fee)) \
-                .replace("[FIRST_INSTALMENT]", "1500") \
-                .replace("[SECOND_INSTALMENT]", str(balance)) \
-                .replace("[SECOND_DUE_DATE]", str(payment_date + timedelta(days=30))) \
+            filled = (
+                contract_text
+                .replace("[STUDENT_NAME]", student_row["Name"])
+                .replace("[DATE]", str(payment_date))
+                .replace("[CLASS]", student_row["Level"])
+                .replace("[AMOUNT]", str(total_fee))
+                .replace("[FIRST_INSTALMENT]", "1500")
+                .replace("[SECOND_INSTALMENT]", str(balance))
+                .replace("[SECOND_DUE_DATE]", str(payment_date + timedelta(days=30)))
                 .replace("[COURSE_LENGTH]", "12")
+            )
 
             for line in filled.split("\n"):
                 safe_line = line.encode("latin-1", "replace").decode("latin-1")
@@ -822,6 +826,7 @@ with tabs[5]:
             pdf.ln(10)
             pdf.cell(0, 10, "Signed: Felix Asadu", ln=True)
 
+            # Download button
             pdf_bytes = pdf.output(dest='S').encode('latin-1', errors='replace')
             st.download_button(
                 "📄 Download PDF",
@@ -832,6 +837,7 @@ with tabs[5]:
             st.success("✅ PDF contract generated.")
     else:
         st.warning("No student data available.")
+
 
 with tabs[6]:
     st.title("📧 Send Email to Student(s)")
