@@ -9,18 +9,22 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
 import urllib.parse
 
-# ——— PAGE CONFIG: must be the very first Streamlit command ———
+# 1) MUST be the very first Streamlit call in your script
 st.set_page_config(page_title="Learn Language Education Academy Dashboard", layout="wide")
 
-# ——— Download logo once at startup ———
-LOGO_URL  = "https://raw.githubusercontent.com/learngermanghana/email/main/logo.png.png"  # note “.png.png”
+# 2) Download logo once (no st.* calls here)
+LOGO_URL  = "https://raw.githubusercontent.com/learngermanghana/email/main/logo.png.png"
 LOGO_FILE = "logo.png"
-
 if not os.path.exists(LOGO_FILE):
     try:
         urllib.request.urlretrieve(LOGO_URL, LOGO_FILE)
-    except Exception as e:
-        st.warning(f"⚠️ Could not download logo (404? check filename): {e}")
+    except Exception:
+        pass  # silently fail—no st.warning before config
+
+# 3) handle your rerun flag
+if st.session_state.get("should_rerun"):
+    st.session_state["should_rerun"] = False
+    st.experimental_rerun()
 
 # ——— Handle rerun flag ———
 if st.session_state.get("should_rerun"):
