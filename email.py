@@ -2,7 +2,7 @@
 import streamlit as st
 import pandas as pd                
 import os
-import request
+import requests
 from datetime import date, datetime, timedelta
 from fpdf import FPDF
 import base64
