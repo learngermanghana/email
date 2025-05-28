@@ -29,7 +29,7 @@ if "emailed_expiries" not in st.session_state:
 # 2) HANDLE RERUN FLAG
 if st.session_state["should_rerun"]:
     st.session_state["should_rerun"] = False
-    st.experimental_rerun()
+    st.rerun()
 
 # === SCHOOL INFO ===
 SCHOOL_NAME    = "Learn Language Education Academy"
