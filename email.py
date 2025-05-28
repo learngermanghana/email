@@ -915,56 +915,93 @@ with tabs[7]:
     else:
         st.info("No expenses file found to export.")
 
-with tabs[2]:
-    st.title("➕ Add Student Manually")
-
-    with st.form("add_student_form"):
-        name = st.text_input("Full Name")
-        phone = st.text_input("Phone Number")
-        email = st.text_input("Email Address")
-        location = st.text_input("Location")
-        emergency = st.text_input("Emergency Contact (Phone Number)")
-        level = st.selectbox("Class Level", ["A1", "A2", "B1", "B2", "C1", "C2"])
-        paid = st.number_input("Amount Paid (GHS)", min_value=0.0, step=1.0)
-        balance = st.number_input("Balance Due (GHS)", min_value=0.0, step=1.0)
-        contract_start = st.date_input("Contract Start", value=date.today())
-        course_length = st.number_input("Course Length (weeks)", min_value=1, value=12)
-        contract_end = contract_start + timedelta(weeks=course_length)
-        student_code = st.text_input("Student Code (must be unique)")
-
-        submit_btn = st.form_submit_button("Add Student")
-
-        if submit_btn:
-            if not name or not phone or not student_code:
-                st.warning("❗ Name, Phone, and Student Code are required.")
-            else:
-                if os.path.exists(student_file):
-                    existing_df = pd.read_csv(student_file)
-                else:
-                    existing_df = pd.DataFrame(columns=[
-                        "Name", "Phone", "Email", "Location", "Emergency Contact (Phone Number)", "Level",
-                        "Paid", "Balance", "ContractStart", "ContractEnd", "StudentCode"
-                    ])
-
-                if student_code in existing_df["StudentCode"].values:
-                    st.error("❌ This Student Code already exists.")
-                    st.stop()
-
-                new_row = pd.DataFrame([{
-                    "Name": name,
-                    "Phone": phone,
-                    "Email": email,
-                    "Location": location,
-                    "Emergency Contact (Phone Number)": emergency,
-                    "Level": level,
-                    "Paid": paid,
-                    "Balance": balance,
-                    "ContractStart": str(contract_start),
-                    "ContractEnd": str(contract_end),
-                    "StudentCode": student_code
-                }])
-
-                updated_df = pd.concat([existing_df, new_row], ignore_index=True)
-                updated_df.to_csv(student_file, index=False)
-                st.success(f"✅ Student '{name}' added successfully.")
+' added successfully.")
                 st.rerun()
+
+with tabs[8]:
+    st.title("📅 Generate A1 Course Schedule")
+
+    import calendar
+    import io
+    from fpdf import FPDF
+
+    # Input controls
+    start_date = st.date_input("Select course start date")
+    selected_days = st.multiselect("Select class days", ["Monday", "Tuesday", "Wednesday"], default=["Monday", "Tuesday", "Wednesday"])
+    generate_btn = st.button("Generate Schedule")
+
+    if generate_btn and start_date and selected_days:
+        day_name_to_index = {day: i for i, day in enumerate(calendar.day_name)}
+        selected_day_indexes = [day_name_to_index[day] for day in selected_days]
+
+        structure = [
+            "Learn Language Education Academy",
+            "Contact: 0205706589 | Website: www.learngermanghana.com",
+            "Course Schedule: Auto-generated",
+            f"Meeting Days: {', '.join(selected_days)}",
+            f"First Week: Begins {start_date.strftime('%A, %d %B %Y')}",
+            "Break: 29th May 2025 - 6th June 2025 (No Classes)",
+            "",
+        ]
+
+        # Course outline details (titles only)
+        course_days = [
+            "Chapter 0.1 - Lesen & Horen",
+            "Chapters 0.2 and 1.1 - Lesen & Horen",
+            "Chapter 1.1 - Schreiben & Sprechen and Chapter 1.2 - Lesen & Horen",
+            "Chapter 2 - Lesen & Horen",
+            "Chapter 1.2 - Schreiben & Sprechen (Recap)",
+            "Chapter 2.3 - Schreiben & Sprechen",
+            "Chapter 3 - Lesen & Horen",
+            "Chapter 4 - Lesen & Horen",
+            "Chapter 5 - Lesen & Horen",
+            "Chapter 6 - Lesen & Horen and Chapter 2.4 - Schreiben & Sprechen",
+            "Chapter 7 - Lesen & Horen",
+            "Chapter 8 - Lesen & Horen",
+            "Chapter 3.5 - Schreiben & Sprechen",
+            "Chapter 3.6 - Schreiben & Sprechen",
+            "Chapter 4.7 - Schreiben & Sprechen",
+            "Chapter 9 and 10 - Lesen & Horen",
+            "Chapter 11 - Lesen & Horen",
+            "Chapter 12.1 - Lesen & Horen and Schreiben & Sprechen (including 5.8)",
+            "Chapter 5.9 - Schreiben & Sprechen",
+            "Chapter 6.10 - Schreiben & Sprechen (Intro to letter writing)",
+            "Chapter 13 - Lesen & Horen and Chapter 6.11 - Schreiben & Sprechen",
+            "Chapter 14.1 - Lesen & Horen and Chapter 7.12 - Schreiben & Sprechen",
+            "Chapter 14.2 - Lesen & Horen and Chapter 7.12 - Schreiben & Sprechen",
+            "Chapter 8.13 - Schreiben & Sprechen",
+            "Exam tips - Schreiben & Sprechen recap",
+        ]
+
+        # Schedule computation
+        from datetime import timedelta
+        scheduled = []
+        current_date = start_date
+        count = 0
+
+        while len(scheduled) < len(course_days):
+            if current_date.weekday() in selected_day_indexes:
+                day_label = f"Day {len(scheduled)+1} ({current_date.strftime('%d %B %Y, %A')}): {course_days[len(scheduled)]}"
+                scheduled.append(day_label)
+            current_date += timedelta(days=1)
+
+        # Weekwise labeling
+        output_lines = []
+        for i, entry in enumerate(scheduled):
+            if i % len(selected_day_indexes) == 0:
+                output_lines.append(f"Week {i // len(selected_day_indexes) + 1}")
+            output_lines.append(entry)
+
+        full_schedule = structure + output_lines
+        st.write("\n".join(full_schedule))
+
+        # PDF export
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", size=12)
+        for line in full_schedule:
+            pdf.multi_cell(0, 10, line)
+        pdf_output = io.BytesIO()
+        pdf.output(pdf_output)
+        st.download_button("📥 Download Schedule PDF", data=pdf_output.getvalue(), file_name="A1_Course_Schedule.pdf")
+
