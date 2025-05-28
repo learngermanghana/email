@@ -1052,3 +1052,4 @@ First Week: Begins {start_date.strftime('%A, %d %B %Y')}
             file_name="a1_course_schedule.pdf",
             mime="application/pdf"
         )
+
