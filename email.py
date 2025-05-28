@@ -912,10 +912,10 @@ with tabs[7]:
         st.info("No expenses file found to export.")
 
 with tabs[8]:
-    st.title("\ud83d\uddd3\ufe0f Generate A1 Course Schedule")
+    st.title("Generate A1 Course Schedule")
 
     st.markdown("""
-    \ud83d\udee0\ufe0f **Create and download a personalized A1 course schedule.**
+    🛠️ **Create and download a personalized A1 course schedule.**
 
     Choose a start date and class days. The schedule will follow the official classroom structure (Lesen & Hören, Schreiben & Sprechen).
     """)
@@ -925,7 +925,7 @@ with tabs[8]:
     from fpdf import FPDF
 
     # User inputs
-    st.subheader("\ud83d\uddd3\ufe0f Configuration")
+    st.subheader("🗓️ Configuration")
     start_date = st.date_input("Select Start Date", value=date.today())
     selected_days = st.multiselect(
         "Select Class Days",
@@ -990,7 +990,7 @@ with tabs[8]:
         selected_indices = sorted([day_map[day] for day in weekdays])
 
         for week_label, sessions in raw_schedule:
-            output.append(f"\n\033[1m{week_label}\033[0m")
+            output.append(f"\n{week_label.upper()}")
             for session in sessions:
                 while current_date.weekday() not in selected_indices:
                     current_date += timedelta(days=1)
@@ -1001,7 +1001,7 @@ with tabs[8]:
                 day_number += 1
         return output
 
-    if st.button("\ud83d\uddd3\ufe0f Generate Schedule"):
+    if st.button("📅 Generate Schedule"):
         schedule_lines = generate_schedule(start_date, selected_days, raw_schedule)
         schedule_text = f"""
 Learn Language Education Academy
@@ -1012,11 +1012,11 @@ First Week: Begins {start_date.strftime('%A, %d %B %Y')}
 
 """ + "\n".join(schedule_lines)
 
-        st.text_area("\ud83d\udcc4 Schedule Preview", value=schedule_text, height=600)
+        st.text_area("📄 Schedule Preview", value=schedule_text, height=600)
 
         # TXT download
         st.download_button(
-            label="\ud83d\udcc5 Download as TXT",
+            label="📁 Download as TXT",
             data=schedule_text,
             file_name="a1_course_schedule.txt",
             mime="text/plain"
@@ -1029,10 +1029,9 @@ First Week: Begins {start_date.strftime('%A, %d %B %Y')}
 
         for line in schedule_text.split("\n"):
             safe_line = sanitize(line)
-            if safe_line.startswith("\033[1m") and safe_line.endswith("\033[0m"):
-                week_header = safe_line.replace("\033[1m", "").replace("\033[0m", "")
+            if safe_line.strip().startswith("WEEK"):
                 pdf.set_font("Arial", "B", 12)
-                pdf.cell(0, 10, week_header, ln=True)
+                pdf.cell(0, 10, safe_line.strip(), ln=True)
                 pdf.set_font("Arial", size=12)
             else:
                 pdf.multi_cell(0, 10, safe_line)
@@ -1040,7 +1039,7 @@ First Week: Begins {start_date.strftime('%A, %d %B %Y')}
         pdf_bytes = pdf.output(dest='S').encode('latin-1')
 
         st.download_button(
-            label="\ud83d\udcc4 Download as PDF",
+            label="📄 Download as PDF",
             data=pdf_bytes,
             file_name="a1_course_schedule.pdf",
             mime="application/pdf"
