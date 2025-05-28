@@ -275,7 +275,6 @@ else:
     </div>
     """, unsafe_allow_html=True)
 
-# ✅ Place this ABOVE any tab block
 tabs = st.tabs([
     "📝 Pending Registrations",
     "👩‍🎓 All Students",
@@ -284,7 +283,8 @@ tabs = st.tabs([
     "📲 WhatsApp Reminders",
     "📄 Generate Contract PDF",
     "📧 Send Email",
-    "📊 Analytics & Export"
+    "📊 Analytics & Export",
+    "📆 A1 Course Schedule"  # 👈 Add this line for tab 8
 ])
 
 with tabs[0]:
