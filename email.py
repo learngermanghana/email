@@ -855,6 +855,99 @@ with tabs[6]:
         if failed:
             st.warning(f"⚠️ Failed to send to: {', '.join(failed)}")
 
+with tabs[8]:
+    st.title("📅 Generate A1 Course Schedule")
+
+    st.markdown("""
+    This tool creates a full 12-week A1 course schedule based on your selected start date and preferred lesson days.
+    
+    **Example:** If classes happen on **Monday, Wednesday, and Friday**, and the course starts on **June 3, 2025**, the tool will build a dynamic plan.
+    """)
+
+    # --- User inputs ---
+    start_date = st.date_input("📆 Select course start date", value=date.today())
+    lesson_days = st.multiselect(
+        "📚 Select lesson days per week",
+        options=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+        default=["Monday", "Wednesday", "Friday"]
+    )
+
+    if st.button("Generate Schedule"):
+        import calendar
+
+        # Convert lesson days to weekday numbers
+        weekday_map = {
+            "Monday": 0, "Tuesday": 1, "Wednesday": 2, "Thursday": 3,
+            "Friday": 4, "Saturday": 5, "Sunday": 6
+        }
+        selected_weekdays = sorted([weekday_map[d] for d in lesson_days])
+
+        # Sample topics from PDF
+        topics = [
+            "Alphabet, Greetings, Personal Info",
+            "Family, Numbers, Countries",
+            "Daily Routines, Time, Appointments",
+            "Food & Drinks, Shopping",
+            "Housing, Directions, Rooms",
+            "Leisure, Hobbies, Weather",
+            "Health, Body Parts, Appointments",
+            "Professions, Workplaces, Emails",
+            "Travel, Transport, Schedules",
+            "School, Learning, Exams",
+            "Review and Mock Tests",
+            "Final Revision + Feedback"
+        ]
+
+        # Generate class sessions (36 sessions over 12 weeks)
+        from datetime import timedelta
+        all_sessions = []
+        current_date = start_date
+        week = 1
+        topic_idx = 0
+
+        while len(all_sessions) < 36:
+            week_dates = []
+            # Look for valid weekdays in the upcoming 7-day window
+            for i in range(7):
+                d = current_date + timedelta(days=i)
+                if d.weekday() in selected_weekdays:
+                    week_dates.append(d)
+            
+            for session_date in week_dates[:3]:  # max 3 lessons per week
+                all_sessions.append({
+                    "Week": f"Week {week}",
+                    "Date": session_date.strftime("%Y-%m-%d"),
+                    "Day": calendar.day_name[session_date.weekday()],
+                    "Topic": topics[topic_idx]
+                })
+            week += 1
+            current_date += timedelta(days=7)
+            topic_idx = min(topic_idx + 1, len(topics) - 1)
+
+        df_schedule = pd.DataFrame(all_sessions)
+        st.success("✅ Schedule generated!")
+        st.dataframe(df_schedule, use_container_width=True)
+
+        # --- Downloadable CSV ---
+        csv = df_schedule.to_csv(index=False)
+        st.download_button("📥 Download Schedule as CSV", csv, file_name="a1_course_schedule.csv")
+
+        # --- Downloadable PDF ---
+        from fpdf import FPDF
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", "B", 14)
+        pdf.cell(200, 10, "Learn Language Education Academy - A1 Course Schedule", ln=True, align="C")
+        pdf.ln(10)
+        pdf.set_font("Arial", size=12)
+
+        for _, row in df_schedule.iterrows():
+            pdf.cell(0, 10, f"{row['Week']} | {row['Date']} ({row['Day']}) - {row['Topic']}", ln=True)
+
+        pdf_output = "a1_schedule.pdf"
+        pdf.output(pdf_output)
+        with open(pdf_output, "rb") as f:
+            st.download_button("📄 Download Schedule as PDF", f.read(), file_name=pdf_output)
 
 with tabs[7]:
     st.title("📊 Analytics & Export")
