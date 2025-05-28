@@ -912,6 +912,7 @@ with tabs[7]:
         st.download_button("📁 Download Expenses CSV", data=expense_csv, file_name="expenses_data.csv")
     else:
         st.info("No expenses file found to export.")
+        
 with tabs[8]:
     st.title("📅 Generate A1 Course Schedule")
 
