@@ -342,7 +342,7 @@ with tabs[0]:
             st.success("✅ Expenses file replaced.")
             st.session_state["should_rerun"] = True
 
-    # Trigger the rerun only once, at the top of the script:
+    # Trigger the rerun at the top‐level if requested
     if st.session_state["should_rerun"]:
         st.session_state["should_rerun"] = False
         st.experimental_rerun()
@@ -455,6 +455,7 @@ with tabs[0]:
 
                     st.success(f"✅ {fullname} approved and saved.")
                     st.session_state["should_rerun"] = True
+                    st.stop()
 
 with tabs[1]:
     st.title("👩‍🎓 All Students (Edit, Update, Delete, Receipt)")
