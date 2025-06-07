@@ -476,7 +476,11 @@ with tabs[1]:
         if col not in df_main.columns:
             df_main[col] = ""
 
-    # ——— Coerce ContractEnd to datetime & compute Status vectorized ———
+    # — Coerce numeric columns to avoid ValueError —
+    df_main["Paid"] = pd.to_numeric(df_main["Paid"], errors="coerce").fillna(0.0)
+    df_main["Balance"] = pd.to_numeric(df_main["Balance"], errors="coerce").fillna(0.0)
+
+    # — Coerce ContractEnd to datetime & compute Status vectorized —
     df_main["ContractEnd"] = pd.to_datetime(df_main["ContractEnd"], errors="coerce")
     df_main["Status"] = "Unknown"
     mask_valid = df_main["ContractEnd"].notna()
@@ -494,56 +498,59 @@ with tabs[1]:
     status_filter  = st.selectbox("Filter by Status", statuses)
 
     view_df = df_main.copy()
-
     if search_term:
         view_df = view_df[
             view_df["Name"].str.contains(search_term, case=False, na=False) |
             view_df["StudentCode"].str.contains(search_term, case=False, na=False)
         ]
-
     if selected_level != "All":
         view_df = view_df[view_df["Level"] == selected_level]
-
     if status_filter != "All":
         view_df = view_df[view_df["Status"] == status_filter]
 
-    if not view_df.empty:
+    if view_df.empty:
+        st.info("No students found in your database.")
+    else:
         for idx, row in view_df.iterrows():
-            name            = row["Name"]
-            phone           = row["Phone"]
-            email           = row["Email"]
-            location        = row["Location"]
-            level           = row["Level"]
-            paid            = float(row["Paid"])
-            balance         = float(row["Balance"])
-            contract_start  = str(row["ContractStart"])
-            contract_end    = row["ContractEnd"].date() if pd.notna(row["ContractEnd"]) else ""
-            student_code    = row["StudentCode"]
-            emergency       = row["Emergency Contact (Phone Number)"]
-            status          = row["Status"]
+            name           = row["Name"]
+            phone          = row["Phone"]
+            email          = row["Email"]
+            location       = row["Location"]
+            level          = row["Level"]
+            paid           = row["Paid"]
+            balance        = row["Balance"]
+            contract_start = str(row["ContractStart"])
+            contract_end   = row["ContractEnd"].date() if pd.notna(row["ContractEnd"]) else ""
+            student_code   = row["StudentCode"]
+            emergency      = row["Emergency Contact (Phone Number)"]
+            status         = row["Status"]
 
             unique_key = f"{student_code}_{idx}"
-            status_color = "🟢" if status == "Enrolled" else ("🔴" if status == "Completed" else "⚪")
+            status_color = (
+                "🟢" if status == "Enrolled" else
+                "🔴" if status == "Completed" else
+                "⚪"
+            )
 
             with st.expander(f"{status_color} {name} ({student_code}) [{status}]"):
                 # Editable fields
-                name_input            = st.text_input("Name", value=name, key=f"name_{unique_key}")
-                phone_input           = st.text_input("Phone", value=phone, key=f"phone_{unique_key}")
-                email_input           = st.text_input("Email", value=email, key=f"email_{unique_key}")
-                location_input        = st.text_input("Location", value=location, key=f"loc_{unique_key}")
-                level_input           = st.text_input("Level", value=level, key=f"level_{unique_key}")
-                paid_input            = st.number_input("Paid", value=paid, key=f"paid_{unique_key}")
-                balance_input         = st.number_input("Balance", value=balance, key=f"bal_{unique_key}")
-                contract_start_input  = st.text_input("Contract Start", value=contract_start, key=f"cs_{unique_key}")
-                contract_end_input    = st.text_input("Contract End", value=contract_end, key=f"ce_{unique_key}")
-                code_input            = st.text_input("Student Code", value=student_code, key=f"code_{unique_key}")
-                emergency_input       = st.text_input("Emergency Contact", value=emergency, key=f"em_{unique_key}")
+                name_input           = st.text_input("Name", value=name, key=f"name_{unique_key}")
+                phone_input          = st.text_input("Phone", value=phone, key=f"phone_{unique_key}")
+                email_input          = st.text_input("Email", value=email, key=f"email_{unique_key}")
+                location_input       = st.text_input("Location", value=location, key=f"loc_{unique_key}")
+                level_input          = st.text_input("Level", value=level, key=f"level_{unique_key}")
+                paid_input           = st.number_input("Paid", value=paid, key=f"paid_{unique_key}")
+                balance_input        = st.number_input("Balance", value=balance, key=f"bal_{unique_key}")
+                contract_start_input = st.text_input("Contract Start", value=contract_start, key=f"cs_{unique_key}")
+                contract_end_input   = st.text_input("Contract End", value=contract_end, key=f"ce_{unique_key}")
+                code_input           = st.text_input("Student Code", value=student_code, key=f"code_{unique_key}")
+                emergency_input      = st.text_input("Emergency Contact", value=emergency, key=f"em_{unique_key}")
 
                 col1, col2, col3 = st.columns(3)
 
                 with col1:
                     if st.button("💾 Update", key=f"update_{unique_key}"):
-                        df_main.at[idx, "Name"] = name_input
+                        df_main.at[idx, "Name"]  = name_input
                         df_main.at[idx, "Phone"] = phone_input
                         df_main.at[idx, "Email"] = email_input
                         df_main.at[idx, "Location"] = location_input
@@ -567,9 +574,9 @@ with tabs[1]:
 
                 with col3:
                     if st.button("📄 Receipt", key=f"receipt_{unique_key}"):
-                        total_fee = paid_input + balance_input
+                        total_fee   = paid_input + balance_input
                         parsed_date = pd.to_datetime(contract_start_input, errors="coerce").date()
-                        pdf_path = generate_receipt_and_contract_pdf(
+                        pdf_path    = generate_receipt_and_contract_pdf(
                             row,
                             st.session_state["agreement_template"],
                             payment_amount=total_fee,
@@ -583,8 +590,6 @@ with tabs[1]:
                             f'download="{name.replace(" ", "_")}_receipt.pdf">Download Receipt</a>'
                         )
                         st.markdown(download_link, unsafe_allow_html=True)
-    else:
-        st.info("No students found in your database.")
 
 with tabs[2]:
     st.title("➕ Add Student Manually")
