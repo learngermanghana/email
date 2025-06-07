@@ -211,16 +211,26 @@ def clean_phone(phone):
     return "233" + phone[1:] if phone.startswith("0") else phone
 
 # 1. Debtors
+# — make sure “Balance” exists and is numeric before filtering
+if "Balance" not in df_main.columns:
+    df_main["Balance"] = 0.0
+else:
+    df_main["Balance"] = pd.to_numeric(df_main["Balance"], errors="coerce").fillna(0.0)
+
 debtors = df_main[df_main["Balance"] > 0]
 for _, row in debtors.iterrows():
     phone = clean_phone(row.get("Phone", ""))
     name = row.get("Name", "Unknown")
     balance = row["Balance"]
     student_code = row.get("StudentCode", "")
-    msg = f"Dear {name}, you owe GHS {balance:.2f} for your course ({student_code}). Please settle it to remain active."
+    msg = (
+        f"Dear {name}, you owe GHS {balance:.2f} for your course ({student_code}). "
+        "Please settle it to remain active."
+    )
     wa_url = f"https://wa.me/{phone}?text={urllib.parse.quote(msg)}"
     notifications.append(
-        f"💰 <b>{name}</b> owes GHS {balance:.2f} [<a href='{wa_url}' target='_blank'>📲 WhatsApp</a>]"
+        f"💰 <b>{name}</b> owes GHS {balance:.2f} "
+        f"[<a href='{wa_url}' target='_blank'>📲 WhatsApp</a>]"
     )
 
 # 2. Expiring contracts (only email once)
