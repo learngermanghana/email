@@ -8,6 +8,7 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
 import urllib.parse
 import calendar
+import numpy as np
 
 # ===== PAGE CONFIG (must be first Streamlit command!) =====
 st.set_page_config(
@@ -459,33 +460,46 @@ with tabs[1]:
     st.title("👩‍🎓 All Students (Edit, Update, Delete, Receipt)")
     today = date.today()
 
+    # Load or initialize students
     if os.path.exists(student_file):
         df_main = pd.read_csv(student_file)
     else:
         df_main = pd.DataFrame()
 
-    required_cols = ["Name", "Phone", "Email", "Location", "Level", "Paid", "Balance", "ContractStart", "ContractEnd", "StudentCode", "Emergency Contact (Phone Number)"]
+    # Ensure required columns exist
+    required_cols = [
+        "Name", "Phone", "Email", "Location", "Level",
+        "Paid", "Balance", "ContractStart", "ContractEnd",
+        "StudentCode", "Emergency Contact (Phone Number)"
+    ]
     for col in required_cols:
         if col not in df_main.columns:
             df_main[col] = ""
 
-    if not df_main.empty and "ContractEnd" in df_main.columns:
-        df_main["Status"] = df_main["ContractEnd"].apply(
-            lambda x: "Completed" if pd.to_datetime(str(x), errors='coerce').date() < today else "Enrolled"
-        )
-    else:
-        df_main["Status"] = "Unknown"
+    # ——— Coerce ContractEnd to datetime & compute Status vectorized ———
+    df_main["ContractEnd"] = pd.to_datetime(df_main["ContractEnd"], errors="coerce")
+    df_main["Status"] = "Unknown"
+    mask_valid = df_main["ContractEnd"].notna()
+    df_main.loc[mask_valid, "Status"] = np.where(
+        df_main.loc[mask_valid, "ContractEnd"].dt.date < today,
+        "Completed",
+        "Enrolled"
+    )
 
     # 🔄 Live Search and Filters
-    search_term = st.text_input("🔍 Search Student by Name or Code")
-    selected_level = st.selectbox("📋 Filter by Class Level", ["All"] + sorted(df_main["Level"].dropna().unique().tolist()))
-    status_filter = st.selectbox("Filter by Status", ["All", "Enrolled", "Completed"])
+    search_term    = st.text_input("🔍 Search Student by Name or Code")
+    levels         = ["All"] + sorted(df_main["Level"].dropna().unique().tolist())
+    selected_level = st.selectbox("📋 Filter by Class Level", levels)
+    statuses       = ["All", "Enrolled", "Completed", "Unknown"]
+    status_filter  = st.selectbox("Filter by Status", statuses)
 
     view_df = df_main.copy()
 
     if search_term:
-        view_df = view_df[view_df["Name"].str.contains(search_term, case=False, na=False) |
-                          view_df["StudentCode"].str.contains(search_term, case=False, na=False)]
+        view_df = view_df[
+            view_df["Name"].str.contains(search_term, case=False, na=False) |
+            view_df["StudentCode"].str.contains(search_term, case=False, na=False)
+        ]
 
     if selected_level != "All":
         view_df = view_df[view_df["Level"] == selected_level]
@@ -495,34 +509,35 @@ with tabs[1]:
 
     if not view_df.empty:
         for idx, row in view_df.iterrows():
-            name = row.get("Name", "")
-            phone = row.get("Phone", "")
-            email = row.get("Email", "")
-            location = row.get("Location", "")
-            level = row.get("Level", "")
-            paid = float(row.get("Paid", 0))
-            balance = float(row.get("Balance", 0))
-            contract_start = str(row.get("ContractStart", ""))
-            contract_end = str(row.get("ContractEnd", ""))
-            student_code = row.get("StudentCode", "")
-            emergency = row.get("Emergency Contact (Phone Number)", "")
-            status = row.get("Status", "Unknown")
+            name            = row["Name"]
+            phone           = row["Phone"]
+            email           = row["Email"]
+            location        = row["Location"]
+            level           = row["Level"]
+            paid            = float(row["Paid"])
+            balance         = float(row["Balance"])
+            contract_start  = str(row["ContractStart"])
+            contract_end    = row["ContractEnd"].date() if pd.notna(row["ContractEnd"]) else ""
+            student_code    = row["StudentCode"]
+            emergency       = row["Emergency Contact (Phone Number)"]
+            status          = row["Status"]
 
             unique_key = f"{student_code}_{idx}"
-            status_color = "🟢" if status == "Enrolled" else "🔴"
+            status_color = "🟢" if status == "Enrolled" else ("🔴" if status == "Completed" else "⚪")
 
             with st.expander(f"{status_color} {name} ({student_code}) [{status}]"):
-                name_input = st.text_input("Name", value=name, key=f"name_{unique_key}")
-                phone_input = st.text_input("Phone", value=phone, key=f"phone_{unique_key}")
-                email_input = st.text_input("Email", value=email, key=f"email_{unique_key}")
-                location_input = st.text_input("Location", value=location, key=f"loc_{unique_key}")
-                level_input = st.text_input("Level", value=level, key=f"level_{unique_key}")
-                paid_input = st.number_input("Paid", value=paid, key=f"paid_{unique_key}")
-                balance_input = st.number_input("Balance", value=balance, key=f"bal_{unique_key}")
-                contract_start_input = st.text_input("Contract Start", value=contract_start, key=f"cs_{unique_key}")
-                contract_end_input = st.text_input("Contract End", value=contract_end, key=f"ce_{unique_key}")
-                student_code_input = st.text_input("Student Code", value=student_code, key=f"code_{unique_key}")
-                emergency_input = st.text_input("Emergency Contact", value=emergency, key=f"em_{unique_key}")
+                # Editable fields
+                name_input            = st.text_input("Name", value=name, key=f"name_{unique_key}")
+                phone_input           = st.text_input("Phone", value=phone, key=f"phone_{unique_key}")
+                email_input           = st.text_input("Email", value=email, key=f"email_{unique_key}")
+                location_input        = st.text_input("Location", value=location, key=f"loc_{unique_key}")
+                level_input           = st.text_input("Level", value=level, key=f"level_{unique_key}")
+                paid_input            = st.number_input("Paid", value=paid, key=f"paid_{unique_key}")
+                balance_input         = st.number_input("Balance", value=balance, key=f"bal_{unique_key}")
+                contract_start_input  = st.text_input("Contract Start", value=contract_start, key=f"cs_{unique_key}")
+                contract_end_input    = st.text_input("Contract End", value=contract_end, key=f"ce_{unique_key}")
+                code_input            = st.text_input("Student Code", value=student_code, key=f"code_{unique_key}")
+                emergency_input       = st.text_input("Emergency Contact", value=emergency, key=f"em_{unique_key}")
 
                 col1, col2, col3 = st.columns(3)
 
@@ -537,40 +552,39 @@ with tabs[1]:
                         df_main.at[idx, "Balance"] = balance_input
                         df_main.at[idx, "ContractStart"] = contract_start_input
                         df_main.at[idx, "ContractEnd"] = contract_end_input
-                        df_main.at[idx, "StudentCode"] = student_code_input
+                        df_main.at[idx, "StudentCode"] = code_input
                         df_main.at[idx, "Emergency Contact (Phone Number)"] = emergency_input
                         df_main.to_csv(student_file, index=False)
                         st.success("✅ Student updated.")
-                        st.rerun()
+                        st.experimental_rerun()
 
                 with col2:
                     if st.button("🗑️ Delete", key=f"delete_{unique_key}"):
                         df_main = df_main.drop(idx).reset_index(drop=True)
                         df_main.to_csv(student_file, index=False)
                         st.success("❌ Student deleted.")
-                        st.rerun()
+                        st.experimental_rerun()
 
                 with col3:
                     if st.button("📄 Receipt", key=f"receipt_{unique_key}"):
                         total_fee = paid_input + balance_input
                         parsed_date = pd.to_datetime(contract_start_input, errors="coerce").date()
-
                         pdf_path = generate_receipt_and_contract_pdf(
                             row,
-                            st.session_state.get("agreement_template", ""),
+                            st.session_state["agreement_template"],
                             payment_amount=total_fee,
                             payment_date=parsed_date
                         )
-
                         with open(pdf_path, "rb") as f:
                             pdf_bytes = f.read()
-                            b64 = base64.b64encode(pdf_bytes).decode()
-                            download_link = f'<a href="data:application/pdf;base64,{b64}" download="{name.replace(" ", "_")}_receipt.pdf">Download PDF</a>'
-                            st.markdown(download_link, unsafe_allow_html=True)
+                        b64 = base64.b64encode(pdf_bytes).decode()
+                        download_link = (
+                            f'<a href="data:application/pdf;base64,{b64}" '
+                            f'download="{name.replace(" ", "_")}_receipt.pdf">Download Receipt</a>'
+                        )
+                        st.markdown(download_link, unsafe_allow_html=True)
     else:
         st.info("No students found in your database.")
-
-
 
 with tabs[2]:
     st.title("➕ Add Student Manually")
