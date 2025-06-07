@@ -7,6 +7,7 @@ import base64
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
 import urllib.parse
+import calendar
 
 # ===== PAGE CONFIG (must be first Streamlit command!) =====
 st.set_page_config(
@@ -15,21 +16,16 @@ st.set_page_config(
 )
 
 # --- Session State Initialization ---
-if "should_rerun" not in st.session_state:
-    st.session_state["should_rerun"] = False
-if "emailed_expiries" not in st.session_state:
-    st.session_state["emailed_expiries"] = set()
+def init_state():
+    st.session_state.setdefault("should_rerun", False)
+    st.session_state.setdefault("emailed_expiries", set())
 
-# === SESSION STATE INIT ===
-if "should_rerun" not in st.session_state:
-    st.session_state["should_rerun"] = False
-if "emailed_expiries" not in st.session_state:
-    st.session_state["emailed_expiries"] = set()
+init_state()
 
 # 2) HANDLE RERUN FLAG
 if st.session_state["should_rerun"]:
     st.session_state["should_rerun"] = False
-    st.rerun()
+    st.experimental_rerun()
 
 # === SCHOOL INFO ===
 SCHOOL_NAME    = "Learn Language Education Academy"
@@ -131,16 +127,19 @@ def generate_receipt_and_contract_pdf(
     pdf.output(filename)
     return filename
 
-
 # === INITIALIZE STUDENT FILE ===
 student_file = "students_simple.csv"
-if os.path.exists(student_file):
-    df_main = pd.read_csv(student_file)
-else:
-    df_main = pd.DataFrame(columns=[
-        "Name", "Phone", "Location", "Level", "Paid", "Balance", "ContractStart", "ContractEnd", "StudentCode", "Email"
-    ])
-    df_main.to_csv(student_file, index=False)
+def load_students():
+    if os.path.exists(student_file):
+        return pd.read_csv(student_file)
+    else:
+        df = pd.DataFrame(columns=[
+            "Name", "Phone", "Location", "Level", "Paid", "Balance", "ContractStart", "ContractEnd", "StudentCode", "Email"
+        ])
+        df.to_csv(student_file, index=False)
+        return df
+
+df_main = load_students()
 
 # === GOOGLE SHEET REGISTRATION FORM (PENDING STUDENTS) ===
 sheet_url = "https://docs.google.com/spreadsheets/d/1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo/export?format=csv"
@@ -207,10 +206,6 @@ st.markdown(f"""
 today = date.today()
 notifications = []
 
-# Normalize data
-df_main["ContractEnd"] = pd.to_datetime(df_main.get("ContractEnd"), errors="coerce")
-df_main["Balance"] = pd.to_numeric(df_main.get("Balance", 0), errors="coerce").fillna(0.0)
-
 def clean_phone(phone):
     phone = str(phone).replace(" ", "").replace("+", "")
     return "233" + phone[1:] if phone.startswith("0") else phone
@@ -230,13 +225,12 @@ for _, row in debtors.iterrows():
 
 # 2. Expiring contracts (only email once)
 expiring = df_main[
-    (df_main["ContractEnd"].notnull()) &
-    (df_main["ContractEnd"].dt.date >= today) &
-    (df_main["ContractEnd"].dt.date <= today + timedelta(days=30))
+    (pd.to_datetime(df_main.get("ContractEnd"), errors="coerce").dt.date >= today) &
+    (pd.to_datetime(df_main.get("ContractEnd"), errors="coerce").dt.date <= today + timedelta(days=30))
 ]
 for _, row in expiring.iterrows():
     name = row.get("Name", "Unknown")
-    end_date = row["ContractEnd"].date()
+    end_date = pd.to_datetime(row["ContractEnd"]).date()
     email = row.get("Email", "")
     student_code = row.get("StudentCode", "")
     unique_key = f"{name}_{student_code}"
@@ -262,10 +256,12 @@ for _, row in expiring.iterrows():
     notifications.append(message)
 
 # 3. Expired contracts
-expired = df_main[(df_main["ContractEnd"].notnull()) & (df_main["ContractEnd"].dt.date < today)]
+expired = df_main[
+    (pd.to_datetime(df_main.get("ContractEnd"), errors="coerce").dt.date < today)
+]
 for _, row in expired.iterrows():
     name = row.get("Name", "Unknown")
-    end_date = row["ContractEnd"].date()
+    end_date = pd.to_datetime(row["ContractEnd"]).date()
     notifications.append(f"❌ <b>{name}</b>'s contract expired on {end_date}")
 
 # Show notifications
@@ -284,6 +280,7 @@ else:
     </div>
     """, unsafe_allow_html=True)
 
+# === TABS ===
 tabs = st.tabs([
     "📝 Pending Registrations",
     "👩‍🎓 All Students",
