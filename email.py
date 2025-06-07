@@ -233,45 +233,45 @@ for _, row in debtors.iterrows():
         f"[<a href='{wa_url}' target='_blank'>📲 WhatsApp</a>]"
     )
 
-# 2. Expiring contracts (only email once)
+# === Ensure ContractEnd column exists and is datetime ===
+if "ContractEnd" not in df_main.columns:
+    df_main["ContractEnd"] = pd.NaT
+df_main["ContractEnd"] = pd.to_datetime(df_main["ContractEnd"], errors="coerce")
+
+# 2. Expiring contracts (next 30 days)
 expiring = df_main[
-    (pd.to_datetime(df_main.get("ContractEnd"), errors="coerce").dt.date >= today) &
-    (pd.to_datetime(df_main.get("ContractEnd"), errors="coerce").dt.date <= today + timedelta(days=30))
+    (df_main["ContractEnd"] >= pd.Timestamp(today)) &
+    (df_main["ContractEnd"] <= pd.Timestamp(today + timedelta(days=30)))
 ]
 for _, row in expiring.iterrows():
     name = row.get("Name", "Unknown")
-    end_date = pd.to_datetime(row["ContractEnd"]).date()
+    end_date = row["ContractEnd"].date()
     email = row.get("Email", "")
     student_code = row.get("StudentCode", "")
-    unique_key = f"{name}_{student_code}"
+    key = f"{name}_{student_code}"
 
     message = f"⏳ <b>{name}</b>'s contract ends on {end_date}"
-
-    if email and school_sendgrid_key and unique_key not in st.session_state["emailed_expiries"]:
+    if email and school_sendgrid_key and key not in st.session_state["emailed_expiries"]:
         try:
             msg = Mail(
                 from_email=school_sender_email,
                 to_emails=email,
                 subject=f"Your contract with {SCHOOL_NAME} ends soon",
-                html_content=f"Dear {name},<br><br>Your contract ends on {end_date}. "
-                             f"Please contact us to extend it.<br><br>{SCHOOL_NAME}"
+                html_content=f"Dear {name},<br>Your contract ends on {end_date}. Please contact us to extend it.<br>{SCHOOL_NAME}"
             )
-            client = SendGridAPIClient(school_sendgrid_key)
-            client.send(msg)
+            SendGridAPIClient(school_sendgrid_key).send(msg)
             message += " ✅ Email sent"
-            st.session_state["emailed_expiries"].add(unique_key)
+            st.session_state["emailed_expiries"].add(key)
         except Exception as e:
             message += f" ⚠️ Email failed: {e}"
 
     notifications.append(message)
 
 # 3. Expired contracts
-expired = df_main[
-    (pd.to_datetime(df_main.get("ContractEnd"), errors="coerce").dt.date < today)
-]
+expired = df_main[df_main["ContractEnd"] < pd.Timestamp(today)]
 for _, row in expired.iterrows():
     name = row.get("Name", "Unknown")
-    end_date = pd.to_datetime(row["ContractEnd"]).date()
+    end_date = row["ContractEnd"].date()
     notifications.append(f"❌ <b>{name}</b>'s contract expired on {end_date}")
 
 # Show notifications
