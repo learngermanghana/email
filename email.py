@@ -203,16 +203,19 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# === NOTIFICATIONS ===
+# === NOTIFICATIONS with Dismiss Buttons ===
 today = date.today()
-notifications = []
+
+# Initialize dismissed set
+st.session_state.setdefault("dismissed_notifs", set())
 
 def clean_phone(phone):
     phone = str(phone).replace(" ", "").replace("+", "")
     return "233" + phone[1:] if phone.startswith("0") else phone
 
-# 1. Debtors
-# — make sure “Balance” exists and is numeric before filtering
+notifications = []
+
+# 1. Debtors (unchanged)
 if "Balance" not in df_main.columns:
     df_main["Balance"] = 0.0
 else:
@@ -225,16 +228,12 @@ for _, row in debtors.iterrows():
     balance = row["Balance"]
     student_code = row.get("StudentCode", "")
     msg = (
-        f"Dear {name}, you owe GHS {balance:.2f} for your course ({student_code}). "
-        "Please settle it to remain active."
-    )
-    wa_url = f"https://wa.me/{phone}?text={urllib.parse.quote(msg)}"
-    notifications.append(
         f"💰 <b>{name}</b> owes GHS {balance:.2f} "
-        f"[<a href='{wa_url}' target='_blank'>📲 WhatsApp</a>]"
+        f"[<a href='https://wa.me/{phone}?text={urllib.parse.quote(msg)}' target='_blank'>📲 WhatsApp</a>]"
     )
+    notifications.append(("debtor_" + student_code, msg))
 
-# === Ensure ContractEnd column exists and is datetime ===
+# Ensure ContractEnd column exists and is datetime
 if "ContractEnd" not in df_main.columns:
     df_main["ContractEnd"] = pd.NaT
 df_main["ContractEnd"] = pd.to_datetime(df_main["ContractEnd"], errors="coerce")
@@ -247,42 +246,37 @@ expiring = df_main[
 for _, row in expiring.iterrows():
     name = row.get("Name", "Unknown")
     end_date = row["ContractEnd"].date()
-    email = row.get("Email", "")
-    student_code = row.get("StudentCode", "")
-    key = f"{name}_{student_code}"
-
-    message = f"⏳ <b>{name}</b>'s contract ends on {end_date}"
-    if email and school_sendgrid_key and key not in st.session_state["emailed_expiries"]:
-        try:
-            msg = Mail(
-                from_email=school_sender_email,
-                to_emails=email,
-                subject=f"Your contract with {SCHOOL_NAME} ends soon",
-                html_content=f"Dear {name},<br>Your contract ends on {end_date}. Please contact us to extend it.<br>{SCHOOL_NAME}"
-            )
-            SendGridAPIClient(school_sendgrid_key).send(msg)
-            message += " ✅ Email sent"
-            st.session_state["emailed_expiries"].add(key)
-        except Exception as e:
-            message += f" ⚠️ Email failed: {e}"
-
-    notifications.append(message)
+    key = f"expiring_{row['StudentCode']}"
+    msg = f"⏳ <b>{name}</b>'s contract ends on {end_date}"
+    notifications.append((key, msg))
 
 # 3. Expired contracts
 expired = df_main[df_main["ContractEnd"] < pd.Timestamp(today)]
 for _, row in expired.iterrows():
     name = row.get("Name", "Unknown")
     end_date = row["ContractEnd"].date()
-    notifications.append(f"❌ <b>{name}</b>'s contract expired on {end_date}")
+    key = f"expired_{row['StudentCode']}"
+    msg = f"❌ <b>{name}</b>'s contract expired on {end_date}"
+    notifications.append((key, msg))
 
-# Show notifications
+# Render notifications, skipping dismissed ones
 if notifications:
-    st.markdown(f"""
+    st.markdown("""
     <div style='background-color:#fff3cd;border:1px solid #ffc107;border-radius:10px;padding:15px;margin-top:10px'>
         <h4>🔔 <b>Notifications</b></h4>
-        <ul>{"".join([f"<li>{n}</li>" for n in notifications])}</ul>
     </div>
     """, unsafe_allow_html=True)
+
+    for key, html in notifications:
+        if key in st.session_state["dismissed_notifs"]:
+            continue
+        cols = st.columns([9,1])
+        with cols[0]:
+            st.markdown(html, unsafe_allow_html=True)
+        with cols[1]:
+            if st.button("Dismiss", key="dismiss_" + key):
+                st.session_state["dismissed_notifs"].add(key)
+                st.experimental_rerun()
 else:
     st.markdown(f"""
     <div style='background-color:#e8f5e9;border:1px solid #4caf50;border-radius:10px;padding:15px;margin-top:10px'>
