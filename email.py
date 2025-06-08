@@ -335,12 +335,6 @@ with st.expander("📤 Upload Data"):
         df.to_csv("expenses_all.csv", index=False)
         st.success("✅ Expenses file replaced. (No reload required!)")
 
-    
-    # --- Top‐level rerun check ---
-    if st.session_state["should_rerun"]:
-        st.session_state["should_rerun"] = False
-        st.experimental_rerun()
-
     # --- Helper: Clean any email source ---
     def get_clean_email(row):
         raw = row.get("email") or row.get("email_address") or row.get("Email Address") or ""
