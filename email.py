@@ -16,17 +16,10 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- Session State Initialization ---
-def init_state():
-    st.session_state.setdefault("should_rerun", False)
-    st.session_state.setdefault("emailed_expiries", set())
+# === Session State Initialization ===
+st.session_state.setdefault("emailed_expiries", set())
+st.session_state.setdefault("dismissed_notifs", set())
 
-init_state()
-
-# 2) HANDLE RERUN FLAG
-if st.session_state["should_rerun"]:
-    st.session_state["should_rerun"] = False
-    st.experimental_rerun()
 
 # === SCHOOL INFO ===
 SCHOOL_NAME    = "Learn Language Education Academy"
