@@ -335,7 +335,7 @@ with st.expander("📤 Upload Data"):
         df.to_csv("expenses_all.csv", index=False)
         st.success("✅ Expenses file replaced. (No reload required!)")
 
-
+    
     # --- Top‐level rerun check ---
     if st.session_state["should_rerun"]:
         st.session_state["should_rerun"] = False
