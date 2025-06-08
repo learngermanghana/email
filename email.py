@@ -215,7 +215,7 @@ def clean_phone(phone):
 
 notifications = []
 
-# 1. Debtors (unchanged)
+# 1. Debtors (fixed)
 if "Balance" not in df_main.columns:
     df_main["Balance"] = 0.0
 else:
@@ -227,13 +227,20 @@ for _, row in debtors.iterrows():
     name = row.get("Name", "Unknown")
     balance = row["Balance"]
     student_code = row.get("StudentCode", "")
-    msg = (
-        f"💰 <b>{name}</b> owes GHS {balance:.2f} "
-        f"[<a href='https://wa.me/{phone}?text={urllib.parse.quote(msg)}' target='_blank'>📲 WhatsApp</a>]"
+    # build the raw text for WhatsApp
+    message_text = (
+        f"Dear {name}, you owe GHS {balance:.2f} for your course ({student_code}). "
+        "Please settle it to remain active."
     )
-    notifications.append(("debtor_" + student_code, msg))
+    wa_url = f"https://wa.me/{phone}?text={urllib.parse.quote(message_text)}"
+    # now build the HTML notification
+    html = (
+        f"💰 <b>{name}</b> owes GHS {balance:.2f} "
+        f"[<a href='{wa_url}' target='_blank'>📲 WhatsApp</a>]"
+    )
+    notifications.append((f"debtor_{student_code}", html))
 
-# Ensure ContractEnd column exists and is datetime
+# Ensure ContractEnd exists & is datetime
 if "ContractEnd" not in df_main.columns:
     df_main["ContractEnd"] = pd.NaT
 df_main["ContractEnd"] = pd.to_datetime(df_main["ContractEnd"], errors="coerce")
@@ -247,8 +254,8 @@ for _, row in expiring.iterrows():
     name = row.get("Name", "Unknown")
     end_date = row["ContractEnd"].date()
     key = f"expiring_{row['StudentCode']}"
-    msg = f"⏳ <b>{name}</b>'s contract ends on {end_date}"
-    notifications.append((key, msg))
+    html = f"⏳ <b>{name}</b>'s contract ends on {end_date}"
+    notifications.append((key, html))
 
 # 3. Expired contracts
 expired = df_main[df_main["ContractEnd"] < pd.Timestamp(today)]
@@ -256,8 +263,8 @@ for _, row in expired.iterrows():
     name = row.get("Name", "Unknown")
     end_date = row["ContractEnd"].date()
     key = f"expired_{row['StudentCode']}"
-    msg = f"❌ <b>{name}</b>'s contract expired on {end_date}"
-    notifications.append((key, msg))
+    html = f"❌ <b>{name}</b>'s contract expired on {end_date}"
+    notifications.append((key, html))
 
 # Render notifications, skipping dismissed ones
 if notifications:
@@ -270,10 +277,10 @@ if notifications:
     for key, html in notifications:
         if key in st.session_state["dismissed_notifs"]:
             continue
-        cols = st.columns([9,1])
-        with cols[0]:
+        col1, col2 = st.columns([9, 1])
+        with col1:
             st.markdown(html, unsafe_allow_html=True)
-        with cols[1]:
+        with col2:
             if st.button("Dismiss", key="dismiss_" + key):
                 st.session_state["dismissed_notifs"].add(key)
                 st.experimental_rerun()
@@ -284,6 +291,7 @@ else:
         <p>No urgent alerts. You're all caught up ✅</p>
     </div>
     """, unsafe_allow_html=True)
+
 
 # === TABS ===
 tabs = st.tabs([
