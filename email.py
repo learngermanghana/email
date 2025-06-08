@@ -203,10 +203,10 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# === NOTIFICATIONS with Dismiss Buttons ===
+# === NOTIFICATIONS with Dismiss Buttons (no explicit rerun) ===
 today = date.today()
 
-# Initialize dismissed set
+# 1. Initialize dismissed set
 st.session_state.setdefault("dismissed_notifs", set())
 
 def clean_phone(phone):
@@ -215,82 +215,81 @@ def clean_phone(phone):
 
 notifications = []
 
-# 1. Debtors (fixed)
+# 2. Debtors
 if "Balance" not in df_main.columns:
     df_main["Balance"] = 0.0
 else:
     df_main["Balance"] = pd.to_numeric(df_main["Balance"], errors="coerce").fillna(0.0)
 
-debtors = df_main[df_main["Balance"] > 0]
-for _, row in debtors.iterrows():
+for _, row in df_main[df_main["Balance"] > 0].iterrows():
     phone = clean_phone(row.get("Phone", ""))
     name = row.get("Name", "Unknown")
     balance = row["Balance"]
-    student_code = row.get("StudentCode", "")
-    # build the raw text for WhatsApp
+    code = row.get("StudentCode", "")
     message_text = (
-        f"Dear {name}, you owe GHS {balance:.2f} for your course ({student_code}). "
+        f"Dear {name}, you owe GHS {balance:.2f} for your course ({code}). "
         "Please settle it to remain active."
     )
     wa_url = f"https://wa.me/{phone}?text={urllib.parse.quote(message_text)}"
-    # now build the HTML notification
     html = (
         f"💰 <b>{name}</b> owes GHS {balance:.2f} "
         f"[<a href='{wa_url}' target='_blank'>📲 WhatsApp</a>]"
     )
-    notifications.append((f"debtor_{student_code}", html))
+    notifications.append((f"debtor_{code}", html))
 
-# Ensure ContractEnd exists & is datetime
+# 3. Ensure ContractEnd exists & is datetime
 if "ContractEnd" not in df_main.columns:
     df_main["ContractEnd"] = pd.NaT
 df_main["ContractEnd"] = pd.to_datetime(df_main["ContractEnd"], errors="coerce")
 
-# 2. Expiring contracts (next 30 days)
-expiring = df_main[
+# 4. Expiring soon (next 30 days)
+for _, row in df_main[
     (df_main["ContractEnd"] >= pd.Timestamp(today)) &
     (df_main["ContractEnd"] <= pd.Timestamp(today + timedelta(days=30)))
-]
-for _, row in expiring.iterrows():
+].iterrows():
     name = row.get("Name", "Unknown")
     end_date = row["ContractEnd"].date()
     key = f"expiring_{row['StudentCode']}"
     html = f"⏳ <b>{name}</b>'s contract ends on {end_date}"
     notifications.append((key, html))
 
-# 3. Expired contracts
-expired = df_main[df_main["ContractEnd"] < pd.Timestamp(today)]
-for _, row in expired.iterrows():
+# 5. Expired contracts
+for _, row in df_main[df_main["ContractEnd"] < pd.Timestamp(today)].iterrows():
     name = row.get("Name", "Unknown")
     end_date = row["ContractEnd"].date()
     key = f"expired_{row['StudentCode']}"
     html = f"❌ <b>{name}</b>'s contract expired on {end_date}"
     notifications.append((key, html))
 
-# Render notifications, skipping dismissed ones
+# 6. Render
 if notifications:
     st.markdown("""
-    <div style='background-color:#fff3cd;border:1px solid #ffc107;border-radius:10px;padding:15px;margin-top:10px'>
-        <h4>🔔 <b>Notifications</b></h4>
+    <div style='background-color:#fff3cd;border:1px solid #ffc107;
+                border-radius:10px;padding:15px;margin-top:10px'>
+      <h4>🔔 <b>Notifications</b></h4>
     </div>
     """, unsafe_allow_html=True)
 
     for key, html in notifications:
         if key in st.session_state["dismissed_notifs"]:
             continue
+
         col1, col2 = st.columns([9, 1])
         with col1:
             st.markdown(html, unsafe_allow_html=True)
         with col2:
             if st.button("Dismiss", key="dismiss_" + key):
                 st.session_state["dismissed_notifs"].add(key)
-                st.experimental_rerun()
+
 else:
     st.markdown(f"""
-    <div style='background-color:#e8f5e9;border:1px solid #4caf50;border-radius:10px;padding:15px;margin-top:10px'>
-        <h4>🔔 <b>Notifications</b></h4>
-        <p>No urgent alerts. You're all caught up ✅</p>
+    <div style='background-color:#e8f5e9;border:1px solid #4caf50;
+                border-radius:10px;padding:15px;margin-top:10px'>
+      <h4>🔔 <b>Notifications</b></h4>
+      <p>No urgent alerts. You're all caught up ✅</p>
     </div>
     """, unsafe_allow_html=True)
+
 
 
 # === TABS ===
