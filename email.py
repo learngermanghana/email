@@ -327,21 +327,21 @@ with tabs[0]:
         st.error(f"❌ Could not load registration sheet: {e}")
         new_students = pd.DataFrame()
 
-    # --- Upload CSV overrides ---
-    with st.expander("📤 Upload Data"):
-        st.subheader("Upload Student CSV")
-        uploaded_student_csv = st.file_uploader("Upload students_simple.csv", type=["csv"])
-        if uploaded_student_csv is not None:
-            pd.read_csv(uploaded_student_csv).to_csv("students_simple.csv", index=False)
-            st.success("✅ Student file replaced.")
-            st.session_state["should_rerun"] = True
+with st.expander("📤 Upload Data"):
+    st.subheader("Upload Student CSV")
+    uploaded_student_csv = st.file_uploader("Upload students_simple.csv", type=["csv"])
+    if uploaded_student_csv is not None:
+        df = pd.read_csv(uploaded_student_csv)
+        df.to_csv("students_simple.csv", index=False)
+        st.success("✅ Student file replaced. (No reload required!)")
 
-        st.subheader("Upload Expenses CSV")
-        uploaded_expenses_csv = st.file_uploader("Upload expenses_all.csv", type=["csv"])
-        if uploaded_expenses_csv is not None:
-            pd.read_csv(uploaded_expenses_csv).to_csv("expenses_all.csv", index=False)
-            st.success("✅ Expenses file replaced.")
-            st.session_state["should_rerun"] = True
+    st.subheader("Upload Expenses CSV")
+    uploaded_expenses_csv = st.file_uploader("Upload expenses_all.csv", type=["csv"])
+    if uploaded_expenses_csv is not None:
+        df = pd.read_csv(uploaded_expenses_csv)
+        df.to_csv("expenses_all.csv", index=False)
+        st.success("✅ Expenses file replaced. (No reload required!)")
+
 
     # --- Top‐level rerun check ---
     if st.session_state["should_rerun"]:
