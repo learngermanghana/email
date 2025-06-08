@@ -320,6 +320,7 @@ with tabs[0]:
         st.error(f"❌ Could not load registration sheet: {e}")
         new_students = pd.DataFrame()
 
+# --- Upload Data (only uploads!) ---
 with st.expander("📤 Upload Data"):
     st.subheader("Upload Student CSV")
     uploaded_student_csv = st.file_uploader("Upload students_simple.csv", type=["csv"])
@@ -335,115 +336,114 @@ with st.expander("📤 Upload Data"):
         df.to_csv("expenses_all.csv", index=False)
         st.success("✅ Expenses file replaced. (No reload required!)")
 
-    # --- Helper: Clean any email source ---
-    def get_clean_email(row):
-        raw = row.get("email") or row.get("email_address") or row.get("Email Address") or ""
-        return "" if pd.isna(raw) else str(raw).strip()
+# --- Helper: Clean any email source ---
+def get_clean_email(row):
+    raw = row.get("email") or row.get("email_address") or row.get("Email Address") or ""
+    return "" if pd.isna(raw) else str(raw).strip()
 
-    # --- Show and approve pending students ---
-    if not new_students.empty:
-        for i, row in new_students.iterrows():
-            fullname   = row.get("full_name") or row.get("name") or f"Student {i}"
-            phone      = row.get("phone_number") or row.get("phone") or ""
-            email      = get_clean_email(row)
-            level      = row.get("class_a1a2_etc") or row.get("class") or row.get("level") or ""
-            location   = row.get("location", "")
-            emergency  = row.get("emergency_contact_phone_number") or row.get("emergency", "")
+# --- Show and approve pending students ---
+if not new_students.empty:
+    for i, row in new_students.iterrows():
+        fullname   = row.get("full_name") or row.get("name") or f"Student {i}"
+        phone      = row.get("phone_number") or row.get("phone") or ""
+        email      = get_clean_email(row)
+        level      = row.get("class_a1a2_etc") or row.get("class") or row.get("level") or ""
+        location   = row.get("location", "")
+        emergency  = row.get("emergency_contact_phone_number") or row.get("emergency", "")
 
-            with st.expander(f"{fullname} ({phone})"):
-                st.write(f"**Email:** {email or '—'}")
-                emergency_input  = st.text_input("Emergency Contact (optional)", value=emergency, key=f"emergency_{i}")
-                student_code     = st.text_input("Assign Student Code", key=f"code_{i}")
-                contract_start   = st.date_input("Contract Start", value=date.today(), key=f"start_{i}")
-                course_length    = st.number_input("Course Length (weeks)", min_value=1, value=12, key=f"length_{i}")
-                contract_end     = st.date_input("Contract End", value=contract_start + timedelta(weeks=course_length), key=f"end_{i}")
-                paid             = st.number_input("Amount Paid (GHS)", min_value=0.0, step=1.0, key=f"paid_{i}")
-                balance          = st.number_input("Balance Due (GHS)", min_value=0.0, step=1.0, key=f"bal_{i}")
-                first_instalment = st.number_input("First Instalment", min_value=0.0, value=1500.0, key=f"firstinst_{i}")
-                attach_pdf       = st.checkbox("Attach PDF to Email?", value=True, key=f"pdf_{i}")
-                send_email       = st.checkbox("Send Welcome Email?", value=bool(email), key=f"email_{i}")
+        with st.expander(f"{fullname} ({phone})"):
+            st.write(f"**Email:** {email or '—'}")
+            emergency_input  = st.text_input("Emergency Contact (optional)", value=emergency, key=f"emergency_{i}")
+            student_code     = st.text_input("Assign Student Code", key=f"code_{i}")
+            contract_start   = st.date_input("Contract Start", value=date.today(), key=f"start_{i}")
+            course_length    = st.number_input("Course Length (weeks)", min_value=1, value=12, key=f"length_{i}")
+            contract_end     = st.date_input("Contract End", value=contract_start + timedelta(weeks=course_length), key=f"end_{i}")
+            paid             = st.number_input("Amount Paid (GHS)", min_value=0.0, step=1.0, key=f"paid_{i}")
+            balance          = st.number_input("Balance Due (GHS)", min_value=0.0, step=1.0, key=f"bal_{i}")
+            first_instalment = st.number_input("First Instalment", min_value=0.0, value=1500.0, key=f"firstinst_{i}")
+            attach_pdf       = st.checkbox("Attach PDF to Email?", value=True, key=f"pdf_{i}")
+            send_email       = st.checkbox("Send Welcome Email?", value=bool(email), key=f"email_{i}")
 
-                if st.button("Approve & Add", key=f"approve_{i}"):
-                    if not student_code:
-                        st.warning("Enter a unique student code.")
-                        continue
+            if st.button("Approve & Add", key=f"approve_{i}"):
+                if not student_code:
+                    st.warning("Enter a unique student code.")
+                    continue
 
-                    # load or init approved_df
-                    if os.path.exists("students_simple.csv"):
-                        approved_df = pd.read_csv("students_simple.csv")
-                    else:
-                        approved_df = pd.DataFrame(columns=[
-                            "Name","Phone","Email","Location","Level",
-                            "Paid","Balance","ContractStart","ContractEnd",
-                            "StudentCode","Emergency Contact (Phone Number)"
-                        ])
+                # load or init approved_df
+                if os.path.exists("students_simple.csv"):
+                    approved_df = pd.read_csv("students_simple.csv")
+                else:
+                    approved_df = pd.DataFrame(columns=[
+                        "Name","Phone","Email","Location","Level",
+                        "Paid","Balance","ContractStart","ContractEnd",
+                        "StudentCode","Emergency Contact (Phone Number)"
+                    ])
 
-                    if student_code in approved_df["StudentCode"].values:
-                        st.warning("❗ Student Code exists. Choose another.")
-                        continue
+                if student_code in approved_df["StudentCode"].values:
+                    st.warning("❗ Student Code exists. Choose another.")
+                    continue
 
-                    student_dict = {
-                        "Name": fullname,
-                        "Phone": phone,
-                        "Email": email,
-                        "Location": location,
-                        "Level": level,
-                        "Paid": paid,
-                        "Balance": balance,
-                        "ContractStart": str(contract_start),
-                        "ContractEnd": str(contract_end),
-                        "StudentCode": student_code,
-                        "Emergency Contact (Phone Number)": emergency_input
-                    }
+                student_dict = {
+                    "Name": fullname,
+                    "Phone": phone,
+                    "Email": email,
+                    "Location": location,
+                    "Level": level,
+                    "Paid": paid,
+                    "Balance": balance,
+                    "ContractStart": str(contract_start),
+                    "ContractEnd": str(contract_end),
+                    "StudentCode": student_code,
+                    "Emergency Contact (Phone Number)": emergency_input
+                }
 
-                    approved_df = pd.concat([approved_df, pd.DataFrame([student_dict])], ignore_index=True)
-                    approved_df.to_csv("students_simple.csv", index=False)
+                approved_df = pd.concat([approved_df, pd.DataFrame([student_dict])], ignore_index=True)
+                approved_df.to_csv("students_simple.csv", index=False)
 
-                    total_fee = paid + balance
-                    pdf_file = generate_receipt_and_contract_pdf(
-                        student_dict,
-                        st.session_state["agreement_template"],
-                        payment_amount=total_fee,
-                        payment_date=contract_start,
-                        first_instalment=first_instalment,
-                        course_length=course_length
-                    )
+                total_fee = paid + balance
+                pdf_file = generate_receipt_and_contract_pdf(
+                    student_dict,
+                    st.session_state["agreement_template"],
+                    payment_amount=total_fee,
+                    payment_date=contract_start,
+                    first_instalment=first_instalment,
+                    course_length=course_length
+                )
 
-                    # optional welcome email
-                    if send_email and email and school_sendgrid_key:
-                        try:
-                            msg = Mail(
-                                from_email=school_sender_email,
-                                to_emails=email,
-                                subject=f"Welcome to {SCHOOL_NAME}",
-                                html_content=(
-                                    f"Dear {fullname},<br><br>"
-                                    f"Welcome to {SCHOOL_NAME}!<br>"
-                                    f"Student Code: <b>{student_code}</b><br>"
-                                    f"Class: {level}<br>"
-                                    f"Contract: {contract_start} to {contract_end}<br>"
-                                    f"Paid: GHS {paid}<br>"
-                                    f"Balance: GHS {balance}<br><br>"
-                                    f"For help, contact us at {SCHOOL_EMAIL} or {SCHOOL_PHONE}."
-                                )
+                # optional welcome email
+                if send_email and email and school_sendgrid_key:
+                    try:
+                        msg = Mail(
+                            from_email=school_sender_email,
+                            to_emails=email,
+                            subject=f"Welcome to {SCHOOL_NAME}",
+                            html_content=(
+                                f"Dear {fullname},<br><br>"
+                                f"Welcome to {SCHOOL_NAME}!<br>"
+                                f"Student Code: <b>{student_code}</b><br>"
+                                f"Class: {level}<br>"
+                                f"Contract: {contract_start} to {contract_end}<br>"
+                                f"Paid: GHS {paid}<br>"
+                                f"Balance: GHS {balance}<br><br>"
+                                f"For help, contact us at {SCHOOL_EMAIL} or {SCHOOL_PHONE}."
                             )
-                            if attach_pdf:
-                                with open(pdf_file, "rb") as f:
-                                    encoded = base64.b64encode(f.read()).decode()
-                                    msg.attachment = Attachment(
-                                        FileContent(encoded),
-                                        FileName(pdf_file),
-                                        FileType("application/pdf"),
-                                        Disposition("attachment")
-                                    )
-                            SendGridAPIClient(school_sendgrid_key).send(msg)
-                            st.success(f"📧 Email sent to {email}")
-                        except Exception as e:
-                            st.warning(f"⚠️ Email failed: {e}")
+                        )
+                        if attach_pdf:
+                            with open(pdf_file, "rb") as f:
+                                encoded = base64.b64encode(f.read()).decode()
+                                msg.attachment = Attachment(
+                                    FileContent(encoded),
+                                    FileName(pdf_file),
+                                    FileType("application/pdf"),
+                                    Disposition("attachment")
+                                )
+                        SendGridAPIClient(school_sendgrid_key).send(msg)
+                        st.success(f"📧 Email sent to {email}")
+                    except Exception as e:
+                        st.warning(f"⚠️ Email failed: {e}")
 
-                    st.success(f"✅ {fullname} approved and saved.")
-                    st.session_state["should_rerun"] = True
-                    st.stop()
+                st.success(f"✅ {fullname} approved and saved.")
+                st.stop()
 
 
 with tabs[1]:
