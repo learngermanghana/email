@@ -1009,12 +1009,7 @@ with tabs[7]:
         st.info("No expenses file found to export.")
 
 with tabs[8]:
-    st.title("Kursplan-Generator: A1, A2, B1")
-
-    st.markdown("""
-    🛠️ **Erstelle und lade personalisierte Kurspläne für A1, A2 und B1 herunter.**
-    Wähle Startdatum und Kurstage, der Plan folgt der offiziellen Struktur.
-    """)
+    st.title("Intelligenter Kursplan-Generator: A1, A2, B1")
 
     from datetime import timedelta
     import calendar
@@ -1023,33 +1018,89 @@ with tabs[8]:
     def sanitize(text):
         return text.encode('latin-1', 'replace').decode('latin-1')
 
-    def generate_schedule(start_date, weekdays, week_structure):
-        output = []
-        current_date = start_date
-        day_number = 1
-        day_map = {day: i for i, day in enumerate(calendar.day_name)}
-        selected_indices = sorted([day_map[day] for day in weekdays])
-        for week_label, sessions in week_structure:
-            output.append(f"\n{week_label.upper()}")
-            for session in sessions:
-                while current_date.weekday() not in selected_indices:
-                    current_date += timedelta(days=1)
-                session_day = calendar.day_name[current_date.weekday()]
-                session_date = current_date.strftime("%d %B %Y")
-                output.append(f"Day {day_number} ({session_date}, {session_day}): {session}")
-                current_date += timedelta(days=1)
-                day_number += 1
-        return output
+    def pick_dates(start_date, week_patterns):
+        """Returns a flat list of all dates, given a start date and week->days pattern."""
+        all_dates = []
+        cur_date = start_date
+        for week_idx, (num_classes, week_days) in enumerate(week_patterns):
+            week_dates = []
+            for _ in range(num_classes):
+                # Find next valid weekday
+                while calendar.day_name[cur_date.weekday()] not in week_days:
+                    cur_date += timedelta(days=1)
+                week_dates.append(cur_date)
+                cur_date += timedelta(days=1)
+            all_dates.extend(week_dates)
+        return all_dates
 
-    # -------- A1 Schedule Block --------
-    st.subheader("🟦 A1 Kursplan erstellen")
-    start_date_a1 = st.date_input("A1 Startdatum", value=date.today(), key="start_date_a1")
-    days_a1 = st.multiselect(
-        "A1 Kurstage auswählen", 
-        options=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], 
-        default=["Monday", "Tuesday", "Wednesday"], key="days_a1"
-    )
-    # A1 schedule structure as before (shortened for demo, extend as needed)
+    def schedule_block(level_name, topic_structure):
+        st.header(f"{level_name} Kursplan")
+        col1, col2 = st.columns(2)
+        with col1:
+            start_date = st.date_input(f"{level_name} Startdatum", value=date.today(), key=f"{level_name}_start")
+            num_weeks = st.number_input(f"Wieviele Wochen für {level_name}?", min_value=1, max_value=len(topic_structure), value=len(topic_structure), key=f"{level_name}_weeks")
+        with col2:
+            default_days = ["Monday", "Tuesday", "Wednesday"]
+            all_days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        week_patterns = []
+        st.markdown("#### Wöchentliche Einstellungen")
+        for i in range(int(num_weeks)):
+            with st.expander(f"Woche {i+1}", expanded=True):
+                week_days = st.multiselect(f"Tage in Woche {i+1}", options=all_days, default=default_days, key=f"{level_name}_days_{i}")
+                num_classes = st.number_input(f"Anzahl Klassen in Woche {i+1}", min_value=1, max_value=len(week_days), value=len(week_days), key=f"{level_name}_num_{i}")
+                week_patterns.append((num_classes, week_days if week_days else default_days))
+
+        if st.button(f"📅 {level_name} Kursplan generieren"):
+            # Flatten all sessions in topic_structure to match to class dates
+            all_sessions = []
+            weeks_labels = []
+            for week_label, sessions in topic_structure[:int(num_weeks)]:
+                all_sessions.extend(sessions)
+                weeks_labels.append(week_label)
+            # Calculate all dates for classes
+            all_dates = pick_dates(start_date, week_patterns)
+            # Map sessions to dates
+            schedule_lines = []
+            session_idx = 0
+            day_counter = 1
+            for w, (week_label, sessions) in enumerate(topic_structure[:int(num_weeks)]):
+                schedule_lines.append(f"\n{week_label.upper()}")
+                for s in sessions:
+                    if session_idx < len(all_dates):
+                        date_str = all_dates[session_idx].strftime("%d %B %Y")
+                        day_name = calendar.day_name[all_dates[session_idx].weekday()]
+                        schedule_lines.append(f"Day {day_counter} ({date_str}, {day_name}): {s}")
+                        session_idx += 1
+                        day_counter += 1
+                    else:
+                        schedule_lines.append(f"Day {day_counter}: {s} (Kein Datum zugewiesen)")
+                        day_counter += 1
+            preview = f"""
+Learn Language Education Academy
+Contact: 0205706589 | Website: www.learngermanghana.com
+Course Schedule: Auto-generated ({level_name})
+First Week: Begins {start_date.strftime('%A, %d %B %Y')}
+
+""" + "\n".join(schedule_lines)
+
+            st.text_area(f"📄 Vorschau {level_name} Kursplan", value=preview, height=420)
+            st.download_button(f"📁 TXT Download ({level_name})", preview, file_name=f"{level_name.lower()}_course_schedule.txt", mime="text/plain")
+
+            pdf = FPDF(); pdf.add_page(); pdf.set_font("Arial", size=12)
+            for line in preview.split("\n"):
+                if line.strip().startswith("WOCHE") or line.strip().startswith("WEEK"):
+                    pdf.set_font("Arial", "B", 12)
+                    pdf.cell(0, 10, sanitize(line.strip()), ln=True)
+                    pdf.set_font("Arial", size=12)
+                else:
+                    pdf.multi_cell(0, 10, sanitize(line))
+            st.download_button(
+                f"📄 PDF Download ({level_name})",
+                data=pdf.output(dest='S').encode('latin-1'),
+                file_name=f"{level_name.lower()}_course_schedule.pdf", mime="application/pdf"
+            )
+
+    # === A1 Topics
     raw_schedule_a1 = [
         ("Week One", ["Chapter 0.1 - Lesen & Horen"]),
         ("Week Two", [
@@ -1057,49 +1108,43 @@ with tabs[8]:
             "Chapter 1.1 - Schreiben & Sprechen and Chapter 1.2 - Lesen & Horen",
             "Chapter 2 - Lesen & Horen"
         ]),
-        # ... continue as before ...
+        ("Week Three", [
+            "Chapter 1.2 - Schreiben & Sprechen (Recap)",
+            "Chapter 2.3 - Schreiben & Sprechen",
+            "Chapter 3 - Lesen & Horen"
+        ]),
+        ("Week Four", [
+            "Chapter 4 - Lesen & Horen",
+            "Chapter 5 - Lesen & Horen",
+            "Chapter 6 - Lesen & Horen and Chapter 2.4 - Schreiben & Sprechen"
+        ]),
+        ("Week Five", [
+            "Chapter 7 - Lesen & Horen",
+            "Chapter 8 - Lesen & Horen",
+            "Chapter 3.5 - Schreiben & Sprechen"
+        ]),
+        ("Week Six", [
+            "Chapter 3.6 - Schreiben & Sprechen",
+            "Chapter 4.7 - Schreiben & Sprechen",
+            "Chapter 9 and 10 - Lesen & Horen"
+        ]),
+        ("Week Seven", [
+            "Chapter 11 - Lesen & Horen",
+            "Chapter 12.1 - Lesen & Horen and Schreiben & Sprechen (including 5.8)",
+            "Chapter 5.9 - Schreiben & Sprechen"
+        ]),
+        ("Week Eight", [
+            "Chapter 6.10 - Schreiben & Sprechen (Intro to letter writing)",
+            "Chapter 13 - Lesen & Horen and Chapter 6.11 - Schreiben & Sprechen",
+            "Chapter 14.1 - Lesen & Horen and Chapter 7.12 - Schreiben & Sprechen"
+        ]),
+        ("Week Nine", [
+            "Chapter 14.2 - Lesen & Horen and Chapter 7.12 - Schreiben & Sprechen",
+            "Chapter 8.13 - Schreiben & Sprechen",
+            "Exam tips - Schreiben & Sprechen recap"
+        ])
     ]
-
-    if st.button("📅 A1 Kursplan generieren"):
-        lines = generate_schedule(start_date_a1, days_a1, raw_schedule_a1)
-        text = f"""
-Learn Language Education Academy
-Contact: 0205706589 | Website: www.learngermanghana.com
-Course Schedule: Auto-generated (A1)
-Meeting Days: {', '.join(days_a1)}
-First Week: Begins {start_date_a1.strftime('%A, %d %B %Y')}
-
-""" + "\n".join(lines)
-        st.text_area("📄 Vorschau A1 Kursplan", value=text, height=400)
-
-        # Download TXT
-        st.download_button("📁 TXT Download (A1)", text, file_name="a1_course_schedule.txt", mime="text/plain")
-
-        # Download PDF
-        pdf = FPDF(); pdf.add_page(); pdf.set_font("Arial", size=12)
-        for line in text.split("\n"):
-            if line.strip().startswith("WEEK"):
-                pdf.set_font("Arial", "B", 12)
-                pdf.cell(0, 10, sanitize(line.strip()), ln=True)
-                pdf.set_font("Arial", size=12)
-            else:
-                pdf.multi_cell(0, 10, sanitize(line))
-        st.download_button(
-            "📄 PDF Download (A1)", 
-            data=pdf.output(dest='S').encode('latin-1'),
-            file_name="a1_course_schedule.pdf", mime="application/pdf"
-        )
-
-    # -------- A2 Schedule Block --------
-    st.divider()
-    st.subheader("🟧 A2 Kursplan erstellen")
-    start_date_a2 = st.date_input("A2 Startdatum", value=date.today(), key="start_date_a2")
-    days_a2 = st.multiselect(
-        "A2 Kurstage auswählen",
-        options=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-        default=["Monday", "Tuesday", "Wednesday"], key="days_a2"
-    )
-    # Your A2 structure (grouped into weeks, can adjust as you wish)
+    # === A2 Topics
     raw_schedule_a2 = [
         ("Woche 1", [
             "1.1. Small Talk (Exercise)",
@@ -1150,44 +1195,7 @@ First Week: Begins {start_date_a1.strftime('%A, %d %B %Y')}
             "10.28. Über die Zukunft sprechen"
         ]),
     ]
-
-    if st.button("📅 A2 Kursplan generieren"):
-        lines = generate_schedule(start_date_a2, days_a2, raw_schedule_a2)
-        text = f"""
-Learn Language Education Academy
-Contact: 0205706589 | Website: www.learngermanghana.com
-Course Schedule: Auto-generated (A2)
-Meeting Days: {', '.join(days_a2)}
-First Week: Begins {start_date_a2.strftime('%A, %d %B %Y')}
-
-""" + "\n".join(lines)
-        st.text_area("📄 Vorschau A2 Kursplan", value=text, height=400)
-
-        st.download_button("📁 TXT Download (A2)", text, file_name="a2_course_schedule.txt", mime="text/plain")
-
-        pdf = FPDF(); pdf.add_page(); pdf.set_font("Arial", size=12)
-        for line in text.split("\n"):
-            if line.strip().startswith("WOCHE"):
-                pdf.set_font("Arial", "B", 12)
-                pdf.cell(0, 10, sanitize(line.strip()), ln=True)
-                pdf.set_font("Arial", size=12)
-            else:
-                pdf.multi_cell(0, 10, sanitize(line))
-        st.download_button(
-            "📄 PDF Download (A2)",
-            data=pdf.output(dest='S').encode('latin-1'),
-            file_name="a2_course_schedule.pdf", mime="application/pdf"
-        )
-
-    # -------- B1 Schedule Block --------
-    st.divider()
-    st.subheader("🟩 B1 Kursplan erstellen")
-    start_date_b1 = st.date_input("B1 Startdatum", value=date.today(), key="start_date_b1")
-    days_b1 = st.multiselect(
-        "B1 Kurstage auswählen",
-        options=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-        default=["Monday", "Tuesday", "Wednesday"], key="days_b1"
-    )
+    # === B1 Topics
     raw_schedule_b1 = [
         ("Woche 1", [
             "1.1. Traumwelten (Übung)",
@@ -1239,32 +1247,11 @@ First Week: Begins {start_date_a2.strftime('%A, %d %B %Y')}
         ])
     ]
 
-    if st.button("📅 B1 Kursplan generieren"):
-        lines = generate_schedule(start_date_b1, days_b1, raw_schedule_b1)
-        text = f"""
-Learn Language Education Academy
-Contact: 0205706589 | Website: www.learngermanghana.com
-Course Schedule: Auto-generated (B1)
-Meeting Days: {', '.join(days_b1)}
-First Week: Begins {start_date_b1.strftime('%A, %d %B %Y')}
-
-""" + "\n".join(lines)
-        st.text_area("📄 Vorschau B1 Kursplan", value=text, height=400)
-
-        st.download_button("📁 TXT Download (B1)", text, file_name="b1_course_schedule.txt", mime="text/plain")
-
-        pdf = FPDF(); pdf.add_page(); pdf.set_font("Arial", size=12)
-        for line in text.split("\n"):
-            if line.strip().startswith("WOCHE"):
-                pdf.set_font("Arial", "B", 12)
-                pdf.cell(0, 10, sanitize(line.strip()), ln=True)
-                pdf.set_font("Arial", size=12)
-            else:
-                pdf.multi_cell(0, 10, sanitize(line))
-        st.download_button(
-            "📄 PDF Download (B1)",
-            data=pdf.output(dest='S').encode('latin-1'),
-            file_name="b1_course_schedule.pdf", mime="application/pdf"
-        )
+    st.markdown("---")
+    schedule_block("A1", raw_schedule_a1)
+    st.markdown("---")
+    schedule_block("A2", raw_schedule_a2)
+    st.markdown("---")
+    schedule_block("B1", raw_schedule_b1)
 
 
