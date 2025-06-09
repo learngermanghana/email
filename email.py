@@ -1009,29 +1009,99 @@ with tabs[7]:
         st.info("No expenses file found to export.")
 
 with tabs[8]:
-    st.title("Generate A1 Course Schedule")
+    st.title("Intelligenter Kursplan-Generator: A1, A2, B1")
 
-    st.markdown("""
-    🛠️ **Create and download a personalized A1 course schedule.**
-
-    Choose a start date and class days. The schedule will follow the official classroom structure (Lesen & Hören, Schreiben & Sprechen).
-    """)
-
-    from datetime import datetime, timedelta
+    from datetime import timedelta
     import calendar
     from fpdf import FPDF
 
-    # User inputs
-    st.subheader("🗓️ Configuration")
-    start_date = st.date_input("Select Start Date", value=date.today())
-    selected_days = st.multiselect(
-        "Select Class Days",
-        options=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-        default=["Monday", "Tuesday", "Wednesday"]
-    )
+    def sanitize(text):
+        return text.encode('latin-1', 'replace').decode('latin-1')
 
-    # Schedule structure (fixed)
-    raw_schedule = [
+    def pick_dates(start_date, week_patterns):
+        """Returns a flat list of all dates, given a start date and week->days pattern."""
+        all_dates = []
+        cur_date = start_date
+        for week_idx, (num_classes, week_days) in enumerate(week_patterns):
+            week_dates = []
+            for _ in range(num_classes):
+                # Find next valid weekday
+                while calendar.day_name[cur_date.weekday()] not in week_days:
+                    cur_date += timedelta(days=1)
+                week_dates.append(cur_date)
+                cur_date += timedelta(days=1)
+            all_dates.extend(week_dates)
+        return all_dates
+
+    def schedule_block(level_name, topic_structure):
+        st.header(f"{level_name} Kursplan")
+        col1, col2 = st.columns(2)
+        with col1:
+            start_date = st.date_input(f"{level_name} Startdatum", value=date.today(), key=f"{level_name}_start")
+            num_weeks = st.number_input(f"Wieviele Wochen für {level_name}?", min_value=1, max_value=len(topic_structure), value=len(topic_structure), key=f"{level_name}_weeks")
+        with col2:
+            default_days = ["Monday", "Tuesday", "Wednesday"]
+            all_days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        week_patterns = []
+        st.markdown("#### Wöchentliche Einstellungen")
+        for i in range(int(num_weeks)):
+            with st.expander(f"Woche {i+1}", expanded=True):
+                week_days = st.multiselect(f"Tage in Woche {i+1}", options=all_days, default=default_days, key=f"{level_name}_days_{i}")
+                num_classes = st.number_input(f"Anzahl Klassen in Woche {i+1}", min_value=1, max_value=len(week_days), value=len(week_days), key=f"{level_name}_num_{i}")
+                week_patterns.append((num_classes, week_days if week_days else default_days))
+
+        if st.button(f"📅 {level_name} Kursplan generieren"):
+            # Flatten all sessions in topic_structure to match to class dates
+            all_sessions = []
+            weeks_labels = []
+            for week_label, sessions in topic_structure[:int(num_weeks)]:
+                all_sessions.extend(sessions)
+                weeks_labels.append(week_label)
+            # Calculate all dates for classes
+            all_dates = pick_dates(start_date, week_patterns)
+            # Map sessions to dates
+            schedule_lines = []
+            session_idx = 0
+            day_counter = 1
+            for w, (week_label, sessions) in enumerate(topic_structure[:int(num_weeks)]):
+                schedule_lines.append(f"\n{week_label.upper()}")
+                for s in sessions:
+                    if session_idx < len(all_dates):
+                        date_str = all_dates[session_idx].strftime("%d %B %Y")
+                        day_name = calendar.day_name[all_dates[session_idx].weekday()]
+                        schedule_lines.append(f"Day {day_counter} ({date_str}, {day_name}): {s}")
+                        session_idx += 1
+                        day_counter += 1
+                    else:
+                        schedule_lines.append(f"Day {day_counter}: {s} (Kein Datum zugewiesen)")
+                        day_counter += 1
+            preview = f"""
+Learn Language Education Academy
+Contact: 0205706589 | Website: www.learngermanghana.com
+Course Schedule: Auto-generated ({level_name})
+First Week: Begins {start_date.strftime('%A, %d %B %Y')}
+
+""" + "\n".join(schedule_lines)
+
+            st.text_area(f"📄 Vorschau {level_name} Kursplan", value=preview, height=420)
+            st.download_button(f"📁 TXT Download ({level_name})", preview, file_name=f"{level_name.lower()}_course_schedule.txt", mime="text/plain")
+
+            pdf = FPDF(); pdf.add_page(); pdf.set_font("Arial", size=12)
+            for line in preview.split("\n"):
+                if line.strip().startswith("WOCHE") or line.strip().startswith("WEEK"):
+                    pdf.set_font("Arial", "B", 12)
+                    pdf.cell(0, 10, sanitize(line.strip()), ln=True)
+                    pdf.set_font("Arial", size=12)
+                else:
+                    pdf.multi_cell(0, 10, sanitize(line))
+            st.download_button(
+                f"📄 PDF Download ({level_name})",
+                data=pdf.output(dest='S').encode('latin-1'),
+                file_name=f"{level_name.lower()}_course_schedule.pdf", mime="application/pdf"
+            )
+
+    # === A1 Topics
+    raw_schedule_a1 = [
         ("Week One", ["Chapter 0.1 - Lesen & Horen"]),
         ("Week Two", [
             "Chapters 0.2 and 1.1 - Lesen & Horen",
@@ -1074,72 +1144,112 @@ with tabs[8]:
             "Exam tips - Schreiben & Sprechen recap"
         ])
     ]
+    # === A2 Topics
+    raw_schedule_a2 = [
+        ("Woche 1", [
+            "1.1. Small Talk (Exercise)",
+            "1.2. Personen Beschreiben (Exercise)",
+            "1.3. Dinge und Personen vergleichen"
+        ]),
+        ("Woche 2", [
+            "2.4. Wo möchten wir uns treffen?",
+            "2.5. Was machst du in deiner Freizeit?"
+        ]),
+        ("Woche 3", [
+            "3.6. Möbel und Räume kennenlernen",
+            "3.7. Eine Wohnung suchen (Übung)",
+            "3.8. Rezepte und Essen (Exercise)"
+        ]),
+        ("Woche 4", [
+            "4.9. Urlaub",
+            "4.10. Tourismus und Traditionelle Feste",
+            "4.11. Unterwegs: Verkehrsmittel vergleichen"
+        ]),
+        ("Woche 5", [
+            "5.12. Ein Tag im Leben (Übung)",
+            "5.13. Ein Vorstellungsgesprach (Exercise)",
+            "5.14. Beruf und Karriere (Exercise)"
+        ]),
+        ("Woche 6", [
+            "6.15. Mein Lieblingssport",
+            "6.16. Wohlbefinden und Entspannung",
+            "6.17. In die Apotheke gehen"
+        ]),
+        ("Woche 7", [
+            "7.18. Die Bank Anrufen",
+            "7.19. Einkaufen – Wo und wie? (Exercise)",
+            "7.20. Typische Reklamationssituationen üben"
+        ]),
+        ("Woche 8", [
+            "8.21. Ein Wochenende planen",
+            "8.22. Die Woche Plannung"
+        ]),
+        ("Woche 9", [
+            "9.23. Wie kommst du zur Schule / zur Arbeit?",
+            "9.24. Einen Urlaub planen",
+            "9.25. Tagesablauf (Exercise)"
+        ]),
+        ("Woche 10", [
+            "10.26. Gefühle in verschiedenen Situationen beschr",
+            "10.27. Digitale Kommunikation",
+            "10.28. Über die Zukunft sprechen"
+        ]),
+    ]
+    # === B1 Topics
+    raw_schedule_b1 = [
+        ("Woche 1", [
+            "1.1. Traumwelten (Übung)",
+            "1.2. Freundes für Leben (Übung)",
+            "1.3. Erfolgsgeschichten (Übung)"
+        ]),
+        ("Woche 2", [
+            "2.4. Wohnung suchen (Übung)",
+            "2.5. Der Besichtigungstermin (Übung)",
+            "2.6. Leben in der Stadt oder auf dem Land?"
+        ]),
+        ("Woche 3", [
+            "3.7. Fast Food vs. Hausmannskost",
+            "3.8. Alles für die Gesundheit",
+            "3.9. Work-Life-Balance im modernen Arbeitsumfeld"
+        ]),
+        ("Woche 4", [
+            "4.10. Digitale Auszeit und Selbstfürsorge",
+            "4.11. Teamspiele und Kooperative Aktivitäten",
+            "4.12. Abenteuer in der Natur",
+            "4.13. Eigene Filmkritik schreiben"
+        ]),
+        ("Woche 5", [
+            "5.14. Traditionelles vs. digitales Lernen",
+            "5.15. Medien und Arbeiten im Homeoffice",
+            "5.16. Prüfungsangst und Stressbewältigung",
+            "5.17. Wie lernt man am besten?"
+        ]),
+        ("Woche 6", [
+            "6.18. Wege zum Wunschberuf",
+            "6.19. Das Vorstellungsgespräch",
+            "6.20. Wie wird man …? (Ausbildung und Qu"
+        ]),
+        ("Woche 7", [
+            "7.21. Lebensformen heute – Familie, Wohnge",
+            "7.22. Was ist dir in einer Beziehung wichtig?",
+            "7.23. Erstes Date – Typische Situationen"
+        ]),
+        ("Woche 8", [
+            "8.24. Konsum und Nachhaltigkeit",
+            "8.25. Online einkaufen – Rechte und Risiken"
+        ]),
+        ("Woche 9", [
+            "9.26. Reiseprobleme und Lösungen"
+        ]),
+        ("Woche 10", [
+            "10.27. Umweltfreundlich im Alltag",
+            "10.28. Klimafreundlich leben"
+        ])
+    ]
 
-    def sanitize(text):
-        return text.encode('latin-1', 'replace').decode('latin-1')
-
-    def generate_schedule(start_date, weekdays, raw_schedule):
-        output = []
-        current_date = start_date
-        day_number = 1
-
-        day_map = {day: i for i, day in enumerate(calendar.day_name)}
-        selected_indices = sorted([day_map[day] for day in weekdays])
-
-        for week_label, sessions in raw_schedule:
-            output.append(f"\n{week_label.upper()}")
-            for session in sessions:
-                while current_date.weekday() not in selected_indices:
-                    current_date += timedelta(days=1)
-                session_day = calendar.day_name[current_date.weekday()]
-                session_date = current_date.strftime("%d %B %Y")
-                output.append(f"Day {day_number} ({session_date}, {session_day}): {session}")
-                current_date += timedelta(days=1)
-                day_number += 1
-        return output
-
-    if st.button("📅 Generate Schedule"):
-        schedule_lines = generate_schedule(start_date, selected_days, raw_schedule)
-        schedule_text = f"""
-Learn Language Education Academy
-Contact: 0205706589 | Website: www.learngermanghana.com
-Course Schedule: Auto-generated
-Meeting Days: {', '.join(selected_days)}
-First Week: Begins {start_date.strftime('%A, %d %B %Y')}
-
-""" + "\n".join(schedule_lines)
-
-        st.text_area("📄 Schedule Preview", value=schedule_text, height=600)
-
-        # TXT download
-        st.download_button(
-            label="📁 Download as TXT",
-            data=schedule_text,
-            file_name="a1_course_schedule.txt",
-            mime="text/plain"
-        )
-
-        # PDF download
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", size=12)
-
-        for line in schedule_text.split("\n"):
-            safe_line = sanitize(line)
-            if safe_line.strip().startswith("WEEK"):
-                pdf.set_font("Arial", "B", 12)
-                pdf.cell(0, 10, safe_line.strip(), ln=True)
-                pdf.set_font("Arial", size=12)
-            else:
-                pdf.multi_cell(0, 10, safe_line)
-
-        pdf_bytes = pdf.output(dest='S').encode('latin-1')
-
-        st.download_button(
-            label="📄 Download as PDF",
-            data=pdf_bytes,
-            file_name="a1_course_schedule.pdf",
-            mime="application/pdf"
-        )
-
-
+    st.markdown("---")
+    schedule_block("A1", raw_schedule_a1)
+    st.markdown("---")
+    schedule_block("A2", raw_schedule_a2)
+    st.markdown("---")
+    schedule_block("B1", raw_schedule_b1)
