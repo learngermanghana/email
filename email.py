@@ -1011,7 +1011,7 @@ with tabs[7]:
 with tabs[8]:
     st.title("Intelligenter Kursplan-Generator: A1, A2, B1")
 
-    from datetime import timedelta
+    from datetime import timedelta, date
     import calendar
     from fpdf import FPDF
 
@@ -1024,11 +1024,19 @@ with tabs[8]:
         cur_date = start_date
         for week_idx, (num_classes, week_days) in enumerate(week_patterns):
             week_dates = []
+            used_days = set()
             for _ in range(num_classes):
-                # Find next valid weekday
-                while calendar.day_name[cur_date.weekday()] not in week_days:
+                # Find next valid weekday (skip if we've already used all for this week)
+                attempts = 0
+                while (calendar.day_name[cur_date.weekday()] not in week_days or
+                       calendar.day_name[cur_date.weekday()] in used_days):
                     cur_date += timedelta(days=1)
+                    attempts += 1
+                    if attempts > 20:  # Prevent infinite loops
+                        break
+                day_str = calendar.day_name[cur_date.weekday()]
                 week_dates.append(cur_date)
+                used_days.add(day_str)
                 cur_date += timedelta(days=1)
             all_dates.extend(week_dates)
         return all_dates
@@ -1046,17 +1054,27 @@ with tabs[8]:
         st.markdown("#### Wöchentliche Einstellungen")
         for i in range(int(num_weeks)):
             with st.expander(f"Woche {i+1}", expanded=True):
-                week_days = st.multiselect(f"Tage in Woche {i+1}", options=all_days, default=default_days, key=f"{level_name}_days_{i}")
-                num_classes = st.number_input(f"Anzahl Klassen in Woche {i+1}", min_value=1, max_value=len(week_days), value=len(week_days), key=f"{level_name}_num_{i}")
+                week_days = st.multiselect(
+                    f"Tage in Woche {i+1}",
+                    options=all_days,
+                    default=default_days,
+                    key=f"{level_name}_days_{i}"
+                )
+                max_sessions = len(week_days) if week_days else 1
+                num_classes = st.number_input(
+                    f"Anzahl Klassen in Woche {i+1}",
+                    min_value=1,
+                    max_value=max_sessions,
+                    value=max_sessions,
+                    key=f"{level_name}_num_{i}"
+                )
                 week_patterns.append((num_classes, week_days if week_days else default_days))
 
         if st.button(f"📅 {level_name} Kursplan generieren"):
             # Flatten all sessions in topic_structure to match to class dates
             all_sessions = []
-            weeks_labels = []
             for week_label, sessions in topic_structure[:int(num_weeks)]:
                 all_sessions.extend(sessions)
-                weeks_labels.append(week_label)
             # Calculate all dates for classes
             all_dates = pick_dates(start_date, week_patterns)
             # Map sessions to dates
@@ -1075,14 +1093,7 @@ with tabs[8]:
                     else:
                         schedule_lines.append(f"Day {day_counter}: {s} (Kein Datum zugewiesen)")
                         day_counter += 1
-            preview = f"""
-Learn Language Education Academy
-Contact: 0205706589 | Website: www.learngermanghana.com
-Course Schedule: ({level_name})
-First Week: Begins {start_date.strftime('%A, %d %B %Y')}
-
-""" + "\n".join(schedule_lines)
-
+            preview = "\n".join(schedule_lines)
             st.text_area(f"📄 Vorschau {level_name} Kursplan", value=preview, height=420)
             st.download_button(f"📁 TXT Download ({level_name})", preview, file_name=f"{level_name.lower()}_course_schedule.txt", mime="text/plain")
 
