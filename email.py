@@ -1009,14 +1009,18 @@ with tabs[7]:
         st.info("No expenses file found to export.")
 
 with tabs[8]:
+    import pandas as pd
+    from datetime import timedelta, date
+    from fpdf import FPDF
+
     st.markdown("""
     <div style='background:#e3f2fd;padding:1.2em 1em 0.8em 1em;border-radius:12px;margin-bottom:1em'>
       <h2 style='color:#1565c0;'>📆 <b>Intelligenter Kursplan-Generator (A1, A2, B1)</b></h2>
-      <p style='font-size:1.08em;color:#333'>Erstellen Sie einen vollständigen, individuell angepassten Kursplan zum Download (TXT oder PDF) – <b>perfekt für Goethe-Prüfungsklassen!</b></p>
+      <p style='font-size:1.08em;color:#333'>Erstellen Sie einen vollständigen, individuell angepassten Kursplan zum Download (TXT oder PDF) – <b>mit Ferien, flexiblem Wochenrhythmus und Lehrkraft/Ort!</b></p>
     </div>
     """, unsafe_allow_html=True)
 
-    # --- Include the schedule templates here so NameError can't happen ---
+    # ---- Schedule templates
     raw_schedule_a1 = [
         ("Week One", ["Chapter 0.1 - Lesen & Horen"]),
         ("Week Two", [
@@ -1161,7 +1165,7 @@ with tabs[8]:
         ])
     ]
 
-    # --- Step 1: Kursniveau auswählen ---
+    # ---- Step 1: Course level ----
     st.markdown("### 1️⃣ **Kursniveau wählen**")
     course_levels = {
         "A1": raw_schedule_a1,
@@ -1172,76 +1176,125 @@ with tabs[8]:
     topic_structure = course_levels[selected_level]
     st.markdown("---")
 
-    # --- Step 2: Startdatum und Unterrichtstage ---
-    st.markdown("### 2️⃣ **Kursstart & Unterrichtstage**")
-    st.write("Wählen Sie das Startdatum und die gewünschten Unterrichtstage für jede Woche.")
-    start_date = st.date_input("📅 **Kursstart**", value=date.today())
+    # ---- Step 2: Basic info & breaks ----
+    st.markdown("### 2️⃣ **Kursdaten, Ferien, Modus**")
+    col1, col2 = st.columns([2,1])
+    with col1:
+        start_date = st.date_input("📅 **Kursstart**", value=date.today())
+        holiday_dates = st.date_input("🔔 Ferien oder Feiertage (Holiday/Break Dates)", [], help="Kein Unterricht an diesen Tagen.")
+    with col2:
+        advanced_mode = st.toggle("⚙️ Erweiterter Wochen-Rhythmus (Custom weekly pattern)", value=False)
+    st.markdown("---")
+
+    # ---- Step 3: Weekly pattern ----
+    st.markdown("### 3️⃣ **Unterrichtstage festlegen**")
     days_of_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     default_days = ["Monday", "Tuesday", "Wednesday"]
 
-    days_per_week = st.multiselect(
-        "📌 **Unterrichtstage wählen:**",
-        options=days_of_week,
-        default=default_days,
-        help="Tage auswählen, an denen der Unterricht stattfindet."
-    )
+    # Simple mode: Same days for all weeks
+    week_patterns = []
+    if not advanced_mode:
+        days_per_week = st.multiselect(
+            "📌 **Unterrichtstage wählen:**",
+            options=days_of_week,
+            default=default_days,
+            help="Tage auswählen, an denen der Unterricht stattfindet."
+        )
+        for i in range(len(topic_structure)):
+            num_sessions = len(topic_structure[i][1])
+            week_patterns.append((num_sessions, days_per_week))
+    else:
+        st.info("Für jede Woche individuelle Unterrichtstage einstellen.")
+        for i, (week_label, sessions) in enumerate(topic_structure):
+            with st.expander(f"{week_label}", expanded=True):
+                week_days = st.multiselect(
+                    f"Unterrichtstage für {week_label}",
+                    options=days_of_week,
+                    default=default_days,
+                    key=f"week_{i}_days"
+                )
+                num_classes = len(sessions)
+                week_patterns.append((num_classes, week_days if week_days else default_days))
+
     st.markdown("---")
 
-    # --- Step 3: Kursvorschau erstellen ---
-    st.markdown("### 3️⃣ **Kursplan-Vorschau**")
+    # ---- Step 4: Teacher/location assignment ----
+    st.markdown("### 4️⃣ **Lehrkraft & Ort zuweisen**")
+    teacher_list = ["Felix Asadu", "Susan Mensah", "Yaw Boateng", "Emilia Schmidt", "Anderer"]
+    location_list = ["Hauptraum", "Online", "Raum 2", "Raum 3", "Anderer"]
 
-    from datetime import timedelta
-    total_sessions = sum(len(sessions) for _, sessions in topic_structure)
-    dates = []
-    cur_date = start_date
-    while len(dates) < total_sessions:
-        if cur_date.strftime("%A") in days_per_week:
-            dates.append(cur_date)
-        cur_date += timedelta(days=1)
-    if len(dates) < total_sessions:
-        st.error("⚠️ **Nicht genug Unterrichtstage ausgewählt!** Bitte passen Sie Ihre Auswahl an.")
-
+    # ---- Generate all class dates, skipping holidays ----
+    total_sessions = sum(wp[0] for wp in week_patterns)
     session_labels = []
     for week_label, sessions in topic_structure:
         for s in sessions:
             session_labels.append((week_label, s))
 
+    # Build dates for all sessions, considering week patterns and holidays
+    dates = []
+    cur_date = start_date
+    for (num_classes, week_days) in week_patterns:
+        week_dates = []
+        # For each class that week
+        while len(week_dates) < num_classes:
+            if (
+                cur_date.strftime("%A") in week_days and
+                cur_date not in holiday_dates
+            ):
+                week_dates.append(cur_date)
+            cur_date += timedelta(days=1)
+        dates.extend(week_dates)
+
+    if len(dates) < total_sessions:
+        st.error("⚠️ **Nicht genug Unterrichtstage!** Wegen Ferien/Feiertagen fehlen Termine. Passen Sie die Einstellungen an.")
+
+    # ---- Teacher/location assignment per session
+    teacher_choices = []
+    location_choices = []
+    for idx in range(total_sessions):
+        teacher_choices.append(st.selectbox(f"👨‍🏫 Lehrkraft für {session_labels[idx][0]}, {session_labels[idx][1]}:", teacher_list, key=f"teacher_{idx}"))
+        location_choices.append(st.selectbox(f"🏫 Ort für {session_labels[idx][0]}, {session_labels[idx][1]}:", location_list, key=f"location_{idx}"))
+
+    # ---- Data preview ----
     schedule_rows = []
     for idx, ((week, session), class_date) in enumerate(zip(session_labels, dates)):
         schedule_rows.append({
             "Week": week,
             "Day": f"Day {idx + 1}",
             "Date": class_date.strftime("%A, %d %B %Y"),
-            "Topic": session
+            "Topic": session,
+            "Teacher": teacher_choices[idx],
+            "Location": location_choices[idx]
         })
-    import pandas as pd
     schedule_df = pd.DataFrame(schedule_rows)
-
-    # --- Card-style summary ---
     st.markdown("""
     <div style='background:#fffde7;border:1px solid #ffe082;border-radius:10px;padding:1em;margin-top:1.2em;margin-bottom:1em'>
     <b>📝 Kursüberblick:</b>
     <ul style='font-size:1.07em'>
       <li><b>Kurs:</b> {level}</li>
       <li><b>Startdatum:</b> {start}</li>
-      <li><b>Unterrichtstage:</b> {days}</li>
+      <li><b>Unterrichtstage/Woche:</b> {weekdays}</li>
       <li><b>Anzahl Einheiten:</b> {sessions}</li>
+      <li><b>Ferien:</b> {holidays}</li>
     </ul>
     </div>
     """.format(
         level=selected_level,
         start=start_date.strftime('%A, %d %B %Y'),
-        days=", ".join(days_per_week),
-        sessions=total_sessions
+        weekdays=", ".join(days_per_week if not advanced_mode else ["pro Woche individuell"]),
+        sessions=total_sessions,
+        holidays=", ".join([d.strftime('%d.%m.%Y') for d in holiday_dates]) if holiday_dates else "—"
     ), unsafe_allow_html=True)
-
     st.dataframe(schedule_df, use_container_width=True)
     st.markdown("---")
 
-    # --- Step 4: Download section ---
-    st.markdown("### 4️⃣ **Kursplan herunterladen**")
+    # ---- Step 5: Download section ----
+    st.markdown("### 5️⃣ **Kursplan herunterladen**")
 
-    txt_lines = [f"- **{row['Day']}** ({row['Date']}): {row['Topic']}" for row in schedule_rows]
+    txt_lines = [
+        f"- **{row['Day']}** ({row['Date']}): {row['Topic']} | {row['Teacher']} | {row['Location']}"
+        for row in schedule_rows
+    ]
     txt_output = (
         f"Learn Language Education Academy\n"
         f"Contact: 0205706589 | Website: www.learngermanghana.com\n"
@@ -1255,13 +1308,32 @@ with tabs[8]:
         file_name=f"{selected_level.lower()}_course_schedule.txt"
     )
 
-    from fpdf import FPDF
-    pdf = FPDF()
+    # ---- PDF with colored header & signature ----
+    class ColorHeaderPDF(FPDF):
+        def header(self):
+            self.set_fill_color(21, 101, 192)  # Blue
+            self.set_text_color(255, 255, 255)
+            self.set_font('Arial', 'B', 14)
+            self.cell(0, 12, "Learn Language Education Academy – Course Schedule", ln=1, align='C', fill=True)
+            self.ln(2)
+            self.set_text_color(0, 0, 0)
+
+    pdf = ColorHeaderPDF()
     pdf.add_page()
-    pdf.set_font("Arial", size=12)
-    for line in txt_output.split("\n"):
-        safe_line = line.encode('latin-1', 'replace').decode('latin-1')
-        pdf.multi_cell(0, 10, safe_line)
+    pdf.set_font("Arial", size=11)
+    pdf.multi_cell(0, 8, f"Course: {selected_level}")
+    pdf.multi_cell(0, 8, f"Start Date: {start_date.strftime('%A, %d %B %Y')}")
+    if holiday_dates:
+        pdf.multi_cell(0, 8, "Breaks/Holidays: " + ", ".join([d.strftime('%d.%m.%Y') for d in holiday_dates]))
+    pdf.ln(2)
+
+    for row in schedule_rows:
+        safe_line = (f"{row['Day']} ({row['Date']}): {row['Topic']} | {row['Teacher']} | {row['Location']}")
+        safe_line = safe_line.encode('latin-1', 'replace').decode('latin-1')
+        pdf.multi_cell(0, 8, safe_line)
+    pdf.ln(6)
+    pdf.set_font("Arial", 'I', 11)
+    pdf.cell(0, 10, "Signed: Felix Asadu", ln=1, align='R')
     st.download_button(
         f"📄 PDF Download ({selected_level})",
         data=pdf.output(dest='S').encode('latin-1'),
@@ -1269,5 +1341,4 @@ with tabs[8]:
         mime="application/pdf"
     )
 
-    st.info("**Tipp:** Sie können die Tabelle als Screenshot teilen oder den PDF-Download verwenden. Bei Bedarf kann ich auch eine individuelle Anpassung der Designfarben machen!")
-
+    st.info("**Tipp:** Kursplan mit Ferien, Lehrer und Ort. Einzelne Sessions können in der Tabelle noch individuell bearbeitet werden (einfach exportieren und in Excel/Word weiter bearbeiten).")
