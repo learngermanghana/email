@@ -1027,26 +1027,22 @@ Contact: {SCHOOL_CONTACT} | Website: {SCHOOL_WEBSITE}
         return text.encode('latin-1', 'replace').decode('latin-1')
 
     def pick_dates(start_date, week_patterns):
-        """Returns a flat list of all dates, given a start date and week->days pattern."""
+        """
+        For each week, schedule num_classes sessions on the selected week_days,
+        all within that calendar week (from that week's start date).
+        """
         all_dates = []
         cur_date = start_date
-        for week_idx, (num_classes, week_days) in enumerate(week_patterns):
-            week_dates = []
-            used_days = set()
-            for _ in range(num_classes):
-                # Find next valid weekday (skip if we've already used all for this week)
-                attempts = 0
-                while (calendar.day_name[cur_date.weekday()] not in week_days or
-                       calendar.day_name[cur_date.weekday()] in used_days):
-                    cur_date += timedelta(days=1)
-                    attempts += 1
-                    if attempts > 20:  # Prevent infinite loops
-                        break
-                day_str = calendar.day_name[cur_date.weekday()]
-                week_dates.append(cur_date)
-                used_days.add(day_str)
-                cur_date += timedelta(days=1)
-            all_dates.extend(week_dates)
+        for num_classes, week_days in week_patterns:
+            week_start = cur_date
+            week_end = week_start + timedelta(days=6)
+            possible_dates = []
+            for offset in range(7):
+                d = week_start + timedelta(days=offset)
+                if calendar.day_name[d.weekday()] in week_days:
+                    possible_dates.append(d)
+            all_dates.extend(possible_dates[:num_classes])
+            cur_date = week_start + timedelta(days=7)
         return all_dates
 
     def schedule_block(level_name, topic_structure):
@@ -1083,7 +1079,7 @@ Contact: {SCHOOL_CONTACT} | Website: {SCHOOL_WEBSITE}
             all_sessions = []
             for week_label, sessions in topic_structure[:int(num_weeks)]:
                 all_sessions.extend(sessions)
-            # Calculate all dates for classes
+            # Calculate all dates for classes with fixed week logic
             all_dates = pick_dates(start_date, week_patterns)
             # Map sessions to dates
             schedule_lines = []
@@ -1287,4 +1283,3 @@ Contact: {SCHOOL_CONTACT} | Website: {SCHOOL_WEBSITE}
     schedule_block("A2", raw_schedule_a2)
     st.markdown("---")
     schedule_block("B1", raw_schedule_b1)
-
