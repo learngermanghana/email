@@ -1156,7 +1156,7 @@ with tabs[8]:
         ])
     ]
 
-    # --- Step 1: Select course level
+    # --- Select course level
     course_levels = {
         "A1": raw_schedule_a1,
         "A2": raw_schedule_a2,
@@ -1165,7 +1165,7 @@ with tabs[8]:
     selected_level = st.selectbox("Wähle das Kursniveau (Choose course level):", list(course_levels.keys()))
     topic_structure = course_levels[selected_level]
 
-    # --- Step 2: Start date and week settings
+    # --- Start date and week settings
     st.subheader("1. Startdatum und Wochentage")
     start_date = st.date_input("Kursstart (Course start date)", value=date.today())
     days_of_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
@@ -1179,7 +1179,7 @@ with tabs[8]:
     )
     num_weeks = len(topic_structure)
 
-    # --- Step 3: Generate all class dates for each session in order
+    # --- Generate all class dates for each session in order
     from datetime import timedelta
     total_sessions = sum(len(sessions) for _, sessions in topic_structure)
     dates = []
@@ -1191,7 +1191,7 @@ with tabs[8]:
     if len(dates) < total_sessions:
         st.warning("Nicht genug Unterrichtstage ausgewählt / Not enough class days selected.")
 
-    # --- Step 4: Flatten sessions and make preview DataFrame
+    # --- Flatten sessions and make preview DataFrame
     session_labels = []
     for week_label, sessions in topic_structure:
         for s in sessions:
@@ -1205,12 +1205,13 @@ with tabs[8]:
             "Date": class_date.strftime("%A, %d %B %Y"),
             "Topic": session
         })
+    import pandas as pd
     schedule_df = pd.DataFrame(schedule_rows)
 
     st.subheader("3. Vorschau (Preview)")
     st.dataframe(schedule_df, use_container_width=True)
 
-    # --- Step 5: Download buttons
+    # --- Download buttons
     txt_lines = [f"{row['Day']} ({row['Date']}): {row['Topic']}" for row in schedule_rows]
     txt_output = (
         f"Learn Language Education Academy\n"
@@ -1225,11 +1226,14 @@ with tabs[8]:
         file_name=f"{selected_level.lower()}_course_schedule.txt"
     )
 
-    # PDF
+    # --- PDF (unicode-safeguard for German characters) ---
     from fpdf import FPDF
-    pdf = FPDF(); pdf.add_page(); pdf.set_font("Arial", size=12)
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
     for line in txt_output.split("\n"):
-        pdf.multi_cell(0, 10, line)
+        safe_line = line.encode('latin-1', 'replace').decode('latin-1')
+        pdf.multi_cell(0, 10, safe_line)
     st.download_button(
         f"📄 PDF Download ({selected_level})",
         data=pdf.output(dest='S').encode('latin-1'),
