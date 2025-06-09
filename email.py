@@ -1009,25 +1009,9 @@ with tabs[7]:
         st.info("No expenses file found to export.")
 
 with tabs[8]:
-    st.title("Intelligenter Kursplan-Generator: A1, A2, B1")
+    st.title("📆 Intelligenter Kursplan-Generator (A1, A2, B1)")
 
-    # --- LIBRARIES AND HELPERS ---
-    from datetime import timedelta, date
-    import calendar
-    from fpdf import FPDF
-
-    def sanitize(text):
-        return text.encode('latin-1', 'replace').decode('latin-1')
-
-    # --- SCHOOL HEADER INFO ---
-    SCHOOL_NAME = "Learn Language Education Academy"
-    SCHOOL_CONTACT = "0205706589"
-    SCHOOL_WEBSITE = "www.learngermanghana.com"
-    SCHOOL_HEADER = f"""{SCHOOL_NAME}
-Contact: {SCHOOL_CONTACT} | Website: {SCHOOL_WEBSITE}
-"""
-
-    # --- ALL SCHEDULE DATA FIRST (no NameError possible!) ---
+    # === Define schedule templates ===
     raw_schedule_a1 = [
         ("Week One", ["Chapter 0.1 - Lesen & Horen"]),
         ("Week Two", [
@@ -1071,7 +1055,6 @@ Contact: {SCHOOL_CONTACT} | Website: {SCHOOL_WEBSITE}
             "Exam tips - Schreiben & Sprechen recap"
         ])
     ]
-
     raw_schedule_a2 = [
         ("Woche 1", [
             "1.1. Small Talk (Exercise)",
@@ -1122,7 +1105,6 @@ Contact: {SCHOOL_CONTACT} | Website: {SCHOOL_WEBSITE}
             "10.28. Über die Zukunft sprechen"
         ]),
     ]
-
     raw_schedule_b1 = [
         ("Woche 1", [
             "1.1. Traumwelten (Übung)",
@@ -1174,152 +1156,83 @@ Contact: {SCHOOL_CONTACT} | Website: {SCHOOL_WEBSITE}
         ])
     ]
 
-    def pick_dates(start_date, week_patterns):
-        """
-        For each week, assign num_classes sessions on selected week_days within that week,
-        starting from start_date. If not enough matching days are found in the week,
-        remaining sessions are scheduled after all main weeks (using any available day).
-        """
-        all_dates = []
-        cur_date = start_date
-        missed_sessions = 0
+    # --- Step 1: Select course level
+    course_levels = {
+        "A1": raw_schedule_a1,
+        "A2": raw_schedule_a2,
+        "B1": raw_schedule_b1
+    }
+    selected_level = st.selectbox("Wähle das Kursniveau (Choose course level):", list(course_levels.keys()))
+    topic_structure = course_levels[selected_level]
 
-        # 1. Schedule weeks
-        for num_classes, week_days in week_patterns:
-            week_start = cur_date
-            possible_dates = []
-            for offset in range(7):
-                d = week_start + timedelta(days=offset)
-                if calendar.day_name[d.weekday()] in week_days:
-                    possible_dates.append(d)
-            # Fill as many as possible, rest are counted as missed
-            all_dates.extend(possible_dates[:num_classes])
-            if len(possible_dates) < num_classes:
-                missed_sessions += (num_classes - len(possible_dates))
-            cur_date = week_start + timedelta(days=7)
+    # --- Step 2: Start date and week settings
+    st.subheader("1. Startdatum und Wochentage")
+    start_date = st.date_input("Kursstart (Course start date)", value=date.today())
+    days_of_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    default_days = ["Monday", "Tuesday", "Wednesday"]
 
-        # 2. For any missed sessions, schedule them sequentially after last week
-        if missed_sessions:
-            final_week_days = week_patterns[-1][1] if week_patterns else ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-            last_date = cur_date
-            scheduled = 0
-            day_idx = 0
-            while scheduled < missed_sessions:
-                wd = final_week_days[day_idx % len(final_week_days)]
-                days_ahead = (list(calendar.day_name).index(wd) - last_date.weekday()) % 7
-                d = last_date + timedelta(days=days_ahead)
-                if d not in all_dates:
-                    all_dates.append(d)
-                    scheduled += 1
-                day_idx += 1
-                # Move to next week if looped through all days
-                if day_idx % len(final_week_days) == 0:
-                    last_date += timedelta(days=7)
+    st.subheader("2. Wähle die Unterrichtstage pro Woche")
+    days_per_week = st.multiselect(
+        "An welchen Tagen finden die Klassen statt? (Which days are classes held?)",
+        options=days_of_week,
+        default=default_days,
+    )
+    num_weeks = len(topic_structure)
 
-        # Sort all_dates for perfect order
-        all_dates.sort()
-        return all_dates
+    # --- Step 3: Generate all class dates for each session in order
+    from datetime import timedelta
+    total_sessions = sum(len(sessions) for _, sessions in topic_structure)
+    dates = []
+    cur_date = start_date
+    while len(dates) < total_sessions:
+        if cur_date.strftime("%A") in days_per_week:
+            dates.append(cur_date)
+        cur_date += timedelta(days=1)
+    if len(dates) < total_sessions:
+        st.warning("Nicht genug Unterrichtstage ausgewählt / Not enough class days selected.")
 
-    def schedule_block(level_name, topic_structure):
-        st.header(f"{level_name} Kursplan")
-        col1, col2 = st.columns(2)
-        with col1:
-            start_date = st.date_input(f"{level_name} Startdatum", value=date.today(), key=f"{level_name}_start")
-            num_weeks = st.number_input(f"Wieviele Wochen für {level_name}?", min_value=1, max_value=len(topic_structure), value=len(topic_structure), key=f"{level_name}_weeks")
-        with col2:
-            default_days = ["Monday", "Tuesday", "Wednesday"]
-            all_days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-        week_patterns = []
-        st.markdown("#### Wöchentliche Einstellungen")
-        for i in range(int(num_weeks)):
-            with st.expander(f"Woche {i+1}", expanded=True):
-                week_days = st.multiselect(
-                    f"Tage in Woche {i+1}",
-                    options=all_days,
-                    default=default_days,
-                    key=f"{level_name}_days_{i}"
-                )
-                max_sessions = len(week_days) if week_days else 1
-                num_classes = st.number_input(
-                    f"Anzahl Klassen in Woche {i+1}",
-                    min_value=1,
-                    max_value=max_sessions,
-                    value=max_sessions,
-                    key=f"{level_name}_num_{i}"
-                )
-                week_patterns.append((num_classes, week_days if week_days else default_days))
+    # --- Step 4: Flatten sessions and make preview DataFrame
+    session_labels = []
+    for week_label, sessions in topic_structure:
+        for s in sessions:
+            session_labels.append((week_label, s))
 
-        if st.button(f"📅 {level_name} Kursplan generieren"):
-            # Flatten all sessions in topic_structure to match to class dates
-            all_sessions = []
-            week_labels = []
-            for week_label, sessions in topic_structure[:int(num_weeks)]:
-                all_sessions.extend(sessions)
-                week_labels.append(week_label)
-            all_dates = pick_dates(start_date, week_patterns)
+    schedule_rows = []
+    for idx, ((week, session), class_date) in enumerate(zip(session_labels, dates)):
+        schedule_rows.append({
+            "Week": week,
+            "Day": f"Day {idx + 1}",
+            "Date": class_date.strftime("%A, %d %B %Y"),
+            "Topic": session
+        })
+    schedule_df = pd.DataFrame(schedule_rows)
 
-            # --- FORMAT LINES (formal style) ---
-            schedule_lines = []
-            session_idx = 0
-            day_counter = 1
-            for w, (week_label, sessions) in enumerate(topic_structure[:int(num_weeks)]):
-                schedule_lines.append(f"{week_label}")
-                for s in sessions:
-                    if session_idx < len(all_dates):
-                        date_str = all_dates[session_idx].strftime("%d %B %Y")
-                        day_name = calendar.day_name[all_dates[session_idx].weekday()]
-                        schedule_lines.append(f"{day_counter}. Day {day_counter} ({date_str}, {day_name}): {s}")
-                        session_idx += 1
-                        day_counter += 1
-                    else:
-                        schedule_lines.append(f"{day_counter}. Day {day_counter}: {s} (Kein Datum zugewiesen)")
-                        day_counter += 1
-                # Optionally add notes here (uncomment as needed)
-                # if w == 5:
-                #     schedule_lines.append("Optional: Watch the 12.2 lecture video for revision")
+    st.subheader("3. Vorschau (Preview)")
+    st.dataframe(schedule_df, use_container_width=True)
 
-            if session_idx < len(all_dates):
-                schedule_lines.append(f"\n--- Nachträgliche Termine (nicht genug Tage in der Woche) ---")
-                for extra_date in all_dates[session_idx:]:
-                    date_str = extra_date.strftime("%d %B %Y")
-                    day_name = calendar.day_name[extra_date.weekday()]
-                    schedule_lines.append(f"Extra ({date_str}, {day_name})")
+    # --- Step 5: Download buttons
+    txt_lines = [f"{row['Day']} ({row['Date']}): {row['Topic']}" for row in schedule_rows]
+    txt_output = (
+        f"Learn Language Education Academy\n"
+        f"Contact: 0205706589 | Website: www.learngermanghana.com\n"
+        f"Course Schedule: {selected_level}\n"
+        f"Start Date: {start_date.strftime('%A, %d %B %Y')}\n\n"
+        + "\n".join(txt_lines)
+    )
+    st.download_button(
+        f"📁 TXT Download ({selected_level})",
+        txt_output,
+        file_name=f"{selected_level.lower()}_course_schedule.txt"
+    )
 
-            preview = (
-                SCHOOL_HEADER
-                + f"Course Schedule: ({level_name})\n"
-                + f"First Week: Begins {start_date.strftime('%A, %d %B %Y')}\n\n"
-                + "\n".join(schedule_lines)
-            )
-            st.text_area(f"📄 Vorschau {level_name} Kursplan", value=preview, height=600)
-            st.download_button(f"📁 TXT Download ({level_name})", preview, file_name=f"{level_name.lower()}_course_schedule.txt", mime="text/plain")
-
-            # PDF with header, week/day style
-            pdf = FPDF(); pdf.add_page(); pdf.set_font("Arial", size=12)
-            for line in preview.split("\n"):
-                if line.strip().startswith(SCHOOL_NAME):
-                    pdf.set_font("Arial", "B", 14)
-                    pdf.cell(0, 10, sanitize(line.strip()), ln=True)
-                    pdf.set_font("Arial", size=12)
-                elif line.strip().startswith("Course Schedule"):
-                    pdf.set_font("Arial", "B", 12)
-                    pdf.cell(0, 10, sanitize(line.strip()), ln=True)
-                    pdf.set_font("Arial", size=12)
-                elif line.strip().startswith("Week") or line.strip().startswith("Woche") or line.strip().startswith("---"):
-                    pdf.set_font("Arial", "B", 12)
-                    pdf.cell(0, 10, sanitize(line.strip()), ln=True)
-                    pdf.set_font("Arial", size=12)
-                else:
-                    pdf.multi_cell(0, 10, sanitize(line))
-            st.download_button(
-                f"📄 PDF Download ({level_name})",
-                data=pdf.output(dest='S').encode('latin-1'),
-                file_name=f"{level_name.lower()}_course_schedule.pdf", mime="application/pdf"
-            )
-
-    st.markdown("---")
-    schedule_block("A1", raw_schedule_a1)
-    st.markdown("---")
-    schedule_block("A2", raw_schedule_a2)
-    st.markdown("---")
-    schedule_block("B1", raw_schedule_b1)
+    # PDF
+    from fpdf import FPDF
+    pdf = FPDF(); pdf.add_page(); pdf.set_font("Arial", size=12)
+    for line in txt_output.split("\n"):
+        pdf.multi_cell(0, 10, line)
+    st.download_button(
+        f"📄 PDF Download ({selected_level})",
+        data=pdf.output(dest='S').encode('latin-1'),
+        file_name=f"{selected_level.lower()}_course_schedule.pdf",
+        mime="application/pdf"
+    )
