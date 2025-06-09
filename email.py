@@ -1028,21 +1028,49 @@ Contact: {SCHOOL_CONTACT} | Website: {SCHOOL_WEBSITE}
 
     def pick_dates(start_date, week_patterns):
         """
-        For each week, schedule num_classes sessions on the selected week_days,
-        all within that calendar week (from that week's start date).
+        For each week, assign num_classes sessions on selected week_days within that week,
+        starting from start_date. If not enough matching days are found in the week,
+        remaining sessions are scheduled after all main weeks (using any available day).
         """
         all_dates = []
         cur_date = start_date
+        missed_sessions = 0
+
+        # 1. Schedule weeks
         for num_classes, week_days in week_patterns:
             week_start = cur_date
-            week_end = week_start + timedelta(days=6)
             possible_dates = []
             for offset in range(7):
                 d = week_start + timedelta(days=offset)
                 if calendar.day_name[d.weekday()] in week_days:
                     possible_dates.append(d)
+            # Fill as many as possible, rest are counted as missed
             all_dates.extend(possible_dates[:num_classes])
+            if len(possible_dates) < num_classes:
+                missed_sessions += (num_classes - len(possible_dates))
             cur_date = week_start + timedelta(days=7)
+
+        # 2. For any missed sessions, schedule them sequentially after last week
+        if missed_sessions:
+            # Continue from last cur_date, schedule on any week_days from the final week (or Monday-Sunday if none)
+            final_week_days = week_patterns[-1][1] if week_patterns else ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+            last_date = cur_date
+            scheduled = 0
+            day_idx = 0
+            while scheduled < missed_sessions:
+                wd = final_week_days[day_idx % len(final_week_days)]
+                days_ahead = (list(calendar.day_name).index(wd) - last_date.weekday()) % 7
+                d = last_date + timedelta(days=days_ahead)
+                if d not in all_dates:
+                    all_dates.append(d)
+                    scheduled += 1
+                day_idx += 1
+                # Move to next week if looped through all days
+                if day_idx % len(final_week_days) == 0:
+                    last_date += timedelta(days=7)
+
+        # Sort all_dates for perfect order
+        all_dates.sort()
         return all_dates
 
     def schedule_block(level_name, topic_structure):
@@ -1079,7 +1107,7 @@ Contact: {SCHOOL_CONTACT} | Website: {SCHOOL_WEBSITE}
             all_sessions = []
             for week_label, sessions in topic_structure[:int(num_weeks)]:
                 all_sessions.extend(sessions)
-            # Calculate all dates for classes with fixed week logic
+            # Calculate all dates for classes with improved week logic
             all_dates = pick_dates(start_date, week_patterns)
             # Map sessions to dates
             schedule_lines = []
@@ -1097,7 +1125,14 @@ Contact: {SCHOOL_CONTACT} | Website: {SCHOOL_WEBSITE}
                     else:
                         schedule_lines.append(f"Day {day_counter}: {s} (Kein Datum zugewiesen)")
                         day_counter += 1
-            # ---- SCHOOL HEADER is inserted below ----
+            # Any extra sessions (overflow from weeks)
+            if session_idx < len(all_dates):
+                schedule_lines.append(f"\n--- Nachträgliche Termine (nicht genug Tage in der Woche) ---")
+                for extra_date in all_dates[session_idx:]:
+                    date_str = extra_date.strftime("%d %B %Y")
+                    day_name = calendar.day_name[extra_date.weekday()]
+                    schedule_lines.append(f"Extra ({date_str}, {day_name})")
+
             preview = (
                 SCHOOL_HEADER
                 + f"Course Schedule: ({level_name})\n"
@@ -1118,7 +1153,7 @@ Contact: {SCHOOL_CONTACT} | Website: {SCHOOL_WEBSITE}
                     pdf.set_font("Arial", "B", 12)
                     pdf.cell(0, 10, sanitize(line.strip()), ln=True)
                     pdf.set_font("Arial", size=12)
-                elif line.strip().startswith("WOCHE") or line.strip().startswith("WEEK"):
+                elif line.strip().startswith("WOCHE") or line.strip().startswith("WEEK") or line.strip().startswith("---"):
                     pdf.set_font("Arial", "B", 12)
                     pdf.cell(0, 10, sanitize(line.strip()), ln=True)
                     pdf.set_font("Arial", size=12)
