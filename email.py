@@ -1078,7 +1078,7 @@ with tabs[8]:
             preview = f"""
 Learn Language Education Academy
 Contact: 0205706589 | Website: www.learngermanghana.com
-Course Schedule: Auto-generated ({level_name})
+Course Schedule: ({level_name})
 First Week: Begins {start_date.strftime('%A, %d %B %Y')}
 
 """ + "\n".join(schedule_lines)
