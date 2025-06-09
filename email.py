@@ -1052,7 +1052,6 @@ Contact: {SCHOOL_CONTACT} | Website: {SCHOOL_WEBSITE}
 
         # 2. For any missed sessions, schedule them sequentially after last week
         if missed_sessions:
-            # Continue from last cur_date, schedule on any week_days from the final week (or Monday-Sunday if none)
             final_week_days = week_patterns[-1][1] if week_patterns else ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
             last_date = cur_date
             scheduled = 0
@@ -1105,26 +1104,32 @@ Contact: {SCHOOL_CONTACT} | Website: {SCHOOL_WEBSITE}
         if st.button(f"📅 {level_name} Kursplan generieren"):
             # Flatten all sessions in topic_structure to match to class dates
             all_sessions = []
+            week_labels = []
             for week_label, sessions in topic_structure[:int(num_weeks)]:
                 all_sessions.extend(sessions)
-            # Calculate all dates for classes with improved week logic
+                week_labels.append(week_label)
             all_dates = pick_dates(start_date, week_patterns)
-            # Map sessions to dates
+
+            # --- FORMAT LINES (formal style) ---
             schedule_lines = []
             session_idx = 0
             day_counter = 1
             for w, (week_label, sessions) in enumerate(topic_structure[:int(num_weeks)]):
-                schedule_lines.append(f"\n{week_label.upper()}")
+                schedule_lines.append(f"{week_label}")
                 for s in sessions:
                     if session_idx < len(all_dates):
                         date_str = all_dates[session_idx].strftime("%d %B %Y")
                         day_name = calendar.day_name[all_dates[session_idx].weekday()]
-                        schedule_lines.append(f"Day {day_counter} ({date_str}, {day_name}): {s}")
+                        schedule_lines.append(f"{day_counter}. Day {day_counter} ({date_str}, {day_name}): {s}")
                         session_idx += 1
                         day_counter += 1
                     else:
-                        schedule_lines.append(f"Day {day_counter}: {s} (Kein Datum zugewiesen)")
+                        schedule_lines.append(f"{day_counter}. Day {day_counter}: {s} (Kein Datum zugewiesen)")
                         day_counter += 1
+                # Optional: Add extra notes here if desired. Example for week 6:
+                # if w == 5:
+                #     schedule_lines.append("Optional: Watch the 12.2 lecture video for revision")
+
             # Any extra sessions (overflow from weeks)
             if session_idx < len(all_dates):
                 schedule_lines.append(f"\n--- Nachträgliche Termine (nicht genug Tage in der Woche) ---")
@@ -1139,10 +1144,10 @@ Contact: {SCHOOL_CONTACT} | Website: {SCHOOL_WEBSITE}
                 + f"First Week: Begins {start_date.strftime('%A, %d %B %Y')}\n\n"
                 + "\n".join(schedule_lines)
             )
-            st.text_area(f"📄 Vorschau {level_name} Kursplan", value=preview, height=420)
+            st.text_area(f"📄 Vorschau {level_name} Kursplan", value=preview, height=600)
             st.download_button(f"📁 TXT Download ({level_name})", preview, file_name=f"{level_name.lower()}_course_schedule.txt", mime="text/plain")
 
-            # PDF with header
+            # PDF with header, week/day style
             pdf = FPDF(); pdf.add_page(); pdf.set_font("Arial", size=12)
             for line in preview.split("\n"):
                 if line.strip().startswith(SCHOOL_NAME):
@@ -1153,7 +1158,7 @@ Contact: {SCHOOL_CONTACT} | Website: {SCHOOL_WEBSITE}
                     pdf.set_font("Arial", "B", 12)
                     pdf.cell(0, 10, sanitize(line.strip()), ln=True)
                     pdf.set_font("Arial", size=12)
-                elif line.strip().startswith("WOCHE") or line.strip().startswith("WEEK") or line.strip().startswith("---"):
+                elif line.strip().startswith("Week") or line.strip().startswith("Woche") or line.strip().startswith("---"):
                     pdf.set_font("Arial", "B", 12)
                     pdf.cell(0, 10, sanitize(line.strip()), ln=True)
                     pdf.set_font("Arial", size=12)
@@ -1318,3 +1323,4 @@ Contact: {SCHOOL_CONTACT} | Website: {SCHOOL_WEBSITE}
     schedule_block("A2", raw_schedule_a2)
     st.markdown("---")
     schedule_block("B1", raw_schedule_b1)
+
