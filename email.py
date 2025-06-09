@@ -1011,6 +1011,14 @@ with tabs[7]:
 with tabs[8]:
     st.title("Intelligenter Kursplan-Generator: A1, A2, B1")
 
+    # -- SCHOOL HEADER INFO --
+    SCHOOL_NAME = "Learn Language Education Academy"
+    SCHOOL_CONTACT = "0205706589"
+    SCHOOL_WEBSITE = "www.learngermanghana.com"
+    SCHOOL_HEADER = f"""{SCHOOL_NAME}
+Contact: {SCHOOL_CONTACT} | Website: {SCHOOL_WEBSITE}
+"""
+
     from datetime import timedelta, date
     import calendar
     from fpdf import FPDF
@@ -1093,13 +1101,28 @@ with tabs[8]:
                     else:
                         schedule_lines.append(f"Day {day_counter}: {s} (Kein Datum zugewiesen)")
                         day_counter += 1
-            preview = "\n".join(schedule_lines)
+            # ---- SCHOOL HEADER is inserted below ----
+            preview = (
+                SCHOOL_HEADER
+                + f"Course Schedule: Auto-generated ({level_name})\n"
+                + f"First Week: Begins {start_date.strftime('%A, %d %B %Y')}\n\n"
+                + "\n".join(schedule_lines)
+            )
             st.text_area(f"📄 Vorschau {level_name} Kursplan", value=preview, height=420)
             st.download_button(f"📁 TXT Download ({level_name})", preview, file_name=f"{level_name.lower()}_course_schedule.txt", mime="text/plain")
 
+            # PDF with header
             pdf = FPDF(); pdf.add_page(); pdf.set_font("Arial", size=12)
             for line in preview.split("\n"):
-                if line.strip().startswith("WOCHE") or line.strip().startswith("WEEK"):
+                if line.strip().startswith(SCHOOL_NAME):
+                    pdf.set_font("Arial", "B", 14)
+                    pdf.cell(0, 10, sanitize(line.strip()), ln=True)
+                    pdf.set_font("Arial", size=12)
+                elif line.strip().startswith("Course Schedule"):
+                    pdf.set_font("Arial", "B", 12)
+                    pdf.cell(0, 10, sanitize(line.strip()), ln=True)
+                    pdf.set_font("Arial", size=12)
+                elif line.strip().startswith("WOCHE") or line.strip().startswith("WEEK"):
                     pdf.set_font("Arial", "B", 12)
                     pdf.cell(0, 10, sanitize(line.strip()), ln=True)
                     pdf.set_font("Arial", size=12)
@@ -1264,3 +1287,4 @@ with tabs[8]:
     schedule_block("A2", raw_schedule_a2)
     st.markdown("---")
     schedule_block("B1", raw_schedule_b1)
+
