@@ -1016,7 +1016,7 @@ with tabs[8]:
     st.markdown("""
     <div style='background:#e3f2fd;padding:1.2em 1em 0.8em 1em;border-radius:12px;margin-bottom:1em'>
       <h2 style='color:#1565c0;'>📆 <b>Intelligenter Kursplan-Generator (A1, A2, B1)</b></h2>
-      <p style='font-size:1.08em;color:#333'>Erstellen Sie einen vollständigen, individuell angepassten Kursplan zum Download (TXT oder PDF) – <b>mit Ferien, flexiblem Wochenrhythmus und Lehrkraft/Ort!</b></p>
+      <p style='font-size:1.08em;color:#333'>Erstellen Sie einen vollständigen, individuell angepassten Kursplan zum Download (TXT oder PDF) – <b>mit Ferien und flexiblem Wochenrhythmus!</b></p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -1218,11 +1218,6 @@ with tabs[8]:
 
     st.markdown("---")
 
-    # ---- Step 4: Teacher/location assignment ----
-    st.markdown("### 4️⃣ **Lehrkraft & Ort zuweisen**")
-    teacher_list = ["Felix Asadu", "Susan Mensah", "Yaw Boateng", "Emilia Schmidt", "Anderer"]
-    location_list = ["Hauptraum", "Online", "Raum 2", "Raum 3", "Anderer"]
-
     # ---- Generate all class dates, skipping holidays ----
     total_sessions = sum(wp[0] for wp in week_patterns)
     session_labels = []
@@ -1248,13 +1243,6 @@ with tabs[8]:
     if len(dates) < total_sessions:
         st.error("⚠️ **Nicht genug Unterrichtstage!** Wegen Ferien/Feiertagen fehlen Termine. Passen Sie die Einstellungen an.")
 
-    # ---- Teacher/location assignment per session
-    teacher_choices = []
-    location_choices = []
-    for idx in range(total_sessions):
-        teacher_choices.append(st.selectbox(f"👨‍🏫 Lehrkraft für {session_labels[idx][0]}, {session_labels[idx][1]}:", teacher_list, key=f"teacher_{idx}"))
-        location_choices.append(st.selectbox(f"🏫 Ort für {session_labels[idx][0]}, {session_labels[idx][1]}:", location_list, key=f"location_{idx}"))
-
     # ---- Data preview ----
     schedule_rows = []
     for idx, ((week, session), class_date) in enumerate(zip(session_labels, dates)):
@@ -1262,9 +1250,7 @@ with tabs[8]:
             "Week": week,
             "Day": f"Day {idx + 1}",
             "Date": class_date.strftime("%A, %d %B %Y"),
-            "Topic": session,
-            "Teacher": teacher_choices[idx],
-            "Location": location_choices[idx]
+            "Topic": session
         })
     schedule_df = pd.DataFrame(schedule_rows)
     st.markdown("""
@@ -1288,11 +1274,11 @@ with tabs[8]:
     st.dataframe(schedule_df, use_container_width=True)
     st.markdown("---")
 
-    # ---- Step 5: Download section ----
-    st.markdown("### 5️⃣ **Kursplan herunterladen**")
+    # ---- Step 4: Download section ----
+    st.markdown("### 4️⃣ **Kursplan herunterladen**")
 
     txt_lines = [
-        f"- **{row['Day']}** ({row['Date']}): {row['Topic']} | {row['Teacher']} | {row['Location']}"
+        f"- **{row['Day']}** ({row['Date']}): {row['Topic']}"
         for row in schedule_rows
     ]
     txt_output = (
@@ -1328,7 +1314,7 @@ with tabs[8]:
     pdf.ln(2)
 
     for row in schedule_rows:
-        safe_line = (f"{row['Day']} ({row['Date']}): {row['Topic']} | {row['Teacher']} | {row['Location']}")
+        safe_line = (f"{row['Day']} ({row['Date']}): {row['Topic']}")
         safe_line = safe_line.encode('latin-1', 'replace').decode('latin-1')
         pdf.multi_cell(0, 8, safe_line)
     pdf.ln(6)
@@ -1341,4 +1327,4 @@ with tabs[8]:
         mime="application/pdf"
     )
 
-    st.info("**Tipp:** Kursplan mit Ferien, Lehrer und Ort. Einzelne Sessions können in der Tabelle noch individuell bearbeitet werden (einfach exportieren und in Excel/Word weiter bearbeiten).")
+    st.info("**Tipp:** Kursplan mit Ferien und flexiblem Wochenrhythmus. Einzelne Sessions können in der Tabelle noch individuell bearbeitet werden (einfach exportieren und in Excel/Word weiter bearbeiten).")
