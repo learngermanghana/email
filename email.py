@@ -1165,6 +1165,10 @@ with tabs[8]:
         ])
     ]
 
+    # -- Helper for safe PDF encoding --
+    def safe_pdf(text):
+        return str(text).encode('latin-1', 'replace').decode('latin-1')
+
     # ---- Step 1: Course level ----
     st.markdown("### 1️⃣ **Kursniveau wählen**")
     course_levels = {
@@ -1191,7 +1195,6 @@ with tabs[8]:
     days_of_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     default_days = ["Monday", "Tuesday", "Wednesday"]
 
-    # Simple mode: Same days for all weeks
     week_patterns = []
     if not advanced_mode:
         days_per_week = st.multiselect(
@@ -1225,12 +1228,10 @@ with tabs[8]:
         for s in sessions:
             session_labels.append((week_label, s))
 
-    # Build dates for all sessions, considering week patterns and holidays
     dates = []
     cur_date = start_date
     for (num_classes, week_days) in week_patterns:
         week_dates = []
-        # For each class that week
         while len(week_dates) < num_classes:
             if (
                 cur_date.strftime("%A") in week_days and
@@ -1300,26 +1301,25 @@ with tabs[8]:
             self.set_fill_color(21, 101, 192)  # Blue
             self.set_text_color(255, 255, 255)
             self.set_font('Arial', 'B', 14)
-            self.cell(0, 12, "Learn Language Education Academy – Course Schedule", ln=1, align='C', fill=True)
+            self.cell(0, 12, safe_pdf("Learn Language Education Academy – Course Schedule"), ln=1, align='C', fill=True)
             self.ln(2)
             self.set_text_color(0, 0, 0)
 
     pdf = ColorHeaderPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=11)
-    pdf.multi_cell(0, 8, f"Course: {selected_level}")
-    pdf.multi_cell(0, 8, f"Start Date: {start_date.strftime('%A, %d %B %Y')}")
+    pdf.multi_cell(0, 8, safe_pdf(f"Course: {selected_level}"))
+    pdf.multi_cell(0, 8, safe_pdf(f"Start Date: {start_date.strftime('%A, %d %B %Y')}"))
     if holiday_dates:
-        pdf.multi_cell(0, 8, "Breaks/Holidays: " + ", ".join([d.strftime('%d.%m.%Y') for d in holiday_dates]))
+        pdf.multi_cell(0, 8, safe_pdf("Breaks/Holidays: " + ", ".join([d.strftime('%d.%m.%Y') for d in holiday_dates])))
     pdf.ln(2)
 
     for row in schedule_rows:
-        safe_line = (f"{row['Day']} ({row['Date']}): {row['Topic']}")
-        safe_line = safe_line.encode('latin-1', 'replace').decode('latin-1')
+        safe_line = safe_pdf(f"{row['Day']} ({row['Date']}): {row['Topic']}")
         pdf.multi_cell(0, 8, safe_line)
     pdf.ln(6)
     pdf.set_font("Arial", 'I', 11)
-    pdf.cell(0, 10, "Signed: Felix Asadu", ln=1, align='R')
+    pdf.cell(0, 10, safe_pdf("Signed: Felix Asadu"), ln=1, align='R')
     st.download_button(
         f"📄 PDF Download ({selected_level})",
         data=pdf.output(dest='S').encode('latin-1'),
