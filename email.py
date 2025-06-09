@@ -1104,7 +1104,7 @@ Contact: {SCHOOL_CONTACT} | Website: {SCHOOL_WEBSITE}
             # ---- SCHOOL HEADER is inserted below ----
             preview = (
                 SCHOOL_HEADER
-                + f"Course Schedule: Auto-generated ({level_name})\n"
+                + f"Course Schedule: ({level_name})\n"
                 + f"First Week: Begins {start_date.strftime('%A, %d %B %Y')}\n\n"
                 + "\n".join(schedule_lines)
             )
