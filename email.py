@@ -1009,7 +1009,7 @@ with tabs[7]:
         st.info("No expenses file found to export.")
 
 with tabs[8]:
-    st.title("Intelligenter Kursplan-Generator: A1, A2, B1 (Automatische Wochenzahl)")
+    st.title("Intelligenter Kursplan-Generator: A1, A2, B1")
 
     from datetime import timedelta, date
     import calendar
@@ -1018,79 +1018,70 @@ with tabs[8]:
     def sanitize(text):
         return text.encode('latin-1', 'replace').decode('latin-1')
 
-    def pick_dates(start_date, week_patterns, num_sessions):
-        """Returns a flat list of all dates, matching num_sessions topics."""
+    def pick_dates(start_date, week_patterns):
+        """Returns a flat list of all dates, given a start date and week->days pattern."""
         all_dates = []
         cur_date = start_date
-        session_count = 0
         for week_idx, (num_classes, week_days) in enumerate(week_patterns):
             week_dates = []
             used_days = set()
             for _ in range(num_classes):
-                if session_count >= num_sessions:
-                    break
+                # Find next valid weekday (skip if we've already used all for this week)
                 attempts = 0
                 while (calendar.day_name[cur_date.weekday()] not in week_days or
                        calendar.day_name[cur_date.weekday()] in used_days):
                     cur_date += timedelta(days=1)
                     attempts += 1
-                    if attempts > 20:
+                    if attempts > 20:  # Prevent infinite loops
                         break
                 day_str = calendar.day_name[cur_date.weekday()]
                 week_dates.append(cur_date)
                 used_days.add(day_str)
                 cur_date += timedelta(days=1)
-                session_count += 1
             all_dates.extend(week_dates)
-            if session_count >= num_sessions:
-                break
         return all_dates
 
     def schedule_block(level_name, topic_structure):
         st.header(f"{level_name} Kursplan")
-        start_date = st.date_input(f"{level_name} Startdatum", value=date.today(), key=f"{level_name}_start")
-        default_days = ["Monday", "Tuesday", "Wednesday"]
-        all_days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-        # Flatten all sessions/topics
-        all_sessions = []
-        for week_label, sessions in topic_structure:
-            all_sessions.extend(sessions)
-        num_sessions = len(all_sessions)
-
-        st.info(f"⚡ Du hast insgesamt **{num_sessions}** Themen/Sitzungen im {level_name} Kurs.")
-
-        week_settings = []
-        current_total = 0
-        week_num = 1
-        # Collect user settings for each week until we cover all topics
-        while current_total < num_sessions:
-            with st.expander(f"Woche {week_num} Einstellungen", expanded=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            start_date = st.date_input(f"{level_name} Startdatum", value=date.today(), key=f"{level_name}_start")
+            num_weeks = st.number_input(f"Wieviele Wochen für {level_name}?", min_value=1, max_value=len(topic_structure), value=len(topic_structure), key=f"{level_name}_weeks")
+        with col2:
+            default_days = ["Monday", "Tuesday", "Wednesday"]
+            all_days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        week_patterns = []
+        st.markdown("#### Wöchentliche Einstellungen")
+        for i in range(int(num_weeks)):
+            with st.expander(f"Woche {i+1}", expanded=True):
                 week_days = st.multiselect(
-                    f"Tage in Woche {week_num}",
+                    f"Tage in Woche {i+1}",
                     options=all_days,
-                    default=default_days if week_num == 1 else [],
-                    key=f"{level_name}_days_{week_num}"
+                    default=default_days,
+                    key=f"{level_name}_days_{i}"
                 )
                 max_sessions = len(week_days) if week_days else 1
                 num_classes = st.number_input(
-                    f"Anzahl Klassen in Woche {week_num}",
+                    f"Anzahl Klassen in Woche {i+1}",
                     min_value=1,
                     max_value=max_sessions,
                     value=max_sessions,
-                    key=f"{level_name}_num_{week_num}"
+                    key=f"{level_name}_num_{i}"
                 )
-                week_settings.append((num_classes, week_days if week_days else default_days))
-                current_total += num_classes
-            week_num += 1
+                week_patterns.append((num_classes, week_days if week_days else default_days))
 
         if st.button(f"📅 {level_name} Kursplan generieren"):
-            all_dates = pick_dates(start_date, week_settings, num_sessions)
-            # Map topics to dates
+            # Flatten all sessions in topic_structure to match to class dates
+            all_sessions = []
+            for week_label, sessions in topic_structure[:int(num_weeks)]:
+                all_sessions.extend(sessions)
+            # Calculate all dates for classes
+            all_dates = pick_dates(start_date, week_patterns)
+            # Map sessions to dates
             schedule_lines = []
             session_idx = 0
             day_counter = 1
-            topic_pointer = 0
-            for w, (week_label, sessions) in enumerate(topic_structure):
+            for w, (week_label, sessions) in enumerate(topic_structure[:int(num_weeks)]):
                 schedule_lines.append(f"\n{week_label.upper()}")
                 for s in sessions:
                     if session_idx < len(all_dates):
@@ -1102,7 +1093,6 @@ with tabs[8]:
                     else:
                         schedule_lines.append(f"Day {day_counter}: {s} (Kein Datum zugewiesen)")
                         day_counter += 1
-                    topic_pointer += 1
             preview = "\n".join(schedule_lines)
             st.text_area(f"📄 Vorschau {level_name} Kursplan", value=preview, height=420)
             st.download_button(f"📁 TXT Download ({level_name})", preview, file_name=f"{level_name.lower()}_course_schedule.txt", mime="text/plain")
@@ -1274,4 +1264,3 @@ with tabs[8]:
     schedule_block("A2", raw_schedule_a2)
     st.markdown("---")
     schedule_block("B1", raw_schedule_b1)
-
