@@ -669,15 +669,9 @@ with tabs[3]:
             }])
             exp = pd.concat([exp, new_exp], ignore_index=True)
             exp.to_csv(expenses_file, index=False)
-
-            # ✅ Reload fresh and convert date column
-            exp = pd.read_csv(expenses_file)
-            exp["Date"] = pd.to_datetime(exp["Date"], errors="coerce")
-            exp["Month"] = exp["Date"].dt.strftime("%B %Y")
-            exp["Year"] = exp["Date"].dt.year
-
             st.success(f"✅ Recorded: {exp_type} – {exp_item}")
             st.session_state["should_rerun"] = True
+            st.experimental_rerun()
 
     # ✅ Convert dates if not done
     exp["Date"] = pd.to_datetime(exp["Date"], errors="coerce")
@@ -685,7 +679,52 @@ with tabs[3]:
     exp["Year"] = exp["Date"].dt.year
 
     st.write("### All Expenses")
-    st.dataframe(exp[["Type", "Item", "Amount", "Date"]], use_container_width=True)
+
+    # --- Pagination for expenses ---
+    ROWS_PER_PAGE = 10
+    total_exp_rows = len(exp)
+    total_exp_pages = (total_exp_rows - 1) // ROWS_PER_PAGE + 1
+
+    if total_exp_pages > 1:
+        exp_page = st.number_input(
+            f"Page (1-{total_exp_pages})",
+            min_value=1, max_value=total_exp_pages, value=1, step=1,
+            key="expenses_page"
+        )
+    else:
+        exp_page = 1
+
+    exp_start_idx = (exp_page - 1) * ROWS_PER_PAGE
+    exp_end_idx = exp_start_idx + ROWS_PER_PAGE
+
+    exp_paged = exp.iloc[exp_start_idx:exp_end_idx].reset_index()  # Keep index for delete/edit reference
+
+    for i, row in exp_paged.iterrows():
+        with st.expander(
+            f"{row['Type']} | {row['Item']} | GHS {row['Amount']} | {row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else ''}"
+        ):
+            edit_col, delete_col = st.columns([2, 1])
+            with edit_col:
+                # Pre-fill values for editing
+                new_type = st.selectbox("Type", ["Bill", "Rent", "Salary", "Marketing", "Other"], index=["Bill", "Rent", "Salary", "Marketing", "Other"].index(row['Type']) if row['Type'] in ["Bill", "Rent", "Salary", "Marketing", "Other"] else 0, key=f"type_{exp_start_idx+i}")
+                new_item = st.text_input("Item", value=row['Item'], key=f"item_{exp_start_idx+i}")
+                new_amount = st.number_input("Amount (GHS)", min_value=0.0, step=1.0, value=float(row['Amount']), key=f"amount_{exp_start_idx+i}")
+                new_date = st.date_input("Date", value=row['Date'].date() if pd.notna(row['Date']) else date.today(), key=f"date_{exp_start_idx+i}")
+                if st.button("💾 Update", key=f"update_exp_{exp_start_idx+i}"):
+                    # Update in main exp DataFrame (use row['index'] for real index in exp)
+                    exp.at[row['index'], "Type"] = new_type
+                    exp.at[row['index'], "Item"] = new_item
+                    exp.at[row['index'], "Amount"] = new_amount
+                    exp.at[row['index'], "Date"] = pd.to_datetime(new_date)
+                    exp.to_csv(expenses_file, index=False)
+                    st.success("✅ Expense updated.")
+                    st.experimental_rerun()
+            with delete_col:
+                if st.button("🗑️ Delete", key=f"delete_exp_{exp_start_idx+i}"):
+                    exp = exp.drop(row['index']).reset_index(drop=True)
+                    exp.to_csv(expenses_file, index=False)
+                    st.success("❌ Expense deleted.")
+                    st.experimental_rerun()
 
     # ✅ Summary Section
     st.write("### Summary")
