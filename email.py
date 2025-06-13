@@ -199,6 +199,12 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # --- Persistent Dismissed Notifications Helper ---
+
+def clean_phone(phone):
+    phone = str(phone).replace(" ", "").replace("+", "")
+    # Converts '024XXXXXXX' to '23324XXXXXXX'
+    return "233" + phone[1:] if phone.startswith("0") else phone
+
 DISMISSED_FILE = "dismissed_notifs.json"
 
 def load_dismissed():
