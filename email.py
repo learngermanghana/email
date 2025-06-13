@@ -950,6 +950,14 @@ with tabs[6]:
 
     file_upload = st.file_uploader("📎 Attach a file (optional)", type=["pdf", "doc", "jpg", "png", "jpeg"])
 
+    MAX_ATTACHMENT_MB = 5  # maximum file size allowed (MB)
+    ALLOWED_MIME_TYPES = [
+        "application/pdf",
+        "image/jpeg", "image/png",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    ]
+
     if st.button("Send Email"):
         if not recipients:
             st.warning("❗ Please select or enter at least one email address.")
@@ -961,17 +969,33 @@ with tabs[6]:
 
         if file_upload:
             try:
-                file_data = file_upload.read()
-                encoded = base64.b64encode(file_data).decode()
-                attachment = Attachment(
-                    FileContent(encoded),
-                    FileName(file_upload.name),
-                    FileType(file_upload.type),
-                    Disposition("attachment")
-                )
+                # File size check
+                file_upload.seek(0, os.SEEK_END)
+                file_size_mb = file_upload.tell() / (1024 * 1024)
+                file_upload.seek(0)
+                if file_size_mb > MAX_ATTACHMENT_MB:
+                    st.error(f"Attachment is too large (>{MAX_ATTACHMENT_MB}MB). Please upload a smaller file.")
+                    file_upload = None
+
+                # File type check
+                if file_upload and file_upload.type not in ALLOWED_MIME_TYPES:
+                    st.error("Unsupported file type! Please upload PDF, JPG, PNG, or DOC/DOCX files only.")
+                    file_upload = None
+
+                # Attach only if checks passed
+                if file_upload:
+                    file_data = file_upload.read()
+                    encoded = base64.b64encode(file_data).decode()
+                    attachment = Attachment(
+                        FileContent(encoded),
+                        FileName(file_upload.name),
+                        FileType(file_upload.type),
+                        Disposition("attachment")
+                    )
             except Exception as e:
                 st.error(f"❌ Failed to process attachment: {e}")
-                st.stop()
+                attachment = None
+                file_upload = None
 
         for email in recipients:
             try:
@@ -993,6 +1017,7 @@ with tabs[6]:
         st.success(f"✅ Sent to {sent} student(s).")
         if failed:
             st.warning(f"⚠️ Failed to send to: {', '.join(failed)}")
+
 
 with tabs[7]:
     st.title("📊 Analytics & Export")
