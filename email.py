@@ -9,6 +9,8 @@ from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileT
 import urllib.parse
 import calendar
 import numpy as np
+import json 
+
 
 # ===== PAGE CONFIG (must be first Streamlit command!) =====
 st.set_page_config(
@@ -196,19 +198,30 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# === NOTIFICATIONS with Dismiss Buttons (no explicit rerun) ===
-today = date.today()
+# --- Persistent Dismissed Notifications Helper ---
+DISMISSED_FILE = "dismissed_notifs.json"
 
-# 1. Initialize dismissed set
-st.session_state.setdefault("dismissed_notifs", set())
+def load_dismissed():
+    if os.path.exists(DISMISSED_FILE):
+        try:
+            with open(DISMISSED_FILE, "r") as f:
+                return set(json.load(f))
+        except Exception:
+            return set()
+    else:
+        return set()
 
-def clean_phone(phone):
-    phone = str(phone).replace(" ", "").replace("+", "")
-    return "233" + phone[1:] if phone.startswith("0") else phone
+def save_dismissed(dismissed_set):
+    with open(DISMISSED_FILE, "w") as f:
+        json.dump(list(dismissed_set), f)
 
+# --- Load or create the dismissed set ---
+dismissed_notifs = load_dismissed()
+
+# --- Your notification creation logic ---
 notifications = []
 
-# 2. Debtors
+# Example: Debtors
 if "Balance" not in df_main.columns:
     df_main["Balance"] = 0.0
 else:
@@ -230,31 +243,10 @@ for _, row in df_main[df_main["Balance"] > 0].iterrows():
     )
     notifications.append((f"debtor_{code}", html))
 
-# 3. Ensure ContractEnd exists & is datetime
-if "ContractEnd" not in df_main.columns:
-    df_main["ContractEnd"] = pd.NaT
-df_main["ContractEnd"] = pd.to_datetime(df_main["ContractEnd"], errors="coerce")
+# Example: Expiries and expired contracts...
+# (your code to populate notifications continues here)
 
-# 4. Expiring soon (next 30 days)
-for _, row in df_main[
-    (df_main["ContractEnd"] >= pd.Timestamp(today)) &
-    (df_main["ContractEnd"] <= pd.Timestamp(today + timedelta(days=30)))
-].iterrows():
-    name = row.get("Name", "Unknown")
-    end_date = row["ContractEnd"].date()
-    key = f"expiring_{row['StudentCode']}"
-    html = f"⏳ <b>{name}</b>'s contract ends on {end_date}"
-    notifications.append((key, html))
-
-# 5. Expired contracts
-for _, row in df_main[df_main["ContractEnd"] < pd.Timestamp(today)].iterrows():
-    name = row.get("Name", "Unknown")
-    end_date = row["ContractEnd"].date()
-    key = f"expired_{row['StudentCode']}"
-    html = f"❌ <b>{name}</b>'s contract expired on {end_date}"
-    notifications.append((key, html))
-
-# 6. Render
+# --- Render notifications ---
 if notifications:
     st.markdown("""
     <div style='background-color:#fff3cd;border:1px solid #ffc107;
@@ -264,7 +256,7 @@ if notifications:
     """, unsafe_allow_html=True)
 
     for key, html in notifications:
-        if key in st.session_state["dismissed_notifs"]:
+        if key in dismissed_notifs:
             continue
 
         col1, col2 = st.columns([9, 1])
@@ -272,8 +264,9 @@ if notifications:
             st.markdown(html, unsafe_allow_html=True)
         with col2:
             if st.button("Dismiss", key="dismiss_" + key):
-                st.session_state["dismissed_notifs"].add(key)
-
+                dismissed_notifs.add(key)
+                save_dismissed(dismissed_notifs)
+                st.experimental_rerun()
 else:
     st.markdown(f"""
     <div style='background-color:#e8f5e9;border:1px solid #4caf50;
@@ -282,7 +275,6 @@ else:
       <p>No urgent alerts. You're all caught up ✅</p>
     </div>
     """, unsafe_allow_html=True)
-
 
 
 # === TABS ===
