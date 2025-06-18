@@ -42,6 +42,21 @@ from sendgrid.helpers.mail import (
 from pdf_utils import generate_receipt_and_contract_pdf
 from email_utils import send_emails
 
+# ===== Helper Functions =====
+def clean_phone(phone):
+    """
+    Convert any Ghanaian phone number to WhatsApp-friendly format:
+    - Remove spaces, dashes, and '+'
+    - If starts with '0', replace with '233'
+    - If starts with '233', leave as is
+    - Returns only digits
+    """
+    phone = str(phone).replace(" ", "").replace("+", "").replace("-", "")
+    if phone.startswith("0"):
+        phone = "233" + phone[1:]
+    phone = ''.join(filter(str.isdigit, phone))
+    return phone
+
 
 # ===== PAGE CONFIG (must be first Streamlit command!) =====
 st.set_page_config(
@@ -781,6 +796,20 @@ with tabs[3]:
 with tabs[4]:
     st.title("📲 WhatsApp Reminders for Debtors")
 
+    def clean_phone(phone):
+        """
+        Convert any Ghanaian phone number to WhatsApp-friendly format:
+        - Remove spaces, dashes, and '+'
+        - If starts with '0', replace with '233'
+        - Returns only digits
+        """
+        phone = str(phone).replace(" ", "").replace("+", "").replace("-", "")
+        if phone.startswith("0"):
+            phone = "233" + phone[1:]
+        phone = ''.join(filter(str.isdigit, phone))
+        return phone
+
+    # Load student data
     if os.path.exists("students_simple.csv"):
         df_main = pd.read_csv("students_simple.csv")
     else:
@@ -799,20 +828,25 @@ with tabs[4]:
                 name = row.get("Name", "Unknown")
                 level = row.get("Level", "")
                 balance = float(row.get("Balance", 0.0))
-                phone = row.get("Phone", "")
-                country = row.get("Country", "Ghana")  # Default to Ghana if missing
+                code = row.get("StudentCode", "")
+                phone = clean_phone(row.get("Phone", ""))
 
+                # Date logic: contract start and due date (one month after)
                 contract_start = row.get("ContractStart", "")
                 if contract_start and not pd.isnull(contract_start):
                     contract_start_dt = pd.to_datetime(contract_start, errors="coerce")
+                    contract_start_fmt = contract_start_dt.strftime("%d %B %Y")
                     due_date_dt = contract_start_dt + timedelta(days=30)
                     due_date_fmt = due_date_dt.strftime("%d %B %Y")
                 else:
+                    contract_start_fmt = "N/A"
                     due_date_fmt = "soon"
 
                 message = (
                     f"Dear {name}, this is a reminder that your balance for your {level} class is GHS {balance:.2f} "
-                    f"and is due by {due_date_fmt}. Kindly make the payment to continue learning with us. Thank you!\n\n"
+                    f"and is due by {due_date_fmt}. "
+                    f"Contract start: {contract_start_fmt}.\n"
+                    "Kindly make the payment to continue learning with us. Thank you!\n\n"
                     "Payment Methods:\n"
                     "1. Mobile Money\n"
                     "   Number: 0245022743\n"
@@ -822,9 +856,8 @@ with tabs[4]:
                     "   Name: Learn Language Education Academy"
                 )
 
-                phone_clean = clean_international_phone(phone, country)
                 encoded_msg = urllib.parse.quote(message)
-                wa_url = f"https://wa.me/{phone_clean}?text={encoded_msg}"
+                wa_url = f"https://wa.me/{phone}?text={encoded_msg}"
 
                 st.markdown(
                     f"**{name}** (GHS {balance:.2f} due) – "
@@ -834,8 +867,6 @@ with tabs[4]:
             st.success("✅ No students with unpaid balances.")
     else:
         st.warning("⚠️ Required columns 'Balance' or 'Phone' are missing in your data.")
-
-
 
 
 with tabs[5]:
