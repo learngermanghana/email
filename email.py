@@ -16,24 +16,19 @@ streamlit run email.py
 ```
 """
 
-import streamlit as st
-
-import pandas as pd
-
+# ===== Standard Library Imports =====
+import base64
+import calendar
+import json
 import os
-
+import urllib.parse
 from datetime import date, datetime, timedelta
 
+# ===== Third-Party Imports =====
+import numpy as np
+import pandas as pd
+import streamlit as st
 from fpdf import FPDF
-
-import base64
-
-from sendgrid import SendGridAPIClient
-
-from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
-
-from fpdf import FPDF
-import base64
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import (
     Mail,
@@ -44,15 +39,9 @@ from sendgrid.helpers.mail import (
     Disposition,
 )
 
+# ===== Project-Specific Imports =====
 from utils.pdf_utils import generate_receipt_and_contract_pdf
 from utils.email_utils import send_emails
-import urllib.parse
-
-import calendar
-
-import numpy as np
-
-import json 
 
 
 
