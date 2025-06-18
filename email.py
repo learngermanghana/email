@@ -1,3 +1,22 @@
+"""Learn Language Education Academy Dashboard
+
+This Streamlit app manages student information, issues receipts/contracts,
+sends email notifications, and generates course schedules.
+
+Dependencies
+------------
+* streamlit>=1.14.0
+* pandas>=1.5.0
+* fpdf>=1.7.2
+* sendgrid>=6.9.1
+
+Run the app in a Python 3 environment with these packages installed, e.g.:
+```
+streamlit run email.py
+```
+"""
+
+import streamlit as st
 import streamlit as st
 import pandas as pd
 import os
