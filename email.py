@@ -17,18 +17,43 @@ streamlit run email.py
 """
 
 import streamlit as st
-import streamlit as st
+
 import pandas as pd
+
 import os
+
 from datetime import date, datetime, timedelta
+
+from fpdf import FPDF
+
+import base64
+
+from sendgrid import SendGridAPIClient
+
+from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
+
 from fpdf import FPDF
 import base64
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
+from sendgrid.helpers.mail import (
+    Mail,
+    Attachment,
+    FileContent,
+    FileName,
+    FileType,
+    Disposition,
+)
+
+from utils.pdf_utils import generate_receipt_and_contract_pdf
+from utils.email_utils import send_emails
 import urllib.parse
+
 import calendar
+
 import numpy as np
+
 import json 
+
 
 
 # ===== PAGE CONFIG (must be first Streamlit command!) =====
