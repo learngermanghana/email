@@ -807,12 +807,13 @@ with tabs[4]:
                     contract_start_dt = pd.to_datetime(contract_start, errors="coerce")
                     due_date_dt = contract_start_dt + timedelta(days=30)
                     due_date_fmt = due_date_dt.strftime("%d %B %Y")
+                    due_info = f" Your next payment is due by: {due_date_fmt}."
                 else:
-                    due_date_fmt = "soon"
+                    due_info = ""
 
                 message = (
-                    f"Dear {name}, this is a reminder that your balance for your {level} class is GHS {balance:.2f} "
-                    f"and is due by {due_date_fmt}. Kindly make the payment to continue learning with us. Thank you!\n\n"
+                    f"Dear {name}, you owe GHS {balance:.2f} for your course ({level})."
+                    f"{due_info} Please settle it to remain active.\n\n"
                     "Payment Methods:\n"
                     "1. Mobile Money\n"
                     "   Number: 0245022743\n"
@@ -834,7 +835,6 @@ with tabs[4]:
             st.success("✅ No students with unpaid balances.")
     else:
         st.warning("⚠️ Required columns 'Balance' or 'Phone' are missing in your data.")
-
 
 
 with tabs[5]:
