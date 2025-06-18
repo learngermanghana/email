@@ -1329,124 +1329,120 @@ with tabs[8]:
     st.markdown("---")
     st.header("🎉 Generate Course Brochure (PDF)")
 
-    # ---- Editable Exam Registration Info ----
-    st.markdown("#### Exam Registration Details")
-    exam_reg_date = st.date_input("Exam Registration Date (editable)", value=date.today())
-    exam_reg_fee = st.text_input("Exam Registration Fee (cedis)", value="1000")
 
-    # ---- Improved Brochure Generator ----
-    def generate_brochure_pdf(course_info, schedule_list, filename="brochure.pdf"):
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_auto_page_break(auto=True, margin=15)
-        MAIN_COLOR = (21, 101, 192)
-        SUB_COLOR = (56, 142, 60)
-        pdf.set_font("Arial", 'B', 22)
-        pdf.set_text_color(*MAIN_COLOR)
-        pdf.cell(0, 18, "Learn Language Education Academy", ln=True, align="C")
-        pdf.set_text_color(0,0,0)
-        pdf.set_font("Arial", 'B', 15)
-        pdf.cell(0, 13, f"{course_info['course_level']} German Class Brochure", ln=True, align="C")
-        pdf.ln(2)
-        pdf.set_draw_color(*MAIN_COLOR)
-        pdf.set_line_width(0.7)
-        pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-        pdf.ln(6)
-        pdf.set_font("Arial", '', 12)
-        pdf.set_text_color(0,0,0)
-        pdf.multi_cell(0, 9, course_info["welcome_message"], align="C")
-        pdf.ln(3)
-        pdf.set_font("Arial", 'B', 13)
-        pdf.set_fill_color(*MAIN_COLOR)
-        pdf.set_text_color(255,255,255)
-        pdf.cell(0, 10, "Class Details", ln=True, fill=True)
-        pdf.set_font("Arial", '', 11)
-        pdf.set_text_color(0,0,0)
-        pdf.cell(70, 8, "Start Date:", border=0)
-        pdf.cell(0, 8, course_info['start_date'], ln=True)
-        pdf.cell(70, 8, "End Date:", border=0)
-        pdf.cell(0, 8, course_info['end_date'], ln=True)
-        pdf.cell(70, 8, "Schedule:", border=0)
-        pdf.cell(0, 8, course_info['meeting_times'], ln=True)
-        pdf.cell(70, 8, "Total Fee:", border=0)
-        pdf.cell(0, 8, f"{course_info['fee']} cedis", ln=True)
-        pdf.cell(70, 8, "Book Fee:", border=0)
-        pdf.cell(0, 8, f"{course_info['book_fee']} cedis", ln=True)
-        pdf.ln(4)
-        # Exam registration box
-        pdf.set_fill_color(255, 244, 179)
-        pdf.set_draw_color(*SUB_COLOR)
-        pdf.set_line_width(0.5)
-        y = pdf.get_y()
-        pdf.rect(12, y, 185, 20, 'DF')
-        pdf.set_xy(12, y)
-        pdf.set_font("Arial", 'B', 12)
-        pdf.set_text_color(*SUB_COLOR)
-        pdf.cell(0, 10, "Exam Registration Details", ln=True, align="C")
-        pdf.set_font("Arial", '', 11)
-        pdf.set_text_color(0,0,0)
-        pdf.cell(92, 8, f"Exam Registration Date: {course_info['exam_date']}", ln=False)
-        pdf.cell(0, 8, f"Fee: {course_info['exam_fee']} cedis", ln=True)
-        pdf.ln(5)
-        pdf.set_x(10)
-        pdf.set_font("Arial", 'B', 13)
-        pdf.set_fill_color(*MAIN_COLOR)
-        pdf.set_text_color(255,255,255)
-        pdf.cell(0, 10, "Course Schedule", ln=True, fill=True)
-        pdf.set_text_color(0,0,0)
-        pdf.set_font("Arial", '', 11)
-        for i, item in enumerate(schedule_list, 1):
-            pdf.multi_cell(0, 8, f"{i}. {item}")
-        pdf.ln(3)
-        pdf.set_font("Arial", 'B', 13)
-        pdf.set_fill_color(*SUB_COLOR)
-        pdf.set_text_color(255,255,255)
-        pdf.cell(0, 10, "Why Choose Us?", ln=True, fill=True)
-        pdf.set_text_color(0,0,0)
-        pdf.set_font("Arial", '', 11)
-        for point in course_info["why_choose_us"]:
-            pdf.multi_cell(0, 8, f"• {point}")
-        pdf.ln(3)
-        pdf.set_font("Arial", 'B', 13)
-        pdf.set_fill_color(220,220,220)
-        pdf.set_text_color(0,0,0)
-        pdf.cell(0, 10, "Contact Information", ln=True, fill=True)
-        pdf.set_font("Arial", '', 11)
-        pdf.cell(0, 8, f"📞 Phone: {course_info['phone']}", ln=True)
-        pdf.cell(0, 8, f"✉️ Email: {course_info['email']}", ln=True)
-        pdf.cell(0, 8, f"🌐 Website: {course_info['website']}", ln=True)
-        pdf.cell(0, 8, f"📍 Location: {course_info['location']}", ln=True)
-        pdf.ln(3)
-        pdf.set_text_color(*MAIN_COLOR)
-        pdf.set_font("Arial", 'I', 12)
-        pdf.multi_cell(0, 11, f'“{course_info["motto"]}”', align="C")
-        return pdf.output(dest="S").encode("latin-1")
+ # ---- Editable Fields ----
+start_date = st.date_input("Start Date", value=date.today())
+meeting_time = st.text_input("Class Time (e.g., 11 am – 12 pm)", value="11 am – 12 pm")
+course_fee = st.text_input("Course Fee (cedis)", value="2500")
+book_fee = st.text_input("Book Fee (cedis)", value="800")
+days_of_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+meeting_days = st.multiselect("Meeting Days", options=days_of_week, default=["Monday", "Tuesday", "Wednesday"])
+exam_reg_date = st.date_input("Exam Registration Date", value=date.today())
+exam_reg_fee = st.text_input("Exam Registration Fee (cedis)", value="1000")
 
-    # ---- Compose info from existing tab variables ----
-    course_info = {
-        "course_level": selected_level,
-        "welcome_message": "Learn a new language and open doors to new opportunities! Join our German class and embark on a journey to fluency.",
-        "start_date": start_date.strftime("%A, %d %B %Y"),
-        "end_date": (dates[-1].strftime("%A, %d %B %Y") if dates else ""),
-        "meeting_times": ", ".join([d for d in (days_per_week if not advanced_mode else week_patterns[0][1])]) + ": " + "11 am – 12 pm",
-        "fee": "2500",
-        "book_fee": "800",
-        "exam_date": exam_reg_date.strftime("%A, %d %B %Y"),
-        "exam_fee": exam_reg_fee,
-        "why_choose_us": [
-            "Hybrid Class: Join online or in-person, flexible for busy schedules.",
-            "Advanced Learning Tools: Letter and speaking correction, vocabulary enhancement.",
-            "Recorded Lectures: Access for review or missed classes.",
-            "Experienced Instructors: Highly qualified teachers.",
-            "Digital and Traditional Resources: Choose software or book.",
-        ],
-        "phone": "+233 205 706 589",
-        "email": "learngermanghana@gmail.com",
-        "website": "www.learngermanghana.com",
-        "location": "Awoshie Junction, Greater Accra.",
-        "motto": "Empowering you with the gift of language."
-    }
+# ---- Compose course info ----
+course_info = {
+    "course_level": selected_level,
+    "welcome_message": "Learn a new language and open doors to new opportunities! Join our German class and embark on a journey to fluency.",
+    "start_date": start_date.strftime("%A, %d %B %Y"),
+    "end_date": (dates[-1].strftime("%A, %d %B %Y") if dates else ""),
+    "meeting_times": ", ".join(meeting_days) + ": " + meeting_time,
+    "fee": course_fee,
+    "book_fee": book_fee,
+    "exam_date": exam_reg_date.strftime("%A, %d %B %Y"),
+    "exam_fee": exam_reg_fee,
+    # ... rest stays the same ...
+}
 
-    if st.button("Generate Brochure PDF"):
-        pdf_bytes = generate_brochure_pdf(course_info, [row["Topic"] for row in rows])
-        st.download_button("Download Brochure PDF", data=pdf_bytes, file_name=f"Brochure_{selected_level}.pdf", mime="application/pdf")
+# ---- PDF Helper ----
+def safe_pdf(text):
+    return str(text).encode("latin-1", "replace").decode("latin-1")
+
+# ---- Brochure Generator ----
+def generate_brochure_pdf(course_info, schedule_list, filename="brochure.pdf"):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    MAIN_COLOR = (21, 101, 192)
+    SUB_COLOR = (56, 142, 60)
+    pdf.set_font("Arial", 'B', 22)
+    pdf.set_text_color(*MAIN_COLOR)
+    pdf.cell(0, 18, safe_pdf("Learn Language Education Academy"), ln=True, align="C")
+    pdf.set_text_color(0,0,0)
+    pdf.set_font("Arial", 'B', 15)
+    pdf.cell(0, 13, safe_pdf(f"{course_info['course_level']} German Class Brochure"), ln=True, align="C")
+    pdf.ln(2)
+    pdf.set_draw_color(*MAIN_COLOR)
+    pdf.set_line_width(0.7)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(6)
+    pdf.set_font("Arial", '', 12)
+    pdf.set_text_color(0,0,0)
+    pdf.multi_cell(0, 9, safe_pdf(course_info["welcome_message"]), align="C")
+    pdf.ln(3)
+    pdf.set_font("Arial", 'B', 13)
+    pdf.set_fill_color(*MAIN_COLOR)
+    pdf.set_text_color(255,255,255)
+    pdf.cell(0, 10, safe_pdf("Class Details"), ln=True, fill=True)
+    pdf.set_font("Arial", '', 11)
+    pdf.set_text_color(0,0,0)
+    pdf.cell(70, 8, safe_pdf("Start Date:"), border=0)
+    pdf.cell(0, 8, safe_pdf(course_info['start_date']), ln=True)
+    pdf.cell(70, 8, safe_pdf("End Date:"), border=0)
+    pdf.cell(0, 8, safe_pdf(course_info['end_date']), ln=True)
+    pdf.cell(70, 8, safe_pdf("Schedule:"), border=0)
+    pdf.cell(0, 8, safe_pdf(course_info['meeting_times']), ln=True)
+    pdf.cell(70, 8, safe_pdf("Total Fee:"), border=0)
+    pdf.cell(0, 8, safe_pdf(f"{course_info['fee']} cedis"), ln=True)
+    pdf.cell(70, 8, safe_pdf("Book Fee:"), border=0)
+    pdf.cell(0, 8, safe_pdf(f"{course_info['book_fee']} cedis"), ln=True)
+    pdf.ln(4)
+    # Exam registration box
+    pdf.set_fill_color(255, 244, 179)
+    pdf.set_draw_color(*SUB_COLOR)
+    pdf.set_line_width(0.5)
+    y = pdf.get_y()
+    pdf.rect(12, y, 185, 20, 'DF')
+    pdf.set_xy(12, y)
+    pdf.set_font("Arial", 'B', 12)
+    pdf.set_text_color(*SUB_COLOR)
+    pdf.cell(0, 10, safe_pdf("Exam Registration Details"), ln=True, align="C")
+    pdf.set_font("Arial", '', 11)
+    pdf.set_text_color(0,0,0)
+    pdf.cell(92, 8, safe_pdf(f"Exam Registration Date: {course_info['exam_date']}"), ln=False)
+    pdf.cell(0, 8, safe_pdf(f"Fee: {course_info['exam_fee']} cedis"), ln=True)
+    pdf.ln(5)
+    pdf.set_x(10)
+    pdf.set_font("Arial", 'B', 13)
+    pdf.set_fill_color(*MAIN_COLOR)
+    pdf.set_text_color(255,255,255)
+    pdf.cell(0, 10, safe_pdf("Course Schedule"), ln=True, fill=True)
+    pdf.set_text_color(0,0,0)
+    pdf.set_font("Arial", '', 11)
+    for i, item in enumerate(schedule_list, 1):
+        pdf.multi_cell(0, 8, safe_pdf(f"{i}. {item}"))
+    pdf.ln(3)
+    pdf.set_font("Arial", 'B', 13)
+    pdf.set_fill_color(*SUB_COLOR)
+    pdf.set_text_color(255,255,255)
+    pdf.cell(0, 10, safe_pdf("Why Choose Us?"), ln=True, fill=True)
+    pdf.set_text_color(0,0,0)
+    pdf.set_font("Arial", '', 11)
+    for point in course_info["why_choose_us"]:
+        pdf.multi_cell(0, 8, safe_pdf(f"• {point}"))
+    pdf.ln(3)
+    pdf.set_font("Arial", 'B', 13)
+    pdf.set_fill_color(220,220,220)
+    pdf.set_text_color(0,0,0)
+    pdf.cell(0, 10, safe_pdf("Contact Information"), ln=True, fill=True)
+    pdf.set_font("Arial", '', 11)
+    pdf.cell(0, 8, safe_pdf(f"📞 Phone: {course_info['phone']}"), ln=True)
+    pdf.cell(0, 8, safe_pdf(f"✉️ Email: {course_info['email']}"), ln=True)
+    pdf.cell(0, 8, safe_pdf(f"🌐 Website: {course_info['website']}"), ln=True)
+    pdf.cell(0, 8, safe_pdf(f"📍 Location: {course_info['location']}"), ln=True)
+    pdf.ln(3)
+    pdf.set_text_color(*MAIN_COLOR)
+    pdf.set_font("Arial", 'I', 12)
+    pdf.multi_cell(0, 11, safe_pdf(f'“{course_info["motto"]}”'), align="C")
+    return pdf.output(dest="S").encode("latin-1")
+
