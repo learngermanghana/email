@@ -39,8 +39,8 @@ from sendgrid.helpers.mail import (
 )
 
 # ===== Project-Specific Imports =====
-from utils.pdf_utils import generate_receipt_and_contract_pdf
-from utils.email_utils import send_emails
+from pdf_utils import generate_receipt_and_contract_pdf
+from email_utils import send_emails
 
 
 # ===== PAGE CONFIG (must be first Streamlit command!) =====
