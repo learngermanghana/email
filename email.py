@@ -800,6 +800,7 @@ with tabs[4]:
                 level = row.get("Level", "")
                 balance = float(row.get("Balance", 0.0))
                 phone = row.get("Phone", "")
+                country = row.get("Country", "Ghana")  # Default to Ghana if missing
 
                 contract_start = row.get("ContractStart", "")
                 if contract_start and not pd.isnull(contract_start):
@@ -821,10 +822,7 @@ with tabs[4]:
                     "   Name: Learn Language Education Academy"
                 )
 
-                phone_clean = phone.replace(" ", "").replace("+", "")
-                if phone_clean.startswith("0"):
-                    phone_clean = "233" + phone_clean[1:]
-
+                phone_clean = clean_international_phone(phone, country)
                 encoded_msg = urllib.parse.quote(message)
                 wa_url = f"https://wa.me/{phone_clean}?text={encoded_msg}"
 
@@ -836,6 +834,7 @@ with tabs[4]:
             st.success("✅ No students with unpaid balances.")
     else:
         st.warning("⚠️ Required columns 'Balance' or 'Phone' are missing in your data.")
+
 
 
 with tabs[5]:
