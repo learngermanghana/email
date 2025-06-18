@@ -1326,123 +1326,208 @@ with tabs[8]:
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
 
-    st.markdown("---")
-    st.header("🎉 Generate Course Brochure (PDF)")
+with tabs[8]:
+    import pandas as pd
+    from datetime import timedelta, date
+    from fpdf import FPDF
 
+    # Unicode/language helper
+    def safe_pdf(text):
+        return str(text).encode("latin-1", "replace").decode("latin-1")
 
- # ---- Editable Fields ----
-start_date = st.date_input("Start Date", value=date.today())
-meeting_time = st.text_input("Class Time (e.g., 11 am – 12 pm)", value="11 am – 12 pm")
-course_fee = st.text_input("Course Fee (cedis)", value="2500")
-book_fee = st.text_input("Book Fee (cedis)", value="800")
-days_of_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-meeting_days = st.multiselect("Meeting Days", options=days_of_week, default=["Monday", "Tuesday", "Wednesday"])
-exam_reg_date = st.date_input("Exam Registration Date", value=date.today())
-exam_reg_fee = st.text_input("Exam Registration Fee (cedis)", value="1000")
+    # Schedules for each level (feel free to extend)
+    raw_schedule_a1 = [
+        ("Week One", ["Chapter 0.1 - Lesen & Horen"]),
+        ("Week Two", ["Chapters 0.2 and 1.1 - Lesen & Horen", "Chapter 1.1 - Schreiben & Sprechen and Chapter 1.2 - Lesen & Horen", "Chapter 2 - Lesen & Horen"]),
+        ("Week Three", ["Chapter 1.2 - Schreiben & Sprechen (Recap)", "Chapter 2.3 - Schreiben & Sprechen", "Chapter 3 - Lesen & Horen"]),
+        ("Week Four", ["Chapter 4 - Lesen & Horen", "Chapter 5 - Lesen & Horen", "Chapter 6 - Lesen & Horen and Chapter 2.4 - Schreiben & Sprechen"]),
+        ("Week Five", ["Chapter 7 - Lesen & Horen", "Chapter 8 - Lesen & Horen", "Chapter 3.5 - Schreiben & Sprechen"]),
+        ("Week Six", ["Chapter 3.6 - Schreiben & Sprechen", "Chapter 4.7 - Schreiben & Sprechen", "Chapter 9 and 10 - Lesen & Horen"]),
+        ("Week Seven", ["Chapter 11 - Lesen & Horen", "Chapter 12.1 - Lesen & Horen and Schreiben & Sprechen (including 5.8)", "Chapter 5.9 - Schreiben & Sprechen"]),
+        ("Week Eight", ["Chapter 6.10 - Schreiben & Sprechen (Intro to letter writing)", "Chapter 13 - Lesen & Horen and Chapter 6.11 - Schreiben & Sprechen", "Chapter 14.1 - Lesen & Horen and Chapter 7.12 - Schreiben & Sprechen"]),
+        ("Week Nine", ["Chapter 14.2 - Lesen & Horen and Chapter 7.12 - Schreiben & Sprechen", "Chapter 8.13 - Schreiben & Sprechen", "Exam tips - Schreiben & Sprechen recap"])
+    ]
+    raw_schedule_a2 = [
+        ("Woche 1", ["1.1. Small Talk (Exercise)", "1.2. Personen Beschreiben (Exercise)", "1.3. Dinge und Personen vergleichen"]),
+        ("Woche 2", ["2.4. Wo möchten wir uns treffen?", "2.5. Was machst du in deiner Freizeit?"]),
+        ("Woche 3", ["3.6. Möbel und Räume kennenlernen", "3.7. Eine Wohnung suchen (Übung)", "3.8. Rezepte und Essen (Exercise)"]),
+        ("Woche 4", ["4.9. Urlaub", "4.10. Tourismus und Traditionelle Feste", "4.11. Unterwegs: Verkehrsmittel vergleichen"]),
+        ("Woche 5", ["5.12. Ein Tag im Leben (Übung)", "5.13. Ein Vorstellungsgesprach (Exercise)", "5.14. Beruf und Karriere (Exercise)"]),
+        ("Woche 6", ["6.15. Mein Lieblingssport", "6.16. Wohlbefinden und Entspannung", "6.17. In die Apotheke gehen"]),
+        ("Woche 7", ["7.18. Die Bank Anrufen", "7.19. Einkaufen – Wo und wie? (Exercise)", "7.20. Typische Reklamationssituationen üben"]),
+        ("Woche 8", ["8.21. Ein Wochenende planen", "8.22. Die Woche Plannung"]),
+        ("Woche 9", ["9.23. Wie kommst du zur Schule / zur Arbeit?", "9.24. Einen Urlaub planen", "9.25. Tagesablauf (Exercise)"]),
+        ("Woche 10", ["10.26. Gefühle in verschiedenen Situationen beschr", "10.27. Digitale Kommunikation", "10.28. Über die Zukunft sprechen"])
+    ]
+    raw_schedule_b1 = [
+        ("Woche 1", ["1.1. Traumwelten (Übung)", "1.2. Freundes für Leben (Übung)", "1.3. Erfolgsgeschichten (Übung)"]),
+        ("Woche 2", ["2.4. Wohnung suchen (Übung)", "2.5. Der Besichtigungsg termin (Übung)", "2.6. Leben in der Stadt oder auf dem Land?"]),
+        ("Woche 3", ["3.7. Fast Food vs. Hausmannskost", "3.8. Alles für die Gesundheit", "3.9. Work-Life-Balance im modernen Arbeitsumfeld"]),
+        ("Woche 4", ["4.10. Digitale Auszeit und Selbstfürsorge", "4.11. Teamspiele und Kooperative Aktivitäten", "4.12. Abenteuer in der Natur", "4.13. Eigene Filmkritik schreiben"]),
+        ("Woche 5", ["5.14. Traditionelles vs. digitales Lernen", "5.15. Medien und Arbeiten im Homeoffice", "5.16. Prüfungsangst und Stressbewältigung", "5.17. Wie lernt man am besten?"]),
+        ("Woche 6", ["6.18. Wege zum Wunschberuf", "6.19. Das Vorstellungsgespräch", "6.20. Wie wird man …? (Ausbildung und Qu)"]),
+        ("Woche 7", ["7.21. Lebensformen heute – Familie, Wohnge", "7.22. Was ist dir in einer Beziehung wichtig?", "7.23. Erstes Date – Typische Situationen"]),
+        ("Woche 8", ["8.24. Konsum und Nachhaltigkeit", "8.25. Online einkaufen – Rechte und Risiken"]),
+        ("Woche 9", ["9.26. Reiseprobleme und Lösungen"]),
+        ("Woche 10", ["10.27. Umweltfreundlich im Alltag", "10.28. Klimafreundlich leben"])
+    ]
 
-# ---- Compose course info ----
-course_info = {
-    "course_level": selected_level,
-    "welcome_message": "Learn a new language and open doors to new opportunities! Join our German class and embark on a journey to fluency.",
-    "start_date": start_date.strftime("%A, %d %B %Y"),
-    "end_date": (dates[-1].strftime("%A, %d %B %Y") if dates else ""),
-    "meeting_times": ", ".join(meeting_days) + ": " + meeting_time,
-    "fee": course_fee,
-    "book_fee": book_fee,
-    "exam_date": exam_reg_date.strftime("%A, %d %B %Y"),
-    "exam_fee": exam_reg_fee,
-    # ... rest stays the same ...
-}
+    course_levels = {"A1": raw_schedule_a1, "A2": raw_schedule_a2, "B1": raw_schedule_b1}
+    st.markdown("## 📚 Generate Course Brochure")
+    selected_level = st.selectbox("Course Level", list(course_levels.keys()))
+    topic_structure = course_levels[selected_level]
 
-# ---- PDF Helper ----
-def safe_pdf(text):
-    return str(text).encode("latin-1", "replace").decode("latin-1")
+    # Editable inputs
+    start_date = st.date_input("Start Date", value=date.today())
+    meeting_time = st.text_input("Class Time (e.g., 11 am – 12 pm)", value="11 am – 12 pm")
+    course_fee = st.text_input("Course Fee (cedis)", value="2500")
+    book_fee = st.text_input("Book Fee (cedis)", value="800")
+    days_of_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    meeting_days = st.multiselect("Meeting Days", options=days_of_week, default=["Monday", "Tuesday", "Wednesday"])
+    exam_reg_date = st.date_input("Exam Registration Date", value=date.today())
+    exam_reg_fee = st.text_input("Exam Registration Fee (cedis)", value="1000")
 
-# ---- Brochure Generator ----
-def generate_brochure_pdf(course_info, schedule_list, filename="brochure.pdf"):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_auto_page_break(auto=True, margin=15)
-    MAIN_COLOR = (21, 101, 192)
-    SUB_COLOR = (56, 142, 60)
-    pdf.set_font("Arial", 'B', 22)
-    pdf.set_text_color(*MAIN_COLOR)
-    pdf.cell(0, 18, safe_pdf("Learn Language Education Academy"), ln=True, align="C")
-    pdf.set_text_color(0,0,0)
-    pdf.set_font("Arial", 'B', 15)
-    pdf.cell(0, 13, safe_pdf(f"{course_info['course_level']} German Class Brochure"), ln=True, align="C")
-    pdf.ln(2)
-    pdf.set_draw_color(*MAIN_COLOR)
-    pdf.set_line_width(0.7)
-    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-    pdf.ln(6)
-    pdf.set_font("Arial", '', 12)
-    pdf.set_text_color(0,0,0)
-    pdf.multi_cell(0, 9, safe_pdf(course_info["welcome_message"]), align="C")
-    pdf.ln(3)
-    pdf.set_font("Arial", 'B', 13)
-    pdf.set_fill_color(*MAIN_COLOR)
-    pdf.set_text_color(255,255,255)
-    pdf.cell(0, 10, safe_pdf("Class Details"), ln=True, fill=True)
-    pdf.set_font("Arial", '', 11)
-    pdf.set_text_color(0,0,0)
-    pdf.cell(70, 8, safe_pdf("Start Date:"), border=0)
-    pdf.cell(0, 8, safe_pdf(course_info['start_date']), ln=True)
-    pdf.cell(70, 8, safe_pdf("End Date:"), border=0)
-    pdf.cell(0, 8, safe_pdf(course_info['end_date']), ln=True)
-    pdf.cell(70, 8, safe_pdf("Schedule:"), border=0)
-    pdf.cell(0, 8, safe_pdf(course_info['meeting_times']), ln=True)
-    pdf.cell(70, 8, safe_pdf("Total Fee:"), border=0)
-    pdf.cell(0, 8, safe_pdf(f"{course_info['fee']} cedis"), ln=True)
-    pdf.cell(70, 8, safe_pdf("Book Fee:"), border=0)
-    pdf.cell(0, 8, safe_pdf(f"{course_info['book_fee']} cedis"), ln=True)
-    pdf.ln(4)
-    # Exam registration box
-    pdf.set_fill_color(255, 244, 179)
-    pdf.set_draw_color(*SUB_COLOR)
-    pdf.set_line_width(0.5)
-    y = pdf.get_y()
-    pdf.rect(12, y, 185, 20, 'DF')
-    pdf.set_xy(12, y)
-    pdf.set_font("Arial", 'B', 12)
-    pdf.set_text_color(*SUB_COLOR)
-    pdf.cell(0, 10, safe_pdf("Exam Registration Details"), ln=True, align="C")
-    pdf.set_font("Arial", '', 11)
-    pdf.set_text_color(0,0,0)
-    pdf.cell(92, 8, safe_pdf(f"Exam Registration Date: {course_info['exam_date']}"), ln=False)
-    pdf.cell(0, 8, safe_pdf(f"Fee: {course_info['exam_fee']} cedis"), ln=True)
-    pdf.ln(5)
-    pdf.set_x(10)
-    pdf.set_font("Arial", 'B', 13)
-    pdf.set_fill_color(*MAIN_COLOR)
-    pdf.set_text_color(255,255,255)
-    pdf.cell(0, 10, safe_pdf("Course Schedule"), ln=True, fill=True)
-    pdf.set_text_color(0,0,0)
-    pdf.set_font("Arial", '', 11)
-    for i, item in enumerate(schedule_list, 1):
-        pdf.multi_cell(0, 8, safe_pdf(f"{i}. {item}"))
-    pdf.ln(3)
-    pdf.set_font("Arial", 'B', 13)
-    pdf.set_fill_color(*SUB_COLOR)
-    pdf.set_text_color(255,255,255)
-    pdf.cell(0, 10, safe_pdf("Why Choose Us?"), ln=True, fill=True)
-    pdf.set_text_color(0,0,0)
-    pdf.set_font("Arial", '', 11)
-    for point in course_info["why_choose_us"]:
-        pdf.multi_cell(0, 8, safe_pdf(f"• {point}"))
-    pdf.ln(3)
-    pdf.set_font("Arial", 'B', 13)
-    pdf.set_fill_color(220,220,220)
-    pdf.set_text_color(0,0,0)
-    pdf.cell(0, 10, safe_pdf("Contact Information"), ln=True, fill=True)
-    pdf.set_font("Arial", '', 11)
-    pdf.cell(0, 8, safe_pdf(f"📞 Phone: {course_info['phone']}"), ln=True)
-    pdf.cell(0, 8, safe_pdf(f"✉️ Email: {course_info['email']}"), ln=True)
-    pdf.cell(0, 8, safe_pdf(f"🌐 Website: {course_info['website']}"), ln=True)
-    pdf.cell(0, 8, safe_pdf(f"📍 Location: {course_info['location']}"), ln=True)
-    pdf.ln(3)
-    pdf.set_text_color(*MAIN_COLOR)
-    pdf.set_font("Arial", 'I', 12)
-    pdf.multi_cell(0, 11, safe_pdf(f'“{course_info["motto"]}”'), align="C")
-    return pdf.output(dest="S").encode("latin-1")
+    # Schedule logic (same as before)
+    week_patterns = [(len(sessions), meeting_days) for _, sessions in topic_structure]
+    total_sessions = sum([wp[0] for wp in week_patterns])
+    session_labels = [(w, s) for w, sess in topic_structure for s in sess]
+    dates = []
+    cur = start_date
+    for num_classes, week_days in week_patterns:
+        week_dates = []
+        while len(week_dates) < num_classes:
+            if cur.strftime("%A") in week_days:
+                week_dates.append(cur)
+            cur += timedelta(days=1)
+        dates.extend(week_dates)
+
+    # Prepare rows for preview and PDF
+    rows = [{"Week": wl, "Day": f"Day {i+1}", "Date": d.strftime("%A, %d %B %Y"), "Topic": tp}
+            for i, ((wl, tp), d) in enumerate(zip(session_labels, dates))]
+    # For brochure, we just need the topics with dates
+    schedule_list = [f"{row['Day']} ({row['Date']}): {row['Topic']}" for row in rows]
+
+    # Automatically determined end date
+    end_date = dates[-1] if dates else start_date
+
+    st.markdown("### Schedule Preview")
+    st.dataframe(pd.DataFrame(rows), use_container_width=True)
+
+    # PDF generator function
+    def generate_brochure_pdf(course_info, schedule_list):
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_auto_page_break(auto=True, margin=15)
+        MAIN_COLOR = (21, 101, 192)
+        SUB_COLOR = (56, 142, 60)
+        pdf.set_font("Arial", 'B', 22)
+        pdf.set_text_color(*MAIN_COLOR)
+        pdf.cell(0, 18, safe_pdf("Learn Language Education Academy"), ln=True, align="C")
+        pdf.set_text_color(0,0,0)
+        pdf.set_font("Arial", 'B', 15)
+        pdf.cell(0, 13, safe_pdf(f"{course_info['course_level']} German Class Brochure"), ln=True, align="C")
+        pdf.ln(2)
+        pdf.set_draw_color(*MAIN_COLOR)
+        pdf.set_line_width(0.7)
+        pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+        pdf.ln(6)
+        pdf.set_font("Arial", '', 12)
+        pdf.set_text_color(0,0,0)
+        pdf.multi_cell(0, 9, safe_pdf(course_info["welcome_message"]), align="C")
+        pdf.ln(3)
+        pdf.set_font("Arial", 'B', 13)
+        pdf.set_fill_color(*MAIN_COLOR)
+        pdf.set_text_color(255,255,255)
+        pdf.cell(0, 10, safe_pdf("Class Details"), ln=True, fill=True)
+        pdf.set_font("Arial", '', 11)
+        pdf.set_text_color(0,0,0)
+        pdf.cell(70, 8, safe_pdf("Start Date:"), border=0)
+        pdf.cell(0, 8, safe_pdf(course_info['start_date']), ln=True)
+        pdf.cell(70, 8, safe_pdf("End Date:"), border=0)
+        pdf.cell(0, 8, safe_pdf(course_info['end_date']), ln=True)
+        pdf.cell(70, 8, safe_pdf("Schedule:"), border=0)
+        pdf.cell(0, 8, safe_pdf(course_info['meeting_times']), ln=True)
+        pdf.cell(70, 8, safe_pdf("Total Fee:"), border=0)
+        pdf.cell(0, 8, safe_pdf(f"{course_info['fee']} cedis"), ln=True)
+        pdf.cell(70, 8, safe_pdf("Book Fee:"), border=0)
+        pdf.cell(0, 8, safe_pdf(f"{course_info['book_fee']} cedis"), ln=True)
+        pdf.ln(4)
+        # Exam registration box
+        pdf.set_fill_color(255, 244, 179)
+        pdf.set_draw_color(*SUB_COLOR)
+        pdf.set_line_width(0.5)
+        y = pdf.get_y()
+        pdf.rect(12, y, 185, 20, 'DF')
+        pdf.set_xy(12, y)
+        pdf.set_font("Arial", 'B', 12)
+        pdf.set_text_color(*SUB_COLOR)
+        pdf.cell(0, 10, safe_pdf("Exam Registration Details"), ln=True, align="C")
+        pdf.set_font("Arial", '', 11)
+        pdf.set_text_color(0,0,0)
+        pdf.cell(92, 8, safe_pdf(f"Exam Registration Date: {course_info['exam_date']}"), ln=False)
+        pdf.cell(0, 8, safe_pdf(f"Fee: {course_info['exam_fee']} cedis"), ln=True)
+        pdf.ln(5)
+        pdf.set_x(10)
+        pdf.set_font("Arial", 'B', 13)
+        pdf.set_fill_color(*MAIN_COLOR)
+        pdf.set_text_color(255,255,255)
+        pdf.cell(0, 10, safe_pdf("Course Schedule"), ln=True, fill=True)
+        pdf.set_text_color(0,0,0)
+        pdf.set_font("Arial", '', 11)
+        for i, item in enumerate(schedule_list, 1):
+            pdf.multi_cell(0, 8, safe_pdf(f"{i}. {item}"))
+        pdf.ln(3)
+        pdf.set_font("Arial", 'B', 13)
+        pdf.set_fill_color(*SUB_COLOR)
+        pdf.set_text_color(255,255,255)
+        pdf.cell(0, 10, safe_pdf("Why Choose Us?"), ln=True, fill=True)
+        pdf.set_text_color(0,0,0)
+        pdf.set_font("Arial", '', 11)
+        for point in course_info["why_choose_us"]:
+            pdf.multi_cell(0, 8, safe_pdf(f"• {point}"))
+        pdf.ln(3)
+        pdf.set_font("Arial", 'B', 13)
+        pdf.set_fill_color(220,220,220)
+        pdf.set_text_color(0,0,0)
+        pdf.cell(0, 10, safe_pdf("Contact Information"), ln=True, fill=True)
+        pdf.set_font("Arial", '', 11)
+        pdf.cell(0, 8, safe_pdf(f"📞 Phone: {course_info['phone']}"), ln=True)
+        pdf.cell(0, 8, safe_pdf(f"✉️ Email: {course_info['email']}"), ln=True)
+        pdf.cell(0, 8, safe_pdf(f"🌐 Website: {course_info['website']}"), ln=True)
+        pdf.cell(0, 8, safe_pdf(f"📍 Location: {course_info['location']}"), ln=True)
+        pdf.ln(3)
+        pdf.set_text_color(*MAIN_COLOR)
+        pdf.set_font("Arial", 'I', 12)
+        pdf.multi_cell(0, 11, safe_pdf(f'“{course_info["motto"]}”'), align="C")
+        return pdf.output(dest="S").encode("latin-1")
+
+    # Compose info for PDF
+    course_info = {
+        "course_level": selected_level,
+        "welcome_message": "Learn a new language and open doors to new opportunities! Join our German class and embark on a journey to fluency.",
+        "start_date": start_date.strftime("%A, %d %B %Y"),
+        "end_date": end_date.strftime("%A, %d %B %Y"),
+        "meeting_times": ", ".join(meeting_days) + ": " + meeting_time,
+        "fee": course_fee,
+        "book_fee": book_fee,
+        "exam_date": exam_reg_date.strftime("%A, %d %B %Y"),
+        "exam_fee": exam_reg_fee,
+        "why_choose_us": [
+            "Hybrid Class: Join online or in-person, flexible for busy schedules.",
+            "Advanced Learning Tools: Letter and speaking correction, vocabulary enhancement.",
+            "Recorded Lectures: Access for review or missed classes.",
+            "Experienced Instructors: Highly qualified teachers.",
+            "Digital and Traditional Resources: Choose software or book.",
+        ],
+        "phone": "+233 205 706 589",
+        "email": "learngermanghana@gmail.com",
+        "website": "www.learngermanghana.com",
+        "location": "Awoshie Junction, Greater Accra.",
+        "motto": "Empowering you with the gift of language."
+    }
+
+    # Download button!
+    if st.button("Generate Brochure PDF"):
+        pdf_bytes = generate_brochure_pdf(course_info, schedule_list)
+        st.download_button("Download Brochure PDF", data=pdf_bytes, file_name=f"Brochure_{selected_level}.pdf", mime="application/pdf")
 
