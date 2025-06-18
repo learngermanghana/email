@@ -42,6 +42,7 @@ from sendgrid.helpers.mail import (
 from pdf_utils import generate_receipt_and_contract_pdf
 from email_utils import send_emails
 
+
 # ===== Helper Functions =====
 def clean_phone(phone):
     """
