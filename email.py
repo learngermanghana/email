@@ -807,28 +807,19 @@ with tabs[4]:
                     contract_start_dt = pd.to_datetime(contract_start, errors="coerce")
                     due_date_dt = contract_start_dt + timedelta(days=30)
                     due_date_fmt = due_date_dt.strftime("%d %B %Y")
-                    due_info = f"\nYour next payment is due by: {due_date_fmt}."
                 else:
-                    due_info = ""
+                    due_date_fmt = "soon"
 
-                # Payment options (feel free to edit/add more)
-                payment_methods = (
-                    "\n\nPayment Methods:\n"
-                    "1. Mobile Money (Ghana)\n"
+                message = (
+                    f"Dear {name}, this is a reminder that your balance for your {level} class is GHS {balance:.2f} "
+                    f"and is due by {due_date_fmt}. Kindly make the payment to continue learning with us. Thank you!\n\n"
+                    "Payment Methods:\n"
+                    "1. Mobile Money\n"
                     "   Number: 0245022743\n"
                     "   Name: Felix Asadu\n"
                     "2. Access Bank (Cedis)\n"
                     "   Account Number: 1050000008017\n"
-                    "   Name: Learn Language Education Academy\n"
-                    "3. WorldRemit or Wave (International)\n"
-                    "   Number: 0545588681 (Name: Felix Asadu)\n"
-                    "4. Bank Transfer (Contact us for IBAN/SWIFT if outside Ghana)\n"
-                )
-
-                message = (
-                    f"Dear {name}, you owe GHS {balance:.2f} for your course ({level})."
-                    f"{due_info}\nPlease settle it to remain active."
-                    f"{payment_methods}"
+                    "   Name: Learn Language Education Academy"
                 )
 
                 phone_clean = clean_international_phone(phone, country)
@@ -843,6 +834,7 @@ with tabs[4]:
             st.success("✅ No students with unpaid balances.")
     else:
         st.warning("⚠️ Required columns 'Balance' or 'Phone' are missing in your data.")
+
 
 
 
