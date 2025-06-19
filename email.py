@@ -1327,29 +1327,22 @@ with tabs[8]:
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
 
-import os
-from datetime import date, timedelta
-from fpdf import FPDF
-import streamlit as st
-
-# Utility to handle non-ASCII characters safely in PDF
 def safe_pdf(text):
     return str(text).encode("latin-1", "replace").decode("latin-1")
 
 class BrochurePDF(FPDF):
     def header(self):
-        # Blue sidebar full page height
+        # Blue sidebar full page (A4 portrait: 297mm height)
         self.set_fill_color(21, 101, 192)
-        self.rect(0, 0, 10, self.h, 'F')
+        self.rect(8, 0, 7, 297, 'F')  # sidebar left, full height
 
-        # Logo, if available
+        # Logo if present
         if hasattr(self, "logo_path") and self.logo_path and os.path.exists(self.logo_path):
             try:
-                self.image(self.logo_path, x=15, y=12, w=34)
+                self.image(self.logo_path, x=25, y=12, w=34)
             except Exception:
                 pass
-
-        # Title to the right of sidebar
+        # Move to the right for the title
         self.set_xy(45, 15)
         self.set_text_color(21, 101, 192)
         self.set_font("Arial", 'B', 20)
@@ -1357,198 +1350,173 @@ class BrochurePDF(FPDF):
         self.ln(2)
 
     def footer(self):
-        # Position cursor for footer content
-        self.set_y(-25)
-        # Inspirational motto
+        self.set_y(-23)
         self.set_font("Arial", 'I', 9)
         self.set_text_color(21, 101, 192)
-        self.cell(0, 6, safe_pdf("“Empowering you with the gift of language.”"), ln=1, align="C")
-        # Page number
+        self.cell(0, 8, safe_pdf("“Empowering you with the gift of language.”"), ln=1, align="C")
         self.set_font("Arial", '', 8)
-        self.set_text_color(150, 150, 150)
-        self.cell(0, 6, f"Page {self.page_no()}", ln=1, align="C")
+        self.set_text_color(150,150,150)
+        self.cell(0, 6, f"Page {self.page_no()}", align="C")
 
-        # Social media icons and links
-        icon_size = 6  # mm
-        spacing = 28  # horizontal spacing
-        x_start = 20
-        y_icon = self.h - 12
+def generate_brochure_pdf(course_info, logo_path="logo.png"):
+    pdf = BrochurePDF()
+    pdf.logo_path = logo_path
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
 
-        social = getattr(self, 'social_links', {})
-        for platform, icon_file in [('Facebook', 'facebook.png'),
-                                    ('Instagram', 'instagram.png'),
-                                    ('WhatsApp', 'whatsapp.png')]:
-            link = social.get(platform.lower())
-            if link and os.path.exists(icon_file):
-                # Draw icon
-                try:
-                    self.image(icon_file, x=x_start, y=y_icon, w=icon_size)
-                except Exception:
-                    pass
-            # Draw link text next to icon
-            self.set_xy(x_start + icon_size + 1, y_icon + icon_size/2 - 2)
-            self.set_font("Arial", '', 8)
-            self.set_text_color(0, 0, 128)
-            self.cell(spacing, 4, safe_pdf(link or ''), ln=0)
-            x_start += spacing
+    # Welcome and History
+    pdf.set_x(20)
+    pdf.set_font("Arial", 'B', 13)
+    pdf.cell(0, 10, safe_pdf("Welcome!"), ln=True)
+    pdf.set_x(20)
+    pdf.set_font("Arial", '', 11)
+    pdf.multi_cell(0, 8, safe_pdf(course_info.get("welcome_message", "")))
+    pdf.ln(2)
 
-class BrochurePDFBuilder:
-    @staticmethod
-    def generate(course_info, logo_path=None, social_links=None):
-        pdf = BrochurePDF()
-        pdf.logo_path = logo_path
-        pdf.social_links = social_links or {}
-        pdf.add_page()
-        pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.set_x(20)
+    pdf.set_font("Arial", 'B', 13)
+    pdf.set_fill_color(240,240,240)
+    pdf.cell(0, 10, safe_pdf("Our Story"), ln=True, fill=True)
+    pdf.set_x(20)
+    pdf.set_font("Arial", '', 11)
+    pdf.set_text_color(0,0,0)
+    pdf.multi_cell(0, 8, safe_pdf(
+        course_info.get("history", 
+        "Founded in 2019 in Accra, Learn Language Education Academy has empowered over 300 students to achieve their German language goals and pass official Goethe-Institut exams. Our mission is to combine digital innovation with expert teaching and personalized support.")
+    ))
+    pdf.ln(3)
 
-        # Welcome Section
-        pdf.set_x(20)
-        pdf.set_font("Arial", 'B', 13)
-        pdf.cell(0, 10, safe_pdf("Welcome!"), ln=True)
-        pdf.set_x(20)
-        pdf.set_font("Arial", '', 11)
-        pdf.multi_cell(0, 8, safe_pdf(course_info.get("welcome_message", "")))
-        pdf.ln(2)
+    # Class Details
+    pdf.set_x(20)
+    pdf.set_font("Arial", 'B', 13)
+    pdf.set_fill_color(21, 101, 192)
+    pdf.set_text_color(255,255,255)
+    pdf.cell(0, 10, safe_pdf("Class Details"), ln=True, fill=True)
+    pdf.set_x(20)
+    pdf.set_font("Arial", '', 11)
+    pdf.set_text_color(0,0,0)
+    details = [
+        ("Course Level:", course_info['course_level']),
+        ("Start Date:", course_info['start_date']),
+        ("End Date:", course_info['end_date']),
+        ("Meeting Days:", course_info['meeting_days']),
+        ("Class Time:", course_info['meeting_time']),
+    ]
+    for k, v in details:
+        pdf.set_x(22)
+        pdf.cell(50, 8, safe_pdf(k), border=0)
+        pdf.cell(0, 8, safe_pdf(v), ln=True)
+    pdf.ln(2)
 
-        # History Section
-        pdf.set_x(20)
-        pdf.set_font("Arial", 'B', 13)
-        pdf.set_fill_color(240, 240, 240)
-        pdf.cell(0, 10, safe_pdf("Our Story"), ln=True, fill=True)
-        pdf.set_x(20)
-        pdf.set_font("Arial", '', 11)
-        pdf.multi_cell(0, 8, safe_pdf(course_info.get("history", "")))
-        pdf.ln(3)
+    # Fees Section
+    pdf.set_x(20)
+    pdf.set_fill_color(255, 235, 59)  # yellow
+    y_fee = pdf.get_y()
+    pdf.rect(20, y_fee, 175, 23, 'F')
+    pdf.set_xy(22, y_fee+2)
+    pdf.set_font("Arial", 'B', 12)
+    pdf.set_text_color(183, 28, 28)
+    pdf.cell(0, 8, safe_pdf("Course Fee: 2,800 cedis (includes installation of our software with all course materials)"), ln=True)
+    pdf.set_x(24)
+    pdf.set_font("Arial", '', 10)
+    pdf.set_text_color(0,0,0)
+    pdf.cell(0, 7, safe_pdf("• If you also want a printed course book, add 800 cedis."), ln=True)
+    pdf.set_x(24)
+    pdf.cell(0, 7, safe_pdf("• You can use just the software to save cost, or buy the book if you prefer."), ln=True)
+    pdf.ln(7)
 
-        # Class Details
-        pdf.set_x(20)
-        pdf.set_font("Arial", 'B', 13)
-        pdf.set_fill_color(21, 101, 192)
-        pdf.set_text_color(255, 255, 255)
-        pdf.cell(0, 10, safe_pdf("Class Details"), ln=True, fill=True)
-        pdf.set_x(20)
-        pdf.set_font("Arial", '', 11)
-        pdf.set_text_color(0, 0, 0)
-        for label, value in [
-            ("Course Level:", course_info['course_level']),
-            ("Start Date:", course_info['start_date']),
-            ("End Date:", course_info['end_date']),
-            ("Meeting Days:", course_info['meeting_days']),
-            ("Class Time:", course_info['meeting_time']),
-        ]:
-            pdf.set_x(22)
-            pdf.cell(50, 8, safe_pdf(label), border=0)
-            pdf.cell(0, 8, safe_pdf(value), ln=True)
-        pdf.ln(2)
+    # Payment Details Box
+    pdf.set_x(20)
+    pdf.set_fill_color(232, 245, 233)
+    y1 = pdf.get_y()
+    pdf.rect(20, y1, 175, 26, 'F')
+    pdf.set_xy(22, y1+2)
+    pdf.set_font("Arial", 'B', 12)
+    pdf.set_text_color(56, 142, 60)
+    pdf.cell(0, 10, safe_pdf("Payment Details"), ln=True, align="C")
+    pdf.set_font("Arial", '', 11)
+    pdf.set_text_color(0,0,0)
+    pdf.set_x(26)
+    pdf.cell(0, 8, safe_pdf("• Mobile Money: 0245022743 (Felix Asadu)"), ln=True)
+    pdf.set_x(26)
+    pdf.cell(0, 8, safe_pdf("• Bank: Access Bank (Cedis)"), ln=True)
+    pdf.set_x(26)
+    pdf.cell(0, 8, safe_pdf("• Account Number: 1050000008017"), ln=True)
+    pdf.set_x(26)
+    pdf.cell(0, 8, safe_pdf("• Account Name: Learn Language Education Academy"), ln=True)
+    pdf.ln(2)
 
-        # Fees Section
-        y_fee = pdf.get_y()
-        pdf.set_fill_color(255, 235, 59)
-        pdf.rect(20, y_fee, 175, 21, 'F')
-        pdf.set_xy(22, y_fee + 2)
-        pdf.set_font("Arial", 'B', 12)
-        pdf.set_text_color(183, 28, 28)
-        pdf.cell(0, 8, safe_pdf("Course Fee: 2,800 cedis (includes software with ALL course materials)"), ln=True)
+    # Exam Registration Box
+    pdf.set_x(20)
+    pdf.set_fill_color(255, 244, 179)
+    y0 = pdf.get_y()
+    pdf.rect(20, y0, 175, 29, 'F')
+    pdf.set_xy(22, y0+2)
+    pdf.set_font("Arial", 'B', 12)
+    pdf.set_text_color(56, 142, 60)
+    pdf.cell(0, 10, safe_pdf("Exam Registration (Goethe-Institut Accra)"), ln=True, align="C")
+    pdf.set_font("Arial", '', 11)
+    pdf.set_text_color(0,0,0)
+    pdf.set_x(28)
+    pdf.cell(0, 8, safe_pdf(f"• Exam Registration Date: {course_info['exam_date']}"), ln=True)
+    pdf.set_x(28)
+    pdf.cell(0, 8, safe_pdf(f"• Exam Fee: {course_info['exam_fee']} cedis"), ln=True)
+    pdf.set_x(28)
+    pdf.set_text_color(200, 0, 0)
+    pdf.set_font("Arial", 'I', 10)
+    pdf.cell(0, 7, safe_pdf("This fee is paid directly to Goethe-Institut Accra, not to the school."), ln=True)
+    pdf.set_text_color(0,0,0)
+    pdf.set_font("Arial", '', 11)
+    pdf.ln(2)
+
+    # Why Choose Us
+    pdf.set_x(20)
+    pdf.set_font("Arial", 'B', 13)
+    pdf.set_fill_color(56, 142, 60)
+    pdf.set_text_color(255,255,255)
+    pdf.cell(0, 10, safe_pdf("Why Choose Us?"), ln=True, fill=True)
+    pdf.set_text_color(0,0,0)
+    pdf.set_font("Arial", '', 11)
+    for point in course_info["why_choose_us"]:
         pdf.set_x(24)
-        pdf.set_font("Arial", '', 10)
-        pdf.multi_cell(0, 7, safe_pdf("• If you also want a printed course book, add 800 cedis.\n• You can use only the software to save cost, but you may buy the book if you prefer."))
-        pdf.ln(7)
+        pdf.cell(0, 8, safe_pdf(f"• {point}"), ln=True)
+    pdf.ln(3)
 
-        # Payment Details
-        y_pay = pdf.get_y()
-        pdf.set_fill_color(232, 245, 233)
-        pdf.rect(20, y_pay, 175, 26, 'F')
-        pdf.set_xy(22, y_pay + 2)
-        pdf.set_font("Arial", 'B', 12)
-        pdf.set_text_color(56, 142, 60)
-        pdf.cell(0, 10, safe_pdf("Payment Details"), ln=True, align="C")
-        pdf.set_font("Arial", '', 11)
-        for line in [
-            "Mobile Money: 0245022743 (Felix Asadu)",
-            "Bank: Access Bank (Cedis)",
-            "Account Number: 1050000008017",
-            "Account Name: Learn Language Education Academy"
-        ]:
-            pdf.set_x(26)
-            pdf.cell(0, 8, safe_pdf(f"• {line}"), ln=True)
-        pdf.ln(2)
+    # Contact Info
+    pdf.set_x(20)
+    pdf.set_font("Arial", 'B', 13)
+    pdf.set_fill_color(220,220,220)
+    pdf.set_text_color(0,0,0)
+    pdf.cell(0, 10, safe_pdf("Contact Information"), ln=True, fill=True)
+    pdf.set_x(24)
+    pdf.set_font("Arial", '', 11)
+    pdf.cell(0, 8, safe_pdf(f"• Phone: {course_info['phone']}"), ln=True)
+    pdf.set_x(24)
+    pdf.cell(0, 8, safe_pdf(f"• Email: {course_info['email']}"), ln=True)
+    pdf.set_x(24)
+    pdf.cell(0, 8, safe_pdf(f"• Website: {course_info['website']}"), ln=True)
+    pdf.set_x(24)
+    pdf.cell(0, 8, safe_pdf(f"• Location: {course_info['location']}"), ln=True)
+    pdf.ln(3)
 
-        # Exam Registration
-        y_exam = pdf.get_ymy() if hasattr(pdf, 'get_ymy') else pdf.get_y()
-        pdf.set_fill_color(255, 244, 179)
-        pdf.rect(20, y_exam, 175, 27, 'F')
-        pdf.set_xy(22, y_exam + 2)
-        pdf.set_font("Arial", 'B', 12)
-        pdf.set_text_color(56, 142, 60)
-        pdf.cell(0, 10, safe_pdf("Exam Registration (Goethe-Institut Accra)"), ln=True, align="C")
-        pdf.set_font("Arial", '', 11)
-        pdf.multi_cell(0, 8, safe_pdf(f"• Exam Registration Date: {course_info['exam_date']}\n• Exam Fee: {course_info['exam_fee']} cedis"))
-        pdf.set_text_color(200, 0, 0)
-        pdf.set_font("Arial", 'I', 10)
-        pdf.multi_cell(0, 7, safe_pdf("This fee is paid directly to Goethe-Institut Accra, not to the school."))
-        pdf.set_text_color(0, 0, 0)
-        pdf.ln(2)
-
-        # Why Choose Us
-        pdf.set_x(20)
-        pdf.set_font("Arial", 'B', 13)
-        pdf.set_fill_color(56, 142, 60)
-        pdf.set_text_color(255, 255, 255)
-        pdf.cell(0, 10, safe_pdf("Why Choose Us?"), ln=True, fill=True)
-        pdf.set_font("Arial", '', 11)
-        pdf.set_text_color(0, 0, 0)
-        for point in course_info.get("why_choose_us", []):
-            pdf.set_x(24)
-            pdf.cell(0, 8, safe_pdf(f"• {point}"), ln=True)
-        pdf.ln(3)
-
-        # Contact Information
-        pdf.set_x(20)
-        pdf.set_font("Arial", 'B', 13)
-        pdf.set_fill_color(220, 220, 220)
-        pdf.set_text_color(0, 0, 0)
-        pdf.cell(0, 10, safe_pdf("Contact Information"), ln=True, fill=True)
-        pdf.set_font("Arial", '', 11)
-        for line in [
-            f"Phone: {course_info.get('phone')}" ,
-            f"Email: {course_info.get('email')}" ,
-            f"Website: {course_info.get('website')}" ,
-            f"Location: {course_info.get('location')}" 
-        ]:
-            pdf.set_x(24)
-            pdf.cell(0, 8, safe_pdf(f"• {line}"), ln=True)
-
-        return pdf.output(dest="S").encode("latin-1")
+    return pdf.output(dest="S").encode("latin-1")
 
 # --- Streamlit UI ---
 st.markdown("## 📑 Course Brochure Designer")
 st.info("Fill in the course details below. All info will appear in the brochure.")
 
-colA, colB = st.columns([2, 2])
+colA, colB = st.columns([2,2])
 with colA:
     selected_level = st.selectbox("Course Level", ["A1", "A2", "B1"], help="Choose the level of the German course.")
     start_date = st.date_input("Start Date", value=date.today())
-    meeting_days = st.multiselect(
-        "Meeting Days",
-        options=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-        default=["Monday", "Tuesday", "Wednesday"]
-    )
+    meeting_days = st.multiselect("Meeting Days", options=["Monday","Tuesday","Wednesday","Thursday","Friday"], default=["Monday", "Tuesday", "Wednesday"])
     meeting_time = st.text_input("Class Time", value="11 am – 12 pm")
-
 with colB:
     exam_reg_date = st.date_input("Exam Registration Date", value=date.today())
     exam_reg_fee = st.text_input("Exam Registration Fee (cedis)", value="1000")
 
-history = st.text_area(
-    "Our Story (school history)",
-    value=course_info.get("history", ""),
-    height=80
-)
-why_choose_us = st.text_area(
-    "Why Choose Us? (one point per line)",
-    value="\n".join(course_info.get("why_choose_us", [])),
-    height=80
-)
+history = st.text_area("Our Story (school history)", value="Founded in 2019 in Accra, Learn Language Education Academy has empowered over 300 students to achieve their German language goals and pass official Goethe-Institut exams. Our mission is to combine digital innovation with expert teaching and personalized support.", height=80)
+why_choose_us = st.text_area("Why Choose Us? (one point per line)", value="Hybrid Class: Join online or in-person, flexible for busy schedules.\nAdvanced Learning Tools: Letter and speaking correction, vocabulary enhancement.\nRecorded Lectures: Access for review or missed classes.\nExperienced Instructors: Highly qualified teachers.\nDigital and Traditional Resources: Choose software or book.", height=80)
 
 end_date = start_date + timedelta(weeks=9)
 
@@ -1559,6 +1527,8 @@ course_info = {
     "end_date": end_date.strftime("%A, %d %B %Y"),
     "meeting_days": ", ".join(meeting_days),
     "meeting_time": meeting_time,
+    "fee": "2800",
+    "book_fee": "800",
     "exam_date": exam_reg_date.strftime("%A, %d %B %Y"),
     "exam_fee": exam_reg_fee,
     "why_choose_us": [point.strip() for point in why_choose_us.splitlines() if point.strip()],
@@ -1566,24 +1536,11 @@ course_info = {
     "phone": "+233 205 706 589",
     "email": "learngermanghana@gmail.com",
     "website": "www.learngermanghana.com",
-    "location": "Awoshie Junction, Greater Accra."
-}
-
-# Example social links dict; update via UI if desired
-social_links = {
-    'facebook': 'https://www.facebook.com/YourAcademyPage',
-    'instagram': 'https://www.instagram.com/YourAcademy',
-    'whatsapp': 'https://api.whatsapp.com/send?phone=233205706589'
+    "location": "Awoshie Junction, Greater Accra.",
+    "motto": "Empowering you with the gift of language."
 }
 
 if st.button("🎉 Generate Brochure PDF"):
-    pdf_bytes = BrochurePDFBuilder.generate(course_info, logo_path="logo.png", social_links=social_links)
+    pdf_bytes = generate_brochure_pdf(course_info, logo_path="logo.png")
     st.success("✅ Brochure ready! Download below.")
-    st.download_button(
-        "⬇️ Download Brochure PDF",
-        data=pdf_bytes,
-        file_name=f"Brochure_{selected_level}.pdf",
-        mime="application/pdf"
-    )
-
-
+    st.download_button("⬇️ Download Brochure PDF", data=pdf_bytes, file_name=f"Brochure_{selected_level}.pdf", mime="application/pdf")
