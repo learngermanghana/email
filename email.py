@@ -1327,6 +1327,10 @@ with tabs[8]:
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
 
+from fpdf import FPDF
+from datetime import timedelta
+import os
+
 def safe_pdf(text):
     return str(text).encode("latin-1", "replace").decode("latin-1")
 
