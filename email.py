@@ -1340,17 +1340,18 @@ class BrochurePDF(FPDF):
         self.set_fill_color(21, 101, 192)
         self.rect(8, 0, 7, 297, 'F')  # sidebar left, full height
 
-        # Logo if present
-        if hasattr(self, "logo_path") and self.logo_path and os.path.exists(self.logo_path):
+        # Logo: Only on the first page, at the top left (just after the blue bar)
+        if self.page_no() == 1 and hasattr(self, "logo_path") and self.logo_path and os.path.exists(self.logo_path):
             try:
-                self.image(self.logo_path, x=25, y=12, w=34)
+                # Adjust x (horizontal) and y (vertical) for perfect alignment
+                self.image(self.logo_path, x=18, y=12, w=28)
             except Exception:
                 pass
-        # Move to the right for the title
-        self.set_xy(45, 15)
+        # Title next to logo
+        self.set_xy(50, 17)  # x=50, y=17 is just to the right and a bit down from the logo
         self.set_text_color(21, 101, 192)
         self.set_font("Arial", 'B', 20)
-        self.cell(0, 14, safe_pdf("Learn Language Education Academy"), ln=1, align="C")
+        self.cell(0, 14, safe_pdf("Learn Language Education Academy"), ln=1, align="L")
         self.ln(2)
 
     def footer(self):
@@ -1361,6 +1362,7 @@ class BrochurePDF(FPDF):
         self.set_font("Arial", '', 8)
         self.set_text_color(150,150,150)
         self.cell(0, 6, f"Page {self.page_no()}", align="C")
+
 
 def generate_brochure_pdf(course_info, logo_path="logo.png"):
     pdf = BrochurePDF()
