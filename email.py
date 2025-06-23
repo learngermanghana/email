@@ -1322,248 +1322,125 @@ with tabs[8]:
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
 
-# -------------------------------------------------------------------------
-# TAB 9 • QUICK MARKING  (Lesen & Hören only, 1 score box + comments)
-# -------------------------------------------------------------------------
 with tabs[9]:
-    st.markdown("## 📝 Assignment Marking & Scores")
+    st.title("📝 Assignment Marking & Scores")
 
-    # ------------------------------------------------------------------ #
-    # 1 • Load student list                                              #
-    # ------------------------------------------------------------------ #
-    STUDENT_FILE = "students.csv"      # must have Name, Phone, Level
-    if os.path.exists(STUDENT_FILE):
-        df_students = pd.read_csv(STUDENT_FILE)
-    else:
-        st.error("students.csv not found – upload it in **📝 Pending** tab.")
-        df_students = pd.DataFrame(columns=["Name", "Phone", "Level"])
-
-    for col in ["Name", "Phone", "Level"]:
-        if col not in df_students.columns:
-            df_students[col] = ""
-
-    student_names = df_students["Name"].dropna().unique().tolist()
-    if not student_names:
-        st.info("First add students.")
+    # === Load students.csv ===
+    student_file = "students.csv"
+    if not os.path.exists(student_file):
+        st.warning("⚠️ students.csv not found. Please upload in 📝 Pending tab.")
         st.stop()
 
-    # ------------------------------------------------------------------ #
-    # 2 • Hard-coded reference answers (extend anytime)                  #
-    # ------------------------------------------------------------------ #
-    REF_ANSWERS = {
-        ("A1", "Lesen & Hören 0.1"):
-"""1 C Guten Morgen
-2 D Guten Tag
-3 B Guten Abend
-4 B Gute Nacht
-5 C Guten Morgen
-6 C Wie geht es Ihnen
-7 B Auf wiedersehen
-8 A Tschüss
-9 C Guten Abend
-10 D Gute Nacht""",
+    student_df = pd.read_csv(student_file)
+    student_names = student_df["Name"].dropna().unique().tolist()
 
-        ("A1", "Lesen & Hören 0.2"):
-"""1 C 26
-2 A A,O,U,B
-3 A Eszett
-4 A K
-5 A A-Umlaut
-6 A A,O,U,B
-7 B 4
+    # === Load or create scores database ===
+    score_db = "scores.db"
+    conn = sqlite3.connect(score_db)
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS scores (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student TEXT,
+            level TEXT,
+            assignment TEXT,
+            score INTEGER,
+            comment TEXT,
+            date TEXT
+        )
+    """)
+    conn.commit()
 
-1 Wasser
-2 Kaffee
-3 Blume
-4 Schule
-5 Tisch""",
+    # === Manual Reference Answers (Editable Later) ===
+    reference_answers = {
+        "Lesen und Hören 0.1": """1. C Guten Morgen
+2. D Guten Tag
+3. B Guten Abend
+4. B Gute Nacht
+5. C Guten Morgen
+6. C Wie geht es Ihnen
+7. B Auf wiedersehen
+8. A Tschüss
+9. C Guten Abend
+10. D Gute Nacht""",
 
-        ("A1", "Lesen & Hören 1.1"):
-"""1 C
-2 C
-3 A
-4 B""",
+        "Lesen und Hören 0.2": """1. C) 26
+2. A) A, O, U, B
+3. A) Eszett
+4. A) K
+5. A) A-Umlaut
+6. A) A, O, U, B
+7. B) 4
 
-        ("A1", "Lesen & Hören 1.2"):
-"""1 Ich heiße Anna
-2 Du heißt Max
-3 Er heißt Peter
-4 Wir kommen aus Italien
-5 Ihr kommt aus Brasilien
-6 Sie kommen aus Russland
-7 Ich wohne in Berlin
-8 Du wohnst in Madrid
-9 Sie wohnt in Wien""",
-
-        ("A1", "Lesen & Hören 2"):
-"""1 sieben   2 drei   3 sechs   4 neun   5 sieben
-6 fünf   7 222   8 509   9 2040   10 5509""",
-
-        ("A1", "Lesen & Hören 4"):
-"""1 C Neun
-2 B Polnisch
-3 D Niederländisch
-…""",
-
-        # 👉 Add more A1 answers here …
-
-        # ---------- A2 sample ----------
-        ("A2", "Lesen & Hören – Kapitel 1"):
-"""Lesen
-1 C In einer Schule
-2 B Weil sie gerne mit Kindern arbeitet
-3 A In einem Büro
-4 B Tennis
-5 B Es war sonnig und warm
-6 B Italien und Spanien
-7 C Weil die Blumen so schön bunt sind
-
-Hören
-1 B Ins Kino gehen
-2 A Weil sie spannende Geschichten liebt
-3 A Tennis
-4 B Es war sonnig und warm
-5 Einen Spaziergang machen""",
-
-        # ---------- B1 placeholder ----------
-        ("B1", "Lesen & Hören – Kapitel 1"):
-"""— Add your B1 answers here —"""
+1. Wasser
+2. Kaffee
+3. Blume
+4. Schule
+5. Tisch"""
     }
 
-    # ------------------------------------------------------------------ #
-    # 3 • Simple score database                                          #
-    # ------------------------------------------------------------------ #
-    SCORE_FILE  = "simple_scores.csv"
-    SCORE_COLS  = ["Date", "Student", "Level", "Assignment", "Score", "Comment"]
-
-    if not os.path.exists(SCORE_FILE):
-        pd.DataFrame(columns=SCORE_COLS).to_csv(SCORE_FILE, index=False)
-
-    df_scores = pd.read_csv(SCORE_FILE)
-
-    # ------------------------------------------------------------------ #
-    # 4 • Marking form                                                   #
-    # ------------------------------------------------------------------ #
-    st.markdown("### ① Select student & enter score")
-
+    # === Add New Marking ===
+    st.subheader("➕ Record Assignment Score")
     col1, col2 = st.columns(2)
     with col1:
-        student = st.selectbox("👤 Student", student_names)
+        student = st.selectbox("👨‍🎓 Select Student", student_names)
+        assignment = st.text_input("📘 Assignment Name (e.g., Lesen und Hören 0.1)")
     with col2:
-        level_default = df_students.loc[df_students["Name"] == student, "Level"].values[0]
-        level = st.text_input("Level", value=level_default)
+        score = st.number_input("✅ Score (out of 100)", min_value=0, max_value=100)
+        comment = st.text_area("💬 Comment (optional)", height=100)
 
-    assignment = st.text_input("Assignment name", value="Lesen & Hören 0.1")
-    score_val  = st.slider("Score (0-100)", 0, 100, 75, step=1)
+    if st.button("💾 Save Result"):
+        c.execute("INSERT INTO scores (student, level, assignment, score, comment, date) VALUES (?, ?, ?, ?, ?, ?)",
+                  (student, student_df[student_df["Name"] == student]["Level"].values[0], assignment, score, comment, str(date.today())))
+        conn.commit()
+        st.success("✅ Result saved!")
 
-    # --- feedback template ---
-    st.markdown("### ② Feedback")
-    templates = [
-        "✅ Great job! Keep practicing.",
-        "⚠️ Watch verb positions.",
-        "📌 Improve article usage (der/die/das).",
-        "🧠 Write longer connected sentences.",
-        "🎯 Excellent vocabulary!"
-    ]
-    colT, colC = st.columns([3,7])
-    with colT:
-        tpl = st.selectbox("Template", [""] + templates)
-    with colC:
-        comment = st.text_area("Add / edit feedback", value=tpl)
+    # === Reference Answer ===
+    if assignment in reference_answers:
+        st.markdown("### 📋 Reference Answer")
+        st.code(reference_answers[assignment])
 
-    # show reference answer
-    ref_key = (level, assignment)
-    answer_preview = REF_ANSWERS.get(ref_key, "— No reference answer saved yet —")
-    with st.expander("🔍 Show reference answer"):
-        st.write(answer_preview)
+    # === Student Results ===
+    st.subheader("📊 Student Score Overview")
+    selected_student = st.selectbox("🔍 View Scores for", student_names, key="view_student")
+    result_df = pd.read_sql_query("SELECT * FROM scores WHERE student = ?", conn, params=(selected_student,))
 
-    # save button
-    if st.button("💾 Save score"):
-        now = datetime.now().strftime("%Y-%m-%d %H:%M")
-        new_row = {
-            "Date": now, "Student": student, "Level": level,
-            "Assignment": assignment, "Score": score_val, "Comment": comment
-        }
-        df_scores = pd.concat([df_scores, pd.DataFrame([new_row])], ignore_index=True)
-        df_scores.to_csv(SCORE_FILE, index=False)
-        st.success("Saved!")
-        st.experimental_rerun()
-
-    # ------------------------------------------------------------------ #
-    # 5 • Student overview (history + average)                           #
-    # ------------------------------------------------------------------ #
-    stu_hist = df_scores[df_scores["Student"] == student].sort_values("Date", ascending=False)
-    st.markdown(f"### ③ {student} – history & average")
-    if stu_hist.empty:
-        st.info("No scores yet.")
+    if result_df.empty:
+        st.info("No scores found for this student yet.")
     else:
-        st.dataframe(stu_hist[["Date", "Assignment", "Score", "Comment"]], use_container_width=True)
-        avg = stu_hist["Score"].mean()
-        st.success(f"**Total assignments:** {len(stu_hist)}   |   **Average:** {avg:.2f}")
+        st.write(f"**Total Assignments:** {len(result_df)}")
+        st.write(f"**Average Score:** {round(result_df['score'].mean(), 2)} / 100")
+        st.dataframe(result_df[["assignment", "score", "comment", "date"]])
 
-        latest = stu_hist.iloc[0]
+        # === Download PDF ===
+        if st.button("📄 Download PDF Summary"):
+            from fpdf import FPDF
 
-        # ------------------------------------------------------------------ #
-        # 6 • PDF report + WhatsApp link                                     #
-        # ------------------------------------------------------------------ #
-        st.markdown("### ④ Download & share")
+            pdf = FPDF()
+            pdf.add_page()
+            pdf.set_font("Arial", size=12)
+            pdf.cell(200, 10, txt=f"Learn Language Education Academy", ln=True, align="C")
+            pdf.cell(200, 10, txt=f"Score Summary for {selected_student}", ln=True, align="C")
+            pdf.ln(10)
 
-        # Build PDF
-        from fpdf import FPDF
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", "B", 14)
-        pdf.cell(0, 10, f"{SCHOOL_NAME} – Score Report", ln=1, align="C")
-        pdf.ln(4)
-        pdf.set_font("Arial", "", 12)
-        pdf.multi_cell(0, 8, f"Student: {student}")
-        pdf.multi_cell(0, 8, f"Level: {latest['Level']}")
-        pdf.multi_cell(0, 8, f"Assignment: {latest['Assignment']}")
-        pdf.multi_cell(0, 8, f"Score: {latest['Score']}/100")
-        pdf.multi_cell(0, 8, f"Average so far: {avg:.2f}")
-        pdf.multi_cell(0, 8, f"Date: {latest['Date']}")
-        pdf.ln(3)
-        pdf.set_font("Arial", "B", 12); pdf.cell(0, 8, "Teacher feedback:", ln=1)
-        pdf.set_font("Arial", "", 12); pdf.multi_cell(0, 8, comment or "—")
-        pdf.ln(3)
-        pdf.set_font("Arial", "B", 12); pdf.cell(0, 8, "Reference answer:", ln=1)
-        pdf.set_font("Arial", "", 11); pdf.multi_cell(0, 6, answer_preview)
-        pdf.ln(8); pdf.set_font("Arial", "I", 11)
-        pdf.cell(0, 8, "Signed: Felix Asadu", ln=1, align="R")
+            for _, row in result_df.iterrows():
+                pdf.multi_cell(0, 10, f"{row['assignment']}: {row['score']}/100\nComment: {row['comment']}\n", align="L")
+                if row["assignment"] in reference_answers:
+                    pdf.set_font("Arial", "I", size=10)
+                    pdf.multi_cell(0, 8, f"Reference Answer:\n{reference_answers[row['assignment']]}", align="L")
+                    pdf.set_font("Arial", size=12)
+                pdf.ln(5)
 
-        pdf_bytes = pdf.output(dest="S").encode("latin-1")
-        pdf_name = f"{student.replace(' ','_')}_{assignment.replace(' ','_')}.pdf"
-        st.download_button("⬇️ Download PDF", pdf_bytes, file_name=pdf_name, mime="application/pdf")
+            pdf.cell(200, 10, txt=f"Average Score: {round(result_df['score'].mean(), 2)}", ln=True, align="L")
+            pdf.ln(5)
+            pdf.cell(200, 10, txt="Signed: Felix Asadu", ln=True, align="L")
 
-        # WhatsApp link
-        phone_raw = df_students.loc[df_students["Name"] == student, "Phone"].values[0]
-        phone = "".join(filter(str.isdigit, str(phone_raw)))
-        if phone.startswith("0"):
-            phone = "233" + phone[1:]
-        if phone:
-            msg = f"Hallo {student}, dein Ergebnis für '{assignment}' ist {score_val}/100. Durchschnitt: {avg:.2f}. Feedback: {comment or '-'}"
-            wa = f"https://wa.me/{phone}?text={urllib.parse.quote(msg)}"
-            st.markdown(f"[📲 Share via WhatsApp]({wa})")
+            pdf_output = f"{selected_student.replace(' ', '_')}_summary.pdf"
+            pdf.output(pdf_output)
 
-    # ------------------------------------------------------------------ #
-    # 7 • Backup / Restore                                               #
-    # ------------------------------------------------------------------ #
-    st.markdown("### ⑤ Backup / Restore Scores")
-    colB1, colB2 = st.columns(2)
-    with colB1:
-        st.download_button("⬇️ Download all scores CSV",
-                           data=df_scores.to_csv(index=False),
-                           file_name="all_student_scores.csv")
-    with colB2:
-        up = st.file_uploader("⬆️ Restore scores CSV", type=["csv"], key="restore_scores")
-        if up:
-            try:
-                new_df = pd.read_csv(up)
-                if set(SCORE_COLS).issubset(new_df.columns):
-                    new_df.to_csv(SCORE_FILE, index=False)
-                    st.success("Scores restored – reloading.")
-                    st.experimental_rerun()
-                else:
-                    st.error("CSV columns do not match – restore aborted.")
-            except Exception as e:
-                st.error(f"Restore failed: {e}")
+            with open(pdf_output, "rb") as f:
+                b64_pdf = base64.b64encode(f.read()).decode()
+            st.markdown(f"""<a href="data:application/octet-stream;base64,{b64_pdf}" download="{pdf_output}">📥 Download PDF</a>""", unsafe_allow_html=True)
+
+    conn.close()
+
