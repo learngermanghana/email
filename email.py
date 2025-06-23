@@ -1330,91 +1330,209 @@ with tabs[8]:
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
 
-with tabs[9]:  # Assignment Marking & Scores Tab
+with tabs[9]:
     st.title("📝 Assignment Marking & Scores")
 
-    # ---- Assignment lists ----
-    A1_ASSIGNMENTS = [
-        "Lesen and Horen 0.1",
-        "Lesen and Horen 0.2",
-        "Lesen and Horen 1.1",
-        "Lesen and Horen 1.2",
-        "Lesen and Horen 2",
-        "Lesen and Horen 3",
-        "Lesen and Horen 4",
-        "Lesen and Horen 5",
-        "Lesen and Horen 6",
-        "Lesen and Horen 7",
-        "Lesen and Horen 8",
-        "Lesen and Horen 9",
-        "Lesen and Horen 10",
-        "Lesen and Horen 11",
-        "Lesen and Horen 12.1",
-        "Lesen and Horen 12.2",
-        "Lesen and Horen 13",
-        "Lesen and Horen 14",
-        "Mock Test Lesen",
-        "Mock Test Lesen and Horen"
-    ]
-    # Reuse your existing code for A2/B1/B2
-    raw_schedule_a2 = [
-        ("Woche 1", ["1.1. Small Talk (Exercise)", "1.2. Personen Beschreiben (Exercise)", "1.3. Dinge und Personen vergleichen"]),
-        ("Woche 2", ["2.4. Wo möchten wir uns treffen?", "2.5. Was machst du in deiner Freizeit?"]),
-        ("Woche 3", ["3.6. Möbel und Räume kennenlernen", "3.7. Eine Wohnung suchen (Übung)", "3.8. Rezepte und Essen (Exercise)"]),
-        ("Woche 4", ["4.9. Urlaub", "4.10. Tourismus und Traditionelle Feste", "4.11. Unterwegs: Verkehrsmittel vergleichen"]),
-        ("Woche 5", ["5.12. Ein Tag im Leben (Übung)", "5.13. Ein Vorstellungsgesprach (Exercise)", "5.14. Beruf und Karriere (Exercise)"]),
-        ("Woche 6", ["6.15. Mein Lieblingssport", "6.16. Wohlbefinden und Entspannung", "6.17. In die Apotheke gehen"]),
-        ("Woche 7", ["7.18. Die Bank Anrufen", "7.19. Einkaufen – Wo und wie? (Exercise)", "7.20. Typische Reklamationssituationen üben"]),
-        ("Woche 8", ["8.21. Ein Wochenende planen", "8.22. Die Woche Plannung"]),
-        ("Woche 9", ["9.23. Wie kommst du zur Schule / zur Arbeit?", "9.24. Einen Urlaub planen", "9.25. Tagesablauf (Exercise)"]),
-        ("Woche 10", ["10.26. Gefühle in verschiedenen Situationen beschr", "10.27. Digitale Kommunikation", "10.28. Über die Zukunft sprechen"])
-    ]
-    raw_schedule_b1 = [
-        ("Woche 1", ["1.1. Traumwelten (Übung)", "1.2. Freundes für Leben (Übung)", "1.3. Erfolgsgeschichten (Übung)"]),
-        ("Woche 2", ["2.4. Wohnung suchen (Übung)", "2.5. Der Besichtigungsg termin (Übung)", "2.6. Leben in der Stadt oder auf dem Land?"]),
-        ("Woche 3", ["3.7. Fast Food vs. Hausmannskost", "3.8. Alles für die Gesundheit", "3.9. Work-Life-Balance im modernen Arbeitsumfeld"]),
-        ("Woche 4", ["4.10. Digitale Auszeit und Selbstfürsorge", "4.11. Teamspiele und Kooperative Aktivitäten", "4.12. Abenteuer in der Natur", "4.13. Eigene Filmkritik schreiben"]),
-        ("Woche 5", ["5.14. Traditionelles vs. digitales Lernen", "5.15. Medien und Arbeiten im Homeoffice", "5.16. Prüfungsangst und Stressbewältigung", "5.17. Wie lernt man am besten?"]),
-        ("Woche 6", ["6.18. Wege zum Wunschberuf", "6.19. Das Vorstellungsgespräch", "6.20. Wie wird man …? (Ausbildung und Qu)"]),
-        ("Woche 7", ["7.21. Lebensformen heute – Familie, Wohnge", "7.22. Was ist dir in einer Beziehung wichtig?", "7.23. Erstes Date – Typische Situationen"]),
-        ("Woche 8", ["8.24. Konsum und Nachhaltigkeit", "8.25. Online einkaufen – Rechte und Risiken"]),
-        ("Woche 9", ["9.26. Reiseprobleme und Lösungen"]),
-        ("Woche 10", ["10.27. Umweltfreundlich im Alltag", "10.28. Klimafreundlich leben"])
-    ]
-    raw_schedule_b2 = []  # Add later if needed
+    # ---- Upload scores CSV to restore data ----
+    st.markdown("#### 📤 Upload Scores CSV to Restore or Replace Data")
+    uploaded_score_csv = st.file_uploader("Upload scores CSV", type=["csv"])
+    SCORE_FILE = "student_assignment_scores.csv"
+    if uploaded_score_csv:
+        df = pd.read_csv(uploaded_score_csv)
+        df.to_csv(SCORE_FILE, index=False)
+        st.success("✅ Scores file restored. Refresh to see updates.")
 
-    def flatten_assignments(schedule):
-        assignments = []
-        for week, topics in schedule:
-            for t in topics:
-                assignments.append(f"{week}: {t}")
-        return assignments
-
-    LEVELS = ["A1", "A2", "B1", "B2"]
-    ASSIGNMENTS = {
-        "A1": A1_ASSIGNMENTS,
-        "A2": flatten_assignments(raw_schedule_a2),
-        "B1": flatten_assignments(raw_schedule_b1),
-        "B2": []  # Placeholder for B2
-    }
-
-    # ---- Reference answers dicts (edit/expand as needed) ----
+    # ---- Reference answers ----
     A1_REFERENCE_ANSWERS = {
-        "Lesen and Horen 0.1": {
-            "Lesen": """1. C Guten Morgen
-2. D Guten Tag
-3. B Guten Abend 
-4. B Gute Nacht
-5. C Guten Morgen
-6. C Wie geht es Ihnen
-7. B Auf wiedersehen
-8. A Tschüss 
-9. C Guten Abend 
-10. D Gute Nacht""",
+        "Lesen and Horen 0.2": {
+            "Lesen": """1.      C) 26
+2.      A) A, O,U, B
+3.      A) Eszett
+4.      A) K
+5.      A) A-Umlaut
+6.      A) A, O, U, B
+7.      B 4
+
+1.      Wasser
+2.      Kaffee
+3.      Blume
+4.      Schule
+5.      Tisch""",
             "Hören": ""
         },
-        # Add for others as needed...
+        "Lesen and Horen 1.1": {
+            "Lesen": """1.      C
+2.      C
+3.      A
+4.      B""",
+            "Hören": ""
+        },
+        "Lesen and Horen 1.2": {
+            "Lesen": """1.      Ich heiBe Anna
+2.      Du heiBt Max
+3.      Er heiBt Peter
+4.      Wir Kommen aus Italien
+5.      Ihr kommt aus Brasilien
+6.      Sie Kommt/Kommen aus Russland
+7.      Ich wohne in Berlin
+8.      Du wohnst in Madrid
+9.      Sie wohnst on wien""",
+            "Hören": """1.      A) Anna
+2.      C) Aus Italien
+3.      D) In Berlin
+4.      B) Tom
+5.      A) In Berlin"""
+        },
+        "Lesen and Horen 2.": {
+            "Lesen": """1.      A) sieben 
+2.      B) Drei 
+3.      B) Sechs
+4.      B) Neun
+5.      B) Sieben
+6.      C) Funf
+7.      B) zweihundertzweiundzwanzig
+8.      A) Funfhundertneun
+9.      A) zweitausendvierzig
+10.  A) funftausendfunfhundertneun
+
+1.      16 – sechzehn
+2.      98 – achtundneunzig
+3.      555 – funfhundertfunfundfunfzig
+4.      1020 – tausendzwanzig
+5.      8553 – achttausendfunfhundertdreiundfundzig""",
+            "Hören": ""
+        },
+        "Lesen and Horen 4": {
+            "Lesen": """1.      C) Neun
+2.      B) Polnisch
+3.      D) Niederlandisch
+4.      A) Deutsch
+5.      C) Paris
+6.      B) Amsterdam 
+7.      C) In der Schweiz""",
+            "Hören": """1.      C) In italien und Frankreich 
+2.      C) Rom
+3.      B) Das Essen
+4.      B) Paris
+5.      A) Nach Spanien"""
+        },
+        "Lesen and Horen 5": {
+            "Lesen": """Part 1: Vocabulary Review 
+1.	Der Tisch – j. the table
+2.	Die Lampe – c. the lamp
+3.	Das Buch – g. the book
+4.	Der Stuhl – e. the chair
+5.	Der Katze – f. the cat
+6.	Das Auto – h. the car
+7.	Der Hund – a. the dog
+8.	Die Blume – d. the flower
+9.	Das Fenster – d. the window
+10.	Der Computer – i. The computer
+
+Part 2: Nominative Case
+1.	Der tisch ist GroB
+2.	Die Lampe ist neu
+3.	Das Buch ist interessant 
+4.	Der Stuhl ist bequem
+5.	Die Katze ist suB
+6.	Das Auto ist Schnell
+7.	Der Hund ist Freundlich
+8.	Die Blume ist schon
+9.	Das Fenster ist offen
+10.	Der Computer ist teuer
+
+Part 3: Accusative Case
+1.	Ich sehe den Tisch
+2.	Sie Kauft die Lampe
+3.	Er liest das Buch
+4.	Wir brauchen den Stuhl
+5.	Du futterst die Katze
+6.	Ich fahre das Auto
+7.	Sie Streichelt den Hund
+8.	Er pfluckt die Blume
+9.	Wir putzen das Fenster
+10.	Sie benutzen computer""",
+            "Hören": ""
+        },
+        "Lesen and Horen 6": {
+            "Lesen": """Teil 1
+1.	Das Wohnzimmer – the living room
+2.	Die Kuche -  the kitchen
+3.	Das Schlafzimmer – the bedroom
+4.	Das Badezimmer  -  the bathroom
+5.	Der Balkon – the balcony
+6.	Der Flur – the hallway
+7.	Das Bett – the bed 
+8.	Der Tisch - the table
+9.	Der Stuhl – the chair
+10.	Der Schrank – the wardrobe
+
+Teil 2
+1.	B) Vier
+2.	A) Ein Sofa und ein Fernseher
+3.	B) Einen Herd, einen Kuhlschrank und einen Tisch mit  vier Stuhlen
+4.	C) Ein groBes Bett
+5.	D) Eine Dusche, eine Badewanne und ein Waschbecken
+6.	D) Klein und Schon
+7.	C) Blumen und einen Kleinen Tisch mit zwei Stuhlen
+
+Teil3
+1.	B
+2.	B
+3.	B
+4.	C
+5.	D
+6.	B
+7.	C""",
+            "Hören": ""
+        },
+        "Lesen and Horen 7": {
+            "Lesen": """Teil 1 (Lesen)
+1.	B) Um sieben Uhr
+2.	B) Um acht Uhr
+3.	B) Um sechs Uhr
+4.	B) Um zehn Uhr
+5.	B) Um neun Uhr
+6.	C) Nachmittags
+7.	A) Um sieben Uhr
+8.	A) Montag
+9.	B) Am Dienstag und Donnerstag
+10.	B) Er ruht sich aus""",
+            "Hören": """Teil 2 – Horen
+1.	B) Um neun Uhr 
+2.	B) Er geht in die Bibliothek
+3.	B) Bis zwei Uhr nachmittags
+4.	B) Um drei Uhr nachmittags
+5.	A) 
+6.	B) Um neun Uhr
+7.	B) Er geht in die Bibliothek
+8.	B) Bis zwei Uhr nachmittags
+9.	B) Um drei Uhr nachmittags
+10.	B) Um sieben Uhr"""
+        },
+        "Lesen and Horen 8": {
+            "Lesen": """Teil 1 (Lesen)
+1.	B) Zwei Uhr nachmittags
+2.	B) 29 Tage
+3.	B) April
+4.	C) 03.02.2024
+5.	C) Mittwoch
+
+Teil 2 (Lesen)
+1.	Falsch
+2.	Richtig
+3.	Richtig
+4.	Falsch
+5.	Richtig""",
+            "Hören": """Teil – Horen
+1.	B) Um Mitternacht
+2.	B) Vier Uhr nachmittags
+3.	C) 28 Tage
+4.	B) Tag. Monat. Jahr
+5.	D) Montag"""
+        },
     }
+
     A2_REFERENCE_ANSWERS = {
         "Woche 1: 1.1. Small Talk (Exercise)": {
             "Lesen": """1. C In einer Schule 
@@ -1428,74 +1546,80 @@ with tabs[9]:  # Assignment Marking & Scores Tab
 2. A Weil sie spannende Geschichten liebt 
 3. A Tennis
 4. B Es war sonnig und warm 
-5. Einen Spaziergang machen""",
+5. Einen Spaziergang machen"""
+        },
+        # Add more A2 assignments as needed!
+    }
+
+    B1_REFERENCE_ANSWERS = {
+        "Woche 1: 1.1. Traumwelten (Übung)": {
+            "Lesen": "",
+            "Hören": "",
             "Schreiben": "",
             "Sprechen": ""
         },
-        # Add for others as needed...
+        # Add more B1...
     }
-    B1_REFERENCE_ANSWERS = {}
     B2_REFERENCE_ANSWERS = {}
 
-    def get_default_ref(level, assignment, skill):
-        refs = {
-            "A1": A1_REFERENCE_ANSWERS,
-            "A2": A2_REFERENCE_ANSWERS,
-            "B1": B1_REFERENCE_ANSWERS,
-            "B2": B2_REFERENCE_ANSWERS,
-        }
-        return refs.get(level, {}).get(assignment, {}).get(skill, "")
+    LEVELS = ["A1", "A2", "B1", "B2"]
+    ASSIGNMENTS = {
+        "A1": list(A1_REFERENCE_ANSWERS.keys()),
+        "A2": list(A2_REFERENCE_ANSWERS.keys()),
+        "B1": list(B1_REFERENCE_ANSWERS.keys()),
+        "B2": []
+    }
 
-    # ---- Load students from your main file ----
-    student_file = "students_simple.csv"
+    # ---- Load students for dropdown ----
+    student_file = "students.csv"  # <-- as per your request
     if os.path.exists(student_file):
         df_students = pd.read_csv(student_file)
         student_names = df_students["Name"].dropna().unique().tolist()
     else:
         student_names = []
 
-    # ---- Score storage file ----
-    SCORE_FILE = "student_assignment_scores.csv"
-    SCORE_COLUMNS = [
-        "Date", "Student", "Level", "Assignment",
-        "Reference_Lesen", "Reference_Horen", "Reference_Schreiben", "Reference_Sprechen",
-        "Student_Lesen", "Student_Horen", "Student_Schreiben", "Student_Sprechen",
-        "Lesen_Score", "Horen_Score", "Schreiben_Score", "Sprechen_Score",
-        "AI_Feedback", "AI_Correction"
-    ]
-    if not os.path.exists(SCORE_FILE):
-        pd.DataFrame(columns=SCORE_COLUMNS).to_csv(SCORE_FILE, index=False)
+    # ---- Assignment input ----
+    level = st.selectbox("Select Level", LEVELS, key="marking_level")
+    student = st.selectbox("Select Student", student_names, key="marking_student")
+    assignment = st.selectbox("Assignment", ASSIGNMENTS[level] if ASSIGNMENTS[level] else ["No assignments (add later)"], key="marking_assignment")
 
-    st.subheader("Record Assignment Scores")
-    level = st.selectbox("Select Level", LEVELS, key="level_select")
-    student = st.selectbox("Select Student", student_names, key="student_select")
-    assignment = st.selectbox("Assignment", ASSIGNMENTS[level] if ASSIGNMENTS[level] else ["No assignments (add later)"], key="assignment_select")
+    # ---- Get default reference answers ----
+    ref_answers = {}
+    if level == "A1":
+        ref_answers = A1_REFERENCE_ANSWERS.get(assignment, {})
+    elif level == "A2":
+        ref_answers = A2_REFERENCE_ANSWERS.get(assignment, {})
+    elif level == "B1":
+        ref_answers = B1_REFERENCE_ANSWERS.get(assignment, {})
+    elif level == "B2":
+        ref_answers = B2_REFERENCE_ANSWERS.get(assignment, {})
 
-    with st.expander("Reference Answers (auto-filled, editable for each assignment)"):
-        ref_lesen = st.text_area("Reference Answer: Lesen", value=get_default_ref(level, assignment, "Lesen"), key="ref_lesen")
-        ref_horen = st.text_area("Reference Answer: Hören", value=get_default_ref(level, assignment, "Hören"), key="ref_horen")
-        ref_schreiben = st.text_area("Reference Answer: Schreiben", value=get_default_ref(level, assignment, "Schreiben"), key="ref_schreiben") if level != "A1" else ""
-        ref_sprechen = st.text_area("Reference Answer: Sprechen", value=get_default_ref(level, assignment, "Sprechen"), key="ref_sprechen") if level != "A1" else ""
+    with st.expander("Reference Answers (editable)", expanded=True):
+        ref_lesen = st.text_area("Reference Answer: Lesen", value=ref_answers.get("Lesen", ""))
+        ref_horen = st.text_area("Reference Answer: Hören", value=ref_answers.get("Hören", ""))
+        ref_schreiben = st.text_area("Reference Answer: Schreiben", value=ref_answers.get("Schreiben", "")) if level not in ["A1"] else ""
+        ref_sprechen = st.text_area("Reference Answer: Sprechen", value=ref_answers.get("Sprechen", "")) if level not in ["A1"] else ""
 
-    with st.expander("Student Answers & Scores"):
-        student_lesen = st.text_area("Student's Lesen Answer", key="student_lesen")
-        student_horen = st.text_area("Student's Hören Answer", key="student_horen")
-        student_schreiben = st.text_area("Student's Schreiben Answer", key="student_schreiben") if level != "A1" else ""
-        student_sprechen = st.text_area("Student's Sprechen Answer", key="student_sprechen") if level != "A1" else ""
+    # ---- Student Answers & Marking ----
+    with st.expander("Student Answers & Scores", expanded=True):
+        student_lesen = st.text_area("Student's Lesen Answer")
+        student_horen = st.text_area("Student's Hören Answer")
+        student_schreiben = st.text_area("Student's Schreiben Answer") if level not in ["A1"] else ""
+        student_sprechen = st.text_area("Student's Sprechen Answer") if level not in ["A1"] else ""
 
-        lesen_score = st.number_input("Lesen Score", 0, 20, step=1, key="lesen_score")
-        horen_score = st.number_input("Hören Score", 0, 20, step=1, key="horen_score")
-        schreiben_score = st.number_input("Schreiben Score", 0, 20, step=1, key="schreiben_score") if level != "A1" else ""
-        sprechen_score = st.number_input("Sprechen Score", 0, 20, step=1, key="sprechen_score") if level != "A1" else ""
+        lesen_score = st.number_input("Lesen Score", 0, 20, step=1)
+        horen_score = st.number_input("Hören Score", 0, 20, step=1)
+        schreiben_score = st.number_input("Schreiben Score", 0, 20, step=1) if level not in ["A1"] else ""
+        sprechen_score = st.number_input("Sprechen Score", 0, 20, step=1) if level not in ["A1"] else ""
 
-    # --- AI Mark Schreiben (A2/B1/B2 only) ---
-    ai_feedback = ""
-    ai_correction = ""
+    # --- AI Auto-Marking for Schreiben (A2/B1/B2 only) ---
+    ai_feedback, ai_correction = "", ""
     OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
-    if level != "A1" and student_schreiben and OPENAI_API_KEY:
-        if st.button("Auto-Mark Schreiben (OpenAI)", key="ai_mark_button"):
-            with st.spinner("Marking with OpenAI..."):
+    if level not in ["A1"] and student_schreiben and OPENAI_API_KEY:
+        if st.button("Auto-Mark Schreiben (OpenAI)", key="auto_mark_schreiben"):
+            with st.spinner("Marking Schreiben with AI..."):
                 try:
+                    import openai
                     openai.api_key = OPENAI_API_KEY
                     prompt = (
                         f"Correct this German {level} Schreiben assignment, give clear feedback in simple German, and assign a score out of 20. "
@@ -1520,9 +1644,19 @@ with tabs[9]:  # Assignment Marking & Scores Tab
                 except Exception as e:
                     st.error(f"OpenAI Error: {e}")
 
-    if st.button("Save Assignment Score", key="save_score_button"):
+    # --- Save scores to CSV ---
+    if st.button("Save Assignment Score", key="save_assignment_score"):
         now = datetime.now().strftime("%Y-%m-%d %H:%M")
-        score_df = pd.read_csv(SCORE_FILE)
+        if os.path.exists(SCORE_FILE):
+            score_df = pd.read_csv(SCORE_FILE)
+        else:
+            score_df = pd.DataFrame(columns=[
+                "Date", "Student", "Level", "Assignment",
+                "Reference_Lesen", "Reference_Horen", "Reference_Schreiben", "Reference_Sprechen",
+                "Student_Lesen", "Student_Horen", "Student_Schreiben", "Student_Sprechen",
+                "Lesen_Score", "Horen_Score", "Schreiben_Score", "Sprechen_Score",
+                "AI_Feedback", "AI_Correction"
+            ])
         new_row = {
             "Date": now, "Student": student, "Level": level, "Assignment": assignment,
             "Reference_Lesen": ref_lesen, "Reference_Horen": ref_horen, "Reference_Schreiben": ref_schreiben, "Reference_Sprechen": ref_sprechen,
@@ -1537,38 +1671,56 @@ with tabs[9]:  # Assignment Marking & Scores Tab
         score_df.to_csv(SCORE_FILE, index=False)
         st.success("✅ Score recorded!")
 
+    # --- Show assignment history for this student & assignment ---
     st.subheader("Student Assignment History")
-    hist_df = pd.read_csv(SCORE_FILE)
+    hist_df = pd.read_csv(SCORE_FILE) if os.path.exists(SCORE_FILE) else pd.DataFrame()
     filt = (hist_df["Student"] == student) & (hist_df["Level"] == level)
-    st.dataframe(hist_df[filt].sort_values("Date", ascending=False), use_container_width=True)
+    filtered_hist = hist_df[filt].sort_values("Date", ascending=False)
+    st.dataframe(filtered_hist, use_container_width=True)
 
-    if not hist_df[filt].empty:
-        avg = hist_df[filt][["Lesen_Score", "Horen_Score", "Schreiben_Score", "Sprechen_Score"]].apply(pd.to_numeric, errors="coerce").mean(axis=1).mean()
-        st.info(f"**Overall Average Score for {student} ({level}): {avg:.2f}**")
+    # --- Calculate and export average scores ---
+    if not filtered_hist.empty:
+        score_cols = ["Lesen_Score", "Horen_Score", "Schreiben_Score", "Sprechen_Score"]
+        for col in score_cols:
+            if col not in filtered_hist.columns:
+                filtered_hist[col] = 0
+        averages = filtered_hist[score_cols].apply(pd.to_numeric, errors="coerce").mean()
+        overall_avg = averages.mean()
+        st.info(f"**Overall Average Score for {student} ({level}): {overall_avg:.2f}**")
 
-    # ---- Export options ----
-    st.subheader("Export Scores")
-    st.download_button("Export Full CSV", data=hist_df.to_csv(index=False), file_name="student_assignment_scores.csv")
+        avg_df = pd.DataFrame({
+            "Student": [student],
+            "Level": [level],
+            "Avg_Lesen": [averages['Lesen_Score']],
+            "Avg_Horen": [averages['Horen_Score']],
+            "Avg_Schreiben": [averages['Schreiben_Score']],
+            "Avg_Sprechen": [averages['Sprechen_Score']],
+            "Overall_Avg": [overall_avg]
+        })
+        st.download_button(
+            f"Download {student} Average Scores (CSV)",
+            data=avg_df.to_csv(index=False),
+            file_name=f"{student}_{level}_average_scores.csv"
+        )
 
-    # Export only this chapter (Lesen & Hören)
-    chapter_mask = (hist_df["Level"] == level) & (hist_df["Assignment"] == assignment)
-    chapter_df = hist_df[chapter_mask]
-    lesen_hoeren_cols = [
-        "Student", "Level", "Assignment",
-        "Reference_Lesen", "Student_Lesen", "Lesen_Score",
-        "Reference_Horen", "Student_Horen", "Horen_Score"
-    ]
-    chapter_export = chapter_df[lesen_hoeren_cols]
-    st.download_button(
-        f"Export Only '{assignment}' (Lesen & Hören)",
-        data=chapter_export.to_csv(index=False),
-        file_name=f"{assignment.replace(' ', '_')}_lesen_hoeren.csv"
-    )
+    # --- Download all scores for this student ---
+    if not filtered_hist.empty:
+        st.download_button(
+            f"Download {student} All Results (CSV)",
+            data=filtered_hist.to_csv(index=False),
+            file_name=f"{student}_{level}_all_results.csv"
+        )
 
-    # Export all students for current assignment (Lesen & Hören)
-    st.download_button(
-        f"Export All Students '{assignment}' (Lesen & Hören)",
-        data=chapter_export.to_csv(index=False),
-        file_name=f"all_{assignment.replace(' ', '_')}_lesen_hoeren.csv"
-    )
+        # WhatsApp share link
+        whatsapp_msg = f"Hallo {student}, dein Gesamtdurchschnitt für {level}: {overall_avg:.2f}. Glückwunsch! Siehe Einzelheiten im Anhang."
+        wa_url = f"https://wa.me/?text={urllib.parse.quote(whatsapp_msg)}"
+        st.markdown(f"**Share average on WhatsApp:** [📲 WhatsApp](<{wa_url}>)")
+
+    # --- Download/export all scores ---
+    if os.path.exists(SCORE_FILE):
+        st.download_button(
+            "Download ALL Scores (CSV)",
+            data=pd.read_csv(SCORE_FILE).to_csv(index=False),
+            file_name="all_student_assignment_scores.csv"
+        )
 
