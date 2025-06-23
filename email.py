@@ -1,26 +1,18 @@
-# ===== Standard Library Imports =====
-import base64
-import calendar
-import json
 import os
+import json
+import base64
 import urllib.parse
 from datetime import date, datetime, timedelta
 
-# ===== Third-Party Imports =====
-import numpy as np
 import pandas as pd
+import numpy as np
 import streamlit as st
 from fpdf import FPDF
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import (
-    Mail,
-    Attachment,
-    FileContent,
-    FileName,
-    FileType,
-    Disposition,
+    Mail, Attachment, FileContent, FileName, FileType, Disposition
 )
-import openai  # <-- For AI marking (Schreiben correction/feedback)
+import openai
 
 # ===== Project-Specific Imports =====
 from pdf_utils import generate_receipt_and_contract_pdf
