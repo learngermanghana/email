@@ -421,7 +421,7 @@ with tabs[0]:
                     }
 
                     approved_df = pd.concat([approved_df, pd.DataFrame([student_dict])], ignore_index=True)
-                    approved_df.to_csv("students_simple.csv", index=False)
+                    approved_df.to_csv("students.csv", index=False)
 
                     total_fee = paid + balance
                     pdf_file = generate_receipt_and_contract_pdf(
