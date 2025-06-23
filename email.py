@@ -1,20 +1,3 @@
-"""
-Learn Language Education Academy Dashboard
-
-This Streamlit app manages student information, issues receipts/contracts,
-sends email notifications, and generates course schedules.
-
-Dependencies
-------------
-* streamlit>=1.14.0
-* pandas>=1.5.0
-* fpdf>=1.7.2
-* sendgrid>=6.9.1
-
-Run the app in a Python 3 environment with these packages installed, e.g.:
-    streamlit run email.py
-"""
-
 # ===== Standard Library Imports =====
 import base64
 import calendar
@@ -43,6 +26,9 @@ import openai  # <-- For AI marking (Schreiben correction/feedback)
 from pdf_utils import generate_receipt_and_contract_pdf
 from email_utils import send_emails
 
+# ===== SQLite for Persistent Data Storage =====
+import sqlite3
+
 # ===== Helper Functions =====
 def clean_phone(phone):
     """
@@ -57,7 +43,6 @@ def clean_phone(phone):
         phone = "233" + phone[1:]
     phone = ''.join(filter(str.isdigit, phone))
     return phone
-
 
 # ===== PAGE CONFIG (must be first Streamlit command!) =====
 st.set_page_config(
@@ -343,6 +328,7 @@ tabs = st.tabs([
     "📝 Marking"   # <--- New tab!
 ])
 
+
 with tabs[0]:
     st.title("📝 Pending ")
 
@@ -494,51 +480,76 @@ with tabs[1]:
     st.title("👩‍🎓 All Students (Edit, Update, Delete, Receipt)")
     today = date.today()
 
-    # Load or initialize students
-    if os.path.exists(student_file):
-        df_main = pd.read_csv(student_file)
-    else:
-        df_main = pd.DataFrame()
+    # === Load or initialize student data ===
+    conn = sqlite3.connect('students.db')
+    cursor = conn.cursor()
 
-    # Ensure required columns exist
+    # Ensure table exists
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS students (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        phone TEXT,
+        email TEXT,
+        location TEXT,
+        level TEXT,
+        paid REAL,
+        balance REAL,
+        contract_start TEXT,
+        contract_end TEXT,
+        student_code TEXT,
+        emergency_contact TEXT
+    )
+    ''')
+    conn.commit()
+
+    # Fetch students from SQLite DB
+    cursor.execute("SELECT * FROM students")
+    students_data = cursor.fetchall()
+    columns = [
+        "id", "name", "phone", "email", "location", "level",
+        "paid", "balance", "contract_start", "contract_end", "student_code", "emergency_contact"
+    ]
+    df_main = pd.DataFrame(students_data, columns=columns)
+
+    # Ensure required columns exist (if any column missing, initialize with empty/default values)
     required_cols = [
-        "Name", "Phone", "Email", "Location", "Level",
-        "Paid", "Balance", "ContractStart", "ContractEnd",
-        "StudentCode", "Emergency Contact (Phone Number)"
+        "name", "phone", "email", "location", "level",
+        "paid", "balance", "contract_start", "contract_end", "student_code", "emergency_contact"
     ]
     for col in required_cols:
         if col not in df_main.columns:
             df_main[col] = ""
 
     # Numeric/Date conversions
-    df_main["Paid"] = pd.to_numeric(df_main["Paid"], errors="coerce").fillna(0.0)
-    df_main["Balance"] = pd.to_numeric(df_main["Balance"], errors="coerce").fillna(0.0)
-    df_main["ContractEnd"] = pd.to_datetime(df_main["ContractEnd"], errors="coerce")
-    df_main["Status"] = "Unknown"
-    mask_valid = df_main["ContractEnd"].notna()
-    df_main.loc[mask_valid, "Status"] = np.where(
-        df_main.loc[mask_valid, "ContractEnd"].dt.date < today,
+    df_main["paid"] = pd.to_numeric(df_main["paid"], errors="coerce").fillna(0.0)
+    df_main["balance"] = pd.to_numeric(df_main["balance"], errors="coerce").fillna(0.0)
+    df_main["contract_end"] = pd.to_datetime(df_main["contract_end"], errors="coerce")
+    df_main["status"] = "Unknown"
+    mask_valid = df_main["contract_end"].notna()
+    df_main.loc[mask_valid, "status"] = np.where(
+        df_main.loc[mask_valid, "contract_end"].dt.date < today,
         "Completed",
         "Enrolled"
     )
 
     # 🔄 Live Search and Filters
-    search_term    = st.text_input("🔍 Search Student by Name or Code")
-    levels         = ["All"] + sorted(df_main["Level"].dropna().unique().tolist())
+    search_term = st.text_input("🔍 Search Student by Name or Code")
+    levels = ["All"] + sorted(df_main["level"].dropna().unique().tolist())
     selected_level = st.selectbox("📋 Filter by Class Level", levels)
-    statuses       = ["All", "Enrolled", "Completed", "Unknown"]
-    status_filter  = st.selectbox("Filter by Status", statuses)
+    statuses = ["All", "Enrolled", "Completed", "Unknown"]
+    status_filter = st.selectbox("Filter by Status", statuses)
 
     view_df = df_main.copy()
     if search_term:
         view_df = view_df[
-            view_df["Name"].str.contains(search_term, case=False, na=False) |
-            view_df["StudentCode"].str.contains(search_term, case=False, na=False)
+            view_df["name"].str.contains(search_term, case=False, na=False) |
+            view_df["student_code"].str.contains(search_term, case=False, na=False)
         ]
     if selected_level != "All":
-        view_df = view_df[view_df["Level"] == selected_level]
+        view_df = view_df[view_df["level"] == selected_level]
     if status_filter != "All":
-        view_df = view_df[view_df["Status"] == status_filter]
+        view_df = view_df[view_df["status"] == status_filter]
 
     if view_df.empty:
         st.info("No students found in your database.")
@@ -556,66 +567,64 @@ with tabs[1]:
 
         paged_df = view_df.iloc[start_idx:end_idx].reset_index(drop=True)
         st.dataframe(
-            paged_df[["Name", "StudentCode", "Level", "Phone", "Paid", "Balance", "Status"]],
+            paged_df[["name", "student_code", "level", "phone", "paid", "balance", "status"]],
             use_container_width=True
         )
 
         # --- Select a student for details ---
-        student_names = paged_df["Name"].tolist()
+        student_names = paged_df["name"].tolist()
         if student_names:
             selected_student = st.selectbox("Select a student to view/edit details", student_names, key="select_student_detail")
-            student_row = paged_df[paged_df["Name"] == selected_student].iloc[0]
+            student_row = paged_df[paged_df["name"] == selected_student].iloc[0]
 
-            idx = view_df[view_df["Name"] == selected_student].index[0]
-            unique_key = f"{student_row['StudentCode']}_{idx}"
+            idx = view_df[view_df["name"] == selected_student].index[0]
+            unique_key = f"{student_row['student_code']}_{idx}"
             status_color = (
-                "🟢" if student_row["Status"] == "Enrolled" else
-                "🔴" if student_row["Status"] == "Completed" else
+                "🟢" if student_row["status"] == "Enrolled" else
+                "🔴" if student_row["status"] == "Completed" else
                 "⚪"
             )
 
-            with st.expander(f"{status_color} {student_row['Name']} ({student_row['StudentCode']}) [{student_row['Status']}]", expanded=True):
+            with st.expander(f"{status_color} {student_row['name']} ({student_row['student_code']}) [{student_row['status']}]", expanded=True):
                 # Editable fields
-                name_input           = st.text_input("Name", value=student_row["Name"], key=f"name_{unique_key}")
-                phone_input          = st.text_input("Phone", value=student_row["Phone"], key=f"phone_{unique_key}")
-                email_input          = st.text_input("Email", value=student_row["Email"], key=f"email_{unique_key}")
-                location_input       = st.text_input("Location", value=student_row["Location"], key=f"loc_{unique_key}")
-                level_input          = st.text_input("Level", value=student_row["Level"], key=f"level_{unique_key}")
-                paid_input           = st.number_input("Paid", value=float(student_row["Paid"]), key=f"paid_{unique_key}")
-                balance_input        = st.number_input("Balance", value=float(student_row["Balance"]), key=f"bal_{unique_key}")
-                contract_start_input = st.text_input("Contract Start", value=str(student_row["ContractStart"]), key=f"cs_{unique_key}")
-                contract_end_input   = st.text_input("Contract End", value=str(student_row["ContractEnd"].date()) if pd.notna(student_row["ContractEnd"]) else "", key=f"ce_{unique_key}")
-                code_input           = st.text_input("Student Code", value=student_row["StudentCode"], key=f"code_{unique_key}")
-                emergency_input      = st.text_input("Emergency Contact", value=student_row["Emergency Contact (Phone Number)"], key=f"em_{unique_key}")
+                name_input = st.text_input("Name", value=student_row["name"], key=f"name_{unique_key}")
+                phone_input = st.text_input("Phone", value=student_row["phone"], key=f"phone_{unique_key}")
+                email_input = st.text_input("Email", value=student_row["email"], key=f"email_{unique_key}")
+                location_input = st.text_input("Location", value=student_row["location"], key=f"loc_{unique_key}")
+                level_input = st.text_input("Level", value=student_row["level"], key=f"level_{unique_key}")
+                paid_input = st.number_input("Paid", value=float(student_row["paid"]), key=f"paid_{unique_key}")
+                balance_input = st.number_input("Balance", value=float(student_row["balance"]), key=f"bal_{unique_key}")
+                contract_start_input = st.text_input("Contract Start", value=str(student_row["contract_start"]), key=f"cs_{unique_key}")
+                contract_end_input = st.text_input("Contract End", value=str(student_row["contract_end"].date()) if pd.notna(student_row["contract_end"]) else "", key=f"ce_{unique_key}")
+                code_input = st.text_input("Student Code", value=student_row["student_code"], key=f"code_{unique_key}")
+                emergency_input = st.text_input("Emergency Contact", value=student_row["emergency_contact"], key=f"em_{unique_key}")
 
                 col1, col2, col3 = st.columns(3)
                 with col1:
                     if st.button("💾 Update", key=f"update_{unique_key}"):
-                        df_main.at[idx, "Name"]  = name_input
-                        df_main.at[idx, "Phone"] = phone_input
-                        df_main.at[idx, "Email"] = email_input
-                        df_main.at[idx, "Location"] = location_input
-                        df_main.at[idx, "Level"] = level_input
-                        df_main.at[idx, "Paid"] = paid_input
-                        df_main.at[idx, "Balance"] = balance_input
-                        df_main.at[idx, "ContractStart"] = contract_start_input
-                        df_main.at[idx, "ContractEnd"] = contract_end_input
-                        df_main.at[idx, "StudentCode"] = code_input
-                        df_main.at[idx, "Emergency Contact (Phone Number)"] = emergency_input
-                        df_main.to_csv(student_file, index=False)
+                        cursor.execute("""
+                        UPDATE students
+                        SET name=?, phone=?, email=?, location=?, level=?, paid=?, balance=?, contract_start=?, contract_end=?, student_code=?, emergency_contact=?
+                        WHERE id=?
+                        """, (
+                            name_input, phone_input, email_input, location_input, level_input,
+                            paid_input, balance_input, contract_start_input, contract_end_input,
+                            code_input, emergency_input, student_row["id"]
+                        ))
+                        conn.commit()
                         st.success("✅ Student updated.")
                         st.experimental_rerun()
                 with col2:
                     if st.button("🗑️ Delete", key=f"delete_{unique_key}"):
-                        df_main = df_main.drop(idx).reset_index(drop=True)
-                        df_main.to_csv(student_file, index=False)
+                        cursor.execute("DELETE FROM students WHERE id=?", (student_row["id"],))
+                        conn.commit()
                         st.success("❌ Student deleted.")
                         st.experimental_rerun()
                 with col3:
                     if st.button("📄 Receipt", key=f"receipt_{unique_key}"):
-                        total_fee   = paid_input + balance_input
+                        total_fee = paid_input + balance_input
                         parsed_date = pd.to_datetime(contract_start_input, errors="coerce").date()
-                        pdf_path    = generate_receipt_and_contract_pdf(
+                        pdf_path = generate_receipt_and_contract_pdf(
                             student_row,
                             st.session_state["agreement_template"],
                             payment_amount=total_fee,
@@ -629,6 +638,10 @@ with tabs[1]:
                             f'download="{name_input.replace(" ", "_")}_receipt.pdf">Download Receipt</a>'
                         )
                         st.markdown(download_link, unsafe_allow_html=True)
+
+# Close SQLite connection after use
+conn.close()
+
 
 with tabs[2]:
     st.title("➕ Add Student Manually")
@@ -683,21 +696,32 @@ with tabs[2]:
                 updated_df = pd.concat([existing_df, new_row], ignore_index=True)
                 updated_df.to_csv(student_file, index=False)
                 st.success(f"✅ Student '{name}' added successfully.")
-                st.rerun()
-
 with tabs[3]:
     st.title("💵 Expenses and Financial Summary")
 
-    expenses_file = "expenses_all.csv"
+    # === Initialize SQLite database for expenses ===
+    conn = sqlite3.connect('expenses.db')
+    cursor = conn.cursor()
 
-    # ✅ Load or initialize expense data
-    if os.path.exists(expenses_file):
-        exp = pd.read_csv(expenses_file)
-    else:
-        exp = pd.DataFrame(columns=["Type", "Item", "Amount", "Date"])
-        exp.to_csv(expenses_file, index=False)
+    # Ensure expenses table exists
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS expenses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type TEXT,
+        item TEXT,
+        amount REAL,
+        date TEXT
+    )
+    ''')
+    conn.commit()
 
-    # ✅ Add new expense
+    # === Load existing expenses from SQLite ===
+    cursor.execute("SELECT * FROM expenses")
+    expenses_data = cursor.fetchall()
+    columns = ["id", "type", "item", "amount", "date"]
+    df_expenses = pd.DataFrame(expenses_data, columns=columns)
+
+    # === Add New Expense ===
     with st.form("add_expense_form"):
         exp_type = st.selectbox("Type", ["Bill", "Rent", "Salary", "Marketing", "Other"])
         exp_item = st.text_input("Expense Item")
@@ -706,28 +730,20 @@ with tabs[3]:
         submit_exp = st.form_submit_button("Add Expense")
 
         if submit_exp and exp_item and exp_amount > 0:
-            new_exp = pd.DataFrame([{
-                "Type": exp_type,
-                "Item": exp_item,
-                "Amount": exp_amount,
-                "Date": exp_date
-            }])
-            exp = pd.concat([exp, new_exp], ignore_index=True)
-            exp.to_csv(expenses_file, index=False)
+            cursor.execute("""
+            INSERT INTO expenses (type, item, amount, date)
+            VALUES (?, ?, ?, ?)
+            """, (exp_type, exp_item, exp_amount, exp_date))
+            conn.commit()
             st.success(f"✅ Recorded: {exp_type} – {exp_item}")
-            st.session_state["should_rerun"] = True
             st.experimental_rerun()
 
-    # ✅ Convert dates if not done
-    exp["Date"] = pd.to_datetime(exp["Date"], errors="coerce")
-    exp["Month"] = exp["Date"].dt.strftime("%B %Y")
-    exp["Year"] = exp["Date"].dt.year
-
+    # === Display Expenses ===
     st.write("### All Expenses")
 
-    # --- Pagination for expenses ---
+    # Pagination for expenses
     ROWS_PER_PAGE = 10
-    total_exp_rows = len(exp)
+    total_exp_rows = len(df_expenses)
     total_exp_pages = (total_exp_rows - 1) // ROWS_PER_PAGE + 1
 
     if total_exp_pages > 1:
@@ -742,57 +758,44 @@ with tabs[3]:
     exp_start_idx = (exp_page - 1) * ROWS_PER_PAGE
     exp_end_idx = exp_start_idx + ROWS_PER_PAGE
 
-    exp_paged = exp.iloc[exp_start_idx:exp_end_idx].reset_index()  # Keep index for delete/edit reference
+    exp_paged = df_expenses.iloc[exp_start_idx:exp_end_idx].reset_index()  # Keep index for delete/edit reference
 
     for i, row in exp_paged.iterrows():
-        with st.expander(
-            f"{row['Type']} | {row['Item']} | GHS {row['Amount']} | {row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else ''}"
-        ):
+        with st.expander(f"{row['type']} | {row['item']} | GHS {row['amount']} | {row['date']}"):
             edit_col, delete_col = st.columns([2, 1])
             with edit_col:
                 # Pre-fill values for editing
-                new_type = st.selectbox("Type", ["Bill", "Rent", "Salary", "Marketing", "Other"], index=["Bill", "Rent", "Salary", "Marketing", "Other"].index(row['Type']) if row['Type'] in ["Bill", "Rent", "Salary", "Marketing", "Other"] else 0, key=f"type_{exp_start_idx+i}")
-                new_item = st.text_input("Item", value=row['Item'], key=f"item_{exp_start_idx+i}")
-                new_amount = st.number_input("Amount (GHS)", min_value=0.0, step=1.0, value=float(row['Amount']), key=f"amount_{exp_start_idx+i}")
-                new_date = st.date_input("Date", value=row['Date'].date() if pd.notna(row['Date']) else date.today(), key=f"date_{exp_start_idx+i}")
+                new_type = st.selectbox("Type", ["Bill", "Rent", "Salary", "Marketing", "Other"], index=["Bill", "Rent", "Salary", "Marketing", "Other"].index(row['type']) if row['type'] in ["Bill", "Rent", "Salary", "Marketing", "Other"] else 0, key=f"type_{exp_start_idx+i}")
+                new_item = st.text_input("Item", value=row['item'], key=f"item_{exp_start_idx+i}")
+                new_amount = st.number_input("Amount (GHS)", min_value=0.0, step=1.0, value=float(row['amount']), key=f"amount_{exp_start_idx+i}")
+                new_date = st.date_input("Date", value=row['date'], key=f"date_{exp_start_idx+i}")
                 if st.button("💾 Update", key=f"update_exp_{exp_start_idx+i}"):
-                    # Update in main exp DataFrame (use row['index'] for real index in exp)
-                    exp.at[row['index'], "Type"] = new_type
-                    exp.at[row['index'], "Item"] = new_item
-                    exp.at[row['index'], "Amount"] = new_amount
-                    exp.at[row['index'], "Date"] = pd.to_datetime(new_date)
-                    exp.to_csv(expenses_file, index=False)
+                    cursor.execute("""
+                    UPDATE expenses
+                    SET type=?, item=?, amount=?, date=?
+                    WHERE id=?
+                    """, (new_type, new_item, new_amount, new_date, row['id']))
+                    conn.commit()
                     st.success("✅ Expense updated.")
                     st.experimental_rerun()
             with delete_col:
                 if st.button("🗑️ Delete", key=f"delete_exp_{exp_start_idx+i}"):
-                    exp = exp.drop(row['index']).reset_index(drop=True)
-                    exp.to_csv(expenses_file, index=False)
+                    cursor.execute("DELETE FROM expenses WHERE id=?", (row['id'],))
+                    conn.commit()
                     st.success("❌ Expense deleted.")
                     st.experimental_rerun()
 
-    # ✅ Summary Section
+    # === Expense Summary ===
     st.write("### Summary")
-    if os.path.exists("students_simple.csv"):
-        df_main = pd.read_csv("students_simple.csv")
-        total_paid = df_main["Paid"].sum() if "Paid" in df_main.columns else 0.0
-    else:
-        total_paid = 0.0
-
-    total_expenses = exp["Amount"].sum() if not exp.empty else 0.0
-    net_profit = total_paid - total_expenses
-
-    st.info(f"💰 **Total Collected:** GHS {total_paid:,.2f}")
+    total_expenses = df_expenses["amount"].sum() if not df_expenses.empty else 0.0
     st.info(f"💸 **Total Expenses:** GHS {total_expenses:,.2f}")
-    st.success(f"📈 **Net Profit:** GHS {net_profit:,.2f}")
 
-    # ✅ Monthly and Yearly Groupings
-    if not exp.empty:
-        st.write("### Expenses by Month")
-        st.dataframe(exp.groupby("Month")["Amount"].sum().reset_index())
+    # === Export Expenses to CSV ===
+    exp_csv = df_expenses.to_csv(index=False)
+    st.download_button("📁 Download Expenses CSV", data=exp_csv, file_name="expenses_data.csv")
 
-        st.write("### Expenses by Year")
-        st.dataframe(exp.groupby("Year")["Amount"].sum().reset_index())
+    # === Close SQLite connection ===
+    conn.close()
 
 with tabs[4]:
     st.title("📲 WhatsApp Reminders for Debtors")
@@ -1327,76 +1330,46 @@ with tabs[8]:
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
 
-with tabs[9]:  # Assignment Marking & Scores Tab
+with tabs[9]:
+    st.title("📝 Assignment Marking & Scores (SQLite)")
 
-    st.title("📝 Assignment Marking & Scores")
+    # -- Select student, assignment, etc. (Load from CSV as before)
+    student_file = "students_simple.csv"
+    if os.path.exists(student_file):
+        df_students = pd.read_csv(student_file)
+        student_names = df_students["Name"].dropna().unique().tolist()
+    else:
+        student_names = []
 
-    # ---- Assignment lists ----
+    LEVELS = ["A1", "A2", "B1", "B2"]
     A1_ASSIGNMENTS = [
-        "Lesen and Horen 0.1",
-        "Lesen and Horen 0.2",
-        "Lesen and Horen 1.1",
-        "Lesen and Horen 1.2",
-        "Lesen and Horen 2",
-        "Lesen and Horen 3",
-        "Lesen and Horen 4",
-        "Lesen and Horen 5",
-        "Lesen and Horen 6",
-        "Lesen and Horen 7",
-        "Lesen and Horen 8",
-        "Lesen and Horen 9",
-        "Lesen and Horen 10",
-        "Lesen and Horen 11",
-        "Lesen and Horen 12.1",
-        "Lesen and Horen 12.2",
-        "Lesen and Horen 13",
-        "Lesen and Horen 14",
-        "Mock Test Lesen",
-        "Mock Test Lesen and Horen"
+        "Lesen and Horen 0.1", "Lesen and Horen 0.2", "Lesen and Horen 1.1", "Lesen and Horen 1.2",
+        "Lesen and Horen 2", "Lesen and Horen 3", "Lesen and Horen 4", "Lesen and Horen 5",
+        "Lesen and Horen 6", "Lesen and Horen 7", "Lesen and Horen 8", "Lesen and Horen 9",
+        "Lesen and Horen 10", "Lesen and Horen 11", "Lesen and Horen 12.1", "Lesen and Horen 12.2",
+        "Lesen and Horen 13", "Lesen and Horen 14", "Mock Test Lesen", "Mock Test Lesen and Horen"
     ]
-    # Reuse your existing code for A2/B1/B2
+    # Sample for A2/B1/B2 (expand as needed)
     raw_schedule_a2 = [
         ("Woche 1", ["1.1. Small Talk (Exercise)", "1.2. Personen Beschreiben (Exercise)", "1.3. Dinge und Personen vergleichen"]),
         ("Woche 2", ["2.4. Wo möchten wir uns treffen?", "2.5. Was machst du in deiner Freizeit?"]),
         ("Woche 3", ["3.6. Möbel und Räume kennenlernen", "3.7. Eine Wohnung suchen (Übung)", "3.8. Rezepte und Essen (Exercise)"]),
         ("Woche 4", ["4.9. Urlaub", "4.10. Tourismus und Traditionelle Feste", "4.11. Unterwegs: Verkehrsmittel vergleichen"]),
-        ("Woche 5", ["5.12. Ein Tag im Leben (Übung)", "5.13. Ein Vorstellungsgesprach (Exercise)", "5.14. Beruf und Karriere (Exercise)"]),
-        ("Woche 6", ["6.15. Mein Lieblingssport", "6.16. Wohlbefinden und Entspannung", "6.17. In die Apotheke gehen"]),
-        ("Woche 7", ["7.18. Die Bank Anrufen", "7.19. Einkaufen – Wo und wie? (Exercise)", "7.20. Typische Reklamationssituationen üben"]),
-        ("Woche 8", ["8.21. Ein Wochenende planen", "8.22. Die Woche Plannung"]),
-        ("Woche 9", ["9.23. Wie kommst du zur Schule / zur Arbeit?", "9.24. Einen Urlaub planen", "9.25. Tagesablauf (Exercise)"]),
-        ("Woche 10", ["10.26. Gefühle in verschiedenen Situationen beschr", "10.27. Digitale Kommunikation", "10.28. Über die Zukunft sprechen"])
+        ("Woche 5", ["5.12. Ein Tag im Leben (Übung)", "5.13. Ein Vorstellungsgesprach (Exercise)", "5.14. Beruf und Karriere (Exercise)"])
     ]
-    raw_schedule_b1 = [
-        ("Woche 1", ["1.1. Traumwelten (Übung)", "1.2. Freundes für Leben (Übung)", "1.3. Erfolgsgeschichten (Übung)"]),
-        ("Woche 2", ["2.4. Wohnung suchen (Übung)", "2.5. Der Besichtigungsg termin (Übung)", "2.6. Leben in der Stadt oder auf dem Land?"]),
-        ("Woche 3", ["3.7. Fast Food vs. Hausmannskost", "3.8. Alles für die Gesundheit", "3.9. Work-Life-Balance im modernen Arbeitsumfeld"]),
-        ("Woche 4", ["4.10. Digitale Auszeit und Selbstfürsorge", "4.11. Teamspiele und Kooperative Aktivitäten", "4.12. Abenteuer in der Natur", "4.13. Eigene Filmkritik schreiben"]),
-        ("Woche 5", ["5.14. Traditionelles vs. digitales Lernen", "5.15. Medien und Arbeiten im Homeoffice", "5.16. Prüfungsangst und Stressbewältigung", "5.17. Wie lernt man am besten?"]),
-        ("Woche 6", ["6.18. Wege zum Wunschberuf", "6.19. Das Vorstellungsgespräch", "6.20. Wie wird man …? (Ausbildung und Qu)"]),
-        ("Woche 7", ["7.21. Lebensformen heute – Familie, Wohnge", "7.22. Was ist dir in einer Beziehung wichtig?", "7.23. Erstes Date – Typische Situationen"]),
-        ("Woche 8", ["8.24. Konsum und Nachhaltigkeit", "8.25. Online einkaufen – Rechte und Risiken"]),
-        ("Woche 9", ["9.26. Reiseprobleme und Lösungen"]),
-        ("Woche 10", ["10.27. Umweltfreundlich im Alltag", "10.28. Klimafreundlich leben"])
-    ]
-    raw_schedule_b2 = []  # Add later if needed
-
-    def flatten_assignments(schedule):
-        assignments = []
-        for week, topics in schedule:
-            for t in topics:
-                assignments.append(f"{week}: {t}")
-        return assignments
-
     LEVELS = ["A1", "A2", "B1", "B2"]
     ASSIGNMENTS = {
         "A1": A1_ASSIGNMENTS,
-        "A2": flatten_assignments(raw_schedule_a2),
+        "A2": flatten_assignments(raw_schedule_a2),  # Flatten the A2/B1 schedule
         "B1": flatten_assignments(raw_schedule_b1),
         "B2": []  # Placeholder for B2
     }
 
-    # ---- Reference answers dicts (edit/expand as needed) ----
+    level = st.selectbox("Select Level", LEVELS)
+    student = st.selectbox("Select Student", student_names)
+    assignment = st.selectbox("Assignment", ASSIGNMENTS[level] if ASSIGNMENTS[level] else ["No assignments (add later)"])
+
+    # ---- Reference answers (editable for each assignment) ----
     A1_REFERENCE_ANSWERS = {
         "Lesen and Horen 0.1": {
             "Lesen": """1. C Guten Morgen
@@ -1411,70 +1384,25 @@ with tabs[9]:  # Assignment Marking & Scores Tab
 10. D Gute Nacht""",
             "Hören": ""
         },
-        # Add for others as needed...
+        # Add other assignments here...
     }
-    A2_REFERENCE_ANSWERS = {
-        "Woche 1: 1.1. Small Talk (Exercise)": {
-            "Lesen": """1. C In einer Schule 
-2. B Weil sie gerne mit Kindem arbeitet
-3. A In einem Buro
-4. B Tennis
-5. B Es war sonnig und warm
-6. B Italien und Spanien
-7. C Weil die Blaume so schön bunt sind""",
-            "Hören": """1. B Ins Kino gehen
-2. A Weil sie spannende Geschichten liebt 
-3. A Tennis
-4. B Es war sonnig und warm 
-5. Einen Spaziergang machen""",
-            "Schreiben": "",
-            "Sprechen": ""
-        },
-        # Add for others as needed...
-    }
-    B1_REFERENCE_ANSWERS = {}
-    B2_REFERENCE_ANSWERS = {}
 
     def get_default_ref(level, assignment, skill):
         refs = {
             "A1": A1_REFERENCE_ANSWERS,
-            "A2": A2_REFERENCE_ANSWERS,
+            "A2": A2_REFERENCE_ANSWERS,  # Add more as needed
             "B1": B1_REFERENCE_ANSWERS,
             "B2": B2_REFERENCE_ANSWERS,
         }
         return refs.get(level, {}).get(assignment, {}).get(skill, "")
 
-    # ---- Load students from your main file ----
-    student_file = "students_simple.csv"
-    if os.path.exists(student_file):
-        df_students = pd.read_csv(student_file)
-        student_names = df_students["Name"].dropna().unique().tolist()
-    else:
-        student_names = []
-
-    # ---- Score storage file ----
-    SCORE_FILE = "student_assignment_scores.csv"
-    SCORE_COLUMNS = [
-        "Date", "Student", "Level", "Assignment",
-        "Reference_Lesen", "Reference_Horen", "Reference_Schreiben", "Reference_Sprechen",
-        "Student_Lesen", "Student_Horen", "Student_Schreiben", "Student_Sprechen",
-        "Lesen_Score", "Horen_Score", "Schreiben_Score", "Sprechen_Score",
-        "AI_Feedback", "AI_Correction"
-    ]
-    if not os.path.exists(SCORE_FILE):
-        pd.DataFrame(columns=SCORE_COLUMNS).to_csv(SCORE_FILE, index=False)
-
-    st.subheader("Record Assignment Scores")
-    level = st.selectbox("Select Level", LEVELS)
-    student = st.selectbox("Select Student", student_names)
-    assignment = st.selectbox("Assignment", ASSIGNMENTS[level] if ASSIGNMENTS[level] else ["No assignments (add later)"])
-
-    with st.expander("Reference Answers (auto-filled, editable for each assignment)"):
+    with st.expander("Reference Answers (editable for each assignment)"):
         ref_lesen = st.text_area("Reference Answer: Lesen", value=get_default_ref(level, assignment, "Lesen"))
         ref_horen = st.text_area("Reference Answer: Hören", value=get_default_ref(level, assignment, "Hören"))
         ref_schreiben = st.text_area("Reference Answer: Schreiben", value=get_default_ref(level, assignment, "Schreiben")) if level != "A1" else ""
         ref_sprechen = st.text_area("Reference Answer: Sprechen", value=get_default_ref(level, assignment, "Sprechen")) if level != "A1" else ""
 
+    # ---- Student answers & scores ----
     with st.expander("Student Answers & Scores"):
         student_lesen = st.text_area("Student's Lesen Answer")
         student_horen = st.text_area("Student's Hören Answer")
@@ -1486,7 +1414,7 @@ with tabs[9]:  # Assignment Marking & Scores Tab
         schreiben_score = st.number_input("Schreiben Score", 0, 20, step=1) if level != "A1" else ""
         sprechen_score = st.number_input("Sprechen Score", 0, 20, step=1) if level != "A1" else ""
 
-    # --- AI Mark Schreiben (A2/B1/B2 only) ---
+    # ---- AI Mark Schreiben (A2/B1/B2 only) ----
     ai_feedback = ""
     ai_correction = ""
     OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
@@ -1518,39 +1446,38 @@ with tabs[9]:  # Assignment Marking & Scores Tab
                 except Exception as e:
                     st.error(f"OpenAI Error: {e}")
 
+    # ---- Save Assignment Scores to SQLite ----
     if st.button("Save Assignment Score"):
         now = datetime.now().strftime("%Y-%m-%d %H:%M")
-        score_df = pd.read_csv(SCORE_FILE)
-        new_row = {
-            "Date": now, "Student": student, "Level": level, "Assignment": assignment,
-            "Reference_Lesen": ref_lesen, "Reference_Horen": ref_horen, "Reference_Schreiben": ref_schreiben, "Reference_Sprechen": ref_sprechen,
-            "Student_Lesen": student_lesen, "Student_Horen": student_horen, "Student_Schreiben": student_schreiben, "Student_Sprechen": student_sprechen,
-            "Lesen_Score": lesen_score, "Horen_Score": horen_score,
-            "Schreiben_Score": schreiben_score if schreiben_score != "" else "",
-            "Sprechen_Score": sprechen_score if sprechen_score != "" else "",
-            "AI_Feedback": ai_feedback,
-            "AI_Correction": ai_correction
-        }
-        score_df = pd.concat([score_df, pd.DataFrame([new_row])], ignore_index=True)
-        score_df.to_csv(SCORE_FILE, index=False)
-        st.success("✅ Score recorded!")
+        with get_db_conn() as conn:
+            conn.execute("""
+                INSERT INTO scores
+                (date, student, level, assignment, ref_lesen, ref_horen, ref_schreiben, ref_sprechen,
+                student_lesen, student_horen, student_schreiben, student_sprechen,
+                lesen_score, horen_score, schreiben_score, sprechen_score, ai_feedback, ai_correction)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                now, student, level, assignment, ref_lesen, ref_horen, ref_schreiben, ref_sprechen,
+                student_lesen, student_horen, student_schreiben, student_sprechen,
+                lesen_score, horen_score, schreiben_score, sprechen_score, ai_feedback, ai_correction
+            ))
+        st.success("✅ Score recorded to database!")
 
-    st.subheader("Student Assignment History")
-    hist_df = pd.read_csv(SCORE_FILE)
-    filt = (hist_df["Student"] == student) & (hist_df["Level"] == level)
-    st.dataframe(hist_df[filt].sort_values("Date", ascending=False), use_container_width=True)
-
-    if not hist_df[filt].empty:
-        avg = hist_df[filt][["Lesen_Score", "Horen_Score", "Schreiben_Score", "Sprechen_Score"]].apply(pd.to_numeric, errors="coerce").mean(axis=1).mean()
-        st.info(f"**Overall Average Score for {student} ({level}): {avg:.2f}**")
+    # ---- Show History (from SQLite) ----
+    with get_db_conn() as conn:
+        df_hist = pd.read_sql_query(
+            "SELECT * FROM scores WHERE student=? AND level=? ORDER BY date DESC",
+            conn, params=(student, level)
+        )
+    st.dataframe(df_hist)
 
     # ---- Export options ----
     st.subheader("Export Scores")
-    st.download_button("Export Full CSV", data=hist_df.to_csv(index=False), file_name="student_assignment_scores.csv")
+    st.download_button("Export Full CSV", data=df_hist.to_csv(index=False), file_name="student_assignment_scores.csv")
 
     # Export only this chapter (Lesen & Hören)
-    chapter_mask = (hist_df["Level"] == level) & (hist_df["Assignment"] == assignment)
-    chapter_df = hist_df[chapter_mask]
+    chapter_mask = (df_hist["Level"] == level) & (df_hist["Assignment"] == assignment)
+    chapter_df = df_hist[chapter_mask]
     lesen_hoeren_cols = [
         "Student", "Level", "Assignment",
         "Reference_Lesen", "Student_Lesen", "Lesen_Score",
@@ -1569,3 +1496,4 @@ with tabs[9]:  # Assignment Marking & Scores Tab
         data=chapter_export.to_csv(index=False),
         file_name=f"all_{assignment.replace(' ', '_')}_lesen_hoeren.csv"
     )
+
