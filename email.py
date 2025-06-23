@@ -1326,17 +1326,20 @@ with tabs[9]:
     st.title("📝 Assignment Marking & Scores")
 
     # -- Reference answers from Google Sheet (or local upload) --
-    GOOGLE_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1WlRL2983fZ0iVAB0HC9nhiwDxfzfZtlgQZNc_JQHKjo/edit?usp=sharing"
+    GOOGLE_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1WlRL2983fZ0iVAB0HC9nhiwDxfzfZtlgQZNc_JQHKjo/gviz/tq?tqx=out:csv"
     ref_upload = st.file_uploader("⬆️ Optional: Upload reference answers CSV", type=["csv"])
+
     if ref_upload:
         ref_df = pd.read_csv(ref_upload)
-        st.success("Reference answers loaded from your file.")
+        st.success("✅ Reference answers loaded from your uploaded file.")
     else:
         try:
             ref_df = pd.read_csv(GOOGLE_SHEET_CSV)
+            st.info("ℹ️ Reference answers loaded from Google Sheet.")
         except Exception as e:
-            st.warning("Could not load reference answers.")
+            st.warning("⚠️ Could not load reference answers.")
             ref_df = pd.DataFrame()
+
 
     # -- Student Data (students.csv for main info) --
     student_file = "students.csv"
