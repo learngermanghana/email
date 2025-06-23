@@ -320,11 +320,10 @@ tabs = st.tabs([
     "📝 Marking"   # <--- New tab!
 ])
 
-
 with tabs[0]:
     st.title("📝 Pending ")
 
-    # --- Load new pending students from form sheet ---
+    # --- Load new pending students from Google Sheet or fallback ---
     try:
         new_students = pd.read_csv(sheet_url)
         def clean_col(c):
@@ -343,40 +342,39 @@ with tabs[0]:
         st.error(f"❌ Could not load registration sheet: {e}")
         new_students = pd.DataFrame()
 
-    # --- Upload Data (only uploads!) ---
+    # --- Upload Section ---
     with st.expander("📤 Upload Data"):
         st.subheader("Upload Student CSV")
-        uploaded_student_csv = st.file_uploader("Upload students_simple.csv", type=["csv"])
+        uploaded_student_csv = st.file_uploader("Upload students.csv", type=["csv"])
         if uploaded_student_csv is not None:
             df = pd.read_csv(uploaded_student_csv)
-            df.to_csv("students_simple.csv", index=False)
-            st.success("✅ Student file replaced. (No reload required!)")
+            df.to_csv("students.csv", index=False)
+            st.success("✅ Student file replaced.")
 
         st.subheader("Upload Expenses CSV")
         uploaded_expenses_csv = st.file_uploader("Upload expenses_all.csv", type=["csv"])
         if uploaded_expenses_csv is not None:
             df = pd.read_csv(uploaded_expenses_csv)
             df.to_csv("expenses_all.csv", index=False)
-            st.success("✅ Expenses file replaced. (No reload required!)")
+            st.success("✅ Expenses file replaced.")
 
-    # --- Helper: Clean any email source ---
     def get_clean_email(row):
         raw = row.get("email") or row.get("email_address") or row.get("Email Address") or ""
         return "" if pd.isna(raw) else str(raw).strip()
 
-    # --- Show and approve pending students ---
+    # --- Show & Approve Each New Student ---
     if not new_students.empty:
         for i, row in new_students.iterrows():
-            fullname   = row.get("full_name") or row.get("name") or f"Student {i}"
-            phone      = row.get("phone_number") or row.get("phone") or ""
-            email      = get_clean_email(row)
-            level      = row.get("class_a1a2_etc") or row.get("class") or row.get("level") or ""
-            location   = row.get("location", "")
-            emergency  = row.get("emergency_contact_phone_number") or row.get("emergency", "")
+            fullname  = row.get("full_name") or row.get("name") or f"Student {i}"
+            phone     = row.get("phone_number") or row.get("phone") or ""
+            email     = get_clean_email(row)
+            level     = row.get("class_a1a2_etc") or row.get("class") or row.get("level") or ""
+            location  = row.get("location", "")
+            emergency = row.get("emergency_contact_phone_number") or row.get("emergency", "")
 
             with st.expander(f"{fullname} ({phone})"):
                 st.write(f"**Email:** {email or '—'}")
-                emergency_input  = st.text_input("Emergency Contact (optional)", value=emergency, key=f"emergency_{i}")
+                emergency_input  = st.text_input("Emergency Contact", value=emergency, key=f"em_{i}")
                 student_code     = st.text_input("Assign Student Code", key=f"code_{i}")
                 contract_start   = st.date_input("Contract Start", value=date.today(), key=f"start_{i}")
                 course_length    = st.number_input("Course Length (weeks)", min_value=1, value=12, key=f"length_{i}")
@@ -392,16 +390,17 @@ with tabs[0]:
                         st.warning("Enter a unique student code.")
                         continue
 
-                    # load or init approved_df
-                    if os.path.exists("students_simple.csv"):
-                        approved_df = pd.read_csv("students_simple.csv")
+                    # --- Load existing approved students from students.csv ---
+                    if os.path.exists("students.csv"):
+                        approved_df = pd.read_csv("students.csv")
                     else:
                         approved_df = pd.DataFrame(columns=[
-                            "Name","Phone","Email","Location","Level",
-                            "Paid","Balance","ContractStart","ContractEnd",
-                            "StudentCode","Emergency Contact (Phone Number)"
+                            "Name", "Phone", "Email", "Location", "Level",
+                            "Paid", "Balance", "ContractStart", "ContractEnd",
+                            "StudentCode", "Emergency Contact (Phone Number)"
                         ])
 
+                    # --- Duplicate check ---
                     if student_code in approved_df["StudentCode"].values:
                         st.warning("❗ Student Code exists. Choose another.")
                         continue
@@ -420,9 +419,11 @@ with tabs[0]:
                         "Emergency Contact (Phone Number)": emergency_input
                     }
 
+                    # --- Save to students.csv ---
                     approved_df = pd.concat([approved_df, pd.DataFrame([student_dict])], ignore_index=True)
                     approved_df.to_csv("students.csv", index=False)
 
+                    # --- Generate PDF and send email (optional) ---
                     total_fee = paid + balance
                     pdf_file = generate_receipt_and_contract_pdf(
                         student_dict,
@@ -433,7 +434,6 @@ with tabs[0]:
                         course_length=course_length
                     )
 
-                    # optional welcome email
                     if send_email and email and school_sendgrid_key:
                         try:
                             msg = Mail(
@@ -466,7 +466,8 @@ with tabs[0]:
                             st.warning(f"⚠️ Email failed: {e}")
 
                     st.success(f"✅ {fullname} approved and saved.")
-                    st.stop()
+                    st.rerun()
+
 
 with tabs[1]:
     st.title("👩‍🎓 All Students (Edit, Update, Delete, Receipt)")
