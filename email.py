@@ -37,11 +37,11 @@ from sendgrid.helpers.mail import (
     FileType,
     Disposition,
 )
+import openai  # <-- For AI marking (Schreiben correction/feedback)
 
 # ===== Project-Specific Imports =====
 from pdf_utils import generate_receipt_and_contract_pdf
 from email_utils import send_emails
-
 
 # ===== Helper Functions =====
 def clean_phone(phone):
@@ -1327,53 +1327,34 @@ with tabs[8]:
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
 
-with tabs[9]:  # Use the next available tab index
+with tabs[9]:  # Assignment Marking & Scores Tab
+
     st.title("📝 Assignment Marking & Scores")
 
-    # ---- Schedule Templates ----
-    raw_schedule_a1 = [
-        ("Week One", ["Chapter 0.1 - Lesen & Horen"]),
-        ("Week Two", [
-            "Chapters 0.2 and 1.1 - Lesen & Horen",
-            "Chapter 1.1 - Schreiben & Sprechen and Chapter 1.2 - Lesen & Horen",
-            "Chapter 2 - Lesen & Horen"
-        ]),
-        ("Week Three", [
-            "Chapter 1.2 - Schreiben & Sprechen (Recap)",
-            "Chapter 2.3 - Schreiben & Sprechen",
-            "Chapter 3 - Lesen & Horen"
-        ]),
-        ("Week Four", [
-            "Chapter 4 - Lesen & Horen",
-            "Chapter 5 - Lesen & Horen",
-            "Chapter 6 - Lesen & Horen and Chapter 2.4 - Schreiben & Sprechen"
-        ]),
-        ("Week Five", [
-            "Chapter 7 - Lesen & Horen",
-            "Chapter 8 - Lesen & Horen",
-            "Chapter 3.5 - Schreiben & Sprechen"
-        ]),
-        ("Week Six", [
-            "Chapter 3.6 - Schreiben & Sprechen",
-            "Chapter 4.7 - Schreiben & Sprechen",
-            "Chapter 9 and 10 - Lesen & Horen"
-        ]),
-        ("Week Seven", [
-            "Chapter 11 - Lesen & Horen",
-            "Chapter 12.1 - Lesen & Horen and Schreiben & Sprechen (including 5.8)",
-            "Chapter 5.9 - Schreiben & Sprechen"
-        ]),
-        ("Week Eight", [
-            "Chapter 6.10 - Schreiben & Sprechen (Intro to letter writing)",
-            "Chapter 13 - Lesen & Horen and Chapter 6.11 - Schreiben & Sprechen",
-            "Chapter 14.1 - Lesen & Horen and Chapter 7.12 - Schreiben & Sprechen"
-        ]),
-        ("Week Nine", [
-            "Chapter 14.2 - Lesen & Horen and Chapter 7.12 - Schreiben & Sprechen",
-            "Chapter 8.13 - Schreiben & Sprechen",
-            "Exam tips - Schreiben & Sprechen recap"
-        ])
+    # ---- Assignment lists ----
+    A1_ASSIGNMENTS = [
+        "Lesen and Horen 0.1",
+        "Lesen and Horen 0.2",
+        "Lesen and Horen 1.1",
+        "Lesen and Horen 1.2",
+        "Lesen and Horen 2",
+        "Lesen and Horen 3",
+        "Lesen and Horen 4",
+        "Lesen and Horen 5",
+        "Lesen and Horen 6",
+        "Lesen and Horen 7",
+        "Lesen and Horen 8",
+        "Lesen and Horen 9",
+        "Lesen and Horen 10",
+        "Lesen and Horen 11",
+        "Lesen and Horen 12.1",
+        "Lesen and Horen 12.2",
+        "Lesen and Horen 13",
+        "Lesen and Horen 14",
+        "Mock Test Lesen",
+        "Mock Test Lesen and Horen"
     ]
+    # Reuse your existing code for A2/B1/B2
     raw_schedule_a2 = [
         ("Woche 1", ["1.1. Small Talk (Exercise)", "1.2. Personen Beschreiben (Exercise)", "1.3. Dinge und Personen vergleichen"]),
         ("Woche 2", ["2.4. Wo möchten wir uns treffen?", "2.5. Was machst du in deiner Freizeit?"]),
@@ -1398,26 +1379,70 @@ with tabs[9]:  # Use the next available tab index
         ("Woche 9", ["9.26. Reiseprobleme und Lösungen"]),
         ("Woche 10", ["10.27. Umweltfreundlich im Alltag", "10.28. Klimafreundlich leben"])
     ]
-    raw_schedule_b2 = []  # Placeholder, add when ready!
+    raw_schedule_b2 = []  # Add later if needed
 
-    def flatten_assignments(schedule, lesen_hoeren_only=False):
+    def flatten_assignments(schedule):
         assignments = []
         for week, topics in schedule:
             for t in topics:
-                if lesen_hoeren_only:
-                    if "Lesen & Horen" in t:
-                        assignments.append(f"{week}: {t}")
-                else:
-                    assignments.append(f"{week}: {t}")
+                assignments.append(f"{week}: {t}")
         return assignments
 
     LEVELS = ["A1", "A2", "B1", "B2"]
     ASSIGNMENTS = {
-        "A1": flatten_assignments(raw_schedule_a1, lesen_hoeren_only=True),
+        "A1": A1_ASSIGNMENTS,
         "A2": flatten_assignments(raw_schedule_a2),
         "B1": flatten_assignments(raw_schedule_b1),
-        "B2": []  # Placeholder for your future B2 assignments
+        "B2": []  # Placeholder for B2
     }
+
+    # ---- Reference answers dicts (edit/expand as needed) ----
+    A1_REFERENCE_ANSWERS = {
+        "Lesen and Horen 0.1": {
+            "Lesen": """1. C Guten Morgen
+2. D Guten Tag
+3. B Guten Abend 
+4. B Gute Nacht
+5. C Guten Morgen
+6. C Wie geht es Ihnen
+7. B Auf wiedersehen
+8. A Tschüss 
+9. C Guten Abend 
+10. D Gute Nacht""",
+            "Hören": ""
+        },
+        # Add for others as needed...
+    }
+    A2_REFERENCE_ANSWERS = {
+        "Woche 1: 1.1. Small Talk (Exercise)": {
+            "Lesen": """1. C In einer Schule 
+2. B Weil sie gerne mit Kindem arbeitet
+3. A In einem Buro
+4. B Tennis
+5. B Es war sonnig und warm
+6. B Italien und Spanien
+7. C Weil die Blaume so schön bunt sind""",
+            "Hören": """1. B Ins Kino gehen
+2. A Weil sie spannende Geschichten liebt 
+3. A Tennis
+4. B Es war sonnig und warm 
+5. Einen Spaziergang machen""",
+            "Schreiben": "",
+            "Sprechen": ""
+        },
+        # Add for others as needed...
+    }
+    B1_REFERENCE_ANSWERS = {}
+    B2_REFERENCE_ANSWERS = {}
+
+    def get_default_ref(level, assignment, skill):
+        refs = {
+            "A1": A1_REFERENCE_ANSWERS,
+            "A2": A2_REFERENCE_ANSWERS,
+            "B1": B1_REFERENCE_ANSWERS,
+            "B2": B2_REFERENCE_ANSWERS,
+        }
+        return refs.get(level, {}).get(assignment, {}).get(skill, "")
 
     # ---- Load students from your main file ----
     student_file = "students_simple.csv"
@@ -1439,47 +1464,70 @@ with tabs[9]:  # Use the next available tab index
     if not os.path.exists(SCORE_FILE):
         pd.DataFrame(columns=SCORE_COLUMNS).to_csv(SCORE_FILE, index=False)
 
-    # ---- UI ----
     st.subheader("Record Assignment Scores")
-
     level = st.selectbox("Select Level", LEVELS)
     student = st.selectbox("Select Student", student_names)
     assignment = st.selectbox("Assignment", ASSIGNMENTS[level] if ASSIGNMENTS[level] else ["No assignments (add later)"])
 
-    # Reference Answers
-    with st.expander("Reference Answers (for manual or auto marking)"):
-        ref_lesen = st.text_area("Reference Answer: Lesen")
-        ref_horen = st.text_area("Reference Answer: Hören")
-        ref_schreiben = st.text_area("Reference Answer: Schreiben")
-        ref_sprechen = st.text_area("Reference Answer: Sprechen")
+    with st.expander("Reference Answers (auto-filled, editable for each assignment)"):
+        ref_lesen = st.text_area("Reference Answer: Lesen", value=get_default_ref(level, assignment, "Lesen"))
+        ref_horen = st.text_area("Reference Answer: Hören", value=get_default_ref(level, assignment, "Hören"))
+        ref_schreiben = st.text_area("Reference Answer: Schreiben", value=get_default_ref(level, assignment, "Schreiben")) if level != "A1" else ""
+        ref_sprechen = st.text_area("Reference Answer: Sprechen", value=get_default_ref(level, assignment, "Sprechen")) if level != "A1" else ""
 
-    # Student Answers & Scores
-    with st.expander("Student Answers (Optional: use for cross-check or auto-marking)"):
+    with st.expander("Student Answers & Scores"):
         student_lesen = st.text_area("Student's Lesen Answer")
         student_horen = st.text_area("Student's Hören Answer")
-        student_schreiben = st.text_area("Student's Schreiben Answer")
-        student_sprechen = st.text_area("Student's Sprechen Answer")
+        student_schreiben = st.text_area("Student's Schreiben Answer") if level != "A1" else ""
+        student_sprechen = st.text_area("Student's Sprechen Answer") if level != "A1" else ""
 
-    lesen_score = st.number_input("Lesen Score", 0, 20, step=1)
-    horen_score = st.number_input("Hören Score", 0, 20, step=1)
-    schreiben_score = st.number_input("Schreiben Score", 0, 20, step=1) if level in ["A2", "B1"] else None
-    sprechen_score = st.number_input("Sprechen Score", 0, 20, step=1) if level in ["A2", "B1"] else None
+        lesen_score = st.number_input("Lesen Score", 0, 20, step=1)
+        horen_score = st.number_input("Hören Score", 0, 20, step=1)
+        schreiben_score = st.number_input("Schreiben Score", 0, 20, step=1) if level != "A1" else ""
+        sprechen_score = st.number_input("Sprechen Score", 0, 20, step=1) if level != "A1" else ""
 
-    ai_feedback = st.text_area("AI Feedback (optional, paste from GPT)", key="aifeedback") if level in ["A2", "B1"] else ""
-    ai_correction = st.text_area("AI Correction (optional, paste from GPT)", key="aicorrection") if level in ["A2", "B1"] else ""
+    # --- AI Mark Schreiben (A2/B1/B2 only) ---
+    ai_feedback = ""
+    ai_correction = ""
+    OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
+    if level != "A1" and student_schreiben and OPENAI_API_KEY:
+        if st.button("Auto-Mark Schreiben (OpenAI)"):
+            with st.spinner("Marking with OpenAI..."):
+                try:
+                    openai.api_key = OPENAI_API_KEY
+                    prompt = (
+                        f"Correct this German {level} Schreiben assignment, give clear feedback in simple German, and assign a score out of 20. "
+                        f"Student answer:\n{student_schreiben}\n"
+                        "Respond as:\nKorrigierter Text:\n[correction]\n\nFeedback:\n[feedback]\n\nPunktzahl: [score]/20"
+                    )
+                    resp = openai.ChatCompletion.create(
+                        model="gpt-4o",
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=0
+                    )
+                    result = resp.choices[0].message.content
+                    try:
+                        ai_correction = result.split("Korrigierter Text:")[1].split("Feedback:")[0].strip()
+                        ai_feedback = result.split("Feedback:")[1].split("Punktzahl:")[0].strip()
+                        score_part = result.split("Punktzahl:")[1].split("/")[0].strip()
+                        schreiben_score = int("".join([c for c in score_part if c.isdigit()]))
+                    except Exception:
+                        ai_correction = result
+                        ai_feedback = ""
+                    st.success(f"Correction:\n{ai_correction}\n\nFeedback:\n{ai_feedback}\n\nScore: {schreiben_score}/20")
+                except Exception as e:
+                    st.error(f"OpenAI Error: {e}")
 
-    # ---- Save Score ----
     if st.button("Save Assignment Score"):
         now = datetime.now().strftime("%Y-%m-%d %H:%M")
-        # Load, append, and save
         score_df = pd.read_csv(SCORE_FILE)
         new_row = {
             "Date": now, "Student": student, "Level": level, "Assignment": assignment,
             "Reference_Lesen": ref_lesen, "Reference_Horen": ref_horen, "Reference_Schreiben": ref_schreiben, "Reference_Sprechen": ref_sprechen,
             "Student_Lesen": student_lesen, "Student_Horen": student_horen, "Student_Schreiben": student_schreiben, "Student_Sprechen": student_sprechen,
             "Lesen_Score": lesen_score, "Horen_Score": horen_score,
-            "Schreiben_Score": schreiben_score if schreiben_score is not None else "",
-            "Sprechen_Score": sprechen_score if sprechen_score is not None else "",
+            "Schreiben_Score": schreiben_score if schreiben_score != "" else "",
+            "Sprechen_Score": sprechen_score if sprechen_score != "" else "",
             "AI_Feedback": ai_feedback,
             "AI_Correction": ai_correction
         }
@@ -1487,17 +1535,37 @@ with tabs[9]:  # Use the next available tab index
         score_df.to_csv(SCORE_FILE, index=False)
         st.success("✅ Score recorded!")
 
-    # ---- Show History ----
     st.subheader("Student Assignment History")
     hist_df = pd.read_csv(SCORE_FILE)
     filt = (hist_df["Student"] == student) & (hist_df["Level"] == level)
     st.dataframe(hist_df[filt].sort_values("Date", ascending=False), use_container_width=True)
 
-    # ---- Show Overall Average ----
     if not hist_df[filt].empty:
         avg = hist_df[filt][["Lesen_Score", "Horen_Score", "Schreiben_Score", "Sprechen_Score"]].apply(pd.to_numeric, errors="coerce").mean(axis=1).mean()
         st.info(f"**Overall Average Score for {student} ({level}): {avg:.2f}**")
 
-    # ---- PDF Export (stub) ----
-    # You can expand this to generate PDF reports using fpdf or similar if you wish!
-    st.caption("To add PDF exports, use fpdf or Streamlit's built-in download features.")
+    # ---- Export options ----
+    st.subheader("Export Scores")
+    st.download_button("Export Full CSV", data=hist_df.to_csv(index=False), file_name="student_assignment_scores.csv")
+
+    # Export only this chapter (Lesen & Hören)
+    chapter_mask = (hist_df["Level"] == level) & (hist_df["Assignment"] == assignment)
+    chapter_df = hist_df[chapter_mask]
+    lesen_hoeren_cols = [
+        "Student", "Level", "Assignment",
+        "Reference_Lesen", "Student_Lesen", "Lesen_Score",
+        "Reference_Horen", "Student_Horen", "Horen_Score"
+    ]
+    chapter_export = chapter_df[lesen_hoeren_cols]
+    st.download_button(
+        f"Export Only '{assignment}' (Lesen & Hören)",
+        data=chapter_export.to_csv(index=False),
+        file_name=f"{assignment.replace(' ', '_')}_lesen_hoeren.csv"
+    )
+
+    # Export all students for current assignment (Lesen & Hören)
+    st.download_button(
+        f"Export All Students '{assignment}' (Lesen & Hören)",
+        data=chapter_export.to_csv(index=False),
+        file_name=f"all_{assignment.replace(' ', '_')}_lesen_hoeren.csv"
+    )
