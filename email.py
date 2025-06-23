@@ -341,6 +341,7 @@ tabs = st.tabs([
     "📧 Send Email",
     "📊 Analytics & Export",
     "📆 A1 Course Schedule"  
+    "📝 Assessment & Marking" 
 ])
 
 with tabs[0]:
