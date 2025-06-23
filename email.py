@@ -331,20 +331,20 @@ else:
 
 
 tabs = st.tabs([
-    "📝 Pending Registrations",
+    "📝 Pending",
     "👩‍🎓 All Students",
     "➕ Add Student",
     "💵 Expenses",
-    "📲 WhatsApp Reminders",
-    "📄 Generate Contract PDF",
+    "📲 Reminders",
+    "📄 Contract ",
     "📧 Send Email",
     "📊 Analytics & Export",
-    "📆 A1 Course Schedule",
-    "📝 Assessment & Marking"   # <--- New tab!
+    "📆 Schedule",
+    "📝 Marking"   # <--- New tab!
 ])
 
 with tabs[0]:
-    st.title("📝 Pending Student Registrations")
+    st.title("📝 Pending ")
 
     # --- Load new pending students from form sheet ---
     try:
