@@ -330,7 +330,6 @@ else:
     """, unsafe_allow_html=True)
 
 
-# === TABS ===
 tabs = st.tabs([
     "📝 Pending Registrations",
     "👩‍🎓 All Students",
@@ -340,8 +339,8 @@ tabs = st.tabs([
     "📄 Generate Contract PDF",
     "📧 Send Email",
     "📊 Analytics & Export",
-    "📆 A1 Course Schedule"  
-    "📝 Assessment & Marking" 
+    "📆 A1 Course Schedule",
+    "📝 Assessment & Marking"   # <--- New tab!
 ])
 
 with tabs[0]:
@@ -1328,3 +1327,177 @@ with tabs[8]:
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
 
+with tabs[9]:  # Use the next available tab index
+    st.title("📝 Assignment Marking & Scores")
+
+    # ---- Schedule Templates ----
+    raw_schedule_a1 = [
+        ("Week One", ["Chapter 0.1 - Lesen & Horen"]),
+        ("Week Two", [
+            "Chapters 0.2 and 1.1 - Lesen & Horen",
+            "Chapter 1.1 - Schreiben & Sprechen and Chapter 1.2 - Lesen & Horen",
+            "Chapter 2 - Lesen & Horen"
+        ]),
+        ("Week Three", [
+            "Chapter 1.2 - Schreiben & Sprechen (Recap)",
+            "Chapter 2.3 - Schreiben & Sprechen",
+            "Chapter 3 - Lesen & Horen"
+        ]),
+        ("Week Four", [
+            "Chapter 4 - Lesen & Horen",
+            "Chapter 5 - Lesen & Horen",
+            "Chapter 6 - Lesen & Horen and Chapter 2.4 - Schreiben & Sprechen"
+        ]),
+        ("Week Five", [
+            "Chapter 7 - Lesen & Horen",
+            "Chapter 8 - Lesen & Horen",
+            "Chapter 3.5 - Schreiben & Sprechen"
+        ]),
+        ("Week Six", [
+            "Chapter 3.6 - Schreiben & Sprechen",
+            "Chapter 4.7 - Schreiben & Sprechen",
+            "Chapter 9 and 10 - Lesen & Horen"
+        ]),
+        ("Week Seven", [
+            "Chapter 11 - Lesen & Horen",
+            "Chapter 12.1 - Lesen & Horen and Schreiben & Sprechen (including 5.8)",
+            "Chapter 5.9 - Schreiben & Sprechen"
+        ]),
+        ("Week Eight", [
+            "Chapter 6.10 - Schreiben & Sprechen (Intro to letter writing)",
+            "Chapter 13 - Lesen & Horen and Chapter 6.11 - Schreiben & Sprechen",
+            "Chapter 14.1 - Lesen & Horen and Chapter 7.12 - Schreiben & Sprechen"
+        ]),
+        ("Week Nine", [
+            "Chapter 14.2 - Lesen & Horen and Chapter 7.12 - Schreiben & Sprechen",
+            "Chapter 8.13 - Schreiben & Sprechen",
+            "Exam tips - Schreiben & Sprechen recap"
+        ])
+    ]
+    raw_schedule_a2 = [
+        ("Woche 1", ["1.1. Small Talk (Exercise)", "1.2. Personen Beschreiben (Exercise)", "1.3. Dinge und Personen vergleichen"]),
+        ("Woche 2", ["2.4. Wo möchten wir uns treffen?", "2.5. Was machst du in deiner Freizeit?"]),
+        ("Woche 3", ["3.6. Möbel und Räume kennenlernen", "3.7. Eine Wohnung suchen (Übung)", "3.8. Rezepte und Essen (Exercise)"]),
+        ("Woche 4", ["4.9. Urlaub", "4.10. Tourismus und Traditionelle Feste", "4.11. Unterwegs: Verkehrsmittel vergleichen"]),
+        ("Woche 5", ["5.12. Ein Tag im Leben (Übung)", "5.13. Ein Vorstellungsgesprach (Exercise)", "5.14. Beruf und Karriere (Exercise)"]),
+        ("Woche 6", ["6.15. Mein Lieblingssport", "6.16. Wohlbefinden und Entspannung", "6.17. In die Apotheke gehen"]),
+        ("Woche 7", ["7.18. Die Bank Anrufen", "7.19. Einkaufen – Wo und wie? (Exercise)", "7.20. Typische Reklamationssituationen üben"]),
+        ("Woche 8", ["8.21. Ein Wochenende planen", "8.22. Die Woche Plannung"]),
+        ("Woche 9", ["9.23. Wie kommst du zur Schule / zur Arbeit?", "9.24. Einen Urlaub planen", "9.25. Tagesablauf (Exercise)"]),
+        ("Woche 10", ["10.26. Gefühle in verschiedenen Situationen beschr", "10.27. Digitale Kommunikation", "10.28. Über die Zukunft sprechen"])
+    ]
+    raw_schedule_b1 = [
+        ("Woche 1", ["1.1. Traumwelten (Übung)", "1.2. Freundes für Leben (Übung)", "1.3. Erfolgsgeschichten (Übung)"]),
+        ("Woche 2", ["2.4. Wohnung suchen (Übung)", "2.5. Der Besichtigungsg termin (Übung)", "2.6. Leben in der Stadt oder auf dem Land?"]),
+        ("Woche 3", ["3.7. Fast Food vs. Hausmannskost", "3.8. Alles für die Gesundheit", "3.9. Work-Life-Balance im modernen Arbeitsumfeld"]),
+        ("Woche 4", ["4.10. Digitale Auszeit und Selbstfürsorge", "4.11. Teamspiele und Kooperative Aktivitäten", "4.12. Abenteuer in der Natur", "4.13. Eigene Filmkritik schreiben"]),
+        ("Woche 5", ["5.14. Traditionelles vs. digitales Lernen", "5.15. Medien und Arbeiten im Homeoffice", "5.16. Prüfungsangst und Stressbewältigung", "5.17. Wie lernt man am besten?"]),
+        ("Woche 6", ["6.18. Wege zum Wunschberuf", "6.19. Das Vorstellungsgespräch", "6.20. Wie wird man …? (Ausbildung und Qu)"]),
+        ("Woche 7", ["7.21. Lebensformen heute – Familie, Wohnge", "7.22. Was ist dir in einer Beziehung wichtig?", "7.23. Erstes Date – Typische Situationen"]),
+        ("Woche 8", ["8.24. Konsum und Nachhaltigkeit", "8.25. Online einkaufen – Rechte und Risiken"]),
+        ("Woche 9", ["9.26. Reiseprobleme und Lösungen"]),
+        ("Woche 10", ["10.27. Umweltfreundlich im Alltag", "10.28. Klimafreundlich leben"])
+    ]
+    raw_schedule_b2 = []  # Placeholder, add when ready!
+
+    def flatten_assignments(schedule, lesen_hoeren_only=False):
+        assignments = []
+        for week, topics in schedule:
+            for t in topics:
+                if lesen_hoeren_only:
+                    if "Lesen & Horen" in t:
+                        assignments.append(f"{week}: {t}")
+                else:
+                    assignments.append(f"{week}: {t}")
+        return assignments
+
+    LEVELS = ["A1", "A2", "B1", "B2"]
+    ASSIGNMENTS = {
+        "A1": flatten_assignments(raw_schedule_a1, lesen_hoeren_only=True),
+        "A2": flatten_assignments(raw_schedule_a2),
+        "B1": flatten_assignments(raw_schedule_b1),
+        "B2": []  # Placeholder for your future B2 assignments
+    }
+
+    # ---- Load students from your main file ----
+    student_file = "students_simple.csv"
+    if os.path.exists(student_file):
+        df_students = pd.read_csv(student_file)
+        student_names = df_students["Name"].dropna().unique().tolist()
+    else:
+        student_names = []
+
+    # ---- Score storage file ----
+    SCORE_FILE = "student_assignment_scores.csv"
+    SCORE_COLUMNS = [
+        "Date", "Student", "Level", "Assignment",
+        "Reference_Lesen", "Reference_Horen", "Reference_Schreiben", "Reference_Sprechen",
+        "Student_Lesen", "Student_Horen", "Student_Schreiben", "Student_Sprechen",
+        "Lesen_Score", "Horen_Score", "Schreiben_Score", "Sprechen_Score",
+        "AI_Feedback", "AI_Correction"
+    ]
+    if not os.path.exists(SCORE_FILE):
+        pd.DataFrame(columns=SCORE_COLUMNS).to_csv(SCORE_FILE, index=False)
+
+    # ---- UI ----
+    st.subheader("Record Assignment Scores")
+
+    level = st.selectbox("Select Level", LEVELS)
+    student = st.selectbox("Select Student", student_names)
+    assignment = st.selectbox("Assignment", ASSIGNMENTS[level] if ASSIGNMENTS[level] else ["No assignments (add later)"])
+
+    # Reference Answers
+    with st.expander("Reference Answers (for manual or auto marking)"):
+        ref_lesen = st.text_area("Reference Answer: Lesen")
+        ref_horen = st.text_area("Reference Answer: Hören")
+        ref_schreiben = st.text_area("Reference Answer: Schreiben")
+        ref_sprechen = st.text_area("Reference Answer: Sprechen")
+
+    # Student Answers & Scores
+    with st.expander("Student Answers (Optional: use for cross-check or auto-marking)"):
+        student_lesen = st.text_area("Student's Lesen Answer")
+        student_horen = st.text_area("Student's Hören Answer")
+        student_schreiben = st.text_area("Student's Schreiben Answer")
+        student_sprechen = st.text_area("Student's Sprechen Answer")
+
+    lesen_score = st.number_input("Lesen Score", 0, 20, step=1)
+    horen_score = st.number_input("Hören Score", 0, 20, step=1)
+    schreiben_score = st.number_input("Schreiben Score", 0, 20, step=1) if level in ["A2", "B1"] else None
+    sprechen_score = st.number_input("Sprechen Score", 0, 20, step=1) if level in ["A2", "B1"] else None
+
+    ai_feedback = st.text_area("AI Feedback (optional, paste from GPT)", key="aifeedback") if level in ["A2", "B1"] else ""
+    ai_correction = st.text_area("AI Correction (optional, paste from GPT)", key="aicorrection") if level in ["A2", "B1"] else ""
+
+    # ---- Save Score ----
+    if st.button("Save Assignment Score"):
+        now = datetime.now().strftime("%Y-%m-%d %H:%M")
+        # Load, append, and save
+        score_df = pd.read_csv(SCORE_FILE)
+        new_row = {
+            "Date": now, "Student": student, "Level": level, "Assignment": assignment,
+            "Reference_Lesen": ref_lesen, "Reference_Horen": ref_horen, "Reference_Schreiben": ref_schreiben, "Reference_Sprechen": ref_sprechen,
+            "Student_Lesen": student_lesen, "Student_Horen": student_horen, "Student_Schreiben": student_schreiben, "Student_Sprechen": student_sprechen,
+            "Lesen_Score": lesen_score, "Horen_Score": horen_score,
+            "Schreiben_Score": schreiben_score if schreiben_score is not None else "",
+            "Sprechen_Score": sprechen_score if sprechen_score is not None else "",
+            "AI_Feedback": ai_feedback,
+            "AI_Correction": ai_correction
+        }
+        score_df = pd.concat([score_df, pd.DataFrame([new_row])], ignore_index=True)
+        score_df.to_csv(SCORE_FILE, index=False)
+        st.success("✅ Score recorded!")
+
+    # ---- Show History ----
+    st.subheader("Student Assignment History")
+    hist_df = pd.read_csv(SCORE_FILE)
+    filt = (hist_df["Student"] == student) & (hist_df["Level"] == level)
+    st.dataframe(hist_df[filt].sort_values("Date", ascending=False), use_container_width=True)
+
+    # ---- Show Overall Average ----
+    if not hist_df[filt].empty:
+        avg = hist_df[filt][["Lesen_Score", "Horen_Score", "Schreiben_Score", "Sprechen_Score"]].apply(pd.to_numeric, errors="coerce").mean(axis=1).mean()
+        st.info(f"**Overall Average Score for {student} ({level}): {avg:.2f}**")
+
+    # ---- PDF Export (stub) ----
+    # You can expand this to generate PDF reports using fpdf or similar if you wish!
+    st.caption("To add PDF exports, use fpdf or Streamlit's built-in download features.")
