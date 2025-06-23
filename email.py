@@ -1323,125 +1323,140 @@ with tabs[8]:
                        mime="application/pdf")
 
 with tabs[9]:
-    st.title("📝 Assignment Marking & Scores")
+    st.title("📝  Quick Marking & Scores")
 
-    # -- Reference answers from Google Sheet (or local upload) --
-    GOOGLE_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1WlRL2983fZ0iVAB0HC9nhiwDxfzfZtlgQZNc_JQHKjo/gviz/tq?tqx=out:csv"
-    ref_upload = st.file_uploader("⬆️ Optional: Upload reference answers CSV", type=["csv"])
-
-    if ref_upload:
-        ref_df = pd.read_csv(ref_upload)
-        st.success("✅ Reference answers loaded from your uploaded file.")
+    # ---------- Load student list ----------
+    STUDENT_FILE = "students.csv"           # must contain at least Name, Phone
+    if os.path.exists(STUDENT_FILE):
+        df_students = pd.read_csv(STUDENT_FILE)
     else:
-        try:
-            ref_df = pd.read_csv(GOOGLE_SHEET_CSV)
-            st.info("ℹ️ Reference answers loaded from Google Sheet.")
-        except Exception as e:
-            st.warning("⚠️ Could not load reference answers.")
-            ref_df = pd.DataFrame()
+        st.error("students.csv not found – upload it in the Pending tab or place it in the repo.")
+        df_students = pd.DataFrame(columns=["Name", "Phone", "Level"])
 
+    # Protect against missing columns
+    for col in ["Name", "Phone", "Level"]:
+        if col not in df_students.columns:
+            df_students[col] = ""
 
-    # -- Student Data (students.csv for main info) --
-    student_file = "students.csv"
-    if os.path.exists(student_file):
-        df_students = pd.read_csv(student_file)
-    else:
-        st.error("students.csv not found.")
-        df_students = pd.DataFrame(columns=["Name", "Level", "StudentCode"])
+    student_names = df_students["Name"].dropna().unique().tolist()
+    if not student_names:
+        st.info("Add some students first.")
+        st.stop()
 
-    # -- Scores DB --
-    SCORE_FILE = "student_scores.csv"
-    SCORE_COLUMNS = ["Date", "Student", "Level", "Assignment", "Skill", "Reference_Answer", "Score"]
+    # ---------- Simple score database ----------
+    SCORE_FILE = "simple_scores.csv"
+    SCORE_COLS = ["Date", "Student", "Level", "Assignment", "Score", "Comment", "Answer_Text"]
     if not os.path.exists(SCORE_FILE):
-        pd.DataFrame(columns=SCORE_COLUMNS).to_csv(SCORE_FILE, index=False)
+        pd.DataFrame(columns=SCORE_COLS).to_csv(SCORE_FILE, index=False)
+
     df_scores = pd.read_csv(SCORE_FILE)
 
-    # -- UI: Select Student, Level, Assignment --
-    st.subheader("Step 1: Select Student & Assignment")
-    student_list = df_students["Name"].dropna().unique().tolist()
-    student = st.selectbox("Student", student_list, index=0 if student_list else None)
-    level = st.selectbox("Level", df_students[df_students["Name"] == student]["Level"].unique().tolist() if student else ["A1","A2","B1","B2"])
-    assignments = ref_df[ref_df["Level"] == level]["Assignment"].dropna().unique().tolist()
-    assignment = st.selectbox("Assignment", assignments if assignments else ["No assignments"], index=0)
+    # ---------- Marking form ----------
+    st.header("Step 1 • Select student & enter score")
 
-    # -- Show Reference Answers for Selected Assignment --
-    st.markdown("#### Reference Answers (for you, not for students)")
-    if not ref_df.empty and assignment in ref_df["Assignment"].values:
-        answers_block = ref_df[(ref_df["Level"] == level) & (ref_df["Assignment"] == assignment)]
-        for _, row in answers_block.iterrows():
-            st.markdown(f"**{row['Skill']}**: {row['Reference_Answer']}")
-    else:
-        st.info("No reference answers for this assignment yet.")
+    col1, col2 = st.columns(2)
+    with col1:
+        student = st.selectbox("👤 Student", student_names)
+    with col2:
+        level_default = df_students.loc[df_students["Name"] == student, "Level"].values[0] if student else ""
+        level = st.text_input("Level", value=level_default)
 
-    # -- Enter Score(s) --
-    st.markdown("---")
-    st.subheader("Step 2: Mark & Save Score")
-    # Show Skills for this assignment
-    skill_list = answers_block["Skill"].unique().tolist() if not ref_df.empty and assignment in ref_df["Assignment"].values else ["Lesen"]
-    scores = {}
-    for skill in skill_list:
-        scores[skill] = st.number_input(f"Score for {skill}", 0, 20, step=1, key=f"{student}_{assignment}_{skill}")
+    assignment = st.text_input("Assignment name", value="Lesen & Hören 0.1")
+    score_val  = st.number_input("Score (0 – 100)", min_value=0, max_value=100, value=75)
+    comment    = st.text_area("Optional teacher comment / feedback")
+    answer_txt = st.text_area("Optional answer key (included in PDF)")
 
-    # Save Button
-    if st.button("💾 Save Score"):
+    if st.button("💾 Save score"):
         now = datetime.now().strftime("%Y-%m-%d %H:%M")
-        new_rows = []
-        for skill in skill_list:
-            ref_ans = answers_block[answers_block["Skill"] == skill]["Reference_Answer"].values[0] if not answers_block.empty else ""
-            new_rows.append({
-                "Date": now,
-                "Student": student,
-                "Level": level,
-                "Assignment": assignment,
-                "Skill": skill,
-                "Reference_Answer": ref_ans,
-                "Score": scores[skill],
-            })
-        df_scores = pd.concat([df_scores, pd.DataFrame(new_rows)], ignore_index=True)
+        new_row = {
+            "Date": now,
+            "Student": student,
+            "Level": level,
+            "Assignment": assignment,
+            "Score": score_val,
+            "Comment": comment,
+            "Answer_Text": answer_txt
+        }
+        df_scores = pd.concat([df_scores, pd.DataFrame([new_row])], ignore_index=True)
         df_scores.to_csv(SCORE_FILE, index=False)
-        st.success("✅ Scores saved!")
+        st.success("Saved!")
 
-    # --- Show This Student's Results and Stats ---
-    st.markdown("---")
-    st.subheader(f"{student} – Results Overview")
-    if not df_scores.empty:
-        student_scores = df_scores[(df_scores["Student"] == student) & (df_scores["Level"] == level)]
-        if not student_scores.empty:
-            st.dataframe(student_scores[["Date", "Assignment", "Skill", "Score"]], use_container_width=True)
-            total_marked = student_scores["Assignment"].nunique()
-            avg_score = student_scores["Score"].mean()
-            st.info(f"**Total Assignments Marked:** {total_marked}")
-            st.info(f"**Average Score:** {avg_score:.2f}")
-        else:
-            st.info("No scores for this student yet.")
+    # ---------- Student overview ----------
+    st.header(f"Step 2 • {student} – history & average")
 
-    # --- Download and WhatsApp Options ---
-    st.markdown("---")
-    st.subheader("Download & Share")
-    if not df_scores.empty and not student_scores.empty:
-        # Download all this student's results
-        student_csv = student_scores.to_csv(index=False)
-        st.download_button(f"⬇️ Download {student} Results (CSV)", student_csv, file_name=f"{student}_scores.csv")
-        # WhatsApp result summary (last assignment)
-        last = student_scores.sort_values("Date").iloc[-1]
-        whatsapp_number = df_students[df_students["Name"] == student]["Phone"].values[0] if "Phone" in df_students.columns else ""
-        msg = (
-            f"Hello {student}, here is your score for '{last['Assignment']}' ({last['Skill']}): {last['Score']}/20. "
-            f"Keep it up! – Learn Language Education Academy"
-        )
-        wa_url = f"https://wa.me/{whatsapp_number}?text={urllib.parse.quote(msg)}" if whatsapp_number else ""
-        if wa_url:
-            st.markdown(f"[📲 Share Last Result on WhatsApp]({wa_url})")
+    stu_hist = df_scores[df_scores["Student"] == student].sort_values("Date", ascending=False)
+    if stu_hist.empty:
+        st.info("No scores for this student yet.")
+    else:
+        st.dataframe(stu_hist[["Date", "Assignment", "Score", "Comment"]], use_container_width=True)
 
-    # --- Upload All Results (for restore) ---
-    st.markdown("---")
-    st.subheader("Restore Scores from CSV (Upload)")
-    upload_scores = st.file_uploader("Upload CSV of all scores (to restore)", type=["csv"], key="restore_scores")
-    if upload_scores:
-        try:
-            new_df = pd.read_csv(upload_scores)
-            new_df.to_csv(SCORE_FILE, index=False)
-            st.success("Scores file restored successfully!")
-            st.experimental_rerun()
-        except Exception as e:
-            st.error(f"Upload failed: {e}")
+        avg = stu_hist["Score"].mean()
+        st.info(f"**Total assignments submitted:** {len(stu_hist)}")
+        st.info(f"**Average score:** {avg:.2f}")
+
+        # ---------- PDF export ----------
+        st.header("Step 3 • Download / share latest score")
+
+        latest = stu_hist.iloc[0]
+        # Simple PDF
+        from fpdf import FPDF
+
+        pdf = FPDF()
+        pdf.set_auto_page_break(auto=True, margin=15)
+        pdf.add_page()
+        pdf.set_font("Arial", "B", 14)
+        pdf.cell(0, 10, f"{SCHOOL_NAME} – Score Report", ln=1, align="C")
+        pdf.ln(4)
+        pdf.set_font("Arial", "", 12)
+        pdf.multi_cell(0, 8, f"Student: {student}")
+        pdf.multi_cell(0, 8, f"Level: {latest['Level']}")
+        pdf.multi_cell(0, 8, f"Assignment: {latest['Assignment']}")
+        pdf.multi_cell(0, 8, f"Score: {latest['Score']}/100")
+        pdf.multi_cell(0, 8, f"Date: {latest['Date']}")
+
+        if latest["Comment"]:
+            pdf.ln(3)
+            pdf.set_font("Arial", "B", 12); pdf.cell(0, 8, "Teacher Comment:", ln=1)
+            pdf.set_font("Arial", "", 12);  pdf.multi_cell(0, 8, latest["Comment"])
+
+        if latest["Answer_Text"]:
+            pdf.ln(3)
+            pdf.set_font("Arial", "B", 12); pdf.cell(0, 8, "Answer Key:", ln=1)
+            pdf.set_font("Arial", "", 11); pdf.multi_cell(0, 6, latest["Answer_Text"])
+
+        pdf.ln(10); pdf.set_font("Arial", "I", 10); pdf.cell(0, 8, "Signed: Felix Asadu", ln=1, align="R")
+
+        pdf_bytes = pdf.output(dest="S").encode("latin-1")
+        pdf_name  = f"{student.replace(' ', '_')}_{latest['Assignment'].replace(' ', '_')}.pdf"
+        st.download_button("⬇️ Download PDF", data=pdf_bytes, file_name=pdf_name, mime="application/pdf")
+
+        # WhatsApp quick share link (score only)
+        phone_raw = df_students.loc[df_students["Name"] == student, "Phone"].values[0]
+        phone_num = "".join(filter(str.isdigit, str(phone_raw))) if phone_raw else ""
+        if phone_num.startswith("0"):
+            phone_num = "233" + phone_num[1:]
+        if phone_num:
+            msg = f"Hallo {student}, dein Ergebnis für '{latest['Assignment']}' ist {latest['Score']}/100. Weiter so! – {SCHOOL_NAME}"
+            wa_link = f"https://wa.me/{phone_num}?text={urllib.parse.quote(msg)}"
+            st.markdown(f"[📲 Share on WhatsApp]({wa_link})")
+
+    # ---------- Full scores backup / restore ----------
+    st.header("Backup & Restore")
+    colU1, colU2 = st.columns(2)
+    with colU1:
+        csv_all = df_scores.to_csv(index=False)
+        st.download_button("⬇️ Download ALL scores CSV", csv_all, file_name="all_student_scores.csv")
+    with colU2:
+        up = st.file_uploader("⬆️ Restore scores CSV", type=["csv"], key="restore_simple")
+        if up:
+            try:
+                new_df = pd.read_csv(up)
+                # basic sanity
+                if set(SCORE_COLS).issubset(new_df.columns):
+                    new_df.to_csv(SCORE_FILE, index=False)
+                    st.success("Scores restored – reloading.")
+                    st.experimental_rerun()
+                else:
+                    st.error("Column mismatch – restore aborted.")
+            except Exception as e:
+                st.error(f"Restore failed: {e}")
