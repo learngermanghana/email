@@ -1330,46 +1330,75 @@ with tabs[8]:
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
 
-with tabs[9]:
-    st.title("📝 Assignment Marking & Scores (SQLite)")
+with tabs[9]:  # Assignment Marking & Scores Tab
+    st.title("📝 Assignment Marking & Scores")
 
-    # -- Select student, assignment, etc. (Load from CSV as before)
-    student_file = "students_simple.csv"
-    if os.path.exists(student_file):
-        df_students = pd.read_csv(student_file)
-        student_names = df_students["Name"].dropna().unique().tolist()
-    else:
-        student_names = []
-
-    LEVELS = ["A1", "A2", "B1", "B2"]
+    # ---- Assignment lists ----
     A1_ASSIGNMENTS = [
-        "Lesen and Horen 0.1", "Lesen and Horen 0.2", "Lesen and Horen 1.1", "Lesen and Horen 1.2",
-        "Lesen and Horen 2", "Lesen and Horen 3", "Lesen and Horen 4", "Lesen and Horen 5",
-        "Lesen and Horen 6", "Lesen and Horen 7", "Lesen and Horen 8", "Lesen and Horen 9",
-        "Lesen and Horen 10", "Lesen and Horen 11", "Lesen and Horen 12.1", "Lesen and Horen 12.2",
-        "Lesen and Horen 13", "Lesen and Horen 14", "Mock Test Lesen", "Mock Test Lesen and Horen"
+        "Lesen and Horen 0.1",
+        "Lesen and Horen 0.2",
+        "Lesen and Horen 1.1",
+        "Lesen and Horen 1.2",
+        "Lesen and Horen 2",
+        "Lesen and Horen 3",
+        "Lesen and Horen 4",
+        "Lesen and Horen 5",
+        "Lesen and Horen 6",
+        "Lesen and Horen 7",
+        "Lesen and Horen 8",
+        "Lesen and Horen 9",
+        "Lesen and Horen 10",
+        "Lesen and Horen 11",
+        "Lesen and Horen 12.1",
+        "Lesen and Horen 12.2",
+        "Lesen and Horen 13",
+        "Lesen and Horen 14",
+        "Mock Test Lesen",
+        "Mock Test Lesen and Horen"
     ]
-    # Sample for A2/B1/B2 (expand as needed)
+    # Reuse your existing code for A2/B1/B2
     raw_schedule_a2 = [
         ("Woche 1", ["1.1. Small Talk (Exercise)", "1.2. Personen Beschreiben (Exercise)", "1.3. Dinge und Personen vergleichen"]),
         ("Woche 2", ["2.4. Wo möchten wir uns treffen?", "2.5. Was machst du in deiner Freizeit?"]),
         ("Woche 3", ["3.6. Möbel und Räume kennenlernen", "3.7. Eine Wohnung suchen (Übung)", "3.8. Rezepte und Essen (Exercise)"]),
         ("Woche 4", ["4.9. Urlaub", "4.10. Tourismus und Traditionelle Feste", "4.11. Unterwegs: Verkehrsmittel vergleichen"]),
-        ("Woche 5", ["5.12. Ein Tag im Leben (Übung)", "5.13. Ein Vorstellungsgesprach (Exercise)", "5.14. Beruf und Karriere (Exercise)"])
+        ("Woche 5", ["5.12. Ein Tag im Leben (Übung)", "5.13. Ein Vorstellungsgesprach (Exercise)", "5.14. Beruf und Karriere (Exercise)"]),
+        ("Woche 6", ["6.15. Mein Lieblingssport", "6.16. Wohlbefinden und Entspannung", "6.17. In die Apotheke gehen"]),
+        ("Woche 7", ["7.18. Die Bank Anrufen", "7.19. Einkaufen – Wo und wie? (Exercise)", "7.20. Typische Reklamationssituationen üben"]),
+        ("Woche 8", ["8.21. Ein Wochenende planen", "8.22. Die Woche Plannung"]),
+        ("Woche 9", ["9.23. Wie kommst du zur Schule / zur Arbeit?", "9.24. Einen Urlaub planen", "9.25. Tagesablauf (Exercise)"]),
+        ("Woche 10", ["10.26. Gefühle in verschiedenen Situationen beschr", "10.27. Digitale Kommunikation", "10.28. Über die Zukunft sprechen"])
     ]
+    raw_schedule_b1 = [
+        ("Woche 1", ["1.1. Traumwelten (Übung)", "1.2. Freundes für Leben (Übung)", "1.3. Erfolgsgeschichten (Übung)"]),
+        ("Woche 2", ["2.4. Wohnung suchen (Übung)", "2.5. Der Besichtigungsg termin (Übung)", "2.6. Leben in der Stadt oder auf dem Land?"]),
+        ("Woche 3", ["3.7. Fast Food vs. Hausmannskost", "3.8. Alles für die Gesundheit", "3.9. Work-Life-Balance im modernen Arbeitsumfeld"]),
+        ("Woche 4", ["4.10. Digitale Auszeit und Selbstfürsorge", "4.11. Teamspiele und Kooperative Aktivitäten", "4.12. Abenteuer in der Natur", "4.13. Eigene Filmkritik schreiben"]),
+        ("Woche 5", ["5.14. Traditionelles vs. digitales Lernen", "5.15. Medien und Arbeiten im Homeoffice", "5.16. Prüfungsangst und Stressbewältigung", "5.17. Wie lernt man am besten?"]),
+        ("Woche 6", ["6.18. Wege zum Wunschberuf", "6.19. Das Vorstellungsgespräch", "6.20. Wie wird man …? (Ausbildung und Qu)"]),
+        ("Woche 7", ["7.21. Lebensformen heute – Familie, Wohnge", "7.22. Was ist dir in einer Beziehung wichtig?", "7.23. Erstes Date – Typische Situationen"]),
+        ("Woche 8", ["8.24. Konsum und Nachhaltigkeit", "8.25. Online einkaufen – Rechte und Risiken"]),
+        ("Woche 9", ["9.26. Reiseprobleme und Lösungen"]),
+        ("Woche 10", ["10.27. Umweltfreundlich im Alltag", "10.28. Klimafreundlich leben"])
+    ]
+    raw_schedule_b2 = []  # Add later if needed
+
+    def flatten_assignments(schedule):
+        assignments = []
+        for week, topics in schedule:
+            for t in topics:
+                assignments.append(f"{week}: {t}")
+        return assignments
+
     LEVELS = ["A1", "A2", "B1", "B2"]
     ASSIGNMENTS = {
         "A1": A1_ASSIGNMENTS,
-        "A2": flatten_assignments(raw_schedule_a2),  # Flatten the A2/B1 schedule
+        "A2": flatten_assignments(raw_schedule_a2),
         "B1": flatten_assignments(raw_schedule_b1),
         "B2": []  # Placeholder for B2
     }
 
-    level = st.selectbox("Select Level", LEVELS)
-    student = st.selectbox("Select Student", student_names)
-    assignment = st.selectbox("Assignment", ASSIGNMENTS[level] if ASSIGNMENTS[level] else ["No assignments (add later)"])
-
-    # ---- Reference answers (editable for each assignment) ----
+    # ---- Reference answers dicts (edit/expand as needed) ----
     A1_REFERENCE_ANSWERS = {
         "Lesen and Horen 0.1": {
             "Lesen": """1. C Guten Morgen
@@ -1384,42 +1413,87 @@ with tabs[9]:
 10. D Gute Nacht""",
             "Hören": ""
         },
-        # Add other assignments here...
+        # Add for others as needed...
     }
+    A2_REFERENCE_ANSWERS = {
+        "Woche 1: 1.1. Small Talk (Exercise)": {
+            "Lesen": """1. C In einer Schule 
+2. B Weil sie gerne mit Kindem arbeitet
+3. A In einem Buro
+4. B Tennis
+5. B Es war sonnig und warm
+6. B Italien und Spanien
+7. C Weil die Blaume so schön bunt sind""",
+            "Hören": """1. B Ins Kino gehen
+2. A Weil sie spannende Geschichten liebt 
+3. A Tennis
+4. B Es war sonnig und warm 
+5. Einen Spaziergang machen""",
+            "Schreiben": "",
+            "Sprechen": ""
+        },
+        # Add for others as needed...
+    }
+    B1_REFERENCE_ANSWERS = {}
+    B2_REFERENCE_ANSWERS = {}
 
     def get_default_ref(level, assignment, skill):
         refs = {
             "A1": A1_REFERENCE_ANSWERS,
-            "A2": A2_REFERENCE_ANSWERS,  # Add more as needed
+            "A2": A2_REFERENCE_ANSWERS,
             "B1": B1_REFERENCE_ANSWERS,
             "B2": B2_REFERENCE_ANSWERS,
         }
         return refs.get(level, {}).get(assignment, {}).get(skill, "")
 
-    with st.expander("Reference Answers (editable for each assignment)"):
-        ref_lesen = st.text_area("Reference Answer: Lesen", value=get_default_ref(level, assignment, "Lesen"))
-        ref_horen = st.text_area("Reference Answer: Hören", value=get_default_ref(level, assignment, "Hören"))
-        ref_schreiben = st.text_area("Reference Answer: Schreiben", value=get_default_ref(level, assignment, "Schreiben")) if level != "A1" else ""
-        ref_sprechen = st.text_area("Reference Answer: Sprechen", value=get_default_ref(level, assignment, "Sprechen")) if level != "A1" else ""
+    # ---- Load students from your main file ----
+    student_file = "students_simple.csv"
+    if os.path.exists(student_file):
+        df_students = pd.read_csv(student_file)
+        student_names = df_students["Name"].dropna().unique().tolist()
+    else:
+        student_names = []
 
-    # ---- Student answers & scores ----
+    # ---- Score storage file ----
+    SCORE_FILE = "student_assignment_scores.csv"
+    SCORE_COLUMNS = [
+        "Date", "Student", "Level", "Assignment",
+        "Reference_Lesen", "Reference_Horen", "Reference_Schreiben", "Reference_Sprechen",
+        "Student_Lesen", "Student_Horen", "Student_Schreiben", "Student_Sprechen",
+        "Lesen_Score", "Horen_Score", "Schreiben_Score", "Sprechen_Score",
+        "AI_Feedback", "AI_Correction"
+    ]
+    if not os.path.exists(SCORE_FILE):
+        pd.DataFrame(columns=SCORE_COLUMNS).to_csv(SCORE_FILE, index=False)
+
+    st.subheader("Record Assignment Scores")
+    level = st.selectbox("Select Level", LEVELS, key="level_select")
+    student = st.selectbox("Select Student", student_names, key="student_select")
+    assignment = st.selectbox("Assignment", ASSIGNMENTS[level] if ASSIGNMENTS[level] else ["No assignments (add later)"], key="assignment_select")
+
+    with st.expander("Reference Answers (auto-filled, editable for each assignment)"):
+        ref_lesen = st.text_area("Reference Answer: Lesen", value=get_default_ref(level, assignment, "Lesen"), key="ref_lesen")
+        ref_horen = st.text_area("Reference Answer: Hören", value=get_default_ref(level, assignment, "Hören"), key="ref_horen")
+        ref_schreiben = st.text_area("Reference Answer: Schreiben", value=get_default_ref(level, assignment, "Schreiben"), key="ref_schreiben") if level != "A1" else ""
+        ref_sprechen = st.text_area("Reference Answer: Sprechen", value=get_default_ref(level, assignment, "Sprechen"), key="ref_sprechen") if level != "A1" else ""
+
     with st.expander("Student Answers & Scores"):
-        student_lesen = st.text_area("Student's Lesen Answer")
-        student_horen = st.text_area("Student's Hören Answer")
-        student_schreiben = st.text_area("Student's Schreiben Answer") if level != "A1" else ""
-        student_sprechen = st.text_area("Student's Sprechen Answer") if level != "A1" else ""
+        student_lesen = st.text_area("Student's Lesen Answer", key="student_lesen")
+        student_horen = st.text_area("Student's Hören Answer", key="student_horen")
+        student_schreiben = st.text_area("Student's Schreiben Answer", key="student_schreiben") if level != "A1" else ""
+        student_sprechen = st.text_area("Student's Sprechen Answer", key="student_sprechen") if level != "A1" else ""
 
-        lesen_score = st.number_input("Lesen Score", 0, 20, step=1)
-        horen_score = st.number_input("Hören Score", 0, 20, step=1)
-        schreiben_score = st.number_input("Schreiben Score", 0, 20, step=1) if level != "A1" else ""
-        sprechen_score = st.number_input("Sprechen Score", 0, 20, step=1) if level != "A1" else ""
+        lesen_score = st.number_input("Lesen Score", 0, 20, step=1, key="lesen_score")
+        horen_score = st.number_input("Hören Score", 0, 20, step=1, key="horen_score")
+        schreiben_score = st.number_input("Schreiben Score", 0, 20, step=1, key="schreiben_score") if level != "A1" else ""
+        sprechen_score = st.number_input("Sprechen Score", 0, 20, step=1, key="sprechen_score") if level != "A1" else ""
 
-    # ---- AI Mark Schreiben (A2/B1/B2 only) ----
+    # --- AI Mark Schreiben (A2/B1/B2 only) ---
     ai_feedback = ""
     ai_correction = ""
     OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
     if level != "A1" and student_schreiben and OPENAI_API_KEY:
-        if st.button("Auto-Mark Schreiben (OpenAI)"):
+        if st.button("Auto-Mark Schreiben (OpenAI)", key="ai_mark_button"):
             with st.spinner("Marking with OpenAI..."):
                 try:
                     openai.api_key = OPENAI_API_KEY
@@ -1446,38 +1520,39 @@ with tabs[9]:
                 except Exception as e:
                     st.error(f"OpenAI Error: {e}")
 
-    # ---- Save Assignment Scores to SQLite ----
-    if st.button("Save Assignment Score"):
+    if st.button("Save Assignment Score", key="save_score_button"):
         now = datetime.now().strftime("%Y-%m-%d %H:%M")
-        with get_db_conn() as conn:
-            conn.execute("""
-                INSERT INTO scores
-                (date, student, level, assignment, ref_lesen, ref_horen, ref_schreiben, ref_sprechen,
-                student_lesen, student_horen, student_schreiben, student_sprechen,
-                lesen_score, horen_score, schreiben_score, sprechen_score, ai_feedback, ai_correction)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                now, student, level, assignment, ref_lesen, ref_horen, ref_schreiben, ref_sprechen,
-                student_lesen, student_horen, student_schreiben, student_sprechen,
-                lesen_score, horen_score, schreiben_score, sprechen_score, ai_feedback, ai_correction
-            ))
-        st.success("✅ Score recorded to database!")
+        score_df = pd.read_csv(SCORE_FILE)
+        new_row = {
+            "Date": now, "Student": student, "Level": level, "Assignment": assignment,
+            "Reference_Lesen": ref_lesen, "Reference_Horen": ref_horen, "Reference_Schreiben": ref_schreiben, "Reference_Sprechen": ref_sprechen,
+            "Student_Lesen": student_lesen, "Student_Horen": student_horen, "Student_Schreiben": student_schreiben, "Student_Sprechen": student_sprechen,
+            "Lesen_Score": lesen_score, "Horen_Score": horen_score,
+            "Schreiben_Score": schreiben_score if schreiben_score != "" else "",
+            "Sprechen_Score": sprechen_score if sprechen_score != "" else "",
+            "AI_Feedback": ai_feedback,
+            "AI_Correction": ai_correction
+        }
+        score_df = pd.concat([score_df, pd.DataFrame([new_row])], ignore_index=True)
+        score_df.to_csv(SCORE_FILE, index=False)
+        st.success("✅ Score recorded!")
 
-    # ---- Show History (from SQLite) ----
-    with get_db_conn() as conn:
-        df_hist = pd.read_sql_query(
-            "SELECT * FROM scores WHERE student=? AND level=? ORDER BY date DESC",
-            conn, params=(student, level)
-        )
-    st.dataframe(df_hist)
+    st.subheader("Student Assignment History")
+    hist_df = pd.read_csv(SCORE_FILE)
+    filt = (hist_df["Student"] == student) & (hist_df["Level"] == level)
+    st.dataframe(hist_df[filt].sort_values("Date", ascending=False), use_container_width=True)
+
+    if not hist_df[filt].empty:
+        avg = hist_df[filt][["Lesen_Score", "Horen_Score", "Schreiben_Score", "Sprechen_Score"]].apply(pd.to_numeric, errors="coerce").mean(axis=1).mean()
+        st.info(f"**Overall Average Score for {student} ({level}): {avg:.2f}**")
 
     # ---- Export options ----
     st.subheader("Export Scores")
-    st.download_button("Export Full CSV", data=df_hist.to_csv(index=False), file_name="student_assignment_scores.csv")
+    st.download_button("Export Full CSV", data=hist_df.to_csv(index=False), file_name="student_assignment_scores.csv")
 
     # Export only this chapter (Lesen & Hören)
-    chapter_mask = (df_hist["Level"] == level) & (df_hist["Assignment"] == assignment)
-    chapter_df = df_hist[chapter_mask]
+    chapter_mask = (hist_df["Level"] == level) & (hist_df["Assignment"] == assignment)
+    chapter_df = hist_df[chapter_mask]
     lesen_hoeren_cols = [
         "Student", "Level", "Assignment",
         "Reference_Lesen", "Student_Lesen", "Lesen_Score",
