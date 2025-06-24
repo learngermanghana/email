@@ -1486,7 +1486,7 @@ with tabs[9]:
         st.markdown(f"**Average Score:** `{avg_score:.1f}`")
         st.markdown(f"**Total Assignments Submitted:** `{len(student_scores)}`")
 
-        # Download PDF Report
+        # --- Download PDF Report ---
         if st.button("📄 Download Student Report PDF"):
             pdf = FPDF()
             pdf.add_page()
@@ -1521,12 +1521,17 @@ with tabs[9]:
                 mime="application/pdf"
             )
 
-        # WhatsApp Share
+        # --- WhatsApp Share ---
         wa_msg = (
             f"Hello {student_row['name']}, your average score is {avg_score:.1f}."
             f" Most recent: {student_scores.iloc[-1]['Assignment']} – {student_scores.iloc[-1]['Score']}/100."
         )
         wa_phone = student_row.get('phone','').replace('+','').replace(' ','')
-        if wa_phone.startswith('0'):\```
+        if wa_phone.startswith('0'):
+            wa_phone = '233' + wa_phone[1:]
+        wa_url = f"https://wa.me/{wa_phone}?text={urllib.parse.quote(wa_msg)}"
+        st.markdown(f"[💬 Send via WhatsApp]({wa_url})", unsafe_allow_html=True)
+    else:
+        st.info("No scores yet. Add a new score above.")
 
 
