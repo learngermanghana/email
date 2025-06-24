@@ -1550,7 +1550,12 @@ with tabs[9]:
     ).fetchall()
     local_df = pd.DataFrame(rows, columns=["StudentCode", "Name", "Assignment", "Score", "Comments", "Date"])
 
-    # --- Combine remote and local scores ---
+        # --- Combine remote and local scores ---
+    scores_df = pd.concat([remote_df, local_df], ignore_index=True)
+    # Normalize and dedupe by date
+    scores_df['Date'] = pd.to_datetime(scores_df['Date'], errors='coerce')
+    scores_df = scores_df.sort_values('Date').drop_duplicates(subset=['StudentCode','Assignment','Date'], keep='last')
+    scores_df['Date'] = scores_df['Date'].dt.strftime('%Y-%m-%d')
     # --- Assignment Input UI ---
     st.markdown("---")
     st.subheader(f"Record Assignment Score for {student_row['name']} ({student_row['studentcode']})")
@@ -1619,4 +1624,5 @@ with tabs[9]:
         )
     else:
         st.info("No scores found for this student.")
+
 
