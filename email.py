@@ -1615,7 +1615,7 @@ with tabs[9]:
         conn_scores.commit()
         st.success("Score saved to database.")
 
-    # --- Download All Scores CSV (from DB) --- (from DB) ---
+        # --- Download All Scores CSV (from DB) ---
     if not scores_df.empty:
         # Merge in student level for export
         export_df = scores_df.merge(
@@ -1624,15 +1624,11 @@ with tabs[9]:
         )
         export_df = export_df[['StudentCode','Name','Assignment','Score','Comments','Date','level']]
         export_df = export_df.rename(columns={'level':'Level'})
-                st.download_button(
+
+        # Properly indent download button
+        st.download_button(
             "📁 Download All Scores CSV",
             data=export_df.to_csv(index=False).encode(),
-            file_name="scores_backup.csv",
-            mime="text/csv"
-        ).encode(),
-            file_name="scores_backup.csv",
-            mime="text/csv"
-        ).encode(),
             file_name="scores_backup.csv",
             mime="text/csv"
         )
@@ -1670,5 +1666,6 @@ with tabs[9]:
         )
     else:
         st.info("No scores found for this student.")
+
 
 
