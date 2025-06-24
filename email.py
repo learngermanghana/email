@@ -1365,6 +1365,23 @@ with tabs[8]:
 with tabs[9]:
     st.title("📝 Assignment Marking & Scores")
 
+    import sqlite3
+    # === Initialize SQLite for Scores ===
+    conn_scores = sqlite3.connect('scores.db')
+    cursor_scores = conn_scores.cursor()
+    cursor_scores.execute('''
+        CREATE TABLE IF NOT EXISTS scores (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            StudentCode TEXT,
+            Name TEXT,
+            Assignment TEXT,
+            Score REAL,
+            Comments TEXT,
+            Date TEXT
+        )
+    ''')
+    conn_scores.commit()
+
     # --- Load student database ---
     github_csv_url = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
     student_file = "students.csv"
@@ -1401,30 +1418,24 @@ with tabs[9]:
     code = chosen.split("(")[-1].replace(")", "").strip().lower()
     student_row = view_df[view_df['studentcode'].str.lower() == code].iloc[0]
 
-    # --- Reference Answers ---
-    ref_answers = { ... }  # (Your full ref_answers dict here)
-
-    # --- Load Scores: remote + local ---
-    scores_sheet = (
-        "https://docs.google.com/spreadsheets/d/"
-        "1l66qurVjKkgM3YCYGN3GURT-Q86DEeHql8BL_Z6YfCY/export?format=csv"
-    )
+        # --- Reference Answers ---
+    # (using ref_answers defined earlier in the script)
     try:
-        remote_df = pd.read_csv(scores_sheet)
-    except Exception:
-        remote_df = pd.DataFrame(columns=["StudentCode","Name","Assignment","Score","Comments","Date"])
-    if os.path.exists("scores.csv"):
-        local_df = pd.read_csv("scores.csv")
-    else:
-        local_df = pd.DataFrame(columns=["StudentCode","Name","Assignment","Score","Comments","Date"])
-    scores_df = pd.concat([remote_df, local_df], ignore_index=True)
-    scores_df = scores_df.drop_duplicates(subset=["StudentCode","Assignment","Date"], keep="last")
+        ref_answers
+    except NameError:
+        st.error("Reference answer bank not defined.")
+        ref_answers = {}
+
+    # --- Load Scores from SQLite ---
+    rows = cursor_scores.execute(
+        "SELECT StudentCode, Name, Assignment, Score, Comments, Date FROM scores"
+    ).fetchall()
+    scores_df = pd.DataFrame(rows, columns=["StudentCode", "Name", "Assignment", "Score", "Comments", "Date"])
 
     # --- Record New Score ---
     st.markdown("---")
     st.subheader(f"Record Assignment Score for {student_row['name']} ({student_row['studentcode']})")
 
-    # Assignment selector with filter
     assign_filter = st.text_input("🔎 Filter assignment titles", key="assign_filter")
     assign_options = [k for k in ref_answers.keys() if assign_filter.lower() in k.lower()]
     assignment = st.selectbox("📋 Select Assignment", [""] + assign_options, key="assignment")
@@ -1438,21 +1449,39 @@ with tabs[9]:
         st.markdown("<br>".join(ref_answers[assignment]), unsafe_allow_html=True)
 
     if st.button("💾 Save Score", key="save_score"):
-        new = {
-            "StudentCode": student_row['studentcode'],
-            "Name": student_row['name'],
-            "Assignment": assignment,
-            "Score": score,
-            "Comments": comments,
-            "Date": datetime.now().strftime("%Y-%m-%d")
-        }
-        # append to local
-        local_df = pd.concat([local_df, pd.DataFrame([new])], ignore_index=True)
-        local_df.to_csv("scores.csv", index=False)
-        st.success("Score saved locally.")
-        scores_df = pd.concat([scores_df, pd.DataFrame([new])], ignore_index=True)
+        now = datetime.now().strftime("%Y-%m-%d")
+        # Save to SQLite
+        cursor_scores.execute(
+            "INSERT INTO scores (StudentCode, Name, Assignment, Score, Comments, Date) VALUES (?,?,?,?,?,?)",
+            (student_row['studentcode'], student_row['name'], assignment, score, comments, now)
+        )
+        conn_scores.commit()
 
-    # --- Download All Scores CSV ---
+        # --- Sync to Google Sheet ---
+        try:
+            import gspread
+            creds = st.secrets["gcp_service_account"]
+            gc = gspread.service_account_from_dict(creds)
+            sh = gc.open_by_key("1l66qurVjKkgM3YCYGN3GURT-Q86DEeHql8BL_Z6YfCY")
+            ws = sh.sheet1
+            ws.append_row([student_row['studentcode'], student_row['name'], assignment, score, comments, now], value_input_option="RAW")
+            st.success("Score saved locally and synced to Google Sheet.")
+        except Exception as e:
+            st.warning(f"Score saved locally, but Google sync failed: {e}")
+
+        # Refresh scores_df
+        rows = cursor_scores.execute(
+            "SELECT StudentCode, Name, Assignment, Score, Comments, Date FROM scores"
+        ).fetchall()
+        scores_df = pd.DataFrame(rows, columns=["StudentCode", "Name", "Assignment", "Score", "Comments", "Date"])
+        st.success("Score saved to database.")
+        # Refresh scores_df
+        rows = cursor_scores.execute(
+            "SELECT StudentCode, Name, Assignment, Score, Comments, Date FROM scores"
+        ).fetchall()
+        scores_df = pd.DataFrame(rows, columns=["StudentCode", "Name", "Assignment", "Score", "Comments", "Date"])
+
+    # --- Download All Scores CSV (from DB) ---
     if not scores_df.empty:
         st.download_button(
             "📁 Download All Scores CSV",
@@ -1469,24 +1498,23 @@ with tabs[9]:
         avg = hist['Score'].mean()
         st.markdown(f"**Average Score:** {avg:.1f}")
 
-        # Generate PDF for download
         pdf = FPDF()
         pdf.add_page()
-        def safe(txt): return str(txt).encode('latin-1', 'replace').decode('latin-1')
+        def safe(txt): return str(txt).encode('latin-1','replace').decode('latin-1')
         pdf.set_font("Arial","B",14)
-        pdf.cell(0,10, safe(f"Report for {student_row['name']}"), ln=True)
+        pdf.cell(0,10,safe(f"Report for {student_row['name']}"),ln=True)
         pdf.ln(5)
         for _, r in hist.iterrows():
             pdf.set_font("Arial","B",12)
-            pdf.cell(0,8, safe(f"{r['Assignment']}: {r['Score']}/100"), ln=True)
+            pdf.cell(0,8,safe(f"{r['Assignment']}: {r['Score']}/100"),ln=True)
             pdf.set_font("Arial","",11)
-            pdf.multi_cell(0,8, safe(f"Comments: {r['Comments']}"))
+            pdf.multi_cell(0,8,safe(f"Comments: {r['Comments']}"))
             if r['Assignment'] in ref_answers:
                 pdf.set_font("Arial","I",11)
-                pdf.multi_cell(0,8, safe("Reference Answers:"))
-                for ans in ref_answers[r['Assignment']]: pdf.multi_cell(0,8, safe(ans))
+                pdf.multi_cell(0,8,safe("Reference Answers:"))
+                for ans in ref_answers[r['Assignment']]: pdf.multi_cell(0,8,safe(ans))
             pdf.ln(3)
-        pdf_bytes = pdf.output(dest='S').encode('latin-1', 'replace')
+        pdf_bytes = pdf.output(dest='S').encode('latin-1','replace')
         st.download_button(
             "📄 Download Student Report PDF",
             data=pdf_bytes,
@@ -1495,3 +1523,4 @@ with tabs[9]:
         )
     else:
         st.info("No scores found for this student.")
+
