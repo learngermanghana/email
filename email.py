@@ -1377,10 +1377,8 @@ if tabs[9]:
             st.warning("Could not find student data. Please upload students.csv in 📝 Pending tab.")
             st.stop()
 
-    # --- Clean up columns for case-insensitivity ---
+    # --- Column normalization for easy lookup ---
     df_students.columns = [col.lower().strip().replace(" ", "_") for col in df_students.columns]
-    col_lookup = lambda col: [c for c in df_students.columns if c.lower() == col.lower().replace(" ", "_")]
-    col_lookup = lambda col: col if col in df_students.columns else col.lower().strip().replace(" ", "_")
 
     # --- Filter/Search UI ---
     st.subheader("Filter/Search Students")
@@ -1389,8 +1387,10 @@ if tabs[9]:
     level_select = st.selectbox("📚 Filter by Level", level_options)
     view_df = df_students.copy()
     if search_term:
-        view_df = view_df[view_df["name"].str.contains(search_term, case=False, na=False) | 
-                          view_df["studentcode"].astype(str).str.contains(search_term, case=False, na=False)]
+        view_df = view_df[
+            view_df["name"].str.contains(search_term, case=False, na=False) |
+            view_df["studentcode"].astype(str).str.contains(search_term, case=False, na=False)
+        ]
     if level_select != "All":
         view_df = view_df[view_df["level"] == level_select]
 
@@ -1404,30 +1404,43 @@ if tabs[9]:
     selected_code = selected.split("(")[-1].replace(")", "").strip()
     student_row = view_df[view_df["studentcode"].astype(str).str.lower() == selected_code.lower()].iloc[0]
 
-    # --- Answers bank (manually coded) ---
+    # --- ANSWERS BANK (EASY TO EDIT!) ---
     a1_answers = {
         "Lesen und Hören 0.2": [
-            "1. C) 26", "2. A) A, O, U, B", "3. A) Eszett", "4. A) K",
-            "5. A) A-Umlaut", "6. A) A, O, U, B", "7. B 4",
+            "1. C) 26",
+            "2. A) A, O, U, B",
+            "3. A) Eszett",
+            "4. A) K",
+            "5. A) A-Umlaut",
+            "6. A) A, O, U, B",
+            "7. B 4",
             "Wasser", "Kaffee", "Blume", "Schule", "Tisch"
         ],
-        # Add other assignments...
+        # Add other A1 assignments here!
     }
     a2_answers = {
         "Lesen": [
-            "1. C In einer Schule", "2. B Weil sie gerne mit Kindern arbeitet", "3. A In einem Büro",
-            "4. B Tennis", "5. B Es war sonnig und warm", "6. B Italien und Spanien", "7. C Weil die Blumen so schön bunt sind"
+            "1. C In einer Schule",
+            "2. B Weil sie gerne mit Kindern arbeitet",
+            "3. A In einem Büro",
+            "4. B Tennis",
+            "5. B Es war sonnig und warm",
+            "6. B Italien und Spanien",
+            "7. C Weil die Blumen so schön bunt sind"
         ],
         "Hören": [
-            "1. B Ins Kino gehen", "2. A Weil sie spannende Geschichten liebt", "3. A Tennis",
-            "4. B Es war sonnig und warm", "5. Einen Spaziergang machen"
+            "1. B Ins Kino gehen",
+            "2. A Weil sie spannende Geschichten liebt",
+            "3. A Tennis",
+            "4. B Es war sonnig und warm",
+            "5. Einen Spaziergang machen"
         ],
-        # Add other assignments...
+        # Add other A2 assignments here!
     }
-    # Merge all for lookup
+    # Merge all
     ref_answers = {**a1_answers, **a2_answers}
 
-    # --- Assignment input UI ---
+    # --- ASSIGNMENT INPUT UI ---
     st.markdown("---")
     st.subheader(f"📝 Record Assignment Score for **{student_row['name']}** ({student_row['studentcode']})")
 
@@ -1438,14 +1451,14 @@ if tabs[9]:
         st.markdown("**Reference Answers:**")
         st.markdown("<br>".join(ref_answers[assignment_name]), unsafe_allow_html=True)
 
-    # --- Scores DB ---
+    # --- SCORES DB ---
     scores_file = "scores.csv"
     if os.path.exists(scores_file):
         scores_df = pd.read_csv(scores_file)
     else:
         scores_df = pd.DataFrame(columns=["StudentCode", "Name", "Assignment", "Score", "Comments", "Date"])
 
-    # --- Save Score ---
+    # --- SAVE SCORE ---
     if st.button("💾 Save Score"):
         new_row = {
             "StudentCode": student_row["studentcode"],
@@ -1459,7 +1472,7 @@ if tabs[9]:
         scores_df.to_csv(scores_file, index=False)
         st.success("Score saved.")
 
-    # --- Upload/Restore Scores DB ---
+    # --- UPLOAD/RESTORE SCORES DB ---
     with st.expander("⬆️ Restore/Upload Scores Backup"):
         uploaded_scores = st.file_uploader("Upload scores.csv", type="csv", key="score_restore")
         if uploaded_scores is not None:
@@ -1467,11 +1480,11 @@ if tabs[9]:
             scores_df.to_csv(scores_file, index=False)
             st.success("Scores restored from uploaded file.")
 
-    # --- Download All Scores Button ---
+    # --- DOWNLOAD ALL SCORES ---
     score_csv = scores_df.to_csv(index=False).encode()
     st.download_button("📁 Download All Scores CSV", data=score_csv, file_name="scores_backup.csv", mime="text/csv", key="download_scores")
 
-    # --- Student Score History & Reference Answers ---
+    # --- STUDENT SCORE HISTORY & SHARING ---
     student_scores = scores_df[scores_df["StudentCode"].astype(str).str.lower() == student_row["studentcode"].lower()]
     if not student_scores.empty:
         st.markdown("### 🗂️ Student's Score History")
@@ -1481,7 +1494,7 @@ if tabs[9]:
         st.markdown(f"**Average Score:** `{avg_score:.1f}`")
         st.markdown(f"**Total Assignments Submitted:** `{len(student_scores)}`")
 
-        # --- Download PDF Report (with reference answers) ---
+        # --- Download PDF Report (with answers) ---
         if st.button("📄 Download Student Report PDF"):
             from fpdf import FPDF
             pdf = FPDF()
@@ -1511,8 +1524,6 @@ if tabs[9]:
             pdf.ln(15)
             pdf.cell(0, 10, "Signed: Felix Asadu", ln=1)
             pdf_out = f"{student_row['name'].replace(' ', '_')}_assignment_report.pdf"
-            # Ensure all text is latin-1 for FPDF
-            def safe_latin1(text): return str(text).encode("latin1", "replace").decode("latin1")
             pdf.output(pdf_out)
             with open(pdf_out, "rb") as f:
                 pdf_bytes = f.read()
@@ -1583,7 +1594,7 @@ if tabs[9]:
     else:
         st.info("No scores for this student yet. Enter and save a new one above!")
 
-    # --- Show Reference Answers Table (so you can easily update/copy) ---
+    # --- Reference Answers Table (to update/copy) ---
     with st.expander("📖 Show/Update Reference Answers (A1/A2)", expanded=False):
         st.write("**A1 Answers:**")
         for k, v in a1_answers.items():
