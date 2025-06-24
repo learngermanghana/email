@@ -1437,12 +1437,14 @@ with tabs[9]:
             "1. 16 – sechzehn", "2. 98 – achtundneunzig", "3. 555 – fünfhundertfünfundfünfzig",
             "4. 1020 – tausendzwanzig", "5. 8553 – achttausendfünfhundertdreiundfünfzig"
         ],
-        "Lesen und Hören 4": [
+        "Lesen und Hören 4 Lesen Übung": [
             "1. C) Neun", "2. B) Polnisch", "3. D) Niederländisch", "4. A) Deutsch", "5. C) Paris", "6. B) Amsterdam", "7. C) In der Schweiz"
-            "1. C) In Italien und Frankreich", "2. C) Rom", "3. B) Das Essen", "4. B) Paris", "5. A) Nach Spanie"
+        ],
+        "Hören Übung (Rund um die Welt)": [
+            "1. C) In Italien und Frankreich", "2. C) Rom", "3. B) Das Essen", "4. B) Paris", "5. A) Nach Spanien"
         ],
         "Lesen und Hören 5": [
-             # Part 1 – Vocabulary Review
+            # Part 1 – Vocabulary Review
             "Der Tisch – the table",
             "Die Lampe – the lamp",
             "Das Buch – the book",
@@ -1477,6 +1479,14 @@ with tabs[9]:
             "8. Er pflückt die Blume",
             "9. Wir putzen das Fenster",
             "10. Sie benutzen den Computer"
+        ],
+        "Lesen und Hören 5 Part 2": [
+            "Der Tisch ist groß", "Die Lampe ist neu", "Das Buch ist interessant", "Der Stuhl ist bequem", "Die Katze ist süß",
+            "Das Auto ist schnell", "Der Hund ist freundlich", "Die Blume ist schön", "Das Fenster ist offen", "Der Computer ist teuer"
+        ],
+        "Lesen und Hören 5 Part 3": [
+            "Ich sehe den Tisch", "Sie kauft die Lampe", "Er liest das Buch", "Wir brauchen den Stuhl", "Du fütterst die Katze",
+            "Ich fahre das Auto", "Sie streichelt den Hund", "Er pflückt die Blume", "Wir putzen das Fenster", "Sie benutzen Computer"
         ],
         "Lesen und Hören 6 Teil 1": [
             "Das Wohnzimmer – the living room", "Die Küche – the kitchen", "Das Schlafzimmer – the bedroom", "Das Badezimmer – the bathroom", "Der Balkon – the balcony",
@@ -1607,9 +1617,19 @@ with tabs[9]:
 
     # --- Download All Scores CSV (from DB) --- (from DB) ---
     if not scores_df.empty:
+        # Merge in student level for export
+        export_df = scores_df.merge(
+            df_students[['studentcode','level']],
+            left_on='StudentCode', right_on='studentcode', how='left'
+        )
+        export_df = export_df[['StudentCode','Name','Assignment','Score','Comments','Date','level']]
+        export_df = export_df.rename(columns={'level':'Level'})
         st.download_button(
             "📁 Download All Scores CSV",
-            data=scores_df.to_csv(index=False).encode(),
+            data=export_df.to_csv(index=False).encode(),
+            file_name="scores_backup.csv",
+            mime="text/csv"
+        ).encode(),
             file_name="scores_backup.csv",
             mime="text/csv"
         )
