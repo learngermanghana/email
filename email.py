@@ -1326,108 +1326,116 @@ with tabs[8]:
 with tabs[9]:
     st.title("📝 Assignment Marking & Scores")
 
-    # 1. Load Student Data
-    # Try to load from local or GitHub (fall back logic)
+    # --- Student Data (auto-load from local or GitHub) ---
+    # Prefer local, fallback to GitHub if missing
     student_file = "students.csv"
-    github_url = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
-    try:
-        if os.path.exists(student_file):
-            df_students = pd.read_csv(student_file)
-        else:
-            df_students = pd.read_csv(github_url)
-    except Exception as e:
-        st.error("⚠️ students.csv not found or could not be loaded. Please upload it in 📝 Pending tab.")
-        st.stop()
+    github_csv = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
+    if os.path.exists(student_file):
+        df_main = pd.read_csv(student_file)
+    else:
+        try:
+            df_main = pd.read_csv(github_csv)
+            st.info("Loaded students from GitHub backup.")
+        except Exception:
+            st.warning("⚠️ students.csv not found locally or on GitHub.")
+            st.stop()
 
-    # --- Student search/filter ---
-    search_term = st.text_input("🔎 Search student by name or code")
-    filtered_df = df_students.copy()
-    if search_term:
-        filtered_df = filtered_df[
-            filtered_df["Name"].astype(str).str.contains(search_term, case=False, na=False) |
-            filtered_df["StudentCode"].astype(str).str.contains(search_term, case=False, na=False)
+    # --- Normalize columns (ignore case, spaces, etc) ---
+    df_main.columns = [c.strip().replace(" ", "_").replace("(", "").replace(")", "").replace("-", "_").replace("/", "_").lower() for c in df_main.columns]
+    def col_lookup(col):
+        # Helper to find the right column regardless of case/space
+        for c in df_main.columns:
+            if c.replace("_", "").lower() == col.replace("_", "").lower():
+                return c
+        return col  # fallback
+
+    # --- Student filter/search ---
+    search = st.text_input("🔎 Search by name/code/location/level").lower()
+    df = df_main.copy()
+    if search:
+        df = df[
+            df[col_lookup("name")].astype(str).str.lower().str.contains(search) |
+            df[col_lookup("studentcode")].astype(str).str.lower().str.contains(search) |
+            df[col_lookup("location")].astype(str).str.lower().str.contains(search) |
+            df[col_lookup("level")].astype(str).str.lower().str.contains(search)
         ]
-    if filtered_df.empty:
-        st.warning("No students found with this search/filter.")
+    # Sort by name for UX
+    df = df.sort_values(by=col_lookup("name"))
+
+    # --- Student List and Selection ---
+    if df.empty:
+        st.info("No students found. Check your search/filter or upload students.csv.")
         st.stop()
 
-    # --- Student list display ---
-    student_list = filtered_df["Name"].astype(str) + " (" + filtered_df["StudentCode"].astype(str) + ")"
-    selected = st.selectbox("Select a student to mark", student_list, key="select_student_marking")
+    # Always use .astype(str) for safety!
+    student_list = df[col_lookup("name")].astype(str) + " (" + df[col_lookup("studentcode")].astype(str) + ")"
+    selected = st.selectbox("Select a student to view/edit details", student_list, key="select_student_detail")
     if not selected:
-        st.info("Select a student above to continue.")
         st.stop()
+
     selected_code = selected.split("(")[-1].replace(")", "").strip()
-    # Robust, case-insensitive match
-    student_row = filtered_df[filtered_df["StudentCode"].astype(str).str.lower() == selected_code.lower()]
+    student_row = df[df[col_lookup("studentcode")].astype(str).str.lower() == selected_code.lower()]
     if student_row.empty:
-        st.warning("Student not found in filtered data. Try clearing search/filter.")
+        st.warning("Student not found in filtered data. Try reloading/clearing filter.")
         st.stop()
     student_row = student_row.iloc[0]
 
-    student_code = str(student_row["StudentCode"])
-
-    # 2. Assignment Entry Form
+    # --- Assignment Entry ---
     st.markdown("---")
-    st.subheader(f"📝 Record Assignment Score for **{student_row['Name']}** ({student_code})")
+    student_code = str(student_row[col_lookup("studentcode")])
+    student_name = str(student_row[col_lookup("name")])
+    st.subheader(f"📝 Record Assignment Score for **{student_name}** ({student_code})")
+
     assignment_name = st.text_input("Assignment Name (e.g., Lesen und Hören 0.2, Test 1, etc.)")
     score = st.number_input("Score", min_value=0, max_value=100, value=0)
-    comments = st.text_area("Comments/Feedback for student", "")
+    comments = st.text_area("Comments/Feedback (visible to student)", "")
 
-    # ---- Reference Answers Logic (easy to update) ----
+    # --- Reference Answers (Edit here for future use) ---
     a1_answers = {
         "Lesen und Hören 0.2": [
-            "1. C) 26", "2. A) A, O,U, B", "3. A) Eszett", "4. A) K", "5. A) A-Umlaut",
-            "6. A) A, O, U, B", "7. B 4",
-            "Wasser", "Kaffee", "Blume", "Schule", "Tisch"
+            "1. C) 26", "2. A) A, O,U, B", "3. A) Eszett", "4. A) K",
+            "5. A) A-Umlaut", "6. A) A, O, U, B", "7. B 4",
+            "1. Wasser", "2. Kaffee", "3. Blume", "4. Schule", "5. Tisch"
         ],
         "Lesen und Hören 1.1": [
             "1. C", "2. C", "3. A", "4. B"
         ],
-        "Lesen und Hören 1.2": [
-            "1. Ich heiße Anna", "2. Du heißt Max", "3. Er heißt Peter", "4. Wir kommen aus Italien", "5. Ihr kommt aus Brasilien",
-            "6. Sie kommt/kommen aus Russland", "7. Ich wohne in Berlin", "8. Du wohnst in Madrid", "9. Sie wohnt in Wien",
-            "1. A) Anna", "2. C) Aus Italien", "3. D) In Berlin", "4. B) Tom", "5. A) In Berlin"
-        ],
-        # ... add more as needed ...
+        # ... (continue with your other A1/A2/B1 assignments as needed)
     }
     a2_answers = {
         "Lesen": [
-            "1. C In einer Schule", "2. B Weil sie gerne mit Kindem arbeitet", "3. A In einem Büro",
-            "4. B Tennis", "5. B Es war sonnig und warm", "6. B Italien und Spanien", "7. C Weil die Blumen so schön bunt sind"
+            "1. C In einer Schule", "2. B Weil sie gerne mit Kindem arbeitet", "3. A In einem Buro",
+            "4. B Tennis", "5. B Es war sonnig und warm", "6. B Italien und Spanien", "7. C Weil die Blaume so schön bunt sind"
         ],
         "Hören": [
             "1. B Ins Kino gehen", "2. A Weil sie spannende Geschichten liebt", "3. A Tennis",
             "4. B Es war sonnig und warm", "5. Einen Spaziergang machen"
-        ],
-        # ... add more as needed ...
+        ]
+        # Add B1, B2 as you wish
     }
 
-    # Show reference answers for quick teacher view
-    st.markdown("#### Reference Answers (for teacher only)")
+    # Show reference if matching
     if assignment_name in a1_answers:
-        st.markdown(f"**A1:** {assignment_name}")
+        st.markdown(f"**Reference Answers for {assignment_name}:**")
         for ans in a1_answers[assignment_name]:
             st.write(ans)
     elif assignment_name in a2_answers:
-        st.markdown(f"**A2:** {assignment_name}")
+        st.markdown(f"**Reference Answers for {assignment_name}:**")
         for ans in a2_answers[assignment_name]:
             st.write(ans)
-    else:
-        st.info("No reference answers found for this assignment.")
 
-    # 3. Save/Load Scores
+    # --- Save/Load Scores DB ---
     scores_file = "scores.csv"
     if os.path.exists(scores_file):
         scores_df = pd.read_csv(scores_file)
     else:
         scores_df = pd.DataFrame(columns=["StudentCode", "Name", "Assignment", "Score", "Comments", "Date"])
 
-    # 4. Save score
+    # --- Save Score Button ---
     if st.button("💾 Save Score"):
         new_row = {
             "StudentCode": student_code,
-            "Name": student_row["Name"],
+            "Name": student_name,
             "Assignment": assignment_name,
             "Score": score,
             "Comments": comments,
@@ -1435,21 +1443,21 @@ with tabs[9]:
         }
         scores_df = pd.concat([scores_df, pd.DataFrame([new_row])], ignore_index=True)
         scores_df.to_csv(scores_file, index=False)
-        st.success("Score saved.")
+        st.success("✅ Score saved.")
 
-    # 5. Upload/Restore Scores DB
+    # --- Upload/Restore Scores DB ---
     with st.expander("⬆️ Restore/Upload Scores Backup"):
         uploaded_scores = st.file_uploader("Upload scores.csv", type="csv", key="score_restore")
         if uploaded_scores is not None:
             scores_df = pd.read_csv(uploaded_scores)
             scores_df.to_csv(scores_file, index=False)
-            st.success("Scores restored from uploaded file.")
+            st.success("✅ Scores restored from uploaded file.")
 
-    # 6. Download All Scores
+    # --- Download All Scores Button ---
     score_csv = scores_df.to_csv(index=False).encode()
     st.download_button("📁 Download All Scores CSV", data=score_csv, file_name="scores_backup.csv", mime="text/csv", key="download_scores")
 
-    # 7. Student Score History, Average, PDF, WhatsApp, Email
+    # --- Show Student Score History, Average, etc ---
     student_scores = scores_df[scores_df["StudentCode"].astype(str).str.lower() == student_code.lower()]
     if not student_scores.empty:
         st.markdown("### 🗂️ Student's Score History")
@@ -1458,31 +1466,36 @@ with tabs[9]:
         st.markdown(f"**Average Score:** `{avg_score:.1f}`")
         st.markdown(f"**Total Assignments Submitted:** `{len(student_scores)}`")
 
-        # --- PDF Download (with signed by teacher) ---
+        # --- PDF Download (with signed by teacher, Unicode fix) ---
         if st.button("📄 Download Student Report PDF"):
             from fpdf import FPDF
+
+            def safe_latin1(text):
+                # Replace all unsupported characters with '?'
+                return str(text).encode("latin1", "replace").decode("latin1")
+
             pdf = FPDF()
             pdf.add_page()
             pdf.set_font("Arial", "B", 14)
-            pdf.cell(0, 12, f"Assignment Report – {student_row['Name']} ({student_code})", ln=1)
+            pdf.cell(0, 12, safe_latin1(f"Assignment Report – {student_name} ({student_code})"), ln=1)
             pdf.set_font("Arial", "", 12)
-            pdf.cell(0, 10, f"Level: {student_row['Level']}", ln=1)
+            pdf.cell(0, 10, safe_latin1(f"Level: {student_row.get(col_lookup('level'), '')}"), ln=1)
             pdf.cell(0, 10, f"Date: {datetime.now().strftime('%Y-%m-%d')}", ln=1)
             pdf.ln(5)
             for idx, row in student_scores.iterrows():
                 pdf.set_font("Arial", "B", 12)
-                pdf.cell(0, 8, f"{row['Assignment']}:", ln=1)
+                pdf.cell(0, 8, safe_latin1(f"{row['Assignment']}: "), ln=1)
                 pdf.set_font("Arial", "", 12)
-                pdf.cell(0, 8, f"Score: {row['Score']}/100", ln=1)
-                pdf.multi_cell(0, 8, f"Comments: {row['Comments']}")
+                pdf.cell(0, 8, safe_latin1(f"Score: {row['Score']}/100"), ln=1)
+                pdf.multi_cell(0, 8, safe_latin1(f"Comments: {row['Comments']}"))
                 pdf.ln(3)
             pdf.ln(10)
             pdf.set_font("Arial", "I", 11)
-            pdf.cell(0, 8, f"Average Score: {avg_score:.1f}", ln=1)
-            pdf.cell(0, 8, f"Total Assignments: {len(student_scores)}", ln=1)
+            pdf.cell(0, 8, safe_latin1(f"Average Score: {avg_score:.1f}"), ln=1)
+            pdf.cell(0, 8, safe_latin1(f"Total Assignments: {len(student_scores)}"), ln=1)
             pdf.ln(15)
-            pdf.cell(0, 10, "Signed: Felix Asadu", ln=1)
-            pdf_out = f"{student_row['Name'].replace(' ', '_')}_assignment_report.pdf"
+            pdf.cell(0, 10, safe_latin1("Signed: Felix Asadu"), ln=1)
+            pdf_out = f"{student_name.replace(' ', '_')}_assignment_report.pdf"
             pdf.output(pdf_out)
             with open(pdf_out, "rb") as f:
                 pdf_bytes = f.read()
@@ -1490,10 +1503,10 @@ with tabs[9]:
 
         # --- WhatsApp Share (quick link) ---
         msg = (
-            f"Hello {student_row['Name']}, your average assignment score is {avg_score:.1f}. "
+            f"Hello {student_name}, your average assignment score is {avg_score:.1f}. "
             f"Recent result: {student_scores.iloc[-1]['Assignment']} – {student_scores.iloc[-1]['Score']}/100."
         )
-        wa_phone = str(student_row.get("Phone", ""))
+        wa_phone = str(student_row.get(col_lookup("phone"), ""))
         if wa_phone and not pd.isna(wa_phone):
             wa_phone = wa_phone.replace(" ", "").replace("+", "")
             if wa_phone.startswith("0"):
@@ -1501,15 +1514,44 @@ with tabs[9]:
             wa_url = f"https://wa.me/{wa_phone}?text={urllib.parse.quote(msg)}"
             st.markdown(f"[💬 Send result via WhatsApp]({wa_url})", unsafe_allow_html=True)
 
-        # --- Email Student Report (info only, needs config) ---
-        if pd.notna(student_row.get("Email", "")) and student_row["Email"]:
+        # --- Send Portal by Email (via SendGrid) ---
+        SENDGRID_API_KEY = st.secrets.get("SENDGRID_API_KEY")
+        SENDER_EMAIL = st.secrets.get("SENDER_EMAIL") or "Learngermanghana@gmail.com"
+        if pd.notna(student_row.get(col_lookup("email"), "")) and student_row[col_lookup("email")]:
             if st.button("✉️ Email Student Portal"):
-                st.info("To enable emailing, set up SMTP credentials in your app.")
+                try:
+                    from sendgrid import SendGridAPIClient
+                    from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
+
+                    msg = Mail(
+                        from_email=SENDER_EMAIL,
+                        to_emails=student_row[col_lookup("email")],
+                        subject=f"Your Assignment Report – {student_name}",
+                        html_content=f"""
+                            Dear {student_name},<br><br>
+                            Attached is your latest assignment report.<br><br>
+                            Best regards,<br>
+                            Felix Asadu<br>
+                            Learn Language Education Academy
+                        """
+                    )
+                    encoded_pdf = base64.b64encode(pdf_bytes).decode()
+                    msg.attachment = Attachment(
+                        FileContent(encoded_pdf),
+                        FileName(pdf_out),
+                        FileType("application/pdf"),
+                        Disposition("attachment"),
+                    )
+                    sg = SendGridAPIClient(SENDGRID_API_KEY)
+                    sg.send(msg)
+                    st.success("✅ Student portal sent by email!")
+                except Exception as e:
+                    st.warning(f"⚠️ Email failed: {e}")
 
     else:
         st.info("No scores for this student yet. Enter and save a new one above!")
 
-    # 8. Reference Answers Table for Teachers (easy to update)
+    # --- Show Reference Answers Table ---
     with st.expander("📖 Show/Update Reference Answers (A1/A2)", expanded=False):
         st.write("**A1 Answers:**")
         for k, v in a1_answers.items():
