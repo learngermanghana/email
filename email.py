@@ -1519,11 +1519,12 @@ with tabs[9]:
         "Lesen und Hören 9 Teil 2": [
             "1. A) Apfel, Bananen und Karotten", "2. A) Müsli mit Joghurt", "3. D) Karotten", "4. A) Käse", "5. C) Schokoladenkuchen"
         ],
-        "Lesen und Hören 10 Lesen": ["Falsch", "Wahr", "Falsch", "Wahr", "Wahr", "Falsch", "Wahr", "Falsch", "Falsch", "Falsch"],
+        "Lesen und Hören 10 ": ["Falsch", "Wahr", "Falsch", "Wahr", "Wahr", "Falsch", "Wahr", "Falsch", "Falsch", "Falsch"],
         "Lesen und Hören 10 Hören": [
             "1. B) Einmal pro Woche", "2. C) Apfel und Bananen", "3. A) Ein halbes Kilo", "4. B) 10 Euro", "5. B) Einen schönen Tag"
         ],
-        "Lesen und Hören 11 #Teil 1": [
+        "Lesen und Hören 11": [
+             #Teil 1
             "1. B) Entschuldigung, wo ist der Bahnhof?", "2. B) Links abbiegen", "3. B) Auf der rechten Seite, direkt neben dem großen Supermarkt",
             "4. B) Wie komme ich zur nächsten Apotheke?", "5. C) Gute Reise und einen schönen Tag noch"
         
