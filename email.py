@@ -1442,7 +1442,7 @@ with tabs[9]:
             "1. C) In Italien und Frankreich", "2. C) Rom", "3. B) Das Essen", "4. B) Paris", "5. A) Nach Spanie"
         ],
         "Lesen und Hören 5": [
-# Part 1 – Vocabulary Review
+             # Part 1 – Vocabulary Review
             "Der Tisch – the table",
             "Die Lampe – the lamp",
             "Das Buch – the book",
