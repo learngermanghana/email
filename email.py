@@ -155,7 +155,7 @@ with tabs[2]:
         exp_csv = df_expenses.to_csv(index=False).encode()
         st.download_button("📁 Download Expenses CSV", data=exp_csv, file_name="expenses_data.csv")
 
-with tabs[3]:
+with tabs[1]:
     st.title("📲 Reminders for Debtors (WhatsApp & Email)")
 
     # --- Load students from GitHub ---
@@ -282,7 +282,7 @@ with tabs[3]:
     else:
         st.success("✅ No students with unpaid balances.")
 
-with tabs[3]:
+with tabs[2]:
     st.title("📲 Reminders for Debtors (WhatsApp & Email)")
 
     # --- Load students from GitHub ---
@@ -409,7 +409,7 @@ with tabs[3]:
     else:
         st.success("✅ No students with unpaid balances.")
         
-with tabs[4]:
+with tabs[3]:
 
     # ---- Helper for safe PDF encoding ----
     def safe_pdf(text):
@@ -598,7 +598,7 @@ with tabs[4]:
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
 
-with tabs[5]:
+with tabs[4]:
     st.title("📝 Assignment Marking & Scores")
 
     # --- Load student database (always GitHub) ---
