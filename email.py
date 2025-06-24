@@ -1407,19 +1407,19 @@ with tabs[9]:
     # --- Reference Answers Bank ---
     a1_answers = {
         "Lesen und Hören 0.2": [
-            "1. C) 26","2. A) A, O, U, B","3. A) Eszett","4. A) K","5. A) A-Umlaut","6. A) A, O, U, B","7. B 4",
-            "Wasser","Kaffee","Blume","Schule","Tisch"
+            "1. C) 26", "2. A) A, O, U, B", "3. A) Eszett", "4. A) K", "5. A) A-Umlaut", "6. A) A, O, U, B", "7. B 4",
+            "Wasser", "Kaffee", "Blume", "Schule", "Tisch"
         ],
         # Extend as needed
     }
     a2_answers = {
         "Lesen": [
-            "1. C In einer Schule","2. B Weil sie gerne mit Kindern arbeitet",
-            "3. A In einem Büro","4. B Tennis","5. B Es war sonnig und warm","6. B Italien und Spanien","7. C Weil die Blumen so schön bunt sind"
+            "1. C In einer Schule", "2. B Weil sie gerne mit Kindern arbeitet",
+            "3. A In einem Büro", "4. B Tennis", "5. B Es war sonnig und warm", "6. B Italien und Spanien", "7. C Weil die Blumen so schön bunt sind"
         ],
         "Hören": [
-            "1. B Ins Kino gehen","2. A Weil sie spannende Geschichten liebt",
-            "3. A Tennis","4. B Es war sonnig und warm","5. Einen Spaziergang machen"
+            "1. B Ins Kino gehen", "2. A Weil sie spannende Geschichten liebt",
+            "3. A Tennis", "4. B Es war sonnig und warm", "5. Einen Spaziergang machen"
         ],
         # Extend as needed
     }
@@ -1435,16 +1435,20 @@ with tabs[9]:
         st.markdown("**Reference Answers:**")
         st.markdown("<br>".join(ref_answers[assignment_name]), unsafe_allow_html=True)
 
-    # --- Scores CSV ---
+        # --- Scores CSV ---
     scores_file = "scores.csv"
     raw_scores_url = "https://raw.githubusercontent.com/learngermanghana/email/main/scores_backup.csv"
-    if os.path.exists(scores_file):
-        scores_df = pd.read_csv(scores_file)
-    else:
-        try:
+    # Load scores: prefer local, but fallback to GitHub if local missing or empty
+    try:
+        if os.path.exists(scores_file):
+            scores_df = pd.read_csv(scores_file)
+            # if local exists but no data, try remote
+            if scores_df.empty:
+                scores_df = pd.read_csv(raw_scores_url)
+        else:
             scores_df = pd.read_csv(raw_scores_url)
-        except Exception:
-            scores_df = pd.DataFrame(columns=["StudentCode","Name","Assignment","Score","Comments","Date"])
+    except Exception:
+        scores_df = pd.DataFrame(columns=["StudentCode", "Name", "Assignment", "Score", "Comments", "Date"] )
 
     # --- Save Score ---
     if st.button("💾 Save Score"):
@@ -1467,6 +1471,7 @@ with tabs[9]:
             df_uploaded = pd.read_csv(uploaded)
             df_uploaded.to_csv(scores_file, index=False)
             st.success("Scores restored.")
+            st.experimental_rerun()
 
     # --- Download All Scores CSV ---
     if not scores_df.empty:
@@ -1481,7 +1486,7 @@ with tabs[9]:
     student_scores = scores_df[scores_df['StudentCode'].str.lower() == student_row['studentcode'].lower()]
     if not student_scores.empty:
         st.markdown("### 🗂️ Student's Score History")
-        st.dataframe(student_scores[['Assignment','Score','Comments','Date']])
+        st.dataframe(student_scores[['Assignment', 'Score', 'Comments', 'Date']])
         avg_score = student_scores['Score'].mean()
         st.markdown(f"**Average Score:** `{avg_score:.1f}`")
         st.markdown(f"**Total Assignments Submitted:** `{len(student_scores)}`")
@@ -1490,48 +1495,49 @@ with tabs[9]:
         if st.button("📄 Download Student Report PDF"):
             pdf = FPDF()
             pdf.add_page()
-            pdf.set_font("Arial","B",14)
-            pdf.cell(0,12,f"Assignment Report – {student_row['name']} ({student_row['studentcode']})",ln=1)
-            pdf.set_font("Arial","",12)
-            pdf.cell(0,10,f"Level: {student_row['level']}",ln=1)
-            pdf.cell(0,10,f"Date: {datetime.now().strftime('%Y-%m-%d')}",ln=1)
+            pdf.set_font("Arial", "B", 14)
+            pdf.cell(0, 12, f"Assignment Report – {student_row['name']} ({student_row['studentcode']})", ln=1)
+            pdf.set_font("Arial", "", 12)
+            pdf.cell(0, 10, f"Level: {student_row['level']}", ln=1)
+            pdf.cell(0, 10, f"Date: {datetime.now().strftime('%Y-%m-%d')}", ln=1)
             pdf.ln(5)
             for _, row in student_scores.iterrows():
-                pdf.set_font("Arial","B",12)
-                pdf.cell(0,8,f"{row['Assignment']}: {row['Score']}/100",ln=1)
-                pdf.set_font("Arial","",11)
-                pdf.multi_cell(0,8,f"Comments: {row['Comments']}")
+                pdf.set_font("Arial", "B", 12)
+                pdf.cell(0, 8, f"{row['Assignment']}: {row['Score']}/100", ln=1)
+                pdf.set_font("Arial", "", 11)
+                pdf.multi_cell(0, 8, f"Comments: {row['Comments']}")
                 if row['Assignment'] in ref_answers:
-                    pdf.set_font("Arial","I",11)
-                    pdf.multi_cell(0,8,"Reference Answers:")
+                    pdf.set_font("Arial", "I", 11)
+                    pdf.multi_cell(0, 8, "Reference Answers:")
                     for ans in ref_answers[row['Assignment']]:
-                        pdf.multi_cell(0,8,ans)
+                        pdf.multi_cell(0, 8, ans)
                 pdf.ln(3)
             pdf.ln(10)
-            pdf.set_font("Arial","I",11)
-            pdf.cell(0,8,f"Average Score: {avg_score:.1f}",ln=1)
-            pdf.cell(0,8,f"Total Assignments: {len(student_scores)}",ln=1)
+            pdf.set_font("Arial", "I", 11)
+            pdf.cell(0, 8, f"Average Score: {avg_score:.1f}", ln=1)
+            pdf.cell(0, 8, f"Total Assignments: {len(student_scores)}", ln=1)
             pdf.ln(15)
-            pdf.cell(0,10,"Signed: Felix Asadu",ln=1)
+            pdf.cell(0, 10, "Signed: Felix Asadu", ln=1)
             out_bytes = pdf.output(dest='S').encode('latin-1')
             st.download_button(
                 "⬇️ Download PDF Report",
                 data=out_bytes,
-                file_name=f"{student_row['name'].replace(' ','_')}_report.pdf",
+                file_name=f"{student_row['name'].replace(' ', '_')}_report.pdf",
                 mime="application/pdf"
             )
 
         # --- WhatsApp Share ---
         wa_msg = (
-            f"Hello {student_row['name']}, your average score is {avg_score:.1f}."
-            f" Most recent: {student_scores.iloc[-1]['Assignment']} – {student_scores.iloc[-1]['Score']}/100."
+            f"Hello {student_row['name']}, your average score is {avg_score:.1f}. "
+            f"Most recent: {student_scores.iloc[-1]['Assignment']} – {student_scores.iloc[-1]['Score']}/100."
         )
-        wa_phone = student_row.get('phone','').replace('+','').replace(' ','')
+        wa_phone = student_row.get('phone', '').replace('+', '').replace(' ', '')
         if wa_phone.startswith('0'):
             wa_phone = '233' + wa_phone[1:]
         wa_url = f"https://wa.me/{wa_phone}?text={urllib.parse.quote(wa_msg)}"
         st.markdown(f"[💬 Send via WhatsApp]({wa_url})", unsafe_allow_html=True)
     else:
         st.info("No scores yet. Add a new score above.")
+
 
 
