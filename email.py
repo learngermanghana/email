@@ -776,43 +776,96 @@ with tabs[3]:
 with tabs[4]:
     st.title("📲 WhatsApp Reminders for Debtors")
 
+    # --- Load students.csv (local, else GitHub backup) ---
+    github_csv_url = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
+    student_file = "students.csv"
+    if os.path.exists(student_file):
+        df = pd.read_csv(student_file)
+    else:
+        try:
+            df = pd.read_csv(github_csv_url)
+            st.info("Loaded student data from GitHub backup.")
+        except Exception:
+            df = pd.DataFrame()
+            st.warning("No student data found. Upload students.csv in 📝 Pending tab to continue.")
+            st.stop()
+
+    # --- Normalize columns for safety ---
+    def col_lookup(x):
+        x = str(x).strip().lower()
+        for c in df.columns:
+            if x == c.strip().lower():
+                return c
+        return x
+
+    # Lower-case column headers
+    df.columns = [c.strip().lower() for c in df.columns]
+
+    # --- Show summary stats at the top ---
+    total_students = len(df)
+    total_paid = pd.to_numeric(df.get(col_lookup("paid"), []), errors="coerce").sum()
+    total_expenses = 0.0  # If you track expenses elsewhere, load and sum here
+    net_profit = total_paid - total_expenses
+
+    st.markdown(f"""
+    <div style='background-color:#f4f8fa;border-radius:8px;padding:12px 16px;margin-bottom:14px'>
+    <b>Summary</b><br>
+    👨‍🎓 <b>Total Students:</b> {total_students}<br>
+    💰 <b>Total Collected:</b> GHS {total_paid:,.2f}<br>
+    💸 <b>Total Expenses:</b> GHS {total_expenses:,.2f}<br>
+    📈 <b>Net Profit:</b> GHS {net_profit:,.2f}
+    </div>
+    """, unsafe_allow_html=True)
+
+    # --- Simple filter/search bar ---
+    st.markdown("#### 🔎 Filter or Search")
+    name_search = st.text_input("Search by name or code", key="wa_search")
+    if "level" in df.columns:
+        levels = ["All"] + sorted(df["level"].dropna().unique().tolist())
+        selected_level = st.selectbox("Filter by Level", levels, key="wa_level")
+    else:
+        selected_level = "All"
+
+    filtered_df = df
+    if name_search:
+        filtered_df = filtered_df[
+            filtered_df[col_lookup("name")].astype(str).str.contains(name_search, case=False, na=False) |
+            filtered_df[col_lookup("studentcode")].astype(str).str.contains(name_search, case=False, na=False)
+        ]
+    if selected_level != "All" and "level" in df.columns:
+        filtered_df = filtered_df[filtered_df["level"] == selected_level]
+
+    # --- Show reminders for debtors ---
+    st.markdown("---")
+    st.subheader("Students with Outstanding Balances")
+
+    # Ensure numeric
+    if col_lookup("balance") not in filtered_df.columns or col_lookup("phone") not in filtered_df.columns:
+        st.warning("Missing required columns: 'Balance' or 'Phone'")
+        st.stop()
+
+    filtered_df[col_lookup("balance")] = pd.to_numeric(filtered_df[col_lookup("balance")], errors="coerce").fillna(0.0)
+    filtered_df[col_lookup("phone")] = filtered_df[col_lookup("phone")].astype(str)
+
+    debtors = filtered_df[filtered_df[col_lookup("balance")] > 0]
+
     def clean_phone(phone):
-        """
-        Convert any Ghanaian phone number to WhatsApp-friendly format:
-        - Remove spaces, dashes, and '+'
-        - If starts with '0', replace with '233'
-        - Returns only digits
-        """
         phone = str(phone).replace(" ", "").replace("+", "").replace("-", "")
         if phone.startswith("0"):
             phone = "233" + phone[1:]
-        phone = ''.join(filter(str.isdigit, phone))
-        return phone
+        return ''.join(filter(str.isdigit, phone))
 
-    # Load student data
-    if os.path.exists("students_simple.csv"):
-        df_main = pd.read_csv("students_simple.csv")
-    else:
-        df_main = pd.DataFrame()
+    if not debtors.empty:
+        for _, row in debtors.iterrows():
+            name = row.get(col_lookup("name"), "Unknown")
+            level = row.get(col_lookup("level"), "")
+            balance = float(row.get(col_lookup("balance"), 0.0))
+            code = row.get(col_lookup("studentcode"), "")
+            phone = clean_phone(row.get(col_lookup("phone"), ""))
 
-    if not df_main.empty and "Balance" in df_main.columns and "Phone" in df_main.columns:
-        df_main["Balance"] = pd.to_numeric(df_main["Balance"], errors="coerce").fillna(0.0)
-        df_main["Phone"] = df_main["Phone"].astype(str)
-
-        debtors = df_main[df_main["Balance"] > 0]
-
-        if not debtors.empty:
-            st.write("### Students with Outstanding Balances")
-
-            for _, row in debtors.iterrows():
-                name = row.get("Name", "Unknown")
-                level = row.get("Level", "")
-                balance = float(row.get("Balance", 0.0))
-                code = row.get("StudentCode", "")
-                phone = clean_phone(row.get("Phone", ""))
-
-                # Date logic: contract start and due date (one month after)
-                contract_start = row.get("ContractStart", "")
+            # Dates
+            contract_start = row.get(col_lookup("contractstart"), "")
+            try:
                 if contract_start and not pd.isnull(contract_start):
                     contract_start_dt = pd.to_datetime(contract_start, errors="coerce")
                     contract_start_fmt = contract_start_dt.strftime("%d %B %Y")
@@ -821,32 +874,35 @@ with tabs[4]:
                 else:
                     contract_start_fmt = "N/A"
                     due_date_fmt = "soon"
+            except Exception:
+                contract_start_fmt = "N/A"
+                due_date_fmt = "soon"
 
-                message = (
-                    f"Dear {name}, this is a reminder that your balance for your {level} class is GHS {balance:.2f} "
-                    f"and is due by {due_date_fmt}. "
-                    f"Contract start: {contract_start_fmt}.\n"
-                    "Kindly make the payment to continue learning with us. Thank you!\n\n"
-                    "Payment Methods:\n"
-                    "1. Mobile Money\n"
-                    "   Number: 0245022743\n"
-                    "   Name: Felix Asadu\n"
-                    "2. Access Bank (Cedis)\n"
-                    "   Account Number: 1050000008017\n"
-                    "   Name: Learn Language Education Academy"
-                )
+            # --- WhatsApp payment message ---
+            message = (
+                f"Dear {name}, this is a reminder that your balance for your {level} class is GHS {balance:.2f} "
+                f"and is due by {due_date_fmt}. "
+                f"Contract start: {contract_start_fmt}.\n"
+                "Kindly make the payment to continue learning with us. Thank you!\n\n"
+                "Payment Methods:\n"
+                "1. Mobile Money\n"
+                "   Number: 0245022743\n"
+                "   Name: Felix Asadu\n"
+                "2. Access Bank (Cedis)\n"
+                "   Account Number: 1050000008017\n"
+                "   Name: Learn Language Education Academy"
+            )
+            encoded_msg = urllib.parse.quote(message)
+            wa_url = f"https://wa.me/{phone}?text={encoded_msg}"
 
-                encoded_msg = urllib.parse.quote(message)
-                wa_url = f"https://wa.me/{phone}?text={encoded_msg}"
-
-                st.markdown(
-                    f"**{name}** (GHS {balance:.2f} due) – "
-                    f"[📲 Remind via WhatsApp](<{wa_url}>)"
-                )
-        else:
-            st.success("✅ No students with unpaid balances.")
+            st.markdown(
+                f"🔔 <b>{name}</b> (<i>{level}</i>, <b>{balance:.2f} GHS due</b>) — "
+                f"<a href='{wa_url}' target='_blank'>📲 Remind via WhatsApp</a>",
+                unsafe_allow_html=True
+            )
     else:
-        st.warning("⚠️ Required columns 'Balance' or 'Phone' are missing in your data.")
+        st.success("✅ No students with unpaid balances.")
+
 
 
 with tabs[5]:
@@ -1306,119 +1362,94 @@ with tabs[8]:
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
 
-with tabs[9]:
+if tabs[9]:
     st.title("📝 Assignment Marking & Scores")
 
-    # --- Student Data (auto-load from local or GitHub) ---
-    # Prefer local, fallback to GitHub if missing
+    # --- Load student database ---
+    github_csv_url = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
     student_file = "students.csv"
-    github_csv = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
     if os.path.exists(student_file):
-        df_main = pd.read_csv(student_file)
+        df_students = pd.read_csv(student_file)
     else:
         try:
-            df_main = pd.read_csv(github_csv)
-            st.info("Loaded students from GitHub backup.")
+            df_students = pd.read_csv(github_csv_url)
         except Exception:
-            st.warning("⚠️ students.csv not found locally or on GitHub.")
+            st.warning("Could not find student data. Please upload students.csv in 📝 Pending tab.")
             st.stop()
 
-    # --- Normalize columns (ignore case, spaces, etc) ---
-    df_main.columns = [c.strip().replace(" ", "_").replace("(", "").replace(")", "").replace("-", "_").replace("/", "_").lower() for c in df_main.columns]
-    def col_lookup(col):
-        # Helper to find the right column regardless of case/space
-        for c in df_main.columns:
-            if c.replace("_", "").lower() == col.replace("_", "").lower():
-                return c
-        return col  # fallback
+    # --- Clean up columns for case-insensitivity ---
+    df_students.columns = [col.lower().strip().replace(" ", "_") for col in df_students.columns]
+    col_lookup = lambda col: [c for c in df_students.columns if c.lower() == col.lower().replace(" ", "_")]
+    col_lookup = lambda col: col if col in df_students.columns else col.lower().strip().replace(" ", "_")
 
-    # --- Student filter/search ---
-    search = st.text_input("🔎 Search by name/code/location/level").lower()
-    df = df_main.copy()
-    if search:
-        df = df[
-            df[col_lookup("name")].astype(str).str.lower().str.contains(search) |
-            df[col_lookup("studentcode")].astype(str).str.lower().str.contains(search) |
-            df[col_lookup("location")].astype(str).str.lower().str.contains(search) |
-            df[col_lookup("level")].astype(str).str.lower().str.contains(search)
-        ]
-    # Sort by name for UX
-    df = df.sort_values(by=col_lookup("name"))
+    # --- Filter/Search UI ---
+    st.subheader("Filter/Search Students")
+    search_term = st.text_input("🔍 Search Name or Code")
+    level_options = ["All"] + sorted(df_students["level"].dropna().unique().tolist())
+    level_select = st.selectbox("📚 Filter by Level", level_options)
+    view_df = df_students.copy()
+    if search_term:
+        view_df = view_df[view_df["name"].str.contains(search_term, case=False, na=False) | 
+                          view_df["studentcode"].astype(str).str.contains(search_term, case=False, na=False)]
+    if level_select != "All":
+        view_df = view_df[view_df["level"] == level_select]
 
-    # --- Student List and Selection ---
-    if df.empty:
-        st.info("No students found. Check your search/filter or upload students.csv.")
+    if view_df.empty:
+        st.warning("No students match your filter.")
         st.stop()
 
-    # Always use .astype(str) for safety!
-    student_list = df[col_lookup("name")].astype(str) + " (" + df[col_lookup("studentcode")].astype(str) + ")"
-    selected = st.selectbox("Select a student to view/edit details", student_list, key="select_student_detail")
-    if not selected:
-        st.stop()
-
+    # --- Student selection ---
+    student_list = view_df["name"].astype(str) + " (" + view_df["studentcode"].astype(str) + ")"
+    selected = st.selectbox("Select a student", student_list, key="select_student_detail")
     selected_code = selected.split("(")[-1].replace(")", "").strip()
-    student_row = df[df[col_lookup("studentcode")].astype(str).str.lower() == selected_code.lower()]
-    if student_row.empty:
-        st.warning("Student not found in filtered data. Try reloading/clearing filter.")
-        st.stop()
-    student_row = student_row.iloc[0]
+    student_row = view_df[view_df["studentcode"].astype(str).str.lower() == selected_code.lower()].iloc[0]
 
-    # --- Assignment Entry ---
-    st.markdown("---")
-    student_code = str(student_row[col_lookup("studentcode")])
-    student_name = str(student_row[col_lookup("name")])
-    st.subheader(f"📝 Record Assignment Score for **{student_name}** ({student_code})")
-
-    assignment_name = st.text_input("Assignment Name (e.g., Lesen und Hören 0.2, Test 1, etc.)")
-    score = st.number_input("Score", min_value=0, max_value=100, value=0)
-    comments = st.text_area("Comments/Feedback (visible to student)", "")
-
-    # --- Reference Answers (Edit here for future use) ---
+    # --- Answers bank (manually coded) ---
     a1_answers = {
         "Lesen und Hören 0.2": [
-            "1. C) 26", "2. A) A, O,U, B", "3. A) Eszett", "4. A) K",
+            "1. C) 26", "2. A) A, O, U, B", "3. A) Eszett", "4. A) K",
             "5. A) A-Umlaut", "6. A) A, O, U, B", "7. B 4",
-            "1. Wasser", "2. Kaffee", "3. Blume", "4. Schule", "5. Tisch"
+            "Wasser", "Kaffee", "Blume", "Schule", "Tisch"
         ],
-        "Lesen und Hören 1.1": [
-            "1. C", "2. C", "3. A", "4. B"
-        ],
-        # ... (continue with your other A1/A2/B1 assignments as needed)
+        # Add other assignments...
     }
     a2_answers = {
         "Lesen": [
-            "1. C In einer Schule", "2. B Weil sie gerne mit Kindem arbeitet", "3. A In einem Buro",
-            "4. B Tennis", "5. B Es war sonnig und warm", "6. B Italien und Spanien", "7. C Weil die Blaume so schön bunt sind"
+            "1. C In einer Schule", "2. B Weil sie gerne mit Kindern arbeitet", "3. A In einem Büro",
+            "4. B Tennis", "5. B Es war sonnig und warm", "6. B Italien und Spanien", "7. C Weil die Blumen so schön bunt sind"
         ],
         "Hören": [
             "1. B Ins Kino gehen", "2. A Weil sie spannende Geschichten liebt", "3. A Tennis",
             "4. B Es war sonnig und warm", "5. Einen Spaziergang machen"
-        ]
-        # Add B1, B2 as you wish
+        ],
+        # Add other assignments...
     }
+    # Merge all for lookup
+    ref_answers = {**a1_answers, **a2_answers}
 
-    # Show reference if matching
-    if assignment_name in a1_answers:
-        st.markdown(f"**Reference Answers for {assignment_name}:**")
-        for ans in a1_answers[assignment_name]:
-            st.write(ans)
-    elif assignment_name in a2_answers:
-        st.markdown(f"**Reference Answers for {assignment_name}:**")
-        for ans in a2_answers[assignment_name]:
-            st.write(ans)
+    # --- Assignment input UI ---
+    st.markdown("---")
+    st.subheader(f"📝 Record Assignment Score for **{student_row['name']}** ({student_row['studentcode']})")
 
-    # --- Save/Load Scores DB ---
+    assignment_name = st.text_input("Assignment Name (e.g., Lesen und Hören 0.2, Test 1, etc.)")
+    score = st.number_input("Score", min_value=0, max_value=100, value=0)
+    comments = st.text_area("Comments/Feedback (visible to student)", "")
+    if assignment_name in ref_answers:
+        st.markdown("**Reference Answers:**")
+        st.markdown("<br>".join(ref_answers[assignment_name]), unsafe_allow_html=True)
+
+    # --- Scores DB ---
     scores_file = "scores.csv"
     if os.path.exists(scores_file):
         scores_df = pd.read_csv(scores_file)
     else:
         scores_df = pd.DataFrame(columns=["StudentCode", "Name", "Assignment", "Score", "Comments", "Date"])
 
-    # --- Save Score Button ---
+    # --- Save Score ---
     if st.button("💾 Save Score"):
         new_row = {
-            "StudentCode": student_code,
-            "Name": student_name,
+            "StudentCode": student_row["studentcode"],
+            "Name": student_row["name"],
             "Assignment": assignment_name,
             "Score": score,
             "Comments": comments,
@@ -1426,7 +1457,7 @@ with tabs[9]:
         }
         scores_df = pd.concat([scores_df, pd.DataFrame([new_row])], ignore_index=True)
         scores_df.to_csv(scores_file, index=False)
-        st.success("✅ Score saved.")
+        st.success("Score saved.")
 
     # --- Upload/Restore Scores DB ---
     with st.expander("⬆️ Restore/Upload Scores Backup"):
@@ -1434,62 +1465,69 @@ with tabs[9]:
         if uploaded_scores is not None:
             scores_df = pd.read_csv(uploaded_scores)
             scores_df.to_csv(scores_file, index=False)
-            st.success("✅ Scores restored from uploaded file.")
+            st.success("Scores restored from uploaded file.")
 
     # --- Download All Scores Button ---
     score_csv = scores_df.to_csv(index=False).encode()
     st.download_button("📁 Download All Scores CSV", data=score_csv, file_name="scores_backup.csv", mime="text/csv", key="download_scores")
 
-    # --- Show Student Score History, Average, etc ---
-    student_scores = scores_df[scores_df["StudentCode"].astype(str).str.lower() == student_code.lower()]
+    # --- Student Score History & Reference Answers ---
+    student_scores = scores_df[scores_df["StudentCode"].astype(str).str.lower() == student_row["studentcode"].lower()]
     if not student_scores.empty:
         st.markdown("### 🗂️ Student's Score History")
         st.dataframe(student_scores[["Assignment", "Score", "Comments", "Date"]])
+
         avg_score = student_scores["Score"].mean()
         st.markdown(f"**Average Score:** `{avg_score:.1f}`")
         st.markdown(f"**Total Assignments Submitted:** `{len(student_scores)}`")
 
-        # --- PDF Download (with signed by teacher, Unicode fix) ---
+        # --- Download PDF Report (with reference answers) ---
         if st.button("📄 Download Student Report PDF"):
             from fpdf import FPDF
-
-            def safe_latin1(text):
-                # Replace all unsupported characters with '?'
-                return str(text).encode("latin1", "replace").decode("latin1")
-
             pdf = FPDF()
             pdf.add_page()
             pdf.set_font("Arial", "B", 14)
-            pdf.cell(0, 12, safe_latin1(f"Assignment Report – {student_name} ({student_code})"), ln=1)
+            pdf.cell(0, 12, f"Assignment Report – {student_row['name']} ({student_row['studentcode']})", ln=1)
             pdf.set_font("Arial", "", 12)
-            pdf.cell(0, 10, safe_latin1(f"Level: {student_row.get(col_lookup('level'), '')}"), ln=1)
+            pdf.cell(0, 10, f"Level: {student_row['level']}", ln=1)
             pdf.cell(0, 10, f"Date: {datetime.now().strftime('%Y-%m-%d')}", ln=1)
             pdf.ln(5)
             for idx, row in student_scores.iterrows():
                 pdf.set_font("Arial", "B", 12)
-                pdf.cell(0, 8, safe_latin1(f"{row['Assignment']}: "), ln=1)
+                pdf.cell(0, 8, f"{row['Assignment']}:", ln=1)
                 pdf.set_font("Arial", "", 12)
-                pdf.cell(0, 8, safe_latin1(f"Score: {row['Score']}/100"), ln=1)
-                pdf.multi_cell(0, 8, safe_latin1(f"Comments: {row['Comments']}"))
+                pdf.cell(0, 8, f"Score: {row['Score']}/100", ln=1)
+                pdf.multi_cell(0, 8, f"Comments: {row['Comments']}")
+                if row['Assignment'] in ref_answers:
+                    pdf.set_font("Arial", "I", 11)
+                    pdf.multi_cell(0, 8, "Reference Answers:")
+                    for ref in ref_answers[row['Assignment']]:
+                        pdf.multi_cell(0, 8, ref)
                 pdf.ln(3)
             pdf.ln(10)
             pdf.set_font("Arial", "I", 11)
-            pdf.cell(0, 8, safe_latin1(f"Average Score: {avg_score:.1f}"), ln=1)
-            pdf.cell(0, 8, safe_latin1(f"Total Assignments: {len(student_scores)}"), ln=1)
+            pdf.cell(0, 8, f"Average Score: {avg_score:.1f}", ln=1)
+            pdf.cell(0, 8, f"Total Assignments: {len(student_scores)}", ln=1)
             pdf.ln(15)
-            pdf.cell(0, 10, safe_latin1("Signed: Felix Asadu"), ln=1)
-            pdf_out = f"{student_name.replace(' ', '_')}_assignment_report.pdf"
+            pdf.cell(0, 10, "Signed: Felix Asadu", ln=1)
+            pdf_out = f"{student_row['name'].replace(' ', '_')}_assignment_report.pdf"
+            # Ensure all text is latin-1 for FPDF
+            def safe_latin1(text): return str(text).encode("latin1", "replace").decode("latin1")
             pdf.output(pdf_out)
             with open(pdf_out, "rb") as f:
                 pdf_bytes = f.read()
             st.download_button("⬇️ Download PDF", data=pdf_bytes, file_name=pdf_out, mime="application/pdf")
 
-        # --- WhatsApp Share (quick link) ---
+        # --- WhatsApp Share (with answers & average) ---
         msg = (
-            f"Hello {student_name}, your average assignment score is {avg_score:.1f}. "
-            f"Recent result: {student_scores.iloc[-1]['Assignment']} – {student_scores.iloc[-1]['Score']}/100."
+            f"Hello {student_row['name']}, your average assignment score is {avg_score:.1f}.\n\n"
+            f"Most recent: {student_scores.iloc[-1]['Assignment']} – {student_scores.iloc[-1]['Score']}/100.\n"
+            f"Reference Answers: "
         )
-        wa_phone = str(student_row.get(col_lookup("phone"), ""))
+        recent = student_scores.iloc[-1]["Assignment"]
+        if recent in ref_answers:
+            msg += "\n" + "\n".join(ref_answers[recent])
+        wa_phone = str(student_row.get("phone", ""))
         if wa_phone and not pd.isna(wa_phone):
             wa_phone = wa_phone.replace(" ", "").replace("+", "")
             if wa_phone.startswith("0"):
@@ -1497,21 +1535,32 @@ with tabs[9]:
             wa_url = f"https://wa.me/{wa_phone}?text={urllib.parse.quote(msg)}"
             st.markdown(f"[💬 Send result via WhatsApp]({wa_url})", unsafe_allow_html=True)
 
-        # --- Send Portal by Email (via SendGrid) ---
+        # --- Download Student Scores Only (for official) ---
+        student_only_csv = student_scores.to_csv(index=False).encode()
+        st.download_button(
+            "📥 Download Student Scores Only",
+            data=student_only_csv,
+            file_name=f"{student_row['name'].replace(' ', '_')}_scores.csv",
+            mime="text/csv",
+            key="download_student_scores"
+        )
+
+        # --- Send Portal by Email (SendGrid, with answers PDF) ---
         SENDGRID_API_KEY = st.secrets.get("SENDGRID_API_KEY")
-        SENDER_EMAIL = st.secrets.get("SENDER_EMAIL") or "Learngermanghana@gmail.com"
-        if pd.notna(student_row.get(col_lookup("email"), "")) and student_row[col_lookup("email")]:
+        SENDER_EMAIL = st.secrets.get("SENDER_EMAIL", "Learngermanghana@gmail.com")
+        if pd.notna(student_row.get("email", "")) and student_row["email"]:
             if st.button("✉️ Email Student Portal"):
                 try:
                     from sendgrid import SendGridAPIClient
                     from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
+                    import base64
 
                     msg = Mail(
                         from_email=SENDER_EMAIL,
-                        to_emails=student_row[col_lookup("email")],
-                        subject=f"Your Assignment Report – {student_name}",
+                        to_emails=student_row["email"],
+                        subject=f"Your Assignment Report – {student_row['name']}",
                         html_content=f"""
-                            Dear {student_name},<br><br>
+                            Dear {student_row['name']},<br><br>
                             Attached is your latest assignment report.<br><br>
                             Best regards,<br>
                             Felix Asadu<br>
@@ -1534,7 +1583,7 @@ with tabs[9]:
     else:
         st.info("No scores for this student yet. Enter and save a new one above!")
 
-    # --- Show Reference Answers Table ---
+    # --- Show Reference Answers Table (so you can easily update/copy) ---
     with st.expander("📖 Show/Update Reference Answers (A1/A2)", expanded=False):
         st.write("**A1 Answers:**")
         for k, v in a1_answers.items():
