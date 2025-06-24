@@ -1441,7 +1441,7 @@ with tabs[9]:
             "1. 16 – sechzehn", "2. 98 – achtundneunzig", "3. 555 – fünfhundertfünfundfünfzig",
             "4. 1020 – tausendzwanzig", "5. 8553 – achttausendfünfhundertdreiundfünfzig"
         ],
-        "Lesen und Hören 4 Lesen Übung": [
+        "Lesen und Hören 4": [
             "1. C) Neun", "2. B) Polnisch", "3. D) Niederländisch", "4. A) Deutsch", "5. C) Paris", "6. B) Amsterdam", "7. C) In der Schweiz"
         ],
         "Hören Übung (Rund um die Welt)": [
@@ -1484,29 +1484,22 @@ with tabs[9]:
             "9. Wir putzen das Fenster",
             "10. Sie benutzen den Computer"
         ],
-        "Lesen und Hören 5 Part 2": [
-            "Der Tisch ist groß", "Die Lampe ist neu", "Das Buch ist interessant", "Der Stuhl ist bequem", "Die Katze ist süß",
-            "Das Auto ist schnell", "Der Hund ist freundlich", "Die Blume ist schön", "Das Fenster ist offen", "Der Computer ist teuer"
-        ],
-        "Lesen und Hören 5 Part 3": [
-            "Ich sehe den Tisch", "Sie kauft die Lampe", "Er liest das Buch", "Wir brauchen den Stuhl", "Du fütterst die Katze",
-            "Ich fahre das Auto", "Sie streichelt den Hund", "Er pflückt die Blume", "Wir putzen das Fenster", "Sie benutzen Computer"
-        ],
-        "Lesen und Hören 6 Teil 1": [
+        "Lesen und Hören 6": [
             "Das Wohnzimmer – the living room", "Die Küche – the kitchen", "Das Schlafzimmer – the bedroom", "Das Badezimmer – the bathroom", "Der Balkon – the balcony",
             "Der Flur – the hallway", "Das Bett – the bed", "Der Tisch – the table", "Der Stuhl – the chair", "Der Schrank – the wardrobe"
-        ],
-        "Lesen und Hören 6 Teil 2": [
+            "",  # blank line for spacing
             "1. B) Vier", "2. A) Ein Sofa und ein Fernseher", "3. B) Einen Herd, einen Kühlschrank und einen Tisch mit vier Stühlen", "4. C) Ein großes Bett", "5. D) Eine Dusche, eine Badewanne und ein Waschbecken",
             "6. D) Klein und schön", "7. C) Blumen und einen kleinen Tisch mit zwei Stühlen"
+            "",  # blank line for spacing
+            ["1. B", "2. B", "3. B", "4. C", "5. D", "6. B", "7. C"],
         ],
-        "Lesen und Hören 6 Teil 3": ["1. B", "2. B", "3. B", "4. C", "5. D", "6. B", "7. C"],
-        "Lesen und Hören 7 Teil 1": [
+        "Lesen und Hören 7": [
             "1. B) Um sieben Uhr", "2. B) Um acht Uhr", "3. B) Um sechs Uhr", "4. B) Um zehn Uhr", "5. B) Um neun Uhr",
+            "",  # blank line for spacing
             "6. C) Nachmittags", "7. A) Um sieben Uhr", "8. A) Montag", "9. B) Am Dienstag und Donnerstag", "10. B) Er ruht sich aus"
-        ],
-        "Lesen und Hören 7 Teil 2": [
+            "",  # blank line for spacing       
             "1. B) Um neun Uhr", "2. B) Er geht in die Bibliothek", "3. B) Bis zwei Uhr nachmittags", "4. B) Um drei Uhr nachmittags", "5. A) ",
+            "",  # blank line for spacing       
             "6. B) Um neun Uhr", "7. B) Er geht in die Bibliothek", "8. B) Bis zwei Uhr nachmittags", "9. B) Um drei Uhr nachmittags", "10. B) Um sieben Uhr"
         ],
         "Lesen und Hören 8 Teil 1": [
