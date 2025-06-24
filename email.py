@@ -61,6 +61,10 @@ with tabs[0]:
         st.warning(f"Could not load registration data: {e}")
         st.info("No pending students. All new students must fill the online registration form.")
 
+def safe_latin1(text):
+    # Replace unsupported Unicode with '?'
+    return text.encode("latin1", "replace").decode("latin1")
+
 with tabs[1]:
     st.title("👩‍🎓 All Students (View, Contracts, Receipts)")
 
@@ -149,13 +153,13 @@ with tabs[1]:
             class PDF(FPDF):
                 def header(self):
                     self.set_font('Arial', 'B', 14)
-                    self.cell(0, 12, "Learn Language Education Academy – Payment Contract", ln=1, align='C')
+                    self.cell(0, 12, safe_latin1("Learn Language Education Academy – Payment Contract"), ln=1, align='C')
             pdf = PDF()
             pdf.add_page()
             pdf.set_font("Arial", size=12)
-            pdf.multi_cell(0, 8, contract_text)
+            pdf.multi_cell(0, 8, safe_latin1(contract_text))
             pdf.set_font("Arial", "I", 11)
-            pdf.cell(0, 10, "Signed: Felix Asadu", ln=1, align='R')
+            pdf.cell(0, 10, safe_latin1("Signed: Felix Asadu"), ln=1, align='R')
             pdf_out = f"{student_row['name'].replace(' ', '_')}_contract.pdf"
             pdf.output(pdf_out)
             with open(pdf_out, "rb") as f:
@@ -182,13 +186,13 @@ with tabs[1]:
             class PDFReceipt(FPDF):
                 def header(self):
                     self.set_font('Arial', 'B', 14)
-                    self.cell(0, 12, "Learn Language Education Academy – Payment Receipt", ln=1, align='C')
+                    self.cell(0, 12, safe_latin1("Learn Language Education Academy – Payment Receipt"), ln=1, align='C')
             pdf_r = PDFReceipt()
             pdf_r.add_page()
             pdf_r.set_font("Arial", size=12)
-            pdf_r.multi_cell(0, 8, receipt_text)
+            pdf_r.multi_cell(0, 8, safe_latin1(receipt_text))
             pdf_r.set_font("Arial", "I", 11)
-            pdf_r.cell(0, 10, "Signed: Felix Asadu", ln=1, align='R')
+            pdf_r.cell(0, 10, safe_latin1("Signed: Felix Asadu"), ln=1, align='R')
             receipt_out = f"{student_row['name'].replace(' ', '_')}_receipt.pdf"
             pdf_r.output(receipt_out)
             with open(receipt_out, "rb") as f:
