@@ -1420,6 +1420,10 @@ with tabs[9]:
 
                 # --- Reference Answers ---
     ref_answers = {
+        "Lesen und Hören 0.1": [
+            "1. C) Guten Morgen", "2. D) Guten Tag", "3. B) Guten Abend", "4. B) Gute Nacht", "5. C) Guten Morgen", "6. C) Wie geht es Ihnen", "7. B) Auf Wiedersehen",
+            "8. C) Tschuss", "9. C) Guten Abend", "10. D) Guten Nacht",
+        ],
         "Lesen und Hören 0.2": [
             "1. C) 26", "2. A) A, O, U, B", "3. A) Eszett", "4. A) K", "5. A) A-Umlaut", "6. A) A, O, U, B", "7. B 4",
             "Wasser", "Kaffee", "Blume", "Schule", "Tisch"
