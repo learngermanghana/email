@@ -74,6 +74,13 @@ from fpdf import FPDF
 def safe_latin1(text):
     return text.encode("latin1", "replace").decode("latin1")
 
+import os
+import pandas as pd
+import numpy as np
+import streamlit as st
+from datetime import date
+
+# --- TAB 1: All Students (View, Contracts, Receipts) ---
 with tabs[1]:
     st.title("👩‍🎓 All Students (View, Contracts, Receipts)")
 
@@ -90,6 +97,11 @@ with tabs[1]:
         c.strip().replace(" ", "_").replace("(", "").replace(")", "").replace("-", "_").replace("/", "_").lower()
         for c in df_students.columns
     ]
+
+    # --- Fill missing columns if necessary ---
+    for col in ["fees", "paid"]:
+        if col not in df_students.columns:
+            df_students[col] = 0.0
 
     # --- Filter/search controls ---
     search_term = st.text_input("🔍 Search Student by Name or Code")
@@ -129,90 +141,82 @@ with tabs[1]:
     else:
         st.dataframe(view_df, use_container_width=True)
 
-        # -- Pick a student for contract/receipt --
-        st.markdown("### 🔎 Select Student For Contract or Receipt")
+        # -- Pick a student for contract/receipt/payment edit --
+        st.markdown("### 🔎 Select Student For Payment Edit, Contract or Receipt")
         pick_list = view_df["name"].astype(str) + " (" + view_df["studentcode"].astype(str) + ")"
         pick = st.selectbox("Select Student", pick_list)
         selected_code = pick.split("(")[-1].replace(")", "").strip()
         student_row = view_df[view_df["studentcode"].astype(str).str.lower() == selected_code.lower()].iloc[0]
 
-        # --- SAFE float conversion function ---
-        import math
-        def to_float(val):
-            try:
-                f = float(val)
-                if math.isnan(f):
-                    return 0.0
-                return f
-            except:
-                return 0.0
+        # --- Payment Editing Section ---
+        st.markdown("#### 💵 Payment Information")
+        total_fees = float(student_row.get('fees', 0.0) or 0.0)
+        paid = float(student_row.get('paid', 0.0) or 0.0)
+        st.info(f"Tuition/Total Fees: GHS {total_fees:,.2f}")
 
-        # --- Payment logic ---
-        total_fees = to_float(student_row.get("fees", 0))
-        paid = to_float(student_row.get("paid", 0))
+        # To avoid StreamlitMixedNumericTypesError, always use floats
         max_value = float(total_fees)
         min_value = 0.0
-        default_paid = min(max(paid, 0.0), total_fees)
-
-        st.markdown("#### 💵 Payment Info")
-        st.write(f"**Total Fees:** GHS {total_fees:,.2f}")
-
         first_instalment = st.number_input(
             "First Installment Paid (GHS)",
             min_value=min_value,
             max_value=max_value,
-            value=default_paid,
+            value=paid,
             step=1.0,
-            key="instalment_input"
+            key=f"instalment_{selected_code}"
         )
+        remaining = total_fees - first_instalment
+        st.write(f"**Remaining Balance:** GHS {remaining:,.2f}")
 
-        remaining_balance = total_fees - first_instalment
-        remaining_balance = max(0.0, remaining_balance)
-        st.info(f"**Remaining Balance:** GHS {remaining_balance:,.2f}")
+        # --- Update paid value in DataFrame (session only) ---
+        if st.button("💾 Update Payment Info for Student"):
+            idx = df_students.index[df_students["studentcode"].astype(str).str.lower() == selected_code.lower()]
+            if not idx.empty:
+                df_students.at[idx[0], "paid"] = first_instalment
+                st.success(f"Updated payment for {student_row['name']} to GHS {first_instalment:,.2f}.")
+            else:
+                st.error("Could not find student in DataFrame.")
 
-        # ============ PDF HELPER ==============
-        def safe_ascii(text):
-            return text.encode("latin1", "replace").decode("latin1")
+        # --- Download updated students.csv for GitHub re-upload ---
+        st.download_button(
+            "⬇️ Download Updated Students CSV",
+            data=df_students.to_csv(index=False),
+            file_name="students_updated.csv"
+        )
 
         # -- Generate Payment Contract PDF --
         if st.button("📝 Generate Payment Contract"):
             from fpdf import FPDF
 
-            contract_text = f"""
-            PAYMENT AGREEMENT
-
-            This Payment Agreement is entered into on {date.today().strftime('%Y-%m-%d')} for students of Learn Language Education Academy and Felix Asadu ("Teacher").
-
-            Student: {student_row['name']} ({student_row['studentcode']})
-            Student Level: {student_row.get('level','')}
-            Contract Start: {student_row.get('contractstart','')}
-            Contract End: {student_row.get('contractend','')}
-            Tuition: GHS {total_fees:,.2f}
-            First Installment: GHS {first_instalment:,.2f}
-            Remaining Balance: GHS {remaining_balance:,.2f}
-
-            Terms:
-            1. Payment can be made in full or in two installments. Second installment is due before end of contract.
-            2. No refunds after payment. Access revoked if payment is overdue.
-            3. Attendance and communication required by both parties.
-
-            Signatures:
-            Student: ______________________      Date: ________________
-
-            For: Learn Language Education Academy
-            Felix Asadu
-            """
+            # Clean contract text for PDF (no unicode, avoid strange symbols)
+            contract_text = (
+                f"This payment contract is made between {student_row['name']} ({student_row['studentcode']}) and Learn Language Education Academy.\n\n"
+                f"Student Level: {student_row.get('level', '')}\n"
+                f"Contract Start: {student_row.get('contractstart', '')}\n"
+                f"Contract End: {student_row.get('contractend', '')}\n"
+                f"Tuition: GHS {total_fees:,.2f}\n"
+                f"First Installment: GHS {first_instalment:,.2f}\n"
+                f"Remaining Balance: GHS {remaining:,.2f}\n"
+                f"Phone: {student_row.get('phone', '')}\n"
+                f"Email: {student_row.get('email', '')}\n"
+                f"Address: {student_row.get('address', '')}\n\n"
+                "By signing, the student agrees to pay all required fees and abide by the Academy's policies.\n\n"
+                "Signed: ______________________      Date: ________________\n\n"
+                "For: Learn Language Education Academy\n"
+                "Felix Asadu"
+            )
 
             class PDF(FPDF):
                 def header(self):
                     self.set_font('Arial', 'B', 14)
-                    self.cell(0, 12, safe_ascii("Learn Language Education Academy – Payment Contract"), ln=1, align='C')
+                    self.cell(0, 12, "Learn Language Education Academy – Payment Contract", ln=1, align='C')
             pdf = PDF()
             pdf.add_page()
             pdf.set_font("Arial", size=12)
-            pdf.multi_cell(0, 8, safe_ascii(contract_text))
+            # Only use ascii to avoid unicode issues
+            pdf.multi_cell(0, 8, contract_text.encode("ascii", "ignore").decode())
             pdf.set_font("Arial", "I", 11)
-            pdf.cell(0, 10, safe_ascii("Signed: Felix Asadu"), ln=1, align='R')
+            pdf.cell(0, 10, "Signed: Felix Asadu", ln=1, align='R')
             pdf_out = f"{student_row['name'].replace(' ', '_')}_contract.pdf"
             pdf.output(pdf_out)
             with open(pdf_out, "rb") as f:
@@ -222,39 +226,31 @@ with tabs[1]:
         # -- Generate Receipt PDF --
         if st.button("📄 Generate Payment Receipt"):
             from fpdf import FPDF
-
-            if remaining_balance == 0.0:
-                payment_status = "Full Payment Received"
-            elif first_instalment == 0.0:
-                payment_status = "No Payment Made"
-            else:
-                payment_status = f"Part Payment: GHS {first_instalment:,.2f} paid, GHS {remaining_balance:,.2f} outstanding"
-
-            receipt_text = f"""
-            RECEIPT OF PAYMENT
-
-            Received from: {student_row['name']} ({student_row['studentcode']})
-            Level: {student_row.get('level','')}
-            Date: {date.today().strftime('%Y-%m-%d')}
-            Amount Paid: GHS {first_instalment:,.2f}
-            Payment Status: {payment_status}
-
-            Thank you for your payment!
-
-            For: Learn Language Education Academy
-            Felix Asadu
-            """
+            # Payment status
+            status = "Full Payment Received" if remaining == 0 else f"Installment Payment: GHS {first_instalment:,.2f} paid, GHS {remaining:,.2f} remaining"
+            receipt_text = (
+                "RECEIPT OF PAYMENT\n\n"
+                f"Received from: {student_row['name']} ({student_row['studentcode']})\n"
+                f"Level: {student_row.get('level', '')}\n"
+                f"Date: {date.today().strftime('%Y-%m-%d')}\n"
+                f"Amount Paid: GHS {first_instalment:,.2f}\n"
+                f"Payment Method: ____________________\n\n"
+                f"Status: {status}\n\n"
+                "Thank you for your payment!\n\n"
+                "For: Learn Language Education Academy\n"
+                "Felix Asadu"
+            )
 
             class PDFReceipt(FPDF):
                 def header(self):
                     self.set_font('Arial', 'B', 14)
-                    self.cell(0, 12, safe_ascii("Learn Language Education Academy – Payment Receipt"), ln=1, align='C')
+                    self.cell(0, 12, "Learn Language Education Academy – Payment Receipt", ln=1, align='C')
             pdf_r = PDFReceipt()
             pdf_r.add_page()
             pdf_r.set_font("Arial", size=12)
-            pdf_r.multi_cell(0, 8, safe_ascii(receipt_text))
+            pdf_r.multi_cell(0, 8, receipt_text.encode("ascii", "ignore").decode())
             pdf_r.set_font("Arial", "I", 11)
-            pdf_r.cell(0, 10, safe_ascii("Signed: Felix Asadu"), ln=1, align='R')
+            pdf_r.cell(0, 10, "Signed: Felix Asadu", ln=1, align='R')
             receipt_out = f"{student_row['name'].replace(' ', '_')}_receipt.pdf"
             pdf_r.output(receipt_out)
             with open(receipt_out, "rb") as f:
