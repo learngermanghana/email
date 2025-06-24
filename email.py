@@ -471,64 +471,46 @@ with tabs[0]:
 
 with tabs[1]:
     st.title("👩‍🎓 All Students (Edit, Update, Delete, Receipt)")
+
+    # ---- Student Data: load from local or GitHub backup ----
+    student_file = "students.csv"
+    github_csv = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
+    if os.path.exists(student_file):
+        df_main = pd.read_csv(student_file)
+    else:
+        try:
+            df_main = pd.read_csv(github_csv)
+            st.info("Loaded students from GitHub backup.")
+        except Exception:
+            st.warning("⚠️ students.csv not found locally or on GitHub.")
+            st.stop()
+
+    # ---- Normalize columns ----
+    df_main.columns = [
+        c.strip().replace(" ", "_").replace("(", "").replace(")", "").replace("-", "_").replace("/", "_").lower()
+        for c in df_main.columns
+    ]
+    def col_lookup(col):
+        for c in df_main.columns:
+            if c.replace("_", "").lower() == col.replace("_", "").lower():
+                return c
+        return col
+
+    # ---- Status & Dates ----
     today = date.today()
+    if col_lookup("contractend") in df_main.columns:
+        df_main["contractend"] = pd.to_datetime(df_main[col_lookup("contractend")], errors="coerce")
+        df_main["status"] = "Unknown"
+        mask_valid = df_main["contractend"].notna()
+        df_main.loc[mask_valid, "status"] = np.where(
+            df_main.loc[mask_valid, "contractend"].dt.date < today,
+            "Completed",
+            "Enrolled"
+        )
 
-    # === Load or initialize student data ===
-    conn = sqlite3.connect('students.db')
-    cursor = conn.cursor()
-
-    # Ensure table exists
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS students (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT,
-        phone TEXT,
-        email TEXT,
-        location TEXT,
-        level TEXT,
-        paid REAL,
-        balance REAL,
-        contract_start TEXT,
-        contract_end TEXT,
-        student_code TEXT,
-        emergency_contact TEXT
-    )
-    ''')
-    conn.commit()
-
-    # Fetch students from SQLite DB
-    cursor.execute("SELECT * FROM students")
-    students_data = cursor.fetchall()
-    columns = [
-        "id", "name", "phone", "email", "location", "level",
-        "paid", "balance", "contract_start", "contract_end", "student_code", "emergency_contact"
-    ]
-    df_main = pd.DataFrame(students_data, columns=columns)
-
-    # Ensure required columns exist (if any column missing, initialize with empty/default values)
-    required_cols = [
-        "name", "phone", "email", "location", "level",
-        "paid", "balance", "contract_start", "contract_end", "student_code", "emergency_contact"
-    ]
-    for col in required_cols:
-        if col not in df_main.columns:
-            df_main[col] = ""
-
-    # Numeric/Date conversions
-    df_main["paid"] = pd.to_numeric(df_main["paid"], errors="coerce").fillna(0.0)
-    df_main["balance"] = pd.to_numeric(df_main["balance"], errors="coerce").fillna(0.0)
-    df_main["contract_end"] = pd.to_datetime(df_main["contract_end"], errors="coerce")
-    df_main["status"] = "Unknown"
-    mask_valid = df_main["contract_end"].notna()
-    df_main.loc[mask_valid, "status"] = np.where(
-        df_main.loc[mask_valid, "contract_end"].dt.date < today,
-        "Completed",
-        "Enrolled"
-    )
-
-    # 🔄 Live Search and Filters
-    search_term = st.text_input("🔍 Search Student by Name or Code")
-    levels = ["All"] + sorted(df_main["level"].dropna().unique().tolist())
+    # ---- Filters/Search ----
+    search_term = st.text_input("🔍 Search Student by Name or Code").lower()
+    levels = ["All"] + sorted(df_main[col_lookup("level")].dropna().unique().tolist())
     selected_level = st.selectbox("📋 Filter by Class Level", levels)
     statuses = ["All", "Enrolled", "Completed", "Unknown"]
     status_filter = st.selectbox("Filter by Status", statuses)
@@ -536,22 +518,21 @@ with tabs[1]:
     view_df = df_main.copy()
     if search_term:
         view_df = view_df[
-            view_df["name"].str.contains(search_term, case=False, na=False) |
-            view_df["student_code"].str.contains(search_term, case=False, na=False)
+            view_df[col_lookup("name")].astype(str).str.lower().str.contains(search_term) |
+            view_df[col_lookup("studentcode")].astype(str).str.lower().str.contains(search_term)
         ]
     if selected_level != "All":
-        view_df = view_df[view_df["level"] == selected_level]
+        view_df = view_df[view_df[col_lookup("level")] == selected_level]
     if status_filter != "All":
         view_df = view_df[view_df["status"] == status_filter]
 
+    # ---- Table & Pagination ----
     if view_df.empty:
-        st.info("No students found in your database.")
+        st.info("No students found.")
     else:
-        # -------- Pagination setup --------
         ROWS_PER_PAGE = 10
         total_rows = len(view_df)
         total_pages = (total_rows - 1) // ROWS_PER_PAGE + 1
-
         page = st.number_input(
             f"Page (1-{total_pages})", min_value=1, max_value=total_pages, value=1, step=1, key="students_page"
         )
@@ -559,58 +540,58 @@ with tabs[1]:
         end_idx = start_idx + ROWS_PER_PAGE
 
         paged_df = view_df.iloc[start_idx:end_idx].reset_index(drop=True)
-        st.dataframe(
-            paged_df[["name", "student_code", "level", "phone", "paid", "balance", "status"]],
-            use_container_width=True
-        )
+        show_cols = [col_lookup(c) for c in ["name", "studentcode", "level", "phone", "paid", "balance", "status"]]
+        st.dataframe(paged_df[show_cols], use_container_width=True)
 
-        # --- Select a student for details ---
-        student_names = paged_df["name"].tolist()
+        # --- Student Details (edit/update/delete/receipt) ---
+        student_names = paged_df[col_lookup("name")].tolist()
         if student_names:
-            selected_student = st.selectbox("Select a student to view/edit details", student_names, key="select_student_detail")
-            student_row = paged_df[paged_df["name"] == selected_student].iloc[0]
-
-            idx = view_df[view_df["name"] == selected_student].index[0]
-            unique_key = f"{student_row['student_code']}_{idx}"
+            selected_student = st.selectbox(
+                "Select a student to view/edit details", student_names, key="select_student_detail_all"
+            )
+            student_row = paged_df[paged_df[col_lookup("name")] == selected_student].iloc[0]
+            idx = view_df[view_df[col_lookup("name")] == selected_student].index[0]
+            unique_key = f"{student_row[col_lookup('studentcode')]}_{idx}"
             status_color = (
                 "🟢" if student_row["status"] == "Enrolled" else
                 "🔴" if student_row["status"] == "Completed" else
                 "⚪"
             )
 
-            with st.expander(f"{status_color} {student_row['name']} ({student_row['student_code']}) [{student_row['status']}]", expanded=True):
-                # Editable fields
-                name_input = st.text_input("Name", value=student_row["name"], key=f"name_{unique_key}")
-                phone_input = st.text_input("Phone", value=student_row["phone"], key=f"phone_{unique_key}")
-                email_input = st.text_input("Email", value=student_row["email"], key=f"email_{unique_key}")
-                location_input = st.text_input("Location", value=student_row["location"], key=f"loc_{unique_key}")
-                level_input = st.text_input("Level", value=student_row["level"], key=f"level_{unique_key}")
-                paid_input = st.number_input("Paid", value=float(student_row["paid"]), key=f"paid_{unique_key}")
-                balance_input = st.number_input("Balance", value=float(student_row["balance"]), key=f"bal_{unique_key}")
-                contract_start_input = st.text_input("Contract Start", value=str(student_row["contract_start"]), key=f"cs_{unique_key}")
-                contract_end_input = st.text_input("Contract End", value=str(student_row["contract_end"].date()) if pd.notna(student_row["contract_end"]) else "", key=f"ce_{unique_key}")
-                code_input = st.text_input("Student Code", value=student_row["student_code"], key=f"code_{unique_key}")
-                emergency_input = st.text_input("Emergency Contact", value=student_row["emergency_contact"], key=f"em_{unique_key}")
+            with st.expander(f"{status_color} {student_row[col_lookup('name')]} ({student_row[col_lookup('studentcode')]}) [{student_row['status']}]", expanded=True):
+                name_input = st.text_input("Name", value=student_row[col_lookup("name")], key=f"name_{unique_key}")
+                phone_input = st.text_input("Phone", value=student_row[col_lookup("phone")], key=f"phone_{unique_key}")
+                email_input = st.text_input("Email", value=student_row.get(col_lookup("email"), ""), key=f"email_{unique_key}")
+                location_input = st.text_input("Location", value=student_row.get(col_lookup("location"), ""), key=f"loc_{unique_key}")
+                level_input = st.text_input("Level", value=student_row[col_lookup("level")], key=f"level_{unique_key}")
+                paid_input = st.number_input("Paid", value=float(student_row[col_lookup("paid")]), key=f"paid_{unique_key}")
+                balance_input = st.number_input("Balance", value=float(student_row[col_lookup("balance")]), key=f"bal_{unique_key}")
+                contract_start_input = st.text_input("Contract Start", value=str(student_row.get(col_lookup("contractstart"), "")), key=f"cs_{unique_key}")
+                contract_end_input = st.text_input("Contract End", value=str(student_row.get(col_lookup("contractend"), "")), key=f"ce_{unique_key}")
+                code_input = st.text_input("Student Code", value=student_row[col_lookup("studentcode")], key=f"code_{unique_key}")
+                emergency_input = st.text_input("Emergency Contact", value=student_row.get(col_lookup("emergencycontact_phonenumber"), ""), key=f"em_{unique_key}")
 
                 col1, col2, col3 = st.columns(3)
                 with col1:
                     if st.button("💾 Update", key=f"update_{unique_key}"):
-                        cursor.execute("""
-                        UPDATE students
-                        SET name=?, phone=?, email=?, location=?, level=?, paid=?, balance=?, contract_start=?, contract_end=?, student_code=?, emergency_contact=?
-                        WHERE id=?
-                        """, (
-                            name_input, phone_input, email_input, location_input, level_input,
-                            paid_input, balance_input, contract_start_input, contract_end_input,
-                            code_input, emergency_input, student_row["id"]
-                        ))
-                        conn.commit()
+                        df_main.at[idx, col_lookup("name")] = name_input
+                        df_main.at[idx, col_lookup("phone")] = phone_input
+                        df_main.at[idx, col_lookup("email")] = email_input
+                        df_main.at[idx, col_lookup("location")] = location_input
+                        df_main.at[idx, col_lookup("level")] = level_input
+                        df_main.at[idx, col_lookup("paid")] = paid_input
+                        df_main.at[idx, col_lookup("balance")] = balance_input
+                        df_main.at[idx, col_lookup("contractstart")] = contract_start_input
+                        df_main.at[idx, col_lookup("contractend")] = contract_end_input
+                        df_main.at[idx, col_lookup("studentcode")] = code_input
+                        df_main.at[idx, col_lookup("emergencycontact_phonenumber")] = emergency_input
+                        df_main.to_csv(student_file, index=False)
                         st.success("✅ Student updated.")
                         st.experimental_rerun()
                 with col2:
                     if st.button("🗑️ Delete", key=f"delete_{unique_key}"):
-                        cursor.execute("DELETE FROM students WHERE id=?", (student_row["id"],))
-                        conn.commit()
+                        df_main = df_main.drop(idx).reset_index(drop=True)
+                        df_main.to_csv(student_file, index=False)
                         st.success("❌ Student deleted.")
                         st.experimental_rerun()
                 with col3:
@@ -632,8 +613,10 @@ with tabs[1]:
                         )
                         st.markdown(download_link, unsafe_allow_html=True)
 
-# Close SQLite connection after use
-conn.close()
+        # --- Download students.csv (for backup/manual editing) ---
+        backup_csv = df_main.to_csv(index=False).encode()
+        st.download_button("📁 Download All Students CSV", data=backup_csv, file_name="students_backup.csv", mime="text/csv", key="download_students_all")
+
 
 
 with tabs[2]:
