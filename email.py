@@ -1571,26 +1571,31 @@ with tabs[9]:
         avg = hist['Score'].mean()
         st.markdown(f"**Average Score:** {avg:.1f}")
 
-        # PDF Report
-        if st.button("Download Student Report PDF"):
-            pdf = FPDF()
-            pdf.add_page()
-            pdf.set_font("Arial","B",14)
-            pdf.cell(0,10,f"Report for {student_row['name']}",ln=True)
-            pdf.ln(5)
-            for _, r in hist.iterrows():
-                pdf.set_font("Arial","B",12)
-                pdf.cell(0,8,f"{r['Assignment']}: {r['Score']}/100",ln=True)
-                pdf.set_font("Arial","",11)
-                pdf.multi_cell(0,8,f"Comments: {r['Comments']}")
-                if r['Assignment'] in ref_answers:
-                    pdf.set_font("Arial","I",11)
-                    pdf.multi_cell(0,8,"Reference Answers:")
-                    for ans in ref_answers[r['Assignment']]:
-                        pdf.multi_cell(0,8,ans)
-                pdf.ln(3)
-            pdf_bytes = pdf.output(dest='S').encode('latin-1')
-            st.download_button("Download PDF Report", data=pdf_bytes, file_name=f"{student_row['name']}_report.pdf")
+        # PDF Report Download
+        # Always generate PDF bytes for download
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial","B",14)
+        pdf.cell(0,10,f"Report for {student_row['name']}",ln=True)
+        pdf.ln(5)
+        for _, r in hist.iterrows():
+            pdf.set_font("Arial","B",12)
+            pdf.cell(0,8,f"{r['Assignment']}: {r['Score']}/100",ln=True)
+            pdf.set_font("Arial","",11)
+            pdf.multi_cell(0,8,f"Comments: {r['Comments']}")
+            if r['Assignment'] in ref_answers:
+                pdf.set_font("Arial","I",11)
+                pdf.multi_cell(0,8,"Reference Answers:")
+                for ans in ref_answers[r['Assignment']]:
+                    pdf.multi_cell(0,8,ans)
+            pdf.ln(3)
+        pdf_bytes = pdf.output(dest='S').encode('latin-1')
+        st.download_button(
+            "📄 Download Student Report PDF",
+            data=pdf_bytes,
+            file_name=f"{student_row['name']}_report.pdf",
+            mime="application/pdf"
+        )
     else:
         st.info("No scores found for this student.")
 
