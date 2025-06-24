@@ -1376,158 +1376,121 @@ with tabs[9]:
         except Exception:
             st.warning("Could not find student data. Please upload students.csv in 📝 Pending tab.")
             st.stop()
-    df_students.columns = [col.lower().strip().replace(" ", "_") for col in df_students.columns]
+    df_students.columns = [c.lower().strip().replace(" ", "_") for c in df_students.columns]
 
-    # --- Filter/Search UI ---
-    st.subheader("Filter/Search Students")
-    search_term = st.text_input("🔍 Search Name or Code")
-    level_options = ["All"] + sorted(df_students["level"].dropna().unique().tolist())
-    level_select = st.selectbox("📚 Filter by Level", level_options)
+    # --- Filter/Search Students ---
+    st.subheader("🔍 Filter/Search Students")
+    search_term = st.text_input("Search by name or code")
+    levels = ["All"] + sorted(df_students['level'].dropna().unique().tolist())
+    selected_level = st.selectbox("Filter by Level", levels)
     view_df = df_students.copy()
     if search_term:
         view_df = view_df[
-            view_df["name"].str.contains(search_term, case=False, na=False) |
-            view_df["studentcode"].astype(str).str.contains(search_term, case=False, na=False)
+            view_df['name'].str.contains(search_term, case=False, na=False) |
+            view_df['studentcode'].astype(str).str.contains(search_term, case=False, na=False)
         ]
-    if level_select != "All":
-        view_df = view_df[view_df["level"] == level_select]
+    if selected_level != "All":
+        view_df = view_df[view_df['level'] == selected_level]
     if view_df.empty:
-        st.warning("No students match your filter.")
+        st.info("No students match your filter.")
         st.stop()
 
-    # --- Student selection ---
-    student_list = view_df["name"] + " (" + view_df["studentcode"] + ")"
-    selected = st.selectbox("Select a student", student_list, key="select_student_detail")
-    selected_code = selected.split("(")[-1].replace(")", "").strip()
-    student_row = view_df[view_df["studentcode"].str.lower() == selected_code.lower()].iloc[0]
+    # --- Select Student ---
+    student_list = view_df['name'] + " (" + view_df['studentcode'] + ")"
+    chosen = st.selectbox("Select a student", student_list)
+    code = chosen.split("(")[-1].replace(")", "").strip().lower()
+    student_row = view_df[view_df['studentcode'].str.lower() == code].iloc[0]
 
-    # --- Reference Answers Bank ---
-    a1_answers = {
-        "Lesen und Hören 0.2": [
-            "1. C) 26", "2. A) A, O, U, B", "3. A) Eszett", "4. A) K", "5. A) A-Umlaut", "6. A) A, O, U, B", "7. B 4",
-            "Wasser", "Kaffee", "Blume", "Schule", "Tisch"
-        ],
-    }
-    a2_answers = {
-        "Lesen": [
-            "1. C In einer Schule", "2. B Weil sie gerne mit Kindern arbeitet",
-            "3. A In einem Büro", "4. B Tennis", "5. B Es war sonnig und warm", "6. B Italien und Spanien", "7. C Weil die Blumen so schön bunt sind"
-        ],
-        "Hören": [
-            "1. B Ins Kino gehen", "2. A Weil sie spannende Geschichten liebt",
-            "3. A Tennis", "4. B Es war sonnig und warm", "5. Einen Spaziergang machen"
-        ],
-    }
+    # --- Reference Answers ---
+    a1_answers = { 'Lesen und Hören 0.2': [
+        '1. C) 26','2. A) A, O, U, B','3. A) Eszett','4. A) K','5. A) A-Umlaut','6. A) A, O, U, B','7. B 4',
+        'Wasser','Kaffee','Blume','Schule','Tisch'
+    ] }
+    a2_answers = { 'Lesen': [
+        '1. C In einer Schule','2. B Weil sie gerne mit Kindern arbeitet',
+        '3. A In einem Büro','4. B Tennis','5. B Es war sonnig und warm','6. B Italien und Spanien','7. C Weil die Blumen so schön bunt sind'
+    ], 'Hören': [
+        '1. B Ins Kino gehen','2. A Weil sie spannende Geschichten liebt',
+        '3. A Tennis','4. B Es war sonnig und warm','5. Einen Spaziergang machen'
+    ] }
     ref_answers = {**a1_answers, **a2_answers}
 
     # --- Assignment Input ---
     st.markdown("---")
-    st.subheader(f"📝 Record Assignment Score for **{student_row['name']}** ({student_row['studentcode']})")
-    assignment_name = st.text_input("Assignment Name (e.g., Lesen und Hören 0.2)")
+    st.subheader(f"Record Assignment Score for {student_row['name']} ({student_row['studentcode']})")
+    assignment = st.text_input("Assignment Name (e.g., Lesen und Hören 0.2)")
     score = st.number_input("Score", min_value=0, max_value=100, value=0)
-    comments = st.text_area("Comments/Feedback (visible to student)")
-    if assignment_name in ref_answers:
+    comments = st.text_area("Comments / Feedback")
+    if assignment in ref_answers:
         st.markdown("**Reference Answers:**")
-        st.markdown("<br>".join(ref_answers[assignment_name]), unsafe_allow_html=True)
+        st.markdown("<br>".join(ref_answers[assignment]), unsafe_allow_html=True)
 
-    # --- Load or Upload Scores ---
-    scores_file = "scores.csv"
-    raw_scores_url = "https://raw.githubusercontent.com/learngermanghana/email/main/scores_backup.csv"
-    uploaded = st.file_uploader("Upload scores.csv", type=["csv"], key="score_restore")
-    if uploaded is not None:
-        scores_df = pd.read_csv(uploaded)
-        scores_df.to_csv(scores_file, index=False)
-        st.success("Scores uploaded and loaded.")
-    else:
-        try:
-            if os.path.exists(scores_file):
-                scores_df = pd.read_csv(scores_file)
-                if scores_df.empty:
-                    scores_df = pd.read_csv(raw_scores_url)
-            else:
-                scores_df = pd.read_csv(raw_scores_url)
-        except Exception:
-            scores_df = pd.DataFrame(columns=["StudentCode", "Name", "Assignment", "Score", "Comments", "Date"])
+    # --- Pull Scores from Google Sheet ---
+    scores_sheet = (
+        "https://docs.google.com/spreadsheets/d/"
+        "1l66qurVjKkgM3YCYGN3GURT-Q86DEeHql8BL_Z6YfCY/export?format=csv"
+    )
+    try:
+        scores_df = pd.read_csv(scores_sheet)
+    except Exception:
+        st.warning("Failed to load scores from Google Sheet.")
+        scores_df = pd.DataFrame(columns=["StudentCode","Name","Assignment","Score","Comments","Date"])
 
-    # --- Save Score ---
+    # --- Save New Score Locally ---
     if st.button("💾 Save Score"):
-        new_row = {
+        new = {
             "StudentCode": student_row['studentcode'],
             "Name": student_row['name'],
-            "Assignment": assignment_name,
+            "Assignment": assignment,
             "Score": score,
             "Comments": comments,
             "Date": datetime.now().strftime("%Y-%m-%d")
         }
-        scores_df = pd.concat([scores_df, pd.DataFrame([new_row])], ignore_index=True)
-        scores_df.to_csv(scores_file, index=False)
-        st.success("Score saved.")
+        scores_df = pd.concat([scores_df, pd.DataFrame([new])], ignore_index=True)
+        scores_df.to_csv("scores.csv", index=False)
+        st.success("Score saved locally.")
 
-    # --- Download All Scores CSV ---
+    # --- Download All Scores ---
     if not scores_df.empty:
         st.download_button(
-            "📁 Download All Scores CSV",
+            "Download All Scores CSV",
             data=scores_df.to_csv(index=False).encode(),
-            file_name="scores_backup.csv",
-            mime="text/csv"
+            file_name="scores_backup.csv"
         )
 
-    # --- Student Score History & Reporting ---
-    student_scores = scores_df[scores_df['StudentCode'].str.lower() == student_row['studentcode'].lower()]
-    if not student_scores.empty:
-        st.markdown("### 🗂️ Student's Score History")
-        st.dataframe(student_scores[['Assignment', 'Score', 'Comments', 'Date']])
-        avg_score = student_scores['Score'].mean()
-        st.markdown(f"**Average Score:** `{avg_score:.1f}`")
-        st.markdown(f"**Total Assignments Submitted:** `{len(student_scores)}`")
+    # --- Display Student History ---
+    hist = scores_df[
+        scores_df['StudentCode'].str.lower() == student_row['studentcode'].lower()
+    ]
+    if not hist.empty:
+        st.markdown("### Student Score History")
+        st.dataframe(hist[['Assignment','Score','Comments','Date']])
+        avg = hist['Score'].mean()
+        st.markdown(f"**Average Score:** {avg:.1f}")
 
-        # Download PDF
-        if st.button("📄 Download Student Report PDF"):
+        # PDF Report
+        if st.button("Download Student Report PDF"):
             pdf = FPDF()
             pdf.add_page()
-            pdf.set_font("Arial", "B", 14)
-            pdf.cell(0, 12, f"Assignment Report – {student_row['name']} ({student_row['studentcode']})", ln=1)
-            pdf.set_font("Arial", "", 12)
-            pdf.cell(0, 10, f"Level: {student_row['level']}", ln=1)
-            pdf.cell(0, 10, f"Date: {datetime.now().strftime('%Y-%m-%d')}", ln=1)
+            pdf.set_font("Arial","B",14)
+            pdf.cell(0,10,f"Report for {student_row['name']}",ln=True)
             pdf.ln(5)
-            for _, row in student_scores.iterrows():
-                pdf.set_font("Arial", "B", 12)
-                pdf.cell(0, 8, f"{row['Assignment']}: {row['Score']}/100", ln=1)
-                pdf.set_font("Arial", "", 11)
-                pdf.multi_cell(0, 8, f"Comments: {row['Comments']}")
-                if row['Assignment'] in ref_answers:
-                    pdf.set_font("Arial", "I", 11)
-                    pdf.multi_cell(0, 8, "Reference Answers:")
-                    for ans in ref_answers[row['Assignment']]:
-                        pdf.multi_cell(0, 8, ans)
+            for _, r in hist.iterrows():
+                pdf.set_font("Arial","B",12)
+                pdf.cell(0,8,f"{r['Assignment']}: {r['Score']}/100",ln=True)
+                pdf.set_font("Arial","",11)
+                pdf.multi_cell(0,8,f"Comments: {r['Comments']}")
+                if r['Assignment'] in ref_answers:
+                    pdf.set_font("Arial","I",11)
+                    pdf.multi_cell(0,8,"Reference Answers:")
+                    for ans in ref_answers[r['Assignment']]:
+                        pdf.multi_cell(0,8,ans)
                 pdf.ln(3)
-            pdf.ln(10)
-            pdf.set_font("Arial", "I", 11)
-            pdf.cell(0, 8, f"Average Score: {avg_score:.1f}", ln=1)
-            pdf.cell(0, 8, f"Total Assignments: {len(student_scores)}", ln=1)
-            pdf.ln(15)
-            pdf.cell(0, 10, "Signed: Felix Asadu", ln=1)
-            out_bytes = pdf.output(dest='S').encode('latin-1')
-            st.download_button(
-                "⬇️ Download PDF Report",
-                data=out_bytes,
-                file_name=f"{student_row['name'].replace(' ', '_')}_report.pdf",
-                mime="application/pdf"
-            )
-
-        # WhatsApp Share
-        wa_msg = (
-            f"Hello {student_row['name']}, your average score is {avg_score:.1f}. "
-            f"Most recent: {student_scores.iloc[-1]['Assignment']} – {student_scores.iloc[-1]['Score']}/100."
-        )
-        wa_phone = student_row.get('phone', '').replace('+', '').replace(' ', '')
-        if wa_phone.startswith('0'):
-            wa_phone = '233' + wa_phone[1:]
-        wa_url = f"https://wa.me/{wa_phone}?text={urllib.parse.quote(wa_msg)}"
-        st.markdown(f"[💬 Send via WhatsApp]({wa_url})", unsafe_allow_html=True)
+            pdf_bytes = pdf.output(dest='S').encode('latin-1')
+            st.download_button("Download PDF Report", data=pdf_bytes, file_name=f"{student_row['name']}_report.pdf")
     else:
-        st.info("No scores yet. Add a new score above.")
+        st.info("No scores found for this student.")
+
 
 
 
