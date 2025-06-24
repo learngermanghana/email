@@ -1524,41 +1524,93 @@ with tabs[9]:
             "1. B) Einmal pro Woche", "2. C) Apfel und Bananen", "3. A) Ein halbes Kilo", "4. B) 10 Euro", "5. B) Einen schönen Tag"
         ],
         "Lesen und Hören 11": [
-             #Teil 1
-            "1. B) Entschuldigung, wo ist der Bahnhof?", "2. B) Links abbiegen", "3. B) Auf der rechten Seite, direkt neben dem großen Supermarkt",
-            "4. B) Wie komme ich zur nächsten Apotheke?", "5. C) Gute Reise und einen schönen Tag noch"
-        
-             #Teil 2
-            "1. C) Wie komme ich zur nächsten Apotheke?", "2. C) Rechts abbiegen", "3. B) Auf der linken Seite, direkt neben der Bäckerei",
-            "4. A) Gehen Sie geradeaus bis zur Kreuzung, dann links", "5. C) Einen schönen Tag noch"
-        
-             #Teil 3
-            "Fragen nach dem Weg: Entschuldigung, wie komme ich zum Bahnhof", "Die Straße überqueren: Überqueren Sie die Straße",
-            "Geradeaus gehen: Gehen Sie geradeaus", "Links abbiegen: Biegen Sie links ab", "Rechts abbiegen: Biegen Sie rechts ab",
+            # Teil 1
+            "1. B) Entschuldigung, wo ist der Bahnhof?",
+            "2. B) Links abbiegen",
+            "3. B) Auf der rechten Seite, direkt neben dem großen Supermarkt",
+            "4. B) Wie komme ich zur nächsten Apotheke?",
+            "5. C) Gute Reise und einen schönen Tag noch",
+            "",  # blank line between parts
+            # Teil 2
+            "1. C) Wie komme ich zur nächsten Apotheke?",
+            "2. C) Rechts abbiegen",
+            "3. B) Auf der linken Seite, direkt neben der Bäckerei",
+            "4. A) Gehen Sie geradeaus bis zur Kreuzung, dann links",
+            "5. C) Einen schönen Tag noch",
+            "",  # blank line between parts
+            # Teil 3
+            "Fragen nach dem Weg: Entschuldigung, wie komme ich zum Bahnhof",
+            "Die Straße überqueren: Überqueren Sie die Straße",
+            "Geradeaus gehen: Gehen Sie geradeaus",
+            "Links abbiegen: Biegen Sie links ab",
+            "Rechts abbiegen: Biegen Sie rechts ab",
             "On the left side: Das Kino ist auf der linken Seite"
         ],
-        "Lesen und Hören 12.1 Teil 1": [
-            "1. B) Ärztin", "2. A) Weil sie keine Zeit hat", "3. B) Um 8 Uhr", "4. C) Viele verschiedene Fächer", "5. C) Einen Sprachkurs besuchen"
+        "Lesen und Hören 12.1": [
+            # Teil 1
+            "1. B) Ärztin",
+            "2. A) Weil sie keine Zeit hat",
+            "3. B) Um 8 Uhr",
+            "4. C) Viele verschiedene Fächer",
+            "5. C) Einen Sprachkurs besuchen",
+            "",  # blank line
+            # Teil 2
+            "1. B) Falsch",
+            "2. B) Falsch",
+            "3. B) Falsch",
+            "4. B) Falsch",
+            "5. B) Falsch",
+            "",  # blank line
+            # Teil 3
+            "A) Richtig",
+            "A) Richtig",
+            "A) Richtig",
+            "A) Richtig",
+            "A) Richtig"
         ],
-        "Lesen und Hören 12.1 Teil 2": ["B) Falsch", "B) Falsch", "B) Falsch", "B) Falsch", "B) Falsch"],
-        "Lesen und Hören 12.1 Teil 3": ["A) Richtig", "A) Richtig", "A) Richtig", "A) Richtig", "A) Richtig"],
-        "Lesen und Hören 12.2 Teil 1": [
-            "In Berlin", "Mit seiner Frau und seinen drei Kindern", "Mit seinem Auto", "Um 7:30 Uhr", "Barzahlung (cash)"
+        "Lesen und Hören 12.2": [
+            # Teil 1
+            "In Berlin",
+            "Mit seiner Frau und seinen drei Kindern",
+            "Mit seinem Auto",
+            "Um 7:30 Uhr",
+            "Barzahlung (cash)",
+            "",  # blank line between parts
+            # Teil 2
+            "1. B) Um 9:00 Uhr",
+            "2. B) Um 12:00 Uhr",
+            "3. B) Um 18:00 Uhr",
+            "4. B) Um 21:00 Uhr",
+            "5. D) Alles Genannte",
+            "",  # blank line between parts
+            # Teil 3
+            "1. B) Um 9 Uhr",
+            "2. B) Um 12 Uhr",
+            "3. A) ein Computer und ein Drucker",
+            "4. C) in einer Bar",
+            "5. C) bar"
         ],
-        "Lesen und Hören 12.2 Teil 2": [
-            "1. B) Um 9:00 Uhr", "2. B) Um 12:00 Uhr", "3. B) Um 18:00 Uhr", "4. B) Um 21:00 Uhr", "5. D) Alles Genannte"
+                "Lesen und Hören 13": [
+            # Teil 1
+            "A", "B", "A", "A", "B", "B",
+            "",  # blank line between parts
+            # Teil 2
+            "A", "B", "B",
+            "",  # blank line between parts
+            # Teil 3
+            "B", "B", "B"
         ],
-        "Lesen und Hören 12.2 Teil 3": [
-            "1. B) Um 9 Uhr", "2. B) Um 12 Uhr", "3. A) ein Computer und ein Drucker", "4. C) in einer Bar", "5. C) bar"
-        ],
-        "Lesen und Hören 13 Teil 1": ["A","B","A","A","B","B"],
-        "Lesen und Hören 13 Teil 2": ["A","B","B"],
-        "Lesen und Hören 13 Teil 3": ["B","B","B"],
-        "Lesen und Hören 14.1 Teil 1": ["Anzeige A","Anzeige B","Anzeige B","Anzeige A","Anzeige A"],
-        "Lesen und Hören 14.1 Teil 2": ["C) Guten Tag, Herr Doktor","B) Halsschmerzen und Fieber","C) Seit gestern","C) Kopfschmerzen und Müdigkeit","A) Ich verschreibe Ihnen Medikamente"],
-        "Lesen und Hören 14.1 Body Parts": [
-            "Kopf – Head","Arm – Arm","Bein – Leg","Auge – Eye","Nase – Nose","Ohr – Ear","Mund – Mouth","Hand – Hand","Fuß – Foot","Bauch – Stomach"
-        ],
+      
+        "Lesen und Hören 14.1": [
+            # Teil 1
+            "Anzeige A", "Anzeige B", "Anzeige B", "Anzeige A", "Anzeige A",
+            "",  # blank line between parts
+            # Teil 2
+            "C) Guten Tag, Herr Doktor", "B) Halsschmerzen und Fieber", "C) Seit gestern", "C) Kopfschmerzen und Müdigkeit", "A) Ich verschreibe Ihnen Medikamente",
+            "",  # blank line between parts
+            # Body Parts
+            "Kopf – Head", "Arm – Arm", "Bein – Leg", "Auge – Eye", "Nase – Nose", "Ohr – Ear", "Mund – Mouth", "Hand – Hand", "Fuß – Foot", "Bauch – Stomach"
+         ],
         "A2 1.1 Lesen": ["1. C) In einer Schule","2. B) Weil sie gerne mit Kindern arbeitet","3. A) In einem Büro","4. B) Tennis","5. B) Es war sonnig und warm","6. B) Italien und Spanien","7. C) Weil die Bäume so schön bunt sind"],
         "A2 1.1 Hören": ["1. B) Ins Kino gehen","2. A) Weil sie spannende Geschichten liebt","3. A) Tennis","4. B) Es war sonnig und warm","5. C) Einen Spaziergang machen"],
         "A2 1.2 Lesen": ["1. B) Ein Jahr","2. B) Er ist immer gut gelaunt und organisiert","3. C) Einen Anzug und eine Brille","4. B) Er geht geduldig auf ihre Anliegen ein","5. B) Weil er seine Mitarbeiter regelmäßig lobt","6. A) Wenn eine Aufgabe nicht rechtzeitig erledigt wird","7. B) Dass er fair ist und die Leistungen der Mitarbeiter wertschätzt"],
