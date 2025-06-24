@@ -1495,4 +1495,3 @@ with tabs[9]:
         )
     else:
         st.info("No scores found for this student.")
-
