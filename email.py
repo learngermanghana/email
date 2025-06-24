@@ -67,188 +67,66 @@ def safe_latin1(text):
     # Replace unsupported Unicode with '?'
     return text.encode("latin1", "replace").decode("latin1")
 
-
-
 with tabs[1]:
+    st.title("👩‍🎓 All Students – Full List")
 
-def generate_contract_and_receipt(student_row, contract_template, payment_date=None):
-    if payment_date is None:
-        payment_date = date.today()
-    paid = float(student_row.get("Paid", 0) or 0)
-    balance = float(student_row.get("Balance", 0) or 0)
-    total_fee = paid + balance
-    payment_status = "FULLY PAID" if balance == 0 else "INSTALLMENT PLAN"
-    due_date = payment_date + timedelta(days=30)
-    filled = contract_template \
-        .replace("[STUDENT_NAME]", str(student_row.get("Name", ""))) \
-        .replace("[DATE]", str(payment_date)) \
-        .replace("[CLASS]", str(student_row.get("Level", ""))) \
-        .replace("[AMOUNT]", f"{total_fee:.2f}") \
-        .replace("[FIRST_INSTALMENT]", f"{paid:.2f}") \
-        .replace("[SECOND_INSTALMENT]", f"{balance:.2f}") \
-        .replace("[SECOND_DUE_DATE]", str(due_date)) \
-        .replace("[COURSE_LENGTH]", str(12))
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=14)
-    pdf.cell(200, 10, safe("Learn Language Education Academy Payment Receipt"), ln=True, align="C")
-    pdf.set_font("Arial", 'B', 12)
-    pdf.set_text_color(0, 128, 0)
-    pdf.cell(200, 10, safe(payment_status), ln=True, align="C")
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Arial", size=12)
-    pdf.ln(10)
-    pdf.cell(200, 10, safe(f"Name: {student_row.get('Name','')}"), ln=True)
-    pdf.cell(200, 10, safe(f"Student Code: {student_row.get('StudentCode','')}"), ln=True)
-    pdf.cell(200, 10, safe(f"Phone: {student_row.get('Phone','')}"), ln=True)
-    pdf.cell(200, 10, safe(f"Level: {student_row.get('Level','')}"), ln=True)
-    pdf.cell(200, 10, f"Amount Paid: GHS {paid:.2f}", ln=True)
-    pdf.cell(200, 10, f"Balance Due: GHS {balance:.2f}", ln=True)
-    pdf.cell(200, 10, f"Total Course Fee: GHS {total_fee:.2f}", ln=True)
-    pdf.cell(200, 10, safe(f"Contract Start: {student_row.get('ContractStart','')}"), ln=True)
-    pdf.cell(200, 10, safe(f"Contract End: {student_row.get('ContractEnd','')}"), ln=True)
-    pdf.cell(200, 10, f"Receipt Date: {payment_date}", ln=True)
-    pdf.ln(10)
-    pdf.cell(0, 10, safe("Thank you for your payment!"), ln=True)
-    pdf.cell(0, 10, safe("Signed: Felix Asadu"), ln=True)
-    pdf.ln(15)
-    pdf.set_font("Arial", size=14)
-    pdf.cell(200, 10, safe("Learn Language Education Academy Student Contract"), ln=True, align="C")
-    pdf.set_font("Arial", size=12)
-    pdf.ln(10)
-    for line in filled.split("\n"):
-        pdf.multi_cell(0, 10, safe(line))
-    pdf.ln(10)
-    pdf.cell(0, 10, safe("Signed: Felix Asadu"), ln=True)
-    pdf.set_y(-15)
-    pdf.set_font("Arial", "I", 8)
-    pdf.cell(0, 10, safe(f"Generated on {date.today()}"), align="C")
-    filename = f"{student_row.get('Name','').replace(' ', '_')}_receipt_contract.pdf"
-    pdf.output(filename)
-    return filename
+    import os
+    import pandas as pd
 
-# === START OF TAB CODE ===
-st.title("👩‍🎓 All Students (Edit, Update, Receipt/Contract)")
+    student_file = "students.csv"
+    github_csv = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
 
-if os.path.exists(student_file):
-    df_main = pd.read_csv(student_file)
-else:
-    st.warning("students.csv not found.")
-    st.stop()
+    # --- Load Data ---
+    if os.path.exists(student_file):
+        df_students = pd.read_csv(student_file)
+    else:
+        try:
+            df_students = pd.read_csv(github_csv)
+            st.info("Loaded students from GitHub backup.")
+        except Exception:
+            st.error("Could not load students.csv from local or GitHub.")
+            st.stop()
 
-# Normalize columns for easier access
-df_main.columns = [
-    c.strip().replace(" ", "_").replace("(", "").replace(")", "").replace("-", "_").replace("/", "_").lower()
-    for c in df_main.columns
-]
-def col_lookup(col):
-    for c in df_main.columns:
-        if c.replace("_", "").lower() == col.replace("_", "").lower():
-            return c
-    return col
-
-# Filters
-search_term = st.text_input("🔍 Search Student by Name or Code").lower()
-levels = ["All"] + sorted(df_main[col_lookup("level")].dropna().unique().tolist())
-selected_level = st.selectbox("📋 Filter by Class Level", levels)
-view_df = df_main.copy()
-if search_term:
-    view_df = view_df[
-        view_df[col_lookup("name")].astype(str).str.lower().str.contains(search_term) |
-        view_df[col_lookup("studentcode")].astype(str).str.lower().str.contains(search_term)
+    # --- Normalize columns ---
+    df_students.columns = [
+        c.strip().replace(" ", "_").replace("(", "").replace(")", "").replace("-", "_").replace("/", "_").lower()
+        for c in df_students.columns
     ]
-if selected_level != "All":
-    view_df = view_df[view_df[col_lookup("level")] == selected_level]
 
-# Table
-if view_df.empty:
-    st.info("No students found.")
-else:
-    st.dataframe(view_df, use_container_width=True)
+    # --- Filter/search controls ---
+    search_term = st.text_input("🔍 Search by Name, Code, Phone, or Email").lower().strip()
+    levels = ["All"] + sorted(df_students["level"].dropna().unique().tolist()) if "level" in df_students.columns else ["All"]
+    selected_level = st.selectbox("📋 Filter by Class Level", levels)
 
-    # Select student to edit/view
-    student_names = view_df[col_lookup("name")].tolist()
-    if student_names:
-        selected_student = st.selectbox(
-            "Select a student to view/edit details", student_names, key="select_student_detail_all"
-        )
-        student_row = view_df[view_df[col_lookup("name")] == selected_student].iloc[0]
-        idx = view_df[view_df[col_lookup("name")] == selected_student].index[0]
-        unique_key = f"{student_row[col_lookup('studentcode')]}_{idx}"
+    # --- Apply filters ---
+    view_df = df_students.copy()
+    if search_term:
+        cols = ["name", "studentcode", "phone", "email"]
+        view_df = view_df[
+            view_df.apply(
+                lambda row: any(
+                    search_term in str(row.get(col, "")).lower() for col in cols
+                ),
+                axis=1
+            )
+        ]
+    if selected_level != "All" and "level" in df_students.columns:
+        view_df = view_df[view_df["level"] == selected_level]
 
-        with st.expander(f"{student_row[col_lookup('name')]} ({student_row[col_lookup('studentcode')]})", expanded=True):
-            name_input = st.text_input("Name", value=student_row[col_lookup("name")], key=f"name_{unique_key}")
-            phone_input = st.text_input("Phone", value=student_row[col_lookup("phone")], key=f"phone_{unique_key}")
-            email_input = st.text_input("Email", value=student_row.get(col_lookup("email"), ""), key=f"email_{unique_key}")
-            location_input = st.text_input("Location", value=student_row.get(col_lookup("location"), ""), key=f"loc_{unique_key}")
-            level_input = st.text_input("Level", value=student_row[col_lookup("level")], key=f"level_{unique_key}")
-            paid_input = st.number_input("Paid", value=float(student_row[col_lookup("paid")]), key=f"paid_{unique_key}")
-            balance_input = st.number_input("Balance", value=float(student_row[col_lookup("balance")]), key=f"bal_{unique_key}")
-            contract_start_input = st.text_input("Contract Start", value=str(student_row.get(col_lookup("contractstart"), "")), key=f"cs_{unique_key}")
-            contract_end_input = st.text_input("Contract End", value=str(student_row.get(col_lookup("contractend"), "")), key=f"ce_{unique_key}")
-            code_input = st.text_input("Student Code", value=student_row[col_lookup("studentcode")], key=f"code_{unique_key}")
-            emergency_input = st.text_input("Emergency Contact", value=student_row.get(col_lookup("emergencycontact_phonenumber"), ""), key=f"em_{unique_key}")
+    # --- Pagination ---
+    ROWS_PER_PAGE = 15
+    total_rows = len(view_df)
+    total_pages = max(1, (total_rows - 1) // ROWS_PER_PAGE + 1)
+    page = st.number_input(
+        f"Page (1-{total_pages})", min_value=1, max_value=total_pages, value=1, step=1, key="students_page"
+    )
+    start_idx = (page - 1) * ROWS_PER_PAGE
+    end_idx = start_idx + ROWS_PER_PAGE
 
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                if st.button("💾 Update", key=f"update_{unique_key}"):
-                    df_main.at[idx, col_lookup("name")] = name_input
-                    df_main.at[idx, col_lookup("phone")] = phone_input
-                    df_main.at[idx, col_lookup("email")] = email_input
-                    df_main.at[idx, col_lookup("location")] = location_input
-                    df_main.at[idx, col_lookup("level")] = level_input
-                    df_main.at[idx, col_lookup("paid")] = paid_input
-                    df_main.at[idx, col_lookup("balance")] = balance_input
-                    df_main.at[idx, col_lookup("contractstart")] = contract_start_input
-                    df_main.at[idx, col_lookup("contractend")] = contract_end_input
-                    df_main.at[idx, col_lookup("studentcode")] = code_input
-                    df_main.at[idx, col_lookup("emergencycontact_phonenumber")] = emergency_input
-                    df_main.to_csv(student_file, index=False)
-                    st.success("✅ Student updated.")
-                    st.experimental_rerun()
-            with col2:
-                if st.button("🗑️ Delete", key=f"delete_{unique_key}"):
-                    df_main = df_main.drop(idx).reset_index(drop=True)
-                    df_main.to_csv(student_file, index=False)
-                    st.success("❌ Student deleted.")
-                    st.experimental_rerun()
-            with col3:
-                if st.button("📄 Contract & Receipt PDF", key=f"receipt_{unique_key}"):
-                    # Use input values (latest edits)
-                    contract_start = contract_start_input
-                    # Get or set contract template
-                    contract_template = st.session_state.get("agreement_template", "CONTRACT NOT FOUND")
-                    # Compose student dict
-                    stu_dict = {
-                        "Name": name_input,
-                        "Phone": phone_input,
-                        "Email": email_input,
-                        "Location": location_input,
-                        "Level": level_input,
-                        "Paid": paid_input,
-                        "Balance": balance_input,
-                        "ContractStart": contract_start,
-                        "ContractEnd": contract_end_input,
-                        "StudentCode": code_input,
-                        "Emergency Contact (Phone Number)": emergency_input,
-                    }
-                    try:
-                        payment_date = pd.to_datetime(contract_start, errors="coerce").date()
-                    except Exception:
-                        payment_date = date.today()
-                    pdf_file = generate_contract_and_receipt(
-                        stu_dict,
-                        contract_template,
-                        payment_date=payment_date
-                    )
-                    with open(pdf_file, "rb") as f:
-                        pdf_bytes = f.read()
-                    st.download_button(
-                        "⬇️ Download Contract + Receipt PDF",
-                        data=pdf_bytes,
-                        file_name=pdf_file,
-                        mime="application/pdf"
-                    )
+    st.write(f"Showing {start_idx+1} to {min(end_idx, total_rows)} of {total_rows} students")
+
+    # --- Display Table ---
+    st.dataframe(view_df.iloc[start_idx:end_idx].reset_index(drop=True), use_container_width=True)
 
 
 
