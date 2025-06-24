@@ -1523,15 +1523,15 @@ with tabs[9]:
         "Lesen und Hören 10 Hören": [
             "1. B) Einmal pro Woche", "2. C) Apfel und Bananen", "3. A) Ein halbes Kilo", "4. B) 10 Euro", "5. B) Einen schönen Tag"
         ],
-        "Lesen und Hören 11 Teil 1": [
+        "Lesen und Hören 11 #Teil 1": [
             "1. B) Entschuldigung, wo ist der Bahnhof?", "2. B) Links abbiegen", "3. B) Auf der rechten Seite, direkt neben dem großen Supermarkt",
             "4. B) Wie komme ich zur nächsten Apotheke?", "5. C) Gute Reise und einen schönen Tag noch"
-        ],
-        "Lesen und Hören 11 Teil 2": [
+        
+             #Teil 2
             "1. C) Wie komme ich zur nächsten Apotheke?", "2. C) Rechts abbiegen", "3. B) Auf der linken Seite, direkt neben der Bäckerei",
             "4. A) Gehen Sie geradeaus bis zur Kreuzung, dann links", "5. C) Einen schönen Tag noch"
-        ],
-        "Lesen und Hören 11 Teil 3": [
+        
+             #Teil 3
             "Fragen nach dem Weg: Entschuldigung, wie komme ich zum Bahnhof", "Die Straße überqueren: Überqueren Sie die Straße",
             "Geradeaus gehen: Gehen Sie geradeaus", "Links abbiegen: Biegen Sie links ab", "Rechts abbiegen: Biegen Sie rechts ab",
             "On the left side: Das Kino ist auf der linken Seite"
