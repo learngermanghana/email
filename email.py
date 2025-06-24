@@ -1551,12 +1551,20 @@ with tabs[9]:
     local_df = pd.DataFrame(rows, columns=["StudentCode", "Name", "Assignment", "Score", "Comments", "Date"])
 
     # --- Combine remote and local scores ---
-    scores_df = pd.concat([remote_df, local_df], ignore_index=True)
-    # remove duplicates keeping latest by Date
-    scores_df["Date"] = pd.to_datetime(scores_df["Date"], errors="coerce")
-    scores_df = scores_df.sort_values("Date").drop_duplicates(subset=["StudentCode", "Assignment", "Date"], keep="last")
-    # back to string date
-    scores_df["Date"] = scores_df["Date"].dt.strftime("%Y-%m-%d")
+    # --- Assignment Input UI ---
+    st.markdown("---")
+    st.subheader(f"Record Assignment Score for {student_row['name']} ({student_row['studentcode']})")
+    # Filter/search assignment titles
+    assign_filter = st.text_input("🔎 Filter assignment titles", key="assign_filter")
+    assign_options = [k for k in ref_answers.keys() if assign_filter.lower() in k.lower()]
+    assignment = st.selectbox("📋 Select Assignment", [""] + assign_options, key="assignment")
+    if not assignment:
+        assignment = st.text_input("Or enter assignment manually", key="assignment_manual")
+    score = st.number_input("Score", min_value=0, max_value=100, value=0, key="score_input")
+    comments = st.text_area("Comments / Feedback", key="comments_input")
+    if assignment in ref_answers:
+        st.markdown("**Reference Answers:**")
+        st.markdown("<br>".join(ref_answers[assignment]), unsafe_allow_html=True)
 
     # --- Record New Score ---
     if st.button("💾 Save Score", key="save_score"):
