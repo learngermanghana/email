@@ -1439,7 +1439,7 @@ with tabs[9]:
         ],
         "Lesen und Hören 4 Lesen Übung": [
             "1. C) Neun", "2. B) Polnisch", "3. D) Niederländisch", "4. A) Deutsch", "5. C) Paris", "6. B) Amsterdam", "7. C) In der Schweiz"
-            "1. C) In Italien und Frankreich", "2. C) Rom", "3. B) Das Essen", "4. B) Paris", "5. A) Nach Spanie
+            "1. C) In Italien und Frankreich", "2. C) Rom", "3. B) Das Essen", "4. B) Paris", "5. A) Nach Spanie"
         ],
         "Lesen und Hören 5 Part 1": [
             "Der Tisch – the table", "Die Lampe – the lamp", "Das Buch – the book", "Der Stuhl – the chair", "Die Katze – the cat",
