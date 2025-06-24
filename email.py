@@ -1326,147 +1326,104 @@ with tabs[8]:
 with tabs[9]:
     st.title("📝 Assignment Marking & Scores")
 
-    # --- GITHUB BACKUP LOGIC ---
-    github_csv_url = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
+    # 1. Load Student Data
+    # Try to load from local or GitHub (fall back logic)
     student_file = "students.csv"
-
-    # --- Helper: Normalize all columns ---
-    def standardize_columns(df):
-        rename = {}
-        for c in df.columns:
-            c_std = (
-                c.strip()
-                 .replace("(", "")
-                 .replace(")", "")
-                 .replace(",", "")
-                 .replace("-", "")
-                 .replace(" ", "")
-                 .replace("_", "")
-                 .lower()
-            )
-            if c_std in ["studentcode", "student_code"]:
-                rename[c] = "StudentCode"
-            elif c_std in ["name", "fullname"]:
-                rename[c] = "Name"
-            elif c_std in ["level", "class"]:
-                rename[c] = "Level"
-            elif c_std in ["email", "emailaddress"]:
-                rename[c] = "Email"
-            elif c_std in ["phone", "phonenumber"]:
-                rename[c] = "Phone"
-            elif c_std in ["status"]:
-                rename[c] = "Status"
-            elif c_std in ["enrolldate"]:
-                rename[c] = "EnrollDate"
-            else:
-                rename[c] = c
-        df = df.rename(columns=rename)
-        return df
-
-    # --- Student loading logic ---
-    students_df = None
-    if os.path.exists(student_file):
-        students_df = pd.read_csv(student_file)
-        st.success("Loaded students from local file.")
-    else:
-        try:
-            students_df = pd.read_csv(github_csv_url)
-            students_df.to_csv(student_file, index=False)
-            st.success("Loaded students from GitHub backup!")
-        except Exception:
-            st.warning("⚠️ students.csv not found locally or on GitHub. Please upload it in 📝 Pending tab.")
-            st.stop()
-    students_df = standardize_columns(students_df)
-
-    # --- Manual reload ---
-    if st.button("🔄 Reload students from GitHub"):
-        try:
-            students_df = pd.read_csv(github_csv_url)
-            students_df.to_csv(student_file, index=False)
-            students_df = standardize_columns(students_df)
-            st.success("Reloaded students from GitHub successfully.")
-        except Exception as e:
-            st.error("Failed to load from GitHub. Check your internet or the CSV link.")
-
-    # --- Reference answers (easy to update!) ---
-    a1_answers = {
-        "Lesen und Hören 0.2": [
-            "C) 26", "A) A, O,U, B", "A) Eszett", "A) K", "A) A-Umlaut", "A) A, O, U, B", "B 4",
-            "Wasser", "Kaffee", "Blume", "Schule", "Tisch"
-        ],
-        "Lesen und Hören 1.1": ["C", "C", "A", "B"],
-        "Lesen und Hören 1.2": [
-            "Ich heiBe Anna", "Du heiBt Max", "Er heiBt Peter", "Wir Kommen aus Italien",
-            "Ihr kommt aus Brasilien", "Sie Kommt/Kommen aus Russland", "Ich wohne in Berlin",
-            "Du wohnst in Madrid", "Sie wohnst on wien",
-            "A) Anna", "C) Aus Italien", "D) In Berlin", "B) Tom", "A) In Berlin"
-        ],
-        "Lesen und Hören 2": [
-            "A) sieben", "B) Drei", "B) Sechs", "B) Neun", "B) Sieben", "C) Funf", "B) zweihundertzweiundzwanzig",
-            "A) Funfhundertneun", "A) zweitausendvierzig", "A) funftausendfunfhundertneun",
-            "16 – sechzehn", "98 – achtundneunzig", "555 – funfhundertfunfundfunfzig", "1020 – tausendzwanzig", "8553 – achttausendfunfhundertdreiundfundzig"
-        ],
-        # ... add more as needed!
-    }
-
-    a2_answers = {
-        "Lesen": [
-            "C In einer Schule", "B Weil sie gerne mit Kindem arbeitet", "A In einem Buro", "B Tennis", 
-            "B Es war sonnig und warm", "B Italien und Spanien", "C Weil die Blaume so schön bunt sind"
-        ],
-        "Hören": [
-            "B Ins Kino gehen", "A Weil sie spannende Geschichten liebt", "A Tennis",
-            "B Es war sonnig und warm", "Einen Spaziergang machen"
-        ]
-    }
-
-    # --- Student Filter & Search ---
-    st.subheader("🔎 Search/Filter Students")
-    search = st.text_input("Name or Student Code", "")
-    level_filter = st.selectbox("Level", ["All"] + sorted(students_df["Level"].dropna().unique()), index=0)
-    filtered_df = students_df.copy()
-    if search:
-        search_lower = search.lower()
-        filtered_df = filtered_df[
-            filtered_df["Name"].str.lower().str.contains(search_lower, na=False) |
-            filtered_df["StudentCode"].astype(str).str.lower().str.contains(search_lower, na=False)
-        ]
-    if level_filter != "All":
-        filtered_df = filtered_df[filtered_df["Level"] == level_filter]
-    if filtered_df.empty:
-        st.info("No students match this filter.")
+    github_url = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
+    try:
+        if os.path.exists(student_file):
+            df_students = pd.read_csv(student_file)
+        else:
+            df_students = pd.read_csv(github_url)
+    except Exception as e:
+        st.error("⚠️ students.csv not found or could not be loaded. Please upload it in 📝 Pending tab.")
         st.stop()
 
-    student_list = filtered_df["Name"] + " (" + filtered_df["StudentCode"].astype(str) + ")"
-    selected = st.selectbox("Select student", student_list)
+    # --- Student search/filter ---
+    search_term = st.text_input("🔎 Search student by name or code")
+    filtered_df = df_students.copy()
+    if search_term:
+        filtered_df = filtered_df[
+            filtered_df["Name"].astype(str).str.contains(search_term, case=False, na=False) |
+            filtered_df["StudentCode"].astype(str).str.contains(search_term, case=False, na=False)
+        ]
+    if filtered_df.empty:
+        st.warning("No students found with this search/filter.")
+        st.stop()
 
-    student_row = filtered_df.iloc[student_list[student_list == selected].index[0]]
+    # --- Student list display ---
+    student_list = filtered_df["Name"].astype(str) + " (" + filtered_df["StudentCode"].astype(str) + ")"
+    selected = st.selectbox("Select a student to mark", student_list, key="select_student_marking")
+    if not selected:
+        st.info("Select a student above to continue.")
+        st.stop()
+    selected_code = selected.split("(")[-1].replace(")", "").strip()
+    # Robust, case-insensitive match
+    student_row = filtered_df[filtered_df["StudentCode"].astype(str).str.lower() == selected_code.lower()]
+    if student_row.empty:
+        st.warning("Student not found in filtered data. Try clearing search/filter.")
+        st.stop()
+    student_row = student_row.iloc[0]
+
     student_code = str(student_row["StudentCode"])
 
-    # --- Assignment Entry ---
+    # 2. Assignment Entry Form
     st.markdown("---")
     st.subheader(f"📝 Record Assignment Score for **{student_row['Name']}** ({student_code})")
-
     assignment_name = st.text_input("Assignment Name (e.g., Lesen und Hören 0.2, Test 1, etc.)")
     score = st.number_input("Score", min_value=0, max_value=100, value=0)
-    comments = st.text_area("Comments/Feedback (visible to student)", "")
+    comments = st.text_area("Comments/Feedback for student", "")
+
+    # ---- Reference Answers Logic (easy to update) ----
+    a1_answers = {
+        "Lesen und Hören 0.2": [
+            "1. C) 26", "2. A) A, O,U, B", "3. A) Eszett", "4. A) K", "5. A) A-Umlaut",
+            "6. A) A, O, U, B", "7. B 4",
+            "Wasser", "Kaffee", "Blume", "Schule", "Tisch"
+        ],
+        "Lesen und Hören 1.1": [
+            "1. C", "2. C", "3. A", "4. B"
+        ],
+        "Lesen und Hören 1.2": [
+            "1. Ich heiße Anna", "2. Du heißt Max", "3. Er heißt Peter", "4. Wir kommen aus Italien", "5. Ihr kommt aus Brasilien",
+            "6. Sie kommt/kommen aus Russland", "7. Ich wohne in Berlin", "8. Du wohnst in Madrid", "9. Sie wohnt in Wien",
+            "1. A) Anna", "2. C) Aus Italien", "3. D) In Berlin", "4. B) Tom", "5. A) In Berlin"
+        ],
+        # ... add more as needed ...
+    }
+    a2_answers = {
+        "Lesen": [
+            "1. C In einer Schule", "2. B Weil sie gerne mit Kindem arbeitet", "3. A In einem Büro",
+            "4. B Tennis", "5. B Es war sonnig und warm", "6. B Italien und Spanien", "7. C Weil die Blumen so schön bunt sind"
+        ],
+        "Hören": [
+            "1. B Ins Kino gehen", "2. A Weil sie spannende Geschichten liebt", "3. A Tennis",
+            "4. B Es war sonnig und warm", "5. Einen Spaziergang machen"
+        ],
+        # ... add more as needed ...
+    }
+
+    # Show reference answers for quick teacher view
+    st.markdown("#### Reference Answers (for teacher only)")
     if assignment_name in a1_answers:
-        st.markdown(f"**Reference Answers for {assignment_name}:**")
+        st.markdown(f"**A1:** {assignment_name}")
         for ans in a1_answers[assignment_name]:
             st.write(ans)
     elif assignment_name in a2_answers:
-        st.markdown(f"**Reference Answers for {assignment_name}:**")
+        st.markdown(f"**A2:** {assignment_name}")
         for ans in a2_answers[assignment_name]:
             st.write(ans)
+    else:
+        st.info("No reference answers found for this assignment.")
 
-    # --- Save/Load Scores DB ---
+    # 3. Save/Load Scores
     scores_file = "scores.csv"
     if os.path.exists(scores_file):
         scores_df = pd.read_csv(scores_file)
     else:
         scores_df = pd.DataFrame(columns=["StudentCode", "Name", "Assignment", "Score", "Comments", "Date"])
 
-    # --- Save Score Button ---
+    # 4. Save score
     if st.button("💾 Save Score"):
         new_row = {
             "StudentCode": student_code,
@@ -1480,7 +1437,7 @@ with tabs[9]:
         scores_df.to_csv(scores_file, index=False)
         st.success("Score saved.")
 
-    # --- Upload/Restore Scores DB ---
+    # 5. Upload/Restore Scores DB
     with st.expander("⬆️ Restore/Upload Scores Backup"):
         uploaded_scores = st.file_uploader("Upload scores.csv", type="csv", key="score_restore")
         if uploaded_scores is not None:
@@ -1488,12 +1445,12 @@ with tabs[9]:
             scores_df.to_csv(scores_file, index=False)
             st.success("Scores restored from uploaded file.")
 
-    # --- Download All Scores Button ---
+    # 6. Download All Scores
     score_csv = scores_df.to_csv(index=False).encode()
     st.download_button("📁 Download All Scores CSV", data=score_csv, file_name="scores_backup.csv", mime="text/csv", key="download_scores")
 
-    # --- Show Student Score History, Average, etc ---
-    student_scores = scores_df[scores_df["StudentCode"] == student_code]
+    # 7. Student Score History, Average, PDF, WhatsApp, Email
+    student_scores = scores_df[scores_df["StudentCode"].astype(str).str.lower() == student_code.lower()]
     if not student_scores.empty:
         st.markdown("### 🗂️ Student's Score History")
         st.dataframe(student_scores[["Assignment", "Score", "Comments", "Date"]])
@@ -1544,27 +1501,15 @@ with tabs[9]:
             wa_url = f"https://wa.me/{wa_phone}?text={urllib.parse.quote(msg)}"
             st.markdown(f"[💬 Send result via WhatsApp]({wa_url})", unsafe_allow_html=True)
 
-        # --- Send Portal by Email (must have email!) ---
+        # --- Email Student Report (info only, needs config) ---
         if pd.notna(student_row.get("Email", "")) and student_row["Email"]:
             if st.button("✉️ Email Student Portal"):
-                import smtplib
-                from email.message import EmailMessage
-                email_addr = student_row["Email"]
-                subject = f"Your Assignment Report – {student_row['Name']}"
-                content = f"Dear {student_row['Name']},\n\nAttached is your latest assignment report.\n\nBest,\nFelix Asadu"
-                msg_email = EmailMessage()
-                msg_email["Subject"] = subject
-                msg_email["From"] = "Learngermanghana@gmail.com"
-                msg_email["To"] = email_addr
-                msg_email.set_content(content)
-                msg_email.add_attachment(pdf_bytes, maintype="application", subtype="pdf", filename=pdf_out)
-                # You need to setup smtp config or use SendGrid etc
                 st.info("To enable emailing, set up SMTP credentials in your app.")
 
     else:
         st.info("No scores for this student yet. Enter and save a new one above!")
 
-    # --- Show Reference Answers Table ---
+    # 8. Reference Answers Table for Teachers (easy to update)
     with st.expander("📖 Show/Update Reference Answers (A1/A2)", expanded=False):
         st.write("**A1 Answers:**")
         for k, v in a1_answers.items():
