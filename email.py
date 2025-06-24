@@ -71,10 +71,6 @@ def safe_latin1(text):
 
 with tabs[1]:
 
-
-def safe(txt):
-    return str(txt).encode("latin-1", "replace").decode("latin-1")
-
 def generate_contract_and_receipt(student_row, contract_template, payment_date=None):
     if payment_date is None:
         payment_date = date.today()
