@@ -1437,7 +1437,7 @@ with tabs[9]:
             "1. 16 – sechzehn", "2. 98 – achtundneunzig", "3. 555 – fünfhundertfünfundfünfzig",
             "4. 1020 – tausendzwanzig", "5. 8553 – achttausendfünfhundertdreiundfünfzig"
         ],
-        "Lesen und Hören 4 Lesen Übung": [
+        "Lesen und Hören 4": [
             "1. C) Neun", "2. B) Polnisch", "3. D) Niederländisch", "4. A) Deutsch", "5. C) Paris", "6. B) Amsterdam", "7. C) In der Schweiz"
             "1. C) In Italien und Frankreich", "2. C) Rom", "3. B) Das Essen", "4. B) Paris", "5. A) Nach Spanie"
         ],
