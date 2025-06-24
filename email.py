@@ -1624,9 +1624,12 @@ with tabs[9]:
         )
         export_df = export_df[['StudentCode','Name','Assignment','Score','Comments','Date','level']]
         export_df = export_df.rename(columns={'level':'Level'})
-        st.download_button(
+                st.download_button(
             "📁 Download All Scores CSV",
             data=export_df.to_csv(index=False).encode(),
+            file_name="scores_backup.csv",
+            mime="text/csv"
+        ).encode(),
             file_name="scores_backup.csv",
             mime="text/csv"
         ).encode(),
