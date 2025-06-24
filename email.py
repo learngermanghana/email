@@ -1444,14 +1444,10 @@ with tabs[9]:
         "Lesen und Hören 5 Part 1": [
             "Der Tisch – the table", "Die Lampe – the lamp", "Das Buch – the book", "Der Stuhl – the chair", "Die Katze – the cat",
             "Das Auto – the car", "Der Hund – the dog", "Die Blume – the flower", "Das Fenster – the window", "Der Computer – the computer"
-        ],
-        "Lesen und Hören 5 Part 2": [
-            "Der Tisch ist groß", "Die Lampe ist neu", "Das Buch ist interessant", "Der Stuhl ist bequem", "Die Katze ist süß",
-            "Das Auto ist schnell", "Der Hund ist freundlich", "Die Blume ist schön", "Das Fenster ist offen", "Der Computer ist teuer"
-        ],
-        "Lesen und Hören 5 Part 3": [
-            "Ich sehe den Tisch", "Sie kauft die Lampe", "Er liest das Buch", "Wir brauchen den Stuhl", "Du fütterst die Katze",
-            "Ich fahre das Auto", "Sie streichelt den Hund", "Er pflückt die Blume", "Wir putzen das Fenster", "Sie benutzen Computer"
+            "1. Der Tisch ist groß", "2. Die Lampe ist neu", "3. Das Buch ist interessant", "4. Der Stuhl ist bequem", "5. Die Katze ist süß"
+            "6. Der Tisch ist groß", "7. Die Lampe ist neu", "8. Das Buch ist interessant", "9. Der Stuhl ist bequem", "10. Die Katze ist süß",
+            "1. Ich sehe den Tisch", "2. Sie kauft die Lampe", "3. Er liest das Buch", "4. Wir brauchen den Stuhl", "5. Du fütterst die Katze",
+            "6. Ich fahre das Auto", "7. Sie streichelt den Hund", "8. Er pflückt die Blume", "9. Wir putzen das Fenster", "10. Sie benutzen Computer"
         ],
         "Lesen und Hören 6 Teil 1": [
             "Das Wohnzimmer – the living room", "Die Küche – the kitchen", "Das Schlafzimmer – the bedroom", "Das Badezimmer – the bathroom", "Der Balkon – the balcony",
