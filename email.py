@@ -1518,10 +1518,18 @@ with tabs[9]:
         "A2 1.3 Hören": ["1. B) Julia ist 26 Jahre alt","2. C) Julia arbeitet als Architektin","3. B) Tobias lebt in Frankfurt","4. A) Tobias möchte ein eigenes Restaurant eröffnen","5. B) Julia und Tobias kochen am Wochenende oft mit Sophie"]
     }
 
-    # --- Assignment Input ---
+        # --- Assignment Input ---
     st.markdown("---")
     st.subheader(f"Record Assignment Score for {student_row['name']} ({student_row['studentcode']})")
-    assignment = st.text_input("Assignment Name (e.g., Lesen und Hören 0.2)")
+
+    # Filter and select from known assignments
+    assign_filter = st.text_input("🔎 Filter assignment titles")
+    assign_options = [key for key in ref_answers.keys() if assign_filter.lower() in key.lower()]
+    assignment = st.selectbox("📋 Select Assignment", [""] + assign_options)
+    # Allow manual entry if needed
+    if not assignment:
+        assignment = st.text_input("Or enter assignment manually (must match reference key)")
+
     score = st.number_input("Score", min_value=0, max_value=100, value=0)
     comments = st.text_area("Comments / Feedback")
     if assignment in ref_answers:
@@ -1571,25 +1579,30 @@ with tabs[9]:
         avg = hist['Score'].mean()
         st.markdown(f"**Average Score:** {avg:.1f}")
 
-        # PDF Report Download
+                # PDF Report Download
         # Always generate PDF bytes for download
         pdf = FPDF()
         pdf.add_page()
+        def safe(txt):
+            return str(txt).encode('latin-1', 'replace').decode('latin-1')
+        # Title
         pdf.set_font("Arial","B",14)
-        pdf.cell(0,10,f"Report for {student_row['name']}",ln=True)
+        pdf.cell(0,10, safe(f"Report for {student_row['name']}"), ln=True)
         pdf.ln(5)
+        # Entries
         for _, r in hist.iterrows():
             pdf.set_font("Arial","B",12)
-            pdf.cell(0,8,f"{r['Assignment']}: {r['Score']}/100",ln=True)
+            pdf.cell(0,8, safe(f"{r['Assignment']}: {r['Score']}/100"), ln=True)
             pdf.set_font("Arial","",11)
-            pdf.multi_cell(0,8,f"Comments: {r['Comments']}")
+            pdf.multi_cell(0,8, safe(f"Comments: {r['Comments']}"))
             if r['Assignment'] in ref_answers:
                 pdf.set_font("Arial","I",11)
-                pdf.multi_cell(0,8,"Reference Answers:")
+                pdf.multi_cell(0,8, safe("Reference Answers:"))
                 for ans in ref_answers[r['Assignment']]:
-                    pdf.multi_cell(0,8,ans)
+                    pdf.multi_cell(0,8, safe(ans))
             pdf.ln(3)
-        pdf_bytes = pdf.output(dest='S').encode('latin-1')
+        # Output bytes with fallback replacement for non-latin1
+        pdf_bytes = pdf.output(dest='S').encode('latin-1', 'replace')
         st.download_button(
             "📄 Download Student Report PDF",
             data=pdf_bytes,
@@ -1598,6 +1611,3 @@ with tabs[9]:
         )
     else:
         st.info("No scores found for this student.")
-
-
-
