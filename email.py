@@ -1376,8 +1376,6 @@ with tabs[9]:
         except Exception:
             st.warning("Could not find student data. Please upload students.csv in 📝 Pending tab.")
             st.stop()
-
-    # --- Normalize columns ---
     df_students.columns = [col.lower().strip().replace(" ", "_") for col in df_students.columns]
 
     # --- Filter/Search UI ---
@@ -1393,7 +1391,6 @@ with tabs[9]:
         ]
     if level_select != "All":
         view_df = view_df[view_df["level"] == level_select]
-
     if view_df.empty:
         st.warning("No students match your filter.")
         st.stop()
@@ -1410,7 +1407,6 @@ with tabs[9]:
             "1. C) 26", "2. A) A, O, U, B", "3. A) Eszett", "4. A) K", "5. A) A-Umlaut", "6. A) A, O, U, B", "7. B 4",
             "Wasser", "Kaffee", "Blume", "Schule", "Tisch"
         ],
-        # Extend as needed
     }
     a2_answers = {
         "Lesen": [
@@ -1421,7 +1417,6 @@ with tabs[9]:
             "1. B Ins Kino gehen", "2. A Weil sie spannende Geschichten liebt",
             "3. A Tennis", "4. B Es war sonnig und warm", "5. Einen Spaziergang machen"
         ],
-        # Extend as needed
     }
     ref_answers = {**a1_answers, **a2_answers}
 
@@ -1435,20 +1430,24 @@ with tabs[9]:
         st.markdown("**Reference Answers:**")
         st.markdown("<br>".join(ref_answers[assignment_name]), unsafe_allow_html=True)
 
-        # --- Scores CSV ---
+    # --- Load or Upload Scores ---
     scores_file = "scores.csv"
     raw_scores_url = "https://raw.githubusercontent.com/learngermanghana/email/main/scores_backup.csv"
-    # Load scores: prefer local, but fallback to GitHub if local missing or empty
-    try:
-        if os.path.exists(scores_file):
-            scores_df = pd.read_csv(scores_file)
-            # if local exists but no data, try remote
-            if scores_df.empty:
+    uploaded = st.file_uploader("Upload scores.csv", type=["csv"], key="score_restore")
+    if uploaded is not None:
+        scores_df = pd.read_csv(uploaded)
+        scores_df.to_csv(scores_file, index=False)
+        st.success("Scores uploaded and loaded.")
+    else:
+        try:
+            if os.path.exists(scores_file):
+                scores_df = pd.read_csv(scores_file)
+                if scores_df.empty:
+                    scores_df = pd.read_csv(raw_scores_url)
+            else:
                 scores_df = pd.read_csv(raw_scores_url)
-        else:
-            scores_df = pd.read_csv(raw_scores_url)
-    except Exception:
-        scores_df = pd.DataFrame(columns=["StudentCode", "Name", "Assignment", "Score", "Comments", "Date"] )
+        except Exception:
+            scores_df = pd.DataFrame(columns=["StudentCode", "Name", "Assignment", "Score", "Comments", "Date"])
 
     # --- Save Score ---
     if st.button("💾 Save Score"):
@@ -1463,15 +1462,6 @@ with tabs[9]:
         scores_df = pd.concat([scores_df, pd.DataFrame([new_row])], ignore_index=True)
         scores_df.to_csv(scores_file, index=False)
         st.success("Score saved.")
-
-    # --- Restore/Upload Scores Backup ---
-    with st.expander("⬆️ Restore/Upload Scores Backup"):
-        uploaded = st.file_uploader("Upload scores.csv", type=["csv"], key="score_restore")
-        if uploaded is not None:
-            df_uploaded = pd.read_csv(uploaded)
-            df_uploaded.to_csv(scores_file, index=False)
-            st.success("Scores restored.")
-            st.experimental_rerun()
 
     # --- Download All Scores CSV ---
     if not scores_df.empty:
@@ -1491,7 +1481,7 @@ with tabs[9]:
         st.markdown(f"**Average Score:** `{avg_score:.1f}`")
         st.markdown(f"**Total Assignments Submitted:** `{len(student_scores)}`")
 
-        # --- Download PDF Report ---
+        # Download PDF
         if st.button("📄 Download Student Report PDF"):
             pdf = FPDF()
             pdf.add_page()
@@ -1526,7 +1516,7 @@ with tabs[9]:
                 mime="application/pdf"
             )
 
-        # --- WhatsApp Share ---
+        # WhatsApp Share
         wa_msg = (
             f"Hello {student_row['name']}, your average score is {avg_score:.1f}. "
             f"Most recent: {student_scores.iloc[-1]['Assignment']} – {student_scores.iloc[-1]['Score']}/100."
