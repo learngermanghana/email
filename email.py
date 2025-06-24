@@ -1402,20 +1402,125 @@ with tabs[9]:
     student_row = view_df[view_df['studentcode'].str.lower() == code].iloc[0]
 
     # --- Reference Answers ---
-    a1_answers = { 'Lesen und Hören 0.2': [
-        '1. C) 26','2. A) A, O, U, B','3. A) Eszett','4. A) K','5. A) A-Umlaut','6. A) A, O, U, B','7. B 4',
-        'Wasser','Kaffee','Blume','Schule','Tisch'
-    ] }
-    a2_answers = { 'Lesen': [
-        '1. C In einer Schule','2. B Weil sie gerne mit Kindern arbeitet',
-        '3. A In einem Büro','4. B Tennis','5. B Es war sonnig und warm','6. B Italien und Spanien','7. C Weil die Blumen so schön bunt sind'
-    ], 'Hören': [
-        '1. B Ins Kino gehen','2. A Weil sie spannende Geschichten liebt',
-        '3. A Tennis','4. B Es war sonnig und warm','5. Einen Spaziergang machen'
-    ] }
-    ref_answers = {**a1_answers, **a2_answers}
+ref_answers = {
+    "Lesen und Hören 0.2": [
+        "1. C) 26", "2. A) A, O, U, B", "3. A) Eszett", "4. A) K", "5. A) A-Umlaut", "6. A) A, O, U, B", "7. B 4",
+        "Wasser", "Kaffee", "Blume", "Schule", "Tisch"
+    ],
+    "Lesen und Hören 1.1": [
+        "1. C", "2. C", "3. A", "4. B"
+    ],
+    "Lesen und Hören 1.2": [
+        "1. Ich heiße Anna", "2. Du heißt Max", "3. Er heißt Peter", "4. Wir kommen aus Italien", 
+        "5. Ihr kommt aus Brasilien", "6. Sie kommt/k kommen aus Russland", "7. Ich wohne in Berlin", 
+        "8. Du wohnst in Madrid", "9. Sie wohnt in Wien",
+        "1. A) Anna", "2. C) Aus Italien", "3. D) In Berlin", "4. B) Tom", "5. A) In Berlin"
+    ],
+    "Lesen und Hören 2": [
+        "1. A) sieben", "2. B) Drei", "3. B) Sechs", "4. B) Neun", "5. B) Sieben", "6. C) Fünf", 
+        "7. B) zweihundertzweiundzwanzig", "8. A) fünfhundertneun", "9. A) zweitausendvierzig", "10. A) fünftausendfünfhundertneun",
+        "1. 16 – sechzehn", "2. 98 – achtundneunzig", "3. 555 – fünfhundertfünfundfünfzig", 
+        "4. 1020 – tausendzwanzig", "5. 8553 – achttausendfünfhundertdreiundfünfzig"
+    ],
+    "Lesen und Hören 4 Lesen Übung": [
+        "1. C) Neun", "2. B) Polnisch", "3. D) Niederländisch", "4. A) Deutsch", "5. C) Paris", "6. B) Amsterdam", "7. C) In der Schweiz"
+    ],
+    "Hören Übung (Rund um die Welt)": [
+        "1. C) In Italien und Frankreich", "2. C) Rom", "3. B) Das Essen", "4. B) Paris", "5. A) Nach Spanien"
+    ],
+    "Lesen und Hören 5 Part 1": [
+        "Der Tisch – the table", "Die Lampe – the lamp", "Das Buch – the book", "Der Stuhl – the chair", "Die Katze – the cat",
+        "Das Auto – the car", "Der Hund – the dog", "Die Blume – the flower", "Das Fenster – the window", "Der Computer – the computer"
+    ],
+    "Lesen und Hören 5 Part 2": [
+        "1. Der Tisch ist groß", "2. Die Lampe ist neu", "3. Das Buch ist interessant", "4. Der Stuhl ist bequem", "5. Die Katze ist süß",
+        "6. Das Auto ist schnell", "7. Der Hund ist freundlich", "8. Die Blume ist schön", "9. Das Fenster ist offen", "10. Der Computer ist teuer"
+    ],
+    "Lesen und Hören 5 Part 3": [
+        "1. Ich sehe den Tisch", "2. Sie kauft die Lampe", "3. Er liest das Buch", "4. Wir brauchen den Stuhl", "5. Du fütterst die Katze",
+        "6. Ich fahre das Auto", "7. Sie streichelt den Hund", "8. Er pflückt die Blume", "9. Wir putzen das Fenster", "10. Sie benutzen Computer"
+    ],
+    "Lesen und Hören 6 Teil 1": [
+        "Das Wohnzimmer – the living room", "Die Küche – the kitchen", "Das Schlafzimmer – the bedroom", "Das Badezimmer – the bathroom", "Der Balkon – the balcony",
+        "Der Flur – the hallway", "Das Bett – the bed", "Der Tisch – the table", "Der Stuhl – the chair", "Der Schrank – the wardrobe"
+    ],
+    "Lesen und Hören 6 Teil 2": [
+        "1. B) Vier", "2. A) Ein Sofa und ein Fernseher", "3. B) Einen Herd, einen Kühlschrank und einen Tisch mit vier Stühlen", "4. C) Ein großes Bett", "5. D) Eine Dusche, eine Badewanne und ein Waschbecken",
+        "6. D) Klein und schön", "7. C) Blumen und einen kleinen Tisch mit zwei Stühlen"
+    ],
+    "Lesen und Hören 6 Teil 3": ["1. B", "2. B", "3. B", "4. C", "5. D", "6. B", "7. C"],
+    "Lesen und Hören 7 Teil 1": [
+        "1. B) Um sieben Uhr", "2. B) Um acht Uhr", "3. B) Um sechs Uhr", "4. B) Um zehn Uhr", "5. B) Um neun Uhr",
+        "6. C) Nachmittags", "7. A) Um sieben Uhr", "8. A) Montag", "9. B) Am Dienstag und Donnerstag", "10. B) Er ruht sich aus"
+    ],
+    "Lesen und Hören 7 Teil 2": [
+        "1. B) Um neun Uhr", "2. B) Er geht in die Bibliothek", "3. B) Bis zwei Uhr nachmittags", "4. B) Um drei Uhr nachmittags", "5. A)",
+        "6. B) Um neun Uhr", "7. B) Er geht in die Bibliothek", "8. B) Bis zwei Uhr nachmittags", "9. B) Um drei Uhr nachmittags", "10. B) Um sieben Uhr"
+    ],
+    "Lesen und Hören 8 Teil 1": [
+        "1. B) Zwei Uhr nachmittags", "2. B) 29 Tage", "3. B) April", "4. C) 03.02.2024", "5. C) Mittwoch"
+    ],
+    "Lesen und Hören 8 Teil 2": ["1. Falsch", "2. Richtig", "3. Richtig", "4. Falsch", "5. Richtig"],
+    "Lesen und Hören 8 Teil 3": [
+        "1. B) Um Mitternacht", "2. B) Vier Uhr nachmittags", "3. C) 28 Tage", "4. B) Tag. Monat. Jahr", "5. D) Montag"
+    ],
+    "Lesen und Hören 9 Teil 1": [
+        "1. B) Apfel und Karotten", "2. C) Karotten", "3. A) Weil er Vegetarier ist", "4. C) Käse", "5. B) Fleisch",
+        "6. B) Kekse", "7. A) Käse", "8. C) Kuchen", "9. C) Schokolade", "10. B) Der Bruder des Autors"
+    ],
+    "Lesen und Hören 9 Teil 2": [
+        "1. A) Apfel, Bananen und Karotten", "2. A) Müsli mit Joghurt", "3. D) Karotten", "4. A) Käse", "5. C) Schokoladenkuchen"
+    ],
+    "Lesen und Hören 10 Lesen": ["1. Falsch", "2. Wahr", "3. Falsch", "4. Wahr", "5. Wahr", "6. Falsch", "7. Wahr", "8. Falsch", "9. Falsch", "10. Falsch"],
+    "Lesen und Hören 10 Hören": [
+        "1. B) Einmal pro Woche", "2. C) Apfel und Bananen", "3. A) Ein halbes Kilo", "4. B) 10 Euro", "5. B) Einen schönen Tag"
+    ],
+    "Lesen und Hören 11 Teil 1": [
+        "1. B) Entschuldigung, wo ist der Bahnhof?", "2. B) Links abbiegen", "3. B) Auf der rechten Seite, direkt neben dem großen Supermarkt",
+        "4. B) Wie komme ich zur nächsten Apotheke?", "5. C) Gute Reise und einen schönen Tag noch"
+    ],
+    "Lesen und Hören 11 Teil 2": [
+        "1. C) Wie komme ich zur nächsten Apotheke?", "2. C) Rechts abbiegen", "3. B) Auf der linken Seite, direkt neben der Bäckerei",
+        "4. A) Gehen Sie geradeaus bis zur Kreuzung, dann links", "5. C) Einen schönen Tag noch"
+    ],
+    "Lesen und Hören 11 Teil 3": [
+        "Fragen nach dem Weg: Entschuldigung, wie komme ich zum Bahnhof", "Die Straße überqueren: Überqueren Sie die Straße",
+        "Geradeaus gehen: Gehen Sie geradeaus", "Links abbiegen: Biegen Sie links ab", "Rechts abbiegen: Biegen Sie rechts ab",
+        "On the left side: Das Kino ist auf der linken Seite"
+    ],
+    "Lesen und Hören 12.1 Teil 1": [
+        "1. B) Ärztin", "2. A) Weil sie keine Zeit hat", "3. B) Um 8 Uhr", "4. C) Viele verschiedene Fächer", "5. C) Einen Sprachkurs besuchen"
+    ],
+    "Lesen und Hören 12.1 Teil 2": [
+        "B) Falsch", "B) Falsch", "B) Falsch", "B) Falsch", "B) Falsch"
+    ],
+    "Lesen und Hören 12.1 Teil 3": ["A) Richtig", "A) Richtig", "A) Richtig", "A) Richtig", "A) Richtig"],
+    "Lesen und Hören 12.2 Teil 1": [
+        "In Berlin", "Mit seiner Frau und seinen drei Kindern", "Mit seinem Auto", "Um 7:30 Uhr", "Barzahlung (cash)"
+    ],
+    "Lesen und Hören 12.2 Teil 2": [
+        "1. B) Um 9:00 Uhr", "2. B) Um 12:00 Uhr", "3. B) Um 18:00 Uhr", "4. B) Um 21:00 Uhr", "5. D) Alles Genannte"
+    ],
+    "Lesen und Hören 12.2 Teil 3": [
+        "1. B) Um 9 Uhr", "2. B) Um 12 Uhr", "3. A) ein Computer und ein Drucker", "4. C) in einer Bar", "5. C) bar"
+    ],
+    "Lesen und Hören 13 Teil 1": ["A","B","A","A","B","B"],
+    "Lesen und Hören 13 Teil 2": ["A","B","B"],
+    "Lesen und Hören 13 Teil 3": ["B","B","B"],
+    "Lesen und Hören 14.1 Teil 1": ["Anzeige A","Anzeige B","Anzeige B","Anzeige A","Anzeige A"],
+    "Lesen und Hören 14.1 Teil 2": ["C) Guten Tag, Herr Doktor","B) Halsschmerzen und Fieber","C) Seit gestern","C) Kopfschmerzen und Müdigkeit","A) Ich verschreibe Ihnen Medikamente"],
+    "Lesen und Hören 14.1 Body Parts": [
+        "Kopf – Head","Arm – Arm","Bein – Leg","Auge – Eye","Nase – Nose","Ohr – Ear","Mund – Mouth","Hand – Hand","Fuß – Foot","Bauch – Stomach"
+    ],
+    "A2 1.1 Lesen": ["1. C) In einer Schule","2. B) Weil sie gerne mit Kindern arbeitet","3. A) In einem Büro","4. B) Tennis","5. B) Es war sonnig und warm","6. B) Italien und Spanien","7. C) Weil die Bäume so schön bunt sind"],
+    "A2 1.1 Hören": ["1. B) Ins Kino gehen","2. A) Weil sie spannende Geschichten liebt","3. A) Tennis","4. B) Es war sonnig und warm","5. C) Einen Spaziergang machen"],
+    "A2 1.2 Lesen": ["1. B) Ein Jahr","2. B) Er ist immer gut gelaunt und organisiert","3. C) Einen Anzug und eine Brille","4. B) Er geht geduldig auf ihre Anliegen ein","5. B) Weil er seine Mitarbeiter regelmäßig lobt","6. A) Wenn eine Aufgabe nicht rechtzeitig erledigt wird","7. B) Dass er fair ist und die Leistungen der Mitarbeiter wertschätzt"],
+    "A2 1.2 Hören": ["1. B) Weil er","2. C) Sprachkurse","3. A) Jeden Tag"],
+    "A2 1.3 Lesen": ["1. B) Anna ist 25 Jahre alt","2. B) In ihrer Freizeit liest Anna Bücher und geht spazieren","3. C) Anna arbeitet in einem Krankenhaus","4. C) Anna hat einen Hund","5. B) Max unterrichtet Mathematik","6. A) Max spielt oft Fußball mit seinen Freunden","7. B) Am Wochenende machen Anna und Max Ausflüge oder besuchen Museen"],
+    "A2 1.3 Hören": ["1. B) Julia ist 26 Jahre alt","2. C) Julia arbeitet als Architektin","3. B) Tobias lebt in Frankfurt","4. A) Tobias möchte ein eigenes Restaurant eröffnen","5. B) Julia und Tobias kochen am Wochenende oft mit Sophie"]
+}
 
-    # --- Assignment Input ---
+# --- Assignment Input ---
     st.markdown("---")
     st.subheader(f"Record Assignment Score for {student_row['name']} ({student_row['studentcode']})")
     assignment = st.text_input("Assignment Name (e.g., Lesen und Hören 0.2)")
@@ -1490,7 +1595,6 @@ with tabs[9]:
             st.download_button("Download PDF Report", data=pdf_bytes, file_name=f"{student_row['name']}_report.pdf")
     else:
         st.info("No scores found for this student.")
-
 
 
 
