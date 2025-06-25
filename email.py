@@ -788,6 +788,13 @@ with tabs[3]:
     # === Close SQLite connection ===
     conn.close()
 
+import os
+import pandas as pd
+import urllib.parse
+from datetime import timedelta
+import streamlit as st
+
+# === Tab 4: WhatsApp Reminders for Debtors ===
 with tabs[4]:
     st.title("📲 WhatsApp Reminders for Debtors")
 
@@ -930,6 +937,11 @@ with tabs[4]:
             file_name="debtor_whatsapp_links.csv",
             mime="text/csv"
         )
+
+# === Tab 5: Generate Contract & Receipt PDF for Any Student ===
+with tabs[5]:
+    pass
+
 
 # --- Tab 5: Generate Contract & Receipt PDF for Any Student ---
 with tabs[5]:
