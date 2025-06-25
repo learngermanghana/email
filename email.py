@@ -1438,12 +1438,9 @@ with tabs[9]:
         ],
         "Lesen und Horen 2": [
             "1. A) sieben", "2. B) Drei", "3. B) Sechs", "4. B) Neun", "5. B) Sieben", "6. C) Fünf",
-            "",  # blank line
-            "7. B) zweihundertzweiundzwanzig", "8. A) fünfhundertneun", "9. A) zweitausendvierzig", "10. A) fünftausendfünfhundertneun",
-            "",  # blank line
-            "1. 16 – sechzehn", "2. 98 – achtundneunzig", "3. 555 – fünfhundertfünfundfünfzig",
-            "",  # blank line
-            "4. 1020 – tausendzwanzig", "5. 8553 – achttausendfünfhundertdreiundfünfzig"
+        ],
+        "Lesen und Horen 3": [ 
+            "1. Es kostet 20 Euro", "2. Sie kostet  15 Euro", "3. Es kostet 25,000 Euro", "4. Er kostet 50 Euro", "5. Sie kostet 100 Euro",       
         ],
         "Lesen und Horen 4": [
             "1. C) Neun", "2. B) Polnisch", "3. D) Niederländisch", "4. A) Deutsch", "5. C) Paris", "6. B) Amsterdam", "7. C) In der Schweiz",
