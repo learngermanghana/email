@@ -788,6 +788,7 @@ with tabs[3]:
     # === Close SQLite connection ===
     conn.close()
 
+
 # --- Tab 4: WhatsApp Reminders for Debtors ---
 with tabs[4]:
     st.title("📲 WhatsApp Reminders for Debtors")
@@ -814,43 +815,44 @@ with tabs[4]:
                 return c
         return key
 
-    # 3) Summary metrics
+    # 3) Compute summary metrics
     paid_col    = col_lookup("paid")
     balance_col = col_lookup("balance")
     df[paid_col]    = pd.to_numeric(df.get(paid_col, []), errors="coerce").fillna(0)
     df[balance_col] = pd.to_numeric(df.get(balance_col, []), errors="coerce").fillna(0)
     total_students = len(df)
     total_paid     = df[paid_col].sum()
-    total_expenses = 0.0
+    total_expenses = 0.0  # load if available
     net_profit     = total_paid - total_expenses
 
-    # Display key metrics
+    # Show key metrics
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Total Students", total_students)
     c2.metric("Total Collected (GHS)", f"{total_paid:,.2f}")
-    c3.metric("Total Expenses", f"{total_expenses:,.2f}")
-    c4.metric("Net Profit", f"{net_profit:,.2f}")
+    c3.metric("Total Expenses (GHS)", f"{total_expenses:,.2f}")
+    c4.metric("Net Profit (GHS)", f"{net_profit:,.2f}")
 
     # 4) Filters: name/code search, level, minimum overdue days
     st.markdown("---")
     st.subheader("🔎 Filter Debtors")
-    name_search = st.text_input("Search by name or code", key="wa_search")
-    level_key   = col_lookup("level")
+    name_search   = st.text_input("Search by name or code", key="wa_search")
+    level_key     = col_lookup("level")
     if level_key in df.columns:
         levels = ["All"] + sorted(df[level_key].dropna().unique().tolist())
         selected_level = st.selectbox("Filter by Level", levels, key="wa_level")
     else:
         selected_level = "All"
-    # default minimum overdue days set to 10
-    slider_days = st.slider("Days Past Due ≥ (default 10 days)", 0, 90, 10, key="wa_overdue_days")
+    # default minimum days past due (payment due one month after start)
+    slider_days   = st.slider("Days Past Due ≥ (default 10 days)", 0, 90, 10, key="wa_overdue_days")
 
-    # 5) Calculate due_date and days_overdue
+    # 5) Calculate due_date, days_overdue, days_left
     cs_col = col_lookup("contractstart")
     df[cs_col] = pd.to_datetime(df.get(cs_col, ''), errors="coerce")
-    df["due_date"] = df[cs_col] + pd.to_timedelta(30, unit="d")
-    df["days_overdue"] = (pd.Timestamp.today() - df["due_date"]).dt.days.fillna(-1)
+    df["due_date"]       = df[cs_col] + pd.to_timedelta(30, unit="d")
+    df["days_overdue"]   = (pd.Timestamp.today() - df["due_date"]).dt.days.fillna(-1)
+    df["days_left"]      = (df["due_date"] - pd.Timestamp.today()).dt.days.fillna(-1)
 
-    # Apply filters to find debtors
+    # Apply filters
     filtered = df.copy()
     if name_search:
         filtered = filtered[
@@ -861,24 +863,24 @@ with tabs[4]:
         filtered = filtered[filtered[level_key] == selected_level]
     debtors = filtered[(filtered[balance_col] > 0) & (filtered["days_overdue"] >= slider_days)]
 
-    # 6) Display all debtors
+    # 6) Display all debtors with days left
     st.markdown("---")
     if debtors.empty:
         st.success("✅ No debtors matching criteria.")
     else:
-        display_cols = [col_lookup("name"), level_key, balance_col, "due_date", "days_overdue"]
+        display_cols = [col_lookup("name"), level_key, balance_col, "due_date", "days_left"]
         tbl = debtors[display_cols].rename(
             columns={
                 col_lookup("name"): "Name",
                 level_key: "Level",
                 balance_col: "Balance (GHS)",
                 "due_date": "Due Date",
-                "days_overdue": "Days Overdue"
+                "days_left": "Days Until Due"
             }
         )
         st.dataframe(tbl, use_container_width=True)
 
-        # 7) WhatsApp reminder links with friendly message
+        # 7) WhatsApp reminder links
         st.markdown("### 📲 Send Friendly Reminders via WhatsApp")
         def clean_phone(ph):
             ph = str(ph).replace("+", "").replace("-", "").replace(" ", "")
@@ -891,16 +893,14 @@ with tabs[4]:
             level = r.get(level_key, "")
             bal   = r[balance_col]
             phone = clean_phone(r.get(col_lookup("phone"), ""))
-            due_dt = r["due_date"]
-            due   = due_dt.strftime("%d %b %Y") if pd.notnull(due_dt) else "soon"
-            # Friendly reminder text mentioning 1-month payment schedule
-            msg   = (
-                f"Hi {name}! Friendly reminder: your payment for the {level} class "
-                f"was due by {due} (one month after your first payment). "
-                f"Current balance: GHS {bal:.2f}. Please let us know if you need help settling this. "
-                "Thanks for being with us!"
+            due   = r["due_date"].strftime("%d %b %Y") if pd.notnull(r["due_date"]) else "soon"
+            days_left = int(r["days_left"])
+            msg = (
+                f"Hi {name}! Friendly reminder: your payment for the {level} class is due by {due}. "
+                f"You have {days_left} days left to settle the GHS {bal:.2f} balance. "
+                "Please let us know if you need help. Thank you!"
             )
-            url   = f"https://wa.me/{phone}?text={urllib.parse.quote(msg)}"
+            url = f"https://wa.me/{phone}?text={urllib.parse.quote(msg)}"
             links.append((name, url))
             st.markdown(f"- **{name}**: [Send WhatsApp Reminder]({url})")
 
