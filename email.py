@@ -903,9 +903,9 @@ with tabs[4]:
     else:
         st.success("✅ No students with unpaid balances.")
 
-
 import pandas as pd
 import base64
+import tempfile
 from datetime import date, timedelta
 from fpdf import FPDF
 
@@ -963,9 +963,8 @@ with tabs[5]:
         # 4) Editable fields before generation
         default_paid    = float(row.get(paid_col, 0))
         default_balance = float(row.get(bal_col, 0))
-        # contract dates editable
-        default_start = pd.to_datetime(row.get(start_col, ""), errors="coerce").date() if pd.to_datetime(row.get(start_col, ""), errors="coerce") is not pd.NaT else date.today()
-        default_end   = pd.to_datetime(row.get(end_col,   ""), errors="coerce").date() if pd.to_datetime(row.get(end_col,   ""), errors="coerce") is not pd.NaT else default_start + timedelta(days=30)
+        default_start = pd.to_datetime(row.get(start_col, ""), errors="coerce").date() if not pd.isnull(pd.to_datetime(row.get(start_col, ""), errors="coerce")) else date.today()
+        default_end   = pd.to_datetime(row.get(end_col,   ""), errors="coerce").date() if not pd.isnull(pd.to_datetime(row.get(end_col,   ""), errors="coerce")) else default_start + timedelta(days=30)
 
         st.subheader("Receipt Details")
         paid_input = st.number_input(
@@ -985,11 +984,12 @@ with tabs[5]:
         contract_end_input = st.date_input(
             "Contract End Date", value=default_end, key="contract_end_input"
         )
-        # dynamic course length
         course_length = (contract_end_input - contract_start_input).days
 
         st.subheader("Logo (optional)")
-        logo_file = st.file_uploader("Upload logo image", type=["png", "jpg", "jpeg"], key="logo_upload")
+        logo_file = st.file_uploader(
+            "Upload logo image", type=["png", "jpg", "jpeg"], key="logo_upload"
+        )
 
         # 5) Generate PDF on button click
         if st.button("Generate & Download PDF"):
@@ -1012,9 +1012,12 @@ with tabs[5]:
             pdf = FPDF()
             pdf.add_page()
 
-            # Add logo if provided
+            # Add logo if provided: save to temp file
             if logo_file:
-                pdf.image(logo_file, x=10, y=8, w=33)
+                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+                tmp.write(logo_file.getbuffer())
+                tmp.close()
+                pdf.image(tmp.name, x=10, y=8, w=33)
                 pdf.ln(25)
 
             # Payment status banner
@@ -1057,14 +1060,14 @@ with tabs[5]:
             template = st.session_state.get("agreement_template", "")
             filled = (
                 template
-                .replace("[STUDENT_NAME]", selected_name)
-                .replace("[DATE]",          str(receipt_date))
-                .replace("[CLASS]",         row.get(level_col, ""))
-                .replace("[AMOUNT]",        str(total))
+                .replace("[STUDENT_NAME]",     selected_name)
+                .replace("[DATE]",             str(receipt_date))
+                .replace("[CLASS]",            row.get(level_col, ""))
+                .replace("[AMOUNT]",           str(total))
                 .replace("[FIRST_INSTALMENT]", f"{paid:.2f}")
-                .replace("[SECOND_INSTALMENT]", f"{balance:.2f}")
-                .replace("[SECOND_DUE_DATE]",   str(contract_end))
-                .replace("[COURSE_LENGTH]",      f"{course_length} days")
+                .replace("[SECOND_INSTALMENT]",f"{balance:.2f}")
+                .replace("[SECOND_DUE_DATE]",  str(contract_end))
+                .replace("[COURSE_LENGTH]",    f"{course_length} days")
             )
             for line in filled.split("\n"):
                 safe = line.encode("latin-1", "replace").decode("latin-1")
@@ -1083,7 +1086,6 @@ with tabs[5]:
                 mime="application/pdf"
             )
             st.success("✅ PDF generated and ready to download.")
-
 
 
 with tabs[7]:
