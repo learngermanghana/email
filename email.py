@@ -1560,21 +1560,20 @@ with tabs[9]:
             "",  # blank line
             "Kopf – Head", "Arm – Arm", "Bein – Leg", "Auge – Eye", "Nase – Nose", "Ohr – Ear", "Mund – Mouth", "Hand – Hand", "Fuß – Foot", "Bauch – Stomach"
         ],
-        "A2 1.1 Lesen": [
+        "A2 1.1 Small Talk": [
             "1. C) In einer Schule", "2. B) Weil sie gerne mit Kindern arbeitet", "3. A) In einem Büro", "4. B) Tennis", "5. B) Es war sonnig und warm", "6. B) Italien und Spanien", "7. C) Weil die Bäume so schön bunt sind"
-        ],
-        "A2 1.1 Lesen": [
-            "1. C) In einer Schule", "2. B) Weil sie gerne mit Kindern arbeitet", "3. A) In einem Büro", "4. B) Tennis", "5. B) Es war sonnig und warm", "6. B) Italien und Spanien", "7. C) Weil die Bäume so schön bunt sind"
-        ],
-        "A2 1.1 Hören": [
+            "",  # blank line     
             "1. B) Ins Kino gehen", "2. A) Weil sie spannende Geschichten liebt", "3. A) Tennis", "4. B) Es war sonnig und warm", "5. C) Einen Spaziergang machen"
         ],
-        "A2 1.2 Lesen": [
+        "A2 1.2 Personen Beschreiben": [
             "1. B) Ein Jahr", "2. B) Er ist immer gut gelaunt und organisiert", "3. C) Einen Anzug und eine Brille", "4. B) Er geht geduldig auf ihre Anliegen ein", "5. B) Weil er seine Mitarbeiter regelmäßig lobt", "6. A) Wenn eine Aufgabe nicht rechtzeitig erledigt wird", "7. B) Dass er fair ist und die Leistungen der Mitarbeiter wertschätzt"
+            "",  # blank line 
+            "1. B) Weil er","2. C) Sprachkurse","3. A) Jeden Tag"
         ],
-        "A2 1.2 Hören": ["1. B) Weil er","2. C) Sprachkurse","3. A) Jeden Tag"],
-        "A2 1.3 Lesen": [
+        "A2 1.3 Dinge und Personen Beschreiben": [
             "1. B) Anna ist 25 Jahre alt", "2. B) In ihrer Freizeit liest Anna Bücher und geht spazieren", "3. C) Anna arbeitet in einem Krankenhaus", "4. C) Anna hat einen Hund", "5. B) Max unterrichtet Mathematik", "6. A) Max spielt oft Fußball mit seinen Freunden", "7. B) Am Wochenende machen Anna und Max Ausflüge oder"
+            "",  # blank line 
+            "1. B) Julia ist 26 Jahre alt", "2. c) Julia arbeitet als Architektin", "3. B) Tobias lebt in Frankfurt", "4. A) Tobias mochte ein eigenes Restaurant ", "5. B) Julia und Tobias kochen am Wochenende oft mit Sophie"           
         ],
         "A2 2.4 Wo möchten wir uns treffen?": [
             "1. B) faul sein", "2. D) Hockey spielen", "3. A) schwimmen gehen", "4. D) zum See fahren und dort im Zelt übernachten", "5. B) eine Route mit dem Zug durch das ganze Land", "1. B) Um 10 Uhr", "2. B) Eine Rucksack", "3. B) Ein Piknik", "4. C) in einem Restaurant", "5. A) Spielen und Spazieren gehen"
