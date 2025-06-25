@@ -1566,6 +1566,9 @@ with tabs[9]:
         "A2 1.1 Lesen": [
             "1. C) In einer Schule", "2. B) Weil sie gerne mit Kindern arbeitet", "3. A) In einem Büro", "4. B) Tennis", "5. B) Es war sonnig und warm", "6. B) Italien und Spanien", "7. C) Weil die Bäume so schön bunt sind"
         ],
+        "A2 1.1 Lesen": [
+            "1. C) In einer Schule", "2. B) Weil sie gerne mit Kindern arbeitet", "3. A) In einem Büro", "4. B) Tennis", "5. B) Es war sonnig und warm", "6. B) Italien und Spanien", "7. C) Weil die Bäume so schön bunt sind"
+        ],
         "A2 1.1 Hören": [
             "1. B) Ins Kino gehen", "2. A) Weil sie spannende Geschichten liebt", "3. A) Tennis", "4. B) Es war sonnig und warm", "5. C) Einen Spaziergang machen"
         ],
@@ -1574,11 +1577,10 @@ with tabs[9]:
         ],
         "A2 1.2 Hören": ["1. B) Weil er","2. C) Sprachkurse","3. A) Jeden Tag"],
         "A2 1.3 Lesen": [
-            "1. B) Anna ist 25 Jahre alt", "2. B) In ihrer Freizeit liest Anna Bücher und geht spazieren", "3. C) Anna arbeitet in einem Krankenhaus", "4. C) Anna hat einen Hund", "5. B) Max unterrichtet Mathematik", 
-            "6. A) Max spielt oft Fußball mit seinen Freunden", "7. B) Am Wochenende machen Anna und Max Ausflüge oder"
+            "1. B) Anna ist 25 Jahre alt", "2. B) In ihrer Freizeit liest Anna Bücher und geht spazieren", "3. C) Anna arbeitet in einem Krankenhaus", "4. C) Anna hat einen Hund", "5. B) Max unterrichtet Mathematik", "6. A) Max spielt oft Fußball mit seinen Freunden", "7. B) Am Wochenende machen Anna und Max Ausflüge oder"
+        ],
         "A2 2.4 Wo möchten wir uns treffen?": [
-            "1. B) faul sein", "2. d) Hockey spielen", "3. C) 3. a) schwimmen gehen", "4. d) zum See fahren und dort im Zelt übernachten", "5. b) eine Route mit dem Zug durch das ganze Land", 
-            "1. B Um 10 Uhr", "2. B Eine Rucksack" "3. B Ein Piknik", "4. C in eienem restaurant", "5. A Spielen und Spazieren gehen"
+            "1. B) faul sein", "2. D) Hockey spielen", "3. A) schwimmen gehen", "4. D) zum See fahren und dort im Zelt übernachten", "5. B) eine Route mit dem Zug durch das ganze Land", "1. B) Um 10 Uhr", "2. B) Eine Rucksack", "3. B) Ein Piknik", "4. C) in einem Restaurant", "5. A) Spielen und Spazieren gehen"
         ]
     }
 
