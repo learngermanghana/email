@@ -788,24 +788,37 @@ with tabs[3]:
     # === Close SQLite connection ===
     conn.close()
 
+import os
+import pandas as pd
+import urllib.parse
+from datetime import timedelta
+import streamlit as st
+
 # === Tab 4: WhatsApp Reminders for Debtors ===
 with tabs[4]:
     st.title("📲 WhatsApp Reminders for Debtors")
 
-    # 1) Load student data (local → GitHub raw fallback)
+    # 1) Load student data (local → Google Sheets → GitHub raw fallback)
     student_file = "students.csv"
+    google_csv   = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
     github_raw   = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
     if os.path.exists(student_file):
         df = pd.read_csv(student_file)
     else:
+        # try Google Sheets first
         try:
-            df = pd.read_csv(github_raw)
-            st.info("Loaded student data from GitHub backup.")
+            df = pd.read_csv(google_csv)
+            st.info("Loaded student data from Google Sheets backup.")
         except Exception:
-            st.warning(
-                "No student data found. Please upload 'students.csv' in the 📝 Pending tab."
-            )
-            st.stop()
+            # fallback to GitHub
+            try:
+                df = pd.read_csv(github_raw)
+                st.info("Loaded student data from GitHub backup.")
+            except Exception:
+                st.warning(
+                    "No student data found. Please upload 'students.csv' in the 📝 Pending tab."
+                )
+                st.stop()
 
     # 2) Normalize column names
     df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
@@ -920,8 +933,10 @@ with tabs[4]:
         st.download_button(
             "📁 Download Reminder Links CSV",
             df_links.to_csv(index=False).encode("utf-8"),
-            file_nam
+            file_name="debtor_whatsapp_links.csv",
+            mime="text/csv"
         )
+
 
 # --- Tab 5: Generate Contract & Receipt PDF for Any Student ---
 with tabs[5]:
