@@ -1489,9 +1489,10 @@ with tabs[9]:
             "",  # blank line
             "Der Flur – the hallway", "Das Bett – the bed", "Der Tisch – the table", "Der Stuhl – the chair", "Der Schrank – the wardrobe",
             "",  # blank line
-            "1. B) Vier", "2. A) Ein Sofa und ein Fernseher", "3. B) Einen Herd, einen Kühlschrank und einen Tisch mit vier Stühlen", "4. C) Ein großes Bett", "5. D) Eine Dusche, eine Badewanne und ein Waschbecken",
-            "",  # blank line
+            "1. B) Vier", "2. A) Ein Sofa und ein Fernseher", "3. B) Einen Herd, einen Kühlschrank und einen Tisch mit vier Stühlen", "4. C) Ein großes Bett", "5. D) Eine Dusche, eine Badewanne und ein Waschbecken",    
             "6. D) Klein und schön", "7. C) Blumen und einen kleinen Tisch mit zwei Stühlen"
+            "",  # blank line
+            " 1. B", " 2.  B", " 3. B", " 4. C", " 5. D", " 6. B", " 7. C"
         ],
         "Lesen und Horen 7": [
             "1. B) Um sieben Uhr", "2. B) Um acht Uhr", "3. B) Um sechs Uhr", "4. B) Um zehn Uhr", "5. B) Um neun Uhr",
