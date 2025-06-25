@@ -406,229 +406,185 @@ with tabs[2]:
                 updated_df = pd.concat([existing_df, new_row], ignore_index=True)
                 updated_df.to_csv(student_file, index=False)
                 st.success(f"✅ Student '{name}' added successfully.")
+
+import pandas as pd
+import urllib.parse
+from datetime import date, timedelta
+import streamlit as st
+
+# --- Tab 3: Expenses and Financial Summary (Google Sheets) ---
 with tabs[3]:
     st.title("💵 Expenses and Financial Summary")
 
-    # === Initialize SQLite database for expenses ===
-    conn = sqlite3.connect('expenses.db')
-    cursor = conn.cursor()
+    # 1) Load expenses from Google Sheets CSV export
+    sheet_id   = "1I5mGFcWbWdK6YQrJtabTg_g-XBEVaIRK1aMFm72vDEM"
+    sheet_csv  = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
+    try:
+        df_expenses = pd.read_csv(sheet_csv)
+        df_expenses.columns = [c.strip().lower().replace(" ", "_") for c in df_expenses.columns]
+        st.success("✅ Loaded expenses from Google Sheets.")
+    except Exception as e:
+        st.error(f"❌ Could not load expenses sheet: {e}")
+        df_expenses = pd.DataFrame(columns=["type", "item", "amount", "date"])
 
-    # Ensure expenses table exists
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS expenses (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        type TEXT,
-        item TEXT,
-        amount REAL,
-        date TEXT
-    )
-    ''')
-    conn.commit()
-
-    # === Load existing expenses from SQLite ===
-    cursor.execute("SELECT * FROM expenses")
-    expenses_data = cursor.fetchall()
-    columns = ["id", "type", "item", "amount", "date"]
-    df_expenses = pd.DataFrame(expenses_data, columns=columns)
-
-    # === Add New Expense ===
+    # 2) Add new expense via form
     with st.form("add_expense_form"):
-        exp_type = st.selectbox("Type", ["Bill", "Rent", "Salary", "Marketing", "Other"])
-        exp_item = st.text_input("Expense Item")
+        exp_type   = st.selectbox("Type", ["Bill","Rent","Salary","Marketing","Other"])
+        exp_item   = st.text_input("Expense Item")
         exp_amount = st.number_input("Amount (GHS)", min_value=0.0, step=1.0)
-        exp_date = st.date_input("Date", value=date.today())
-        submit_exp = st.form_submit_button("Add Expense")
-
-        if submit_exp and exp_item and exp_amount > 0:
-            cursor.execute("""
-            INSERT INTO expenses (type, item, amount, date)
-            VALUES (?, ?, ?, ?)
-            """, (exp_type, exp_item, exp_amount, exp_date))
-            conn.commit()
+        exp_date   = st.date_input("Date", value=date.today())
+        submit     = st.form_submit_button("Add Expense")
+        if submit and exp_item and exp_amount > 0:
+            new_row = {"type": exp_type, "item": exp_item, "amount": exp_amount, "date": exp_date}
+            df_expenses = pd.concat([df_expenses, pd.DataFrame([new_row])], ignore_index=True)
             st.success(f"✅ Recorded: {exp_type} – {exp_item}")
             st.experimental_rerun()
 
-    # === Display Expenses ===
+    # 3) Display all expenses with pagination
     st.write("### All Expenses")
-
-    # Pagination for expenses
     ROWS_PER_PAGE = 10
-    total_exp_rows = len(df_expenses)
-    total_exp_pages = (total_exp_rows - 1) // ROWS_PER_PAGE + 1
+    total_rows    = len(df_expenses)
+    total_pages   = (total_rows - 1) // ROWS_PER_PAGE + 1
+    page = st.number_input(
+        f"Page (1-{total_pages})", min_value=1, max_value=total_pages, value=1, step=1, key="exp_page"
+    ) if total_pages > 1 else 1
+    start = (page - 1) * ROWS_PER_PAGE
+    end   = start + ROWS_PER_PAGE
+    st.dataframe(df_expenses.iloc[start:end].reset_index(drop=True), use_container_width=True)
 
-    if total_exp_pages > 1:
-        exp_page = st.number_input(
-            f"Page (1-{total_exp_pages})",
-            min_value=1, max_value=total_exp_pages, value=1, step=1,
-            key="expenses_page"
-        )
-    else:
-        exp_page = 1
-
-    exp_start_idx = (exp_page - 1) * ROWS_PER_PAGE
-    exp_end_idx = exp_start_idx + ROWS_PER_PAGE
-
-    exp_paged = df_expenses.iloc[exp_start_idx:exp_end_idx].reset_index()  # Keep index for delete/edit reference
-
-    for i, row in exp_paged.iterrows():
-        with st.expander(f"{row['type']} | {row['item']} | GHS {row['amount']} | {row['date']}"):
-            edit_col, delete_col = st.columns([2, 1])
-            with edit_col:
-                # Pre-fill values for editing
-                new_type = st.selectbox("Type", ["Bill", "Rent", "Salary", "Marketing", "Other"], index=["Bill", "Rent", "Salary", "Marketing", "Other"].index(row['type']) if row['type'] in ["Bill", "Rent", "Salary", "Marketing", "Other"] else 0, key=f"type_{exp_start_idx+i}")
-                new_item = st.text_input("Item", value=row['item'], key=f"item_{exp_start_idx+i}")
-                new_amount = st.number_input("Amount (GHS)", min_value=0.0, step=1.0, value=float(row['amount']), key=f"amount_{exp_start_idx+i}")
-                new_date = st.date_input("Date", value=row['date'], key=f"date_{exp_start_idx+i}")
-                if st.button("💾 Update", key=f"update_exp_{exp_start_idx+i}"):
-                    cursor.execute("""
-                    UPDATE expenses
-                    SET type=?, item=?, amount=?, date=?
-                    WHERE id=?
-                    """, (new_type, new_item, new_amount, new_date, row['id']))
-                    conn.commit()
-                    st.success("✅ Expense updated.")
-                    st.experimental_rerun()
-            with delete_col:
-                if st.button("🗑️ Delete", key=f"delete_exp_{exp_start_idx+i}"):
-                    cursor.execute("DELETE FROM expenses WHERE id=?", (row['id'],))
-                    conn.commit()
-                    st.success("❌ Expense deleted.")
-                    st.experimental_rerun()
-
-    # === Expense Summary ===
-    st.write("### Summary")
+    # 4) Expense summary
     total_expenses = df_expenses["amount"].sum() if not df_expenses.empty else 0.0
     st.info(f"💸 **Total Expenses:** GHS {total_expenses:,.2f}")
 
-    # === Export Expenses to CSV ===
-    exp_csv = df_expenses.to_csv(index=False)
-    st.download_button("📁 Download Expenses CSV", data=exp_csv, file_name="expenses_data.csv")
+    # 5) Export to CSV
+    csv_data = df_expenses.to_csv(index=False)
+    st.download_button(
+        "📁 Download Expenses CSV",
+        data=csv_data,
+        file_name="expenses_data.csv",
+        mime="text/csv"
+    )
 
-    # === Close SQLite connection ===
-    conn.close()
 
-# === Tab 4: WhatsApp Reminders for Debtors ===
+# --- Tab 4: WhatsApp Reminders for Debtors (with Expenses) ---
 with tabs[4]:
     st.title("📲 WhatsApp Reminders for Debtors")
 
-    def load_student_data(path, google_url, github_url):
-        if os.path.exists(path):
-            return pd.read_csv(path)
-        for url in (google_url, github_url):
-            try:
-                return pd.read_csv(url)
-            except Exception:
-                pass
-        st.warning("No student data found. Please provide students.csv locally or ensure the remote sheet is accessible.")
-        st.stop()
+    # 1) Load Expenses from Google Sheets
+    exp_sheet_id = "1I5mGFcWbWdK6YQrJtabTg_g-XBEVaIRK1aMFm72vDEM"
+    exp_csv_url  = f"https://docs.google.com/spreadsheets/d/{exp_sheet_id}/export?format=csv"
+    try:
+        df_exp = pd.read_csv(exp_csv_url)
+        df_exp.columns = [c.strip().lower().replace(" ", "_") for c in df_exp.columns]
+        total_expenses = pd.to_numeric(df_exp.get("amount", []), errors="coerce").fillna(0).sum()
+    except Exception:
+        total_expenses = 0.0
 
-    student_file = "students.csv"
-    google_csv = (
-        "https://docs.google.com/spreadsheets/d/"
-        "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
-    )
-    github_csv = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
+    # 2) Load Students
     df = load_student_data(student_file, google_csv, github_csv)
-
     df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
     col_map = {c.replace("_", ""): c for c in df.columns}
     def col_lookup(key):
         return col_map.get(key.strip().lower().replace(" ", "_").replace("_", ""), key)
 
-    cs = col_lookup("contractstart")
-    df[cs] = pd.to_datetime(df.get(cs, pd.NaT), errors="coerce")
-    try:
-        gh = pd.read_csv(github_csv)
-        gh.columns = [c.strip().lower().replace(" ", "_") for c in gh.columns]
-        gh_cs = pd.to_datetime(gh.get(cs, pd.NaT), errors="coerce")
-        df[cs] = df[cs].fillna(gh_cs)
-    except Exception:
-        pass
-    df[cs] = df[cs].fillna(pd.Timestamp.today())
-
+    cs  = col_lookup("contractstart")
     paid = col_lookup("paid")
-    bal = col_lookup("balance")
-    df[paid] = pd.to_numeric(df.get(paid, 0), errors="coerce").fillna(0)
-    df[bal] = pd.to_numeric(df.get(bal, 0), errors="coerce").fillna(0)
+    bal  = col_lookup("balance")
 
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Total Students", len(df))
-    c2.metric("Total Collected (GHS)", f"{df[paid].sum():,.2f}")
-    c3.metric("Total Expenses (GHS)", "0.00")
-    c4.metric("Net Profit (GHS)", f"{df[paid].sum():,.2f}")
+    # Parse dates & amounts
+    df[cs]   = pd.to_datetime(df.get(cs, pd.NaT), errors="coerce").fillna(pd.Timestamp.today())
+    df[paid] = pd.to_numeric(df.get(paid, 0), errors="coerce").fillna(0)
+    df[bal]  = pd.to_numeric(df.get(bal, 0), errors="coerce").fillna(0)
+
+    # 3) Financial Metrics
+    total_collected = df[paid].sum()
+    net_profit      = total_collected - total_expenses
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Total Students", len(df))
+    m2.metric("Total Collected (GHS)", f"{total_collected:,.2f}")
+    m3.metric("Total Expenses (GHS)",  f"{total_expenses:,.2f}")
+    m4.metric("Net Profit (GHS)",      f"{net_profit:,.2f}")
 
     st.markdown("---")
+
+    # 4) Filters
     search = st.text_input("Search by name or code", key="wa_search")
-    lvl = col_lookup("level")
+    lvl    = col_lookup("level")
     if lvl in df.columns:
-        opts = ["All"] + sorted(df[lvl].dropna().unique().tolist())
+        opts     = ["All"] + sorted(df[lvl].dropna().unique().tolist())
         selected = st.selectbox("Filter by Level", opts, key="wa_level")
     else:
         selected = "All"
 
-    df["due_date"] = df[cs] + timedelta(days=30)
+    # 5) Compute Due Dates
+    df["due_date"]  = df[cs] + timedelta(days=30)
     df["days_left"] = (df["due_date"] - pd.Timestamp.today()).dt.days.astype(int)
 
+    # 6) Identify Debtors
     filt = df[df[bal] > 0]
     if search:
         mask1 = filt[col_lookup("name")].str.contains(search, case=False, na=False)
         mask2 = filt[col_lookup("studentcode")].str.contains(search, case=False, na=False)
-        filt = filt[mask1 | mask2]
+        filt  = filt[mask1 | mask2]
     if selected != "All":
         filt = filt[filt[lvl] == selected]
 
     st.markdown("---")
+
     if filt.empty:
         st.success("✅ No students currently owing a balance.")
     else:
         st.metric("Number of Debtors", len(filt))
-        cols = [col_lookup("name"), lvl, bal, "due_date", "days_left"]
-        tbl = filt[cols].rename(columns={
+        tbl_cols = [col_lookup("name"), lvl, bal, "due_date", "days_left"]
+        tbl = filt[tbl_cols].rename(columns={
             col_lookup("name"): "Name",
-            lvl: "Level",
-            bal: "Balance (GHS)",
-            "due_date": "Due Date",
-            "days_left": "Days Until Due"
+            lvl:                 "Level",
+            bal:                 "Balance (GHS)",
+            "due_date":          "Due Date",
+            "days_left":         "Days Until Due"
         })
         st.dataframe(tbl, use_container_width=True)
 
+        # 7) Build WhatsApp links
         def clean_phone(s):
             p = s.astype(str).str.replace(r"[+\- ]", "", regex=True)
             p = p.where(~p.str.startswith("0"), "233" + p.str[1:])
             return p.str.extract(r"(\d+)")[0]
 
         ws = filt.assign(
-            phone=clean_phone(filt[col_lookup("phone")]),
-            due_str=filt["due_date"].dt.strftime("%d %b %Y"),
-            bal_str=filt[bal].map(lambda x: f"GHS {x:.2f}"),
-            days=filt["days_left"].astype(int)
+            phone    = clean_phone(filt[col_lookup("phone")]),
+            due_str  = filt["due_date"].dt.strftime("%d %b %Y"),
+            bal_str  = filt[bal].map(lambda x: f"GHS {x:.2f}"),
+            days     = filt["days_left"].astype(int)
         )
-        def url(row):
+
+        def make_link(row):
             if row.days >= 0:
                 msg = f"You have {row.days} {'day' if row.days==1 else 'days'} left to settle the {row.bal_str} balance."
             else:
                 od = abs(row.days)
                 msg = f"Your payment is overdue by {od} {'day' if od==1 else 'days'}. Please settle as soon as possible."
             text = (
-                f"Hi {row[col_lookup('name')]}! Friendly reminder: your payment for the {row[lvl]} class is due by {row.due_str}. "
-                f"{msg} Thank you!"
+                f"Hi {row[col_lookup('name')]}! Friendly reminder: your payment for the {row[lvl]} class "
+                f"is due by {row.due_str}. {msg} Thank you!"
             )
             return f"https://wa.me/{row.phone}?text={urllib.parse.quote(text)}"
 
-        ws["link"] = ws.apply(url, axis=1)
+        ws["link"] = ws.apply(make_link, axis=1)
         for nm, lk in ws[[col_lookup("name"), "link"]].itertuples(index=False):
             st.markdown(f"- **{nm}**: [Send Reminder]({lk})")
 
-        dl = ws[[col_lookup("name"), "link"]].rename(
-            columns={col_lookup("name"): "Name", "link": "WhatsApp URL"}
-        )
+        dl = ws[[col_lookup("name"), "link"]].rename(columns={
+            col_lookup("name"): "Name", "link": "WhatsApp URL"
+        })
         st.download_button(
             "📁 Download Reminder Links CSV",
             dl.to_csv(index=False).encode("utf-8"),
             file_name="debtor_whatsapp_links.csv",
             mime="text/csv"
         )
-        
+
 # === Tab 5: Generate Contract & Receipt PDF for Any Student ===
 with tabs[5]:
     pass
