@@ -921,6 +921,7 @@ with tabs[4]:
             "📁 Download Reminder Links CSV",
             df_links.to_csv(index=False).encode("utf-8"),
             file_nam
+        )
 
 # --- Tab 5: Generate Contract & Receipt PDF for Any Student ---
 with tabs[5]:
