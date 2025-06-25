@@ -918,6 +918,33 @@ with tabs[4]:
     else:
         st.success("✅ No students with unpaid balances.")
 
+# === AGREEMENT TEMPLATE STATE ===
+if "agreement_template" not in st.session_state:
+    st.session_state["agreement_template"] = """
+PAYMENT AGREEMENT
+
+This Payment Agreement is entered into on [DATE] for [CLASS] students of Learn Language Education Academy and Felix Asadu ("Teacher").
+
+Terms of Payment:
+1. Payment Amount: The student agrees to pay the teacher a total of [AMOUNT] cedis for the course.
+2. Payment Schedule: The payment can be made in full or in two installments: GHS [FIRST_INSTALLMENT] for the first installment, and the remaining balance for the second installment after one month of payment. 
+3. Late Payments: In the event of late payment, the school may revoke access to all learning platforms. No refund will be made.
+4. Refunds: Once a deposit is made and a receipt is issued, no refunds will be provided.
+
+Cancellation and Refund Policy:
+1. If the teacher cancels a lesson, it will be rescheduled.
+
+Miscellaneous Terms:
+1. Attendance: The student agrees to attend lessons punctually.
+2. Communication: Both parties agree to communicate changes promptly.
+3. Termination: Either party may terminate this Agreement with written notice if the other party breaches any material term.
+
+Signatures:
+[STUDENT_NAME]
+Date: [DATE]
+Asadu Felix
+"""
+
 import pandas as pd
 import base64
 import tempfile
@@ -1080,8 +1107,8 @@ with tabs[5]:
                 .replace("[DATE]",             str(receipt_date))
                 .replace("[CLASS]",            row.get(level_col, ""))
                 .replace("[AMOUNT]",           str(total))
-                .replace("[FIRST_INSTALMENT]", f"{paid:.2f}")
-                .replace("[SECOND_INSTALMENT]",f"{balance:.2f}")
+                .replace("[FIRST_INSTALLMENT]", f"{paid:.2f}")
+                .replace("[SECOND_INSTALLMENT]",f"{balance:.2f}")
                 .replace("[SECOND_DUE_DATE]",  str(contract_end))
                 .replace("[COURSE_LENGTH]",    f"{course_length} days")
             )
@@ -1102,7 +1129,6 @@ with tabs[5]:
                 mime="application/pdf"
             )
             st.success("✅ PDF generated and ready to download.")
-
 
 
 with tabs[7]:
