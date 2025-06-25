@@ -1578,6 +1578,7 @@ with tabs[9]:
             "6. A) Max spielt oft Fußball mit seinen Freunden", "7. B) Am Wochenende machen Anna und Max Ausflüge oder"
         ],
         "B1 1.1 Lesen"
+               }
 
     # --- Load Scores from Google Sheet CSV ---
     scores_sheet_url = (
