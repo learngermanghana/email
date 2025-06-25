@@ -788,7 +788,6 @@ with tabs[3]:
     # === Close SQLite connection ===
     conn.close()
 
-# === Tab 4: WhatsApp Reminders for Debtors ===
 with tabs[4]:
     st.title("📲 WhatsApp Reminders for Debtors")
 
@@ -824,6 +823,19 @@ with tabs[4]:
             if c.replace("_", "") == key.replace("_", ""):
                 return c
         return key
+
+        # 2\.5) Fill missing fields from GitHub backup
+    try:
+        df_github = pd.read_csv(github_raw)
+        # Normalize GitHub columns
+        df_github.columns = [c.strip().lower().replace(" ", "_") for c in df_github.columns]
+        # Fill missing contractstart values from GitHub
+        cs_col = col_lookup("contractstart")
+        df_github[cs_col] = pd.to_datetime(df_github.get(cs_col, ""), errors="coerce")
+        df[cs_col] = pd.to_datetime(df.get(cs_col, ""), errors="coerce").fillna(df_github[cs_col])
+    except Exception:
+        # If GitHub backup fails, proceed with whatever we have
+        pass
 
     # 3) Summary metrics
     paid_col    = col_lookup("paid")
@@ -918,7 +930,6 @@ with tabs[4]:
             file_name="debtor_whatsapp_links.csv",
             mime="text/csv"
         )
-
 
 # --- Tab 5: Generate Contract & Receipt PDF for Any Student ---
 with tabs[5]:
