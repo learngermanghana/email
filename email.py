@@ -848,10 +848,12 @@ with tabs[4]:
 
     # 5) Compute due dates and days left/overdue
     cs_col = col_lookup("contractstart")
-    df[cs_col]        = pd.to_datetime(df.get(cs_col, ""), errors="coerce")
-    df["due_date"]   = df[cs_col] + pd.to_timedelta(30, unit="d")
-    df["days_left"]  = (df["due_date"] - pd.Timestamp.today()).dt.days.fillna(-1).astype(int)
-    df["days_overdue"] = -df["days_left"].clip(upper=0)
+    df[cs_col] = pd.to_datetime(df.get(cs_col, ""), errors="coerce")
+    # Default missing start dates to today for calculation
+    df[cs_col] = df[cs_col].fillna(pd.Timestamp.today())
+    df["due_date"]      = df[cs_col] + timedelta(days=30)
+    df["days_left"]     = (df["due_date"] - pd.Timestamp.today()).dt.days.astype(int)
+    df["days_overdue"]  = (-df["days_left"]).clip(lower=0).astype(int)
 
     # Apply filters and select debtors
     filtered = df.copy()
@@ -891,20 +893,20 @@ with tabs[4]:
 
         links = []
         for _, row in debtors.iterrows():
-            name       = row[col_lookup("name")]
-            level      = row.get(level_key, "")
-            balance    = row[balance_col]
-            due        = row["due_date"].strftime("%d %b %Y") if pd.notnull(row["due_date"]) else "soon"
-            days_left  = row["days_left"]
-            phone      = clean_phone(row.get(col_lookup("phone"), ""))
+            name    = row[col_lookup("name")]
+            level   = row.get(level_key, "")
+            bal     = row[balance_col]
+            due     = row["due_date"].strftime("%d %b %Y")
+            days_left = row["days_left"]
+            phone   = clean_phone(row.get(col_lookup("phone"), ""))
 
             # Compose message
             msg = f"Hi {name}! Friendly reminder: your payment for the {level} class is due by {due}. "
             if days_left >= 0:
                 day_word = "day" if days_left == 1 else "days"
-                msg += f"You have {days_left} {day_word} left to settle the GHS {balance:.2f} balance. "
+                msg += f"You have {days_left} {day_word} left to settle the GHS {bal:.2f} balance. "
             else:
-                overdue = abs(days_left)
+                overdue  = abs(days_left)
                 day_word = "day" if overdue == 1 else "days"
                 msg += f"Your payment is overdue by {overdue} {day_word}. Please settle as soon as possible. "
             msg += "Thank you!"
@@ -918,10 +920,7 @@ with tabs[4]:
         st.download_button(
             "📁 Download Reminder Links CSV",
             df_links.to_csv(index=False).encode("utf-8"),
-            file_name="debtor_whatsapp_links.csv",
-            mime="text/csv"
-        )
-
+            file_nam
 
 # --- Tab 5: Generate Contract & Receipt PDF for Any Student ---
 with tabs[5]:
