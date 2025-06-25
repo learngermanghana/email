@@ -1420,23 +1420,23 @@ with tabs[9]:
 
                     # --- Reference Answers ---
     ref_answers = {
-        "Lesen und Hören 0.1": [
+        "Lesen und Horen 0.1": [
             "1. C) Guten Morgen", "2. D) Guten Tag", "3. B) Guten Abend", "4. B) Gute Nacht", "5. C) Guten Morgen", "6. C) Wie geht es Ihnen?", "7. B) Auf Wiedersehen",
             "8. C) Tschüss", "9. C) Guten Abend", "10. D) Gute Nacht"
         ],
-        "Lesen und Hören 0.2": [
+        "Lesen und Horen 0.2": [
             "1. C) 26", "2. A) A, O, U, B", "3. A) Eszett", "4. A) K", "5. A) A-Umlaut", "6. A) A, O, U, B", "7. B) 4",
             "",  # blank line
             "Wasser", "Kaffee", "Blume", "Schule", "Tisch"
         ],
-        "Lesen und Hören 1.1": ["1. C", "2. C", "3. A", "4. B"],
+        "Lesen und Horen 1.1": ["1. C", "2. C", "3. A", "4. B"],
         "Lesen und Hören 1.2": [
             "1. Ich heiße Anna", "2. Du heißt Max", "3. Er heißt Peter", "4. Wir kommen aus Italien", "5. Ihr kommt aus Brasilien", "6. Sie kommen aus Russland",
             "7. Ich wohne in Berlin", "8. Du wohnst in Madrid", "9. Sie wohnt in Wien",
             "",  # blank line
             "1. A) Anna", "2. C) Aus Italien", "3. D) In Berlin", "4. B) Tom", "5. A) In Berlin"
         ],
-        "Lesen und Hören 2": [
+        "Lesen und Horen 2": [
             "1. A) sieben", "2. B) Drei", "3. B) Sechs", "4. B) Neun", "5. B) Sieben", "6. C) Fünf",
             "",  # blank line
             "7. B) zweihundertzweiundzwanzig", "8. A) fünfhundertneun", "9. A) zweitausendvierzig", "10. A) fünftausendfünfhundertneun",
@@ -1445,12 +1445,12 @@ with tabs[9]:
             "",  # blank line
             "4. 1020 – tausendzwanzig", "5. 8553 – achttausendfünfhundertdreiundfünfzig"
         ],
-        "Lesen und Hören 4": [
+        "Lesen und Horen 4": [
             "1. C) Neun", "2. B) Polnisch", "3. D) Niederländisch", "4. A) Deutsch", "5. C) Paris", "6. B) Amsterdam", "7. C) In der Schweiz",
             "",  # blank line
             "1. C) In Italien und Frankreich", "2. C) Rom", "3. B) Das Essen", "4. B) Paris", "5. A) Nach Spanien"
         ],
-        "Lesen und Hören 5": [
+        "Lesen und Horen 5": [
             # Part 1 – Vocabulary Review
             "Der Tisch – the table",
             "Die Lampe – the lamp",
@@ -1487,7 +1487,7 @@ with tabs[9]:
             "9. Wir putzen das Fenster",
             "10. Sie benutzen den Computer"
         ],
-        "Lesen und Hören 6": [
+        "Lesen und Horen 6": [
             "Das Wohnzimmer – the living room", "Die Küche – the kitchen", "Das Schlafzimmer – the bedroom", "Das Badezimmer – the bathroom", "Der Balkon – the balcony",
             "",  # blank line
             "Der Flur – the hallway", "Das Bett – the bed", "Der Tisch – the table", "Der Stuhl – the chair", "Der Schrank – the wardrobe",
@@ -1496,7 +1496,7 @@ with tabs[9]:
             "",  # blank line
             "6. D) Klein und schön", "7. C) Blumen und einen kleinen Tisch mit zwei Stühlen"
         ],
-        "Lesen und Hören 7": [
+        "Lesen und Horen 7": [
             "1. B) Um sieben Uhr", "2. B) Um acht Uhr", "3. B) Um sechs Uhr", "4. B) Um zehn Uhr", "5. B) Um neun Uhr",
             "",  # blank line
             "6. C) Nachmittags", "7. A) Um sieben Uhr", "8. A) Montag", "9. B) Am Dienstag und Donnerstag", "10. B) Er ruht sich aus",
@@ -1505,26 +1505,26 @@ with tabs[9]:
             "",  # blank line
             "6. B) Um neun Uhr", "7. B) Er geht in die Bibliothek", "8. B) Bis zwei Uhr nachmittags", "9. B) Um drei Uhr nachmittags", "10. B) Um sieben Uhr"
         ],
-        "Lesen und Hören 8": [
+        "Lesen und Horen 8": [
             "1. B) Zwei Uhr nachmittags", "2. B) 29 Tage", "3. B) April", "4. C) 03.02.2024", "5. C) Mittwoch",
             "",  # blank line
             "1. Falsch", "2. Richtig", "3. Richtig", "4. Falsch", "5. Richtig",
             "",  # blank line
             "1. B) Um Mitternacht", "2. B) Vier Uhr nachmittags", "3. C) 28 Tage", "4. B) Tag. Monat. Jahr", "5. D) Montag"
         ],
-        "Lesen und Hören 9": [
+        "Lesen und Horen 9": [
             "1. B) Apfel und Karotten", "2. C) Karotten", "3. A) Weil er Vegetarier ist", "4. C) Käse", "5. B) Fleisch",
             "",  # blank line
             "6. B) Kekse", "7. A) Käse", "8. C) Kuchen", "9. C) Schokolade", "10. B) Der Bruder des Autors",
             "",  # blank line
             "1. A) Apfel, Bananen und Karotten", "2. A) Müsli mit Joghurt", "3. D) Karotten", "4. A) Käse", "5. C) Schokoladenkuchen"
         ],
-        "Lesen und Hören 10": [
+        "Lesen und Horen 10": [
             "1. Falsch", "2. Wahr", "3. Falsch", "4. Wahr", "5. Wahr", "6. Falsch", "7. Wahr", "8. Falsch", "9. Falsch", "10. Falsch",
             "",  # blank line
             "1. B) Einmal pro Woche", "2. C) Apfel und Bananen", "3. A) Ein halbes Kilo", "4. B) 10 Euro", "5. B) Einen schönen Tag"
         ],
-        "Lesen und Hören 11": [
+        "Lesen und Horen 11": [
             "1. B) Entschuldigung, wo ist der Bahnhof?", "2. B) Links abbiegen", "3. B) Auf der rechten Seite, direkt neben dem großen Supermarkt",
             "4. B) Wie komme ich zur nächsten Apotheke?", "5. C) Gute Reise und einen schönen Tag noch",
             "",  # blank line
@@ -1535,28 +1535,28 @@ with tabs[9]:
             "Geradeaus gehen: Gehen Sie geradeaus", "Links abbiegen: Biegen Sie links ab", "Rechts abbiegen: Biegen Sie rechts ab",
             "On the left side: Das Kino ist auf der linken Seite"
         ],
-        "Lesen und Hören 12.1": [
+        "Lesen und Horen 12.1": [
             "1. B) Ärztin", "2. A) Weil sie keine Zeit hat", "3. B) Um 8 Uhr", "4. C) Viele verschiedene Fächer", "5. C) Einen Sprachkurs besuchen",
             "",  # blank line
             "1. B) Falsch", "2. B) Falsch", "3. B) Falsch", "4. B) Falsch", "5. B) Falsch",
             "",  # blank line
             "A) Richtig", "A) Richtig", "A) Richtig", "A) Richtig", "A) Richtig"
         ],
-        "Lesen und Hören 12.2": [
+        "Lesen und Horen 12.2": [
             "In Berlin", "Mit seiner Frau und seinen drei Kindern", "Mit seinem Auto", "Um 7:30 Uhr", "Barzahlung (cash)",
             "",  # blank line
             "1. B) Um 9:00 Uhr", "2. B) Um 12:00 Uhr", "3. B) Um 18:00 Uhr", "4. B) Um 21:00 Uhr", "5. D) Alles Genannte",
             "",  # blank line
             "1. B) Um 9 Uhr", "2. B) Um 12 Uhr", "3. A) ein Computer und ein Drucker", "4. C) in einer Bar", "5. C) bar"
         ],
-        "Lesen und Hören 13": [
+        "Lesen und Horen 13": [
             "A", "B", "A", "A", "B", "B",
             "",  # blank line
             "A", "B", "B",
             "",  # blank line
             "B", "B", "B"
         ],
-        "Lesen und Hören 14.1": [
+        "Lesen und Horen 14.1": [
             "Anzeige A", "Anzeige B", "Anzeige B", "Anzeige A", "Anzeige A",
             "",  # blank line
             "C) Guten Tag, Herr Doktor", "B) Halsschmerzen und Fieber", "C) Seit gestern", "C) Kopfschmerzen und Müdigkeit", "A) Ich verschreibe Ihnen Medikamente",
@@ -1576,6 +1576,9 @@ with tabs[9]:
         "A2 1.3 Lesen": [
             "1. B) Anna ist 25 Jahre alt", "2. B) In ihrer Freizeit liest Anna Bücher und geht spazieren", "3. C) Anna arbeitet in einem Krankenhaus", "4. C) Anna hat einen Hund", "5. B) Max unterrichtet Mathematik", 
             "6. A) Max spielt oft Fußball mit seinen Freunden", "7. B) Am Wochenende machen Anna und Max Ausflüge oder"
+        "A2 2.4 Wo möchten wir uns treffen?": [
+            "1. B) faul sein", "2. d) Hockey spielen", "3. C) 3. a) schwimmen gehen", "4. d) zum See fahren und dort im Zelt übernachten", "5. b) eine Route mit dem Zug durch das ganze Land", 
+            "1. B Um 10 Uhr", "2. B Eine Rucksack" "3. B Ein Piknik", "4. C in eienem restaurant", "5. A Spielen und Spazieren gehen"
         ],
                }
 
