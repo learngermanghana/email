@@ -913,208 +913,117 @@ with tabs[5]:
         selected_name = st.selectbox("Select Student", student_names)
 
         if st.button("Generate PDF"):
-            # Fetch student data
-            student_row = df_main[df_main["Name"] == selected_name].iloc[0]
+            # --- 1) Load students.csv, falling back to GitHub ---
+            try:
+                df_latest = pd.read_csv(student_file)
+            except FileNotFoundError:
+                df_latest = pd.read_csv(github_csv)
+                st.info("Loaded students from GitHub backup.")
 
-            # Parse ContractStart date safely
-            raw_date = student_row.get("ContractStart", date.today())
-            pd_date = pd.to_datetime(raw_date, errors="coerce")
-            payment_date = pd_date.date() if not pd.isnull(pd_date) else date.today()
+            # --- 2) Normalize column names ---
+            df_latest.columns = [
+                c.strip()
+                 .replace(" ", "_")
+                 .replace("(", "")
+                 .replace(")", "")
+                 .replace("-", "_")
+                 .replace("/", "_")
+                 .lower()
+                for c in df_latest.columns
+            ]
+            def col_lookup(col):
+                for c in df_latest.columns:
+                    if c.replace("_", "").lower() == col.replace("_", "").lower():
+                        return c
+                return col
 
-            # Calculate amounts
-            paid = float(student_row.get("Paid", 0))
-            balance = float(student_row.get("Balance", 0))
-            total_fee = paid + balance
+            # --- 3) Select the student row ---
+            name_col    = col_lookup("name")
+            contract_col= col_lookup("contractstart")
+            paid_col    = col_lookup("paid")
+            balance_col = col_lookup("balance")
+            row = df_latest[df_latest[name_col] == selected_name].iloc[0]
 
-            # Create PDF (no logo)
+            # --- 4) Parse dates & amounts ---
+            start_raw = row.get(contract_col, "")
+            pd_start = pd.to_datetime(start_raw, errors="coerce")
+            contract_start = pd_start.date() if not pd.isnull(pd_start) else date.today()
+            paid    = float(row.get(paid_col, 0))
+            balance = float(row.get(balance_col, 0))
+            total   = paid + balance
+
+            # --- 5) Build the PDF ---
             pdf = FPDF()
             pdf.add_page()
 
-            # 1) Payment status banner
-            payment_status = "FULLY PAID" if balance == 0 else "INSTALLMENT PLAN"
+            # Payment status banner
+            status = "FULLY PAID" if balance == 0 else "INSTALLMENT PLAN"
             pdf.set_font("Arial", "B", 12)
             pdf.set_text_color(0, 128, 0)
-            pdf.cell(200, 10, payment_status, ln=True, align="C")
+            pdf.cell(0, 10, status, ln=True, align="C")
             pdf.set_text_color(0, 0, 0)
             pdf.ln(5)
 
-            # 2) Receipt header
+            # Receipt header & details
             pdf.set_font("Arial", size=14)
-            pdf.cell(200, 10, f"{SCHOOL_NAME} Payment Receipt", ln=True, align="C")
-
-            # 3) Receipt details
+            pdf.cell(0, 10, f"{SCHOOL_NAME} Payment Receipt", ln=True, align="C")
+            pdf.ln(10)
             pdf.set_font("Arial", size=12)
+            details = [
+                ("Name",          row.get(name_col, "")),
+                ("Student Code",  row.get(col_lookup("studentcode"), "")),
+                ("Phone",         row.get(col_lookup("phone"), "")),
+                ("Level",         row.get(col_lookup("level"), "")),
+                ("Amount Paid",   f"GHS {paid:.2f}"),
+                ("Balance Due",   f"GHS {balance:.2f}"),
+                ("Total Fee",     f"GHS {total:.2f}"),
+                ("Contract Start",contract_start),
+                ("Contract End",  row.get(col_lookup("contractend"), "")),
+                ("Receipt Date",  date.today())
+            ]
+            for label, val in details:
+                pdf.cell(0, 8, f"{label}: {val}", ln=True)
             pdf.ln(10)
-            pdf.cell(200, 10, f"Name: {student_row.get('Name','')}", ln=True)
-            pdf.cell(200, 10, f"Student Code: {student_row.get('StudentCode','')}", ln=True)
-            pdf.cell(200, 10, f"Phone: {student_row.get('Phone','')}", ln=True)
-            pdf.cell(200, 10, f"Level: {student_row.get('Level','')}", ln=True)
-            pdf.cell(200, 10, f"Amount Paid: GHS {paid:.2f}", ln=True)
-            pdf.cell(200, 10, f"Balance Due: GHS {balance:.2f}", ln=True)
-            pdf.cell(200, 10, f"Total Course Fee: GHS {total_fee:.2f}", ln=True)
-            pdf.cell(200, 10, f"Contract Start: {student_row.get('ContractStart','')}", ln=True)
-            pdf.cell(200, 10, f"Contract End: {student_row.get('ContractEnd','')}", ln=True)
-            pdf.cell(200, 10, f"Receipt Date: {payment_date}", ln=True)
+            pdf.cell(0, 8, "Thank you for your payment!", ln=True)
+            pdf.cell(0, 8, "Signed: Felix Asadu", ln=True)
 
-            # 4) Thank-you and signature
-            pdf.ln(10)
-            pdf.cell(0, 10, "Thank you for your payment!", ln=True)
-            pdf.cell(0, 10, "Signed: Felix Asadu", ln=True)
-
-            # 5) Contract section
+            # Contract section
             pdf.ln(15)
             pdf.set_font("Arial", size=14)
-            pdf.cell(200, 10, f"{SCHOOL_NAME} Student Contract", ln=True, align="C")
-
+            pdf.cell(0, 10, f"{SCHOOL_NAME} Student Contract", ln=True, align="C")
             pdf.set_font("Arial", size=12)
-            pdf.ln(10)
-            contract_text = st.session_state.get("agreement_template", "")
+            pdf.ln(8)
+
+            template = st.session_state.get("agreement_template", "")
             filled = (
-                contract_text
-                .replace("[STUDENT_NAME]", str(student_row.get("Name","")))
-                .replace("[DATE]", str(payment_date))
-                .replace("[CLASS]", str(student_row.get("Level","")))
-                .replace("[AMOUNT]", str(total_fee))
-                .replace("[FIRST_INSTALMENT]", "1500")
+                template
+                .replace("[STUDENT_NAME]",    row.get(name_col, ""))
+                .replace("[DATE]",            str(date.today()))
+                .replace("[CLASS]",           row.get(col_lookup("level"), ""))
+                .replace("[AMOUNT]",          str(total))
+                .replace("[FIRST_INSTALMENT]","1500")
                 .replace("[SECOND_INSTALMENT]", str(balance))
-                .replace("[SECOND_DUE_DATE]", str(payment_date + timedelta(days=30)))
-                .replace("[COURSE_LENGTH]", "12")
+                .replace("[SECOND_DUE_DATE]",  str(date.today() + timedelta(days=30)))
+                .replace("[COURSE_LENGTH]",   "12")
             )
             for line in filled.split("\n"):
-                safe_line = line.encode("latin-1", "replace").decode("latin-1")
-                pdf.multi_cell(0, 10, safe_line)
-
+                safe = line.encode("latin-1", "replace").decode("latin-1")
+                pdf.multi_cell(0, 8, safe)
             pdf.ln(10)
-            pdf.cell(0, 10, "Signed: Felix Asadu", ln=True)
+            pdf.cell(0, 8, "Signed: Felix Asadu", ln=True)
 
-            # 6) Download button
-            pdf_bytes = pdf.output(dest="S").encode("latin-1", errors="replace")
+            # --- 6) Download button ---
+            pdf_bytes = pdf.output(dest="S").encode("latin-1", "replace")
             st.download_button(
                 "📄 Download PDF",
                 data=pdf_bytes,
-                file_name=f"{selected_name.replace(' ', '_')}_contract.pdf",
+                file_name=f"{selected_name.replace(' ','_')}_contract.pdf",
                 mime="application/pdf"
             )
             st.success("✅ PDF contract generated.")
     else:
         st.warning("No student data available.")
 
-with tabs[6]:
-    st.title("📧 Send Email to Student(s)")
-
-    # Normalize column names
-    df_main.columns = [c.strip().lower() for c in df_main.columns]
-
-    # Ensure 'email' column exists
-    if "email" not in df_main.columns:
-        df_main["email"] = ""
-
-    # Get students with valid emails
-    email_entries = [(row["name"], row["email"]) for _, row in df_main.iterrows()
-                     if isinstance(row.get("email", ""), str) and "@" in row.get("email", "")]
-    email_options = [f"{name} ({email})" for name, email in email_entries]
-    email_lookup = {f"{name} ({email})": email for name, email in email_entries}
-
-    st.markdown("### 👤 Choose Recipients")
-
-    mode = st.radio("Send email to:", ["Individual student", "All students with email", "Manual entry"])
-
-    recipients = []
-
-    if mode == "Individual student":
-        if email_options:
-            selected = st.selectbox("Select student", email_options)
-            recipients = [email_lookup[selected]]
-        else:
-            st.warning("⚠️ No valid student emails found in your database.")
-
-    elif mode == "All students with email":
-        if email_entries:
-            recipients = [email for _, email in email_entries]
-            st.info(f"✅ {len(recipients)} student(s) will receive this email.")
-        else:
-            st.warning("⚠️ No student emails found. Upload a proper student file or update emails.")
-
-    elif mode == "Manual entry":
-        manual_email = st.text_input("Enter email address manually")
-        if "@" in manual_email:
-            recipients = [manual_email]
-        else:
-            st.warning("Enter a valid email address to proceed.")
-
-    st.markdown("### ✍️ Compose Message")
-    subject = st.text_input("Email Subject", value="Information from Learn Language Education Academy")
-    message = st.text_area("Message Body (HTML or plain text)", value="Dear Student,\n\n...", height=200)
-
-    file_upload = st.file_uploader("📎 Attach a file (optional)", type=["pdf", "doc", "jpg", "png", "jpeg"])
-
-    MAX_ATTACHMENT_MB = 5  # maximum file size allowed (MB)
-    ALLOWED_MIME_TYPES = [
-        "application/pdf",
-        "image/jpeg", "image/png",
-        "application/msword",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    ]
-
-    if st.button("Send Email"):
-        if not recipients:
-            st.warning("❗ Please select or enter at least one email address.")
-            st.stop()
-
-        sent = 0
-        failed = []
-        attachment = None
-
-        if file_upload:
-            try:
-                # File size check
-                file_upload.seek(0, os.SEEK_END)
-                file_size_mb = file_upload.tell() / (1024 * 1024)
-                file_upload.seek(0)
-                if file_size_mb > MAX_ATTACHMENT_MB:
-                    st.error(f"Attachment is too large (>{MAX_ATTACHMENT_MB}MB). Please upload a smaller file.")
-                    file_upload = None
-
-                # File type check
-                if file_upload and file_upload.type not in ALLOWED_MIME_TYPES:
-                    st.error("Unsupported file type! Please upload PDF, JPG, PNG, or DOC/DOCX files only.")
-                    file_upload = None
-
-                # Attach only if checks passed
-                if file_upload:
-                    file_data = file_upload.read()
-                    encoded = base64.b64encode(file_data).decode()
-                    attachment = Attachment(
-                        FileContent(encoded),
-                        FileName(file_upload.name),
-                        FileType(file_upload.type),
-                        Disposition("attachment")
-                    )
-            except Exception as e:
-                st.error(f"❌ Failed to process attachment: {e}")
-                attachment = None
-                file_upload = None
-
-        for email in recipients:
-            try:
-                msg = Mail(
-                    from_email=school_sender_email,
-                    to_emails=email,
-                    subject=subject,
-                    html_content=message.replace("\n", "<br>")
-                )
-                if attachment:
-                    msg.attachment = attachment
-
-                client = SendGridAPIClient(school_sendgrid_key)
-                client.send(msg)
-                sent += 1
-            except Exception as e:
-                failed.append(email)
-
-        st.success(f"✅ Sent to {sent} student(s).")
-        if failed:
-            st.warning(f"⚠️ Failed to send to: {', '.join(failed)}")
 
 
 with tabs[7]:
