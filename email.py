@@ -1426,19 +1426,26 @@ with tabs[9]:
         ],
         "Lesen und Hören 0.2": [
             "1. C) 26", "2. A) A, O, U, B", "3. A) Eszett", "4. A) K", "5. A) A-Umlaut", "6. A) A, O, U, B", "7. B 4",
+            "",  # blank line for spacing
             "Wasser", "Kaffee", "Blume", "Schule", "Tisch"
         ],
         "Lesen und Hören 1.1": ["1. C", "2. C", "3. A", "4. B"],
         "Lesen und Hören 1.2": [
             "1. Ich heiße Anna", "2. Du heißt Max", "3. Er heißt Peter", "4. Wir kommen aus Italien",
+            "",  # blank line for spacing
             "5. Ihr kommt aus Brasilien", "6. Sie kommt/k kommen aus Russland", "7. Ich wohne in Berlin",
+            "",  # blank line for spacing
             "8. Du wohnst in Madrid", "9. Sie wohnt in Wien",
+            "",  # blank line for spacing
             "1. A) Anna", "2. C) Aus Italien", "3. D) In Berlin", "4. B) Tom", "5. A) In Berlin"
         ],
         "Lesen und Hören 2": [
             "1. A) sieben", "2. B) Drei", "3. B) Sechs", "4. B) Neun", "5. B) Sieben", "6. C) Fünf",
+            "",  # blank line for spacing
             "7. B) zweihundertzweiundzwanzig", "8. A) fünfhundertneun", "9. A) zweitausendvierzig", "10. A) fünftausendfünfhundertneun",
+            "",  # blank line for spacing
             "1. 16 – sechzehn", "2. 98 – achtundneunzig", "3. 555 – fünfhundertfünfundfünfzig",
+            "",  # blank line for spacing
             "4. 1020 – tausendzwanzig", "5. 8553 – achttausendfünfhundertdreiundfünfzig"
         ],
         "Lesen und Hören 4": [
@@ -1486,9 +1493,11 @@ with tabs[9]:
         ],
         "Lesen und Hören 6": [
             "Das Wohnzimmer – the living room", "Die Küche – the kitchen", "Das Schlafzimmer – the bedroom", "Das Badezimmer – the bathroom", "Der Balkon – the balcony",
+            "",  # blank line for spacing
             "Der Flur – the hallway", "Das Bett – the bed", "Der Tisch – the table", "Der Stuhl – the chair", "Der Schrank – the wardrobe"
             "",  # blank line for spacing
             "1. B) Vier", "2. A) Ein Sofa und ein Fernseher", "3. B) Einen Herd, einen Kühlschrank und einen Tisch mit vier Stühlen", "4. C) Ein großes Bett", "5. D) Eine Dusche, eine Badewanne und ein Waschbecken",
+            "",  # blank line for spacing
             "6. D) Klein und schön", "7. C) Blumen und einen kleinen Tisch mit zwei Stühlen"
             "",  # blank line for spacing
             ["1. B", "2. B", "3. B", "4. C", "5. D", "6. B", "7. C"],
@@ -1502,22 +1511,23 @@ with tabs[9]:
             "",  # blank line for spacing       
             "6. B) Um neun Uhr", "7. B) Er geht in die Bibliothek", "8. B) Bis zwei Uhr nachmittags", "9. B) Um drei Uhr nachmittags", "10. B) Um sieben Uhr"
         ],
-        "Lesen und Hören 8 Teil 1": [
+        "Lesen und Hören 8": [
             "1. B) Zwei Uhr nachmittags", "2. B) 29 Tage", "3. B) April", "4. C) 03.02.2024", "5. C) Mittwoch"
-        ],
-        "Lesen und Hören 8 Teil 2": ["Falsch", "Richtig", "Richtig", "Falsch", "Richtig"],
-        "Lesen und Hören 8 Teil 3": [
+            "",  # blank line for spacing
+           "1. Falsch", "2. Richtig", "3. Richtig", "4. Falsch", "5. Richtig",
+            "",  # blank line for spacing
             "1. B) Um Mitternacht", "2. B) Vier Uhr nachmittags", "3. C) 28 Tage", "4. B) Tag. Monat. Jahr", "5. D) Montag"
         ],
-        "Lesen und Hören 9 Teil 1": [
+        "Lesen und Hören 9": [
             "1. B) Apfel und Karotten", "2. C) Karotten", "3. A) Weil er Vegetarier ist", "4. C) Käse", "5. B) Fleisch",
+            "",  # blank line for spacing
             "6. B) Kekse", "7. A) Käse", "8. C) Kuchen", "9. C) Schokolade", "10. B) Der Bruder des Autors"
-        ],
-        "Lesen und Hören 9 Teil 2": [
+            "",  # blank line for spacing
             "1. A) Apfel, Bananen und Karotten", "2. A) Müsli mit Joghurt", "3. D) Karotten", "4. A) Käse", "5. C) Schokoladenkuchen"
         ],
-        "Lesen und Hören 10 ": ["Falsch", "Wahr", "Falsch", "Wahr", "Wahr", "Falsch", "Wahr", "Falsch", "Falsch", "Falsch"],
-        "Lesen und Hören 10 Hören": [
+        "Lesen und Hören 10 ": [ 
+            "1. Falsch", "2. Wahr", "3. Falsch", "4. Wahr", "5. Wahr", "6. Falsch", "Wahr", "7. Falsch", "8. Falsch", "9. Falsch",
+        
             "1. B) Einmal pro Woche", "2. C) Apfel und Bananen", "3. A) Ein halbes Kilo", "4. B) 10 Euro", "5. B) Einen schönen Tag"
         ],
         "Lesen und Hören 11": [
