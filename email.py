@@ -789,6 +789,12 @@ with tabs[3]:
     conn.close()
 
 
+import os
+import pandas as pd
+import urllib.parse
+from datetime import datetime, timedelta
+import streamlit as st
+
 # --- Tab 4: WhatsApp Reminders for Debtors ---
 with tabs[4]:
     st.title("📲 WhatsApp Reminders for Debtors")
@@ -868,6 +874,8 @@ with tabs[4]:
     if debtors.empty:
         st.success("✅ No debtors matching criteria.")
     else:
+        # Show count of debtors
+        st.metric("Debtors", len(debtors))
         display_cols = [col_lookup("name"), level_key, balance_col, "due_date", "days_left"]
         tbl = debtors[display_cols].rename(
             columns={
@@ -886,6 +894,10 @@ with tabs[4]:
             ph = str(ph).replace("+", "").replace("-", "").replace(" ", "")
             if ph.startswith("0"): ph = "233" + ph[1:]
             return ''.join(filter(str.isdigit, ph))
+(ph):
+            ph = str(ph).replace("+", "").replace("-", "").replace(" ", "")
+            if ph.startswith("0"): ph = "233" + ph[1:]
+            return ''.join(filter(str.isdigit, ph))
 
         links = []
         for _, r in debtors.iterrows():
@@ -898,7 +910,7 @@ with tabs[4]:
             msg = (
                 f"Hi {name}! Friendly reminder: your payment for the {level} class is due by {due}. "
                 f"You have {days_left} days left to settle the GHS {bal:.2f} balance. "
-                "Please let us know if you need help. Thank you!"
+                "Thank you!"
             )
             url = f"https://wa.me/{phone}?text={urllib.parse.quote(msg)}"
             links.append((name, url))
@@ -912,7 +924,11 @@ with tabs[4]:
             file_name="debtor_whatsapp_links.csv",
             mime="text/csv"
         )
-        
+
+# --- Tab 5: Generate Contract & Receipt PDF for Any Student ---
+with tabs[5]:
+    pass
+
 # === AGREEMENT TEMPLATE STATE ===
 if "agreement_template" not in st.session_state:
     st.session_state["agreement_template"] = """
