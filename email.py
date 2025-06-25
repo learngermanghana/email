@@ -788,135 +788,133 @@ with tabs[3]:
     # === Close SQLite connection ===
     conn.close()
 
+# --- Tab 4: WhatsApp Reminders for Debtors ---
 with tabs[4]:
     st.title("📲 WhatsApp Reminders for Debtors")
 
-    # --- Load students.csv (local, else GitHub backup) ---
-    github_csv_url = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
+    # 1) Load student data (local → GitHub raw fallback)
     student_file = "students.csv"
-    if os.path.exists(student_file):
+    github_raw    = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
+    try:
         df = pd.read_csv(student_file)
-    else:
-        try:
-            df = pd.read_csv(github_csv_url)
-            st.info("Loaded student data from GitHub backup.")
-        except Exception:
-            df = pd.DataFrame()
-            st.warning("No student data found. Upload students.csv in 📝 Pending tab to continue.")
-            st.stop()
-
-    # --- Normalize columns for safety ---
-    def col_lookup(x):
-        x = str(x).strip().lower()
+    except FileNotFoundError:
+        df = pd.read_csv(github_raw)
+        st.info("Loaded student data from GitHub backup.")
+    
+    # 2) Normalize columns: strip, lower, replace spaces
+    df.columns = [
+        c.strip().lower().replace(" ", "_") for c in df.columns
+    ]
+    
+    # Helper to lookup flexible column names
+    def col_lookup(key):
+        key = key.strip().lower().replace(" ", "_")
         for c in df.columns:
-            if x == c.strip().lower():
+            if c.replace("_", "") == key.replace("_", ""):
                 return c
-        return x
+        return key
 
-    # Lower-case column headers
-    df.columns = [c.strip().lower() for c in df.columns]
+    # 3) Compute summary metrics
+    paid_col    = col_lookup("paid")
+    balance_col = col_lookup("balance")
 
-    # --- Show summary stats at the top ---
+    df[paid_col]    = pd.to_numeric(df.get(paid_col, []), errors="coerce").fillna(0)
+    df[balance_col] = pd.to_numeric(df.get(balance_col, []), errors="coerce").fillna(0)
     total_students = len(df)
-    total_paid = pd.to_numeric(df.get(col_lookup("paid"), []), errors="coerce").sum()
-    total_expenses = 0.0  # If you track expenses elsewhere, load and sum here
-    net_profit = total_paid - total_expenses
+    total_paid     = df[paid_col].sum()
+    total_expenses = 0.0  # load if available
+    net_profit     = total_paid - total_expenses
 
-    st.markdown(f"""
-    <div style='background-color:#f4f8fa;border-radius:8px;padding:12px 16px;margin-bottom:14px'>
-    <b>Summary</b><br>
-    👨‍🎓 <b>Total Students:</b> {total_students}<br>
-    💰 <b>Total Collected:</b> GHS {total_paid:,.2f}<br>
-    💸 <b>Total Expenses:</b> GHS {total_expenses:,.2f}<br>
-    📈 <b>Net Profit:</b> GHS {net_profit:,.2f}
-    </div>
-    """, unsafe_allow_html=True)
+    # Display as st.metric
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Total Students", total_students)
+    m2.metric("Total Collected (GHS)", f"{total_paid:,.2f}")
+    m3.metric("Total Expenses", f"{total_expenses:,.2f}")
+    m4.metric("Net Profit", f"{net_profit:,.2f}")
 
-    # --- Simple filter/search bar ---
-    st.markdown("#### 🔎 Filter or Search")
-    name_search = st.text_input("Search by name or code", key="wa_search")
-    if "level" in df.columns:
-        levels = ["All"] + sorted(df["level"].dropna().unique().tolist())
+    # 4) Filters: name/code search, level, minimum overdue days
+    st.markdown("---")
+    st.subheader("🔎 Filter Debtors")
+    name_search    = st.text_input("Search by name or code", key="wa_search")
+    level_key      = col_lookup("level")
+    if level_key in df.columns:
+        levels = ["All"] + sorted(df[level_key].dropna().unique().tolist())
         selected_level = st.selectbox("Filter by Level", levels, key="wa_level")
     else:
         selected_level = "All"
+    # overdue days slider
+    slider_days = st.slider("Days Past Due ≥", 0, 90, 0, key="wa_overdue_days")
 
-    filtered_df = df
+    # 5) Prepare date fields and filter
+    cs_col = col_lookup("contractstart")
+    df[cs_col] = pd.to_datetime(df.get(cs_col, "), errors="coerce")
+    df["due_date"] = df[cs_col] + pd.to_timedelta(30, unit="d")
+    df["days_overdue"] = (pd.Timestamp.today() - df["due_date"]).dt.days.fillna(-1)
+
+    # Apply filters
+    filtered = df.copy()
     if name_search:
-        filtered_df = filtered_df[
-            filtered_df[col_lookup("name")].astype(str).str.contains(name_search, case=False, na=False) |
-            filtered_df[col_lookup("studentcode")].astype(str).str.contains(name_search, case=False, na=False)
+        filtered = filtered[
+            filtered[col_lookup("name")].str.contains(name_search, case=False, na=False) |
+            filtered[col_lookup("studentcode")].str.contains(name_search, case=False, na=False)
         ]
-    if selected_level != "All" and "level" in df.columns:
-        filtered_df = filtered_df[filtered_df["level"] == selected_level]
+    if selected_level != "All":
+        filtered = filtered[filtered[level_key] == selected_level]
+    # debtors: positive balance and overdue days >= slider
+    debtors = filtered[(filtered[balance_col] > 0) & (filtered["days_overdue"] >= slider_days)]
 
-    # --- Show reminders for debtors ---
+    # 6) Show debtors table with key info
     st.markdown("---")
-    st.subheader("Students with Outstanding Balances")
-
-    # Ensure numeric
-    if col_lookup("balance") not in filtered_df.columns or col_lookup("phone") not in filtered_df.columns:
-        st.warning("Missing required columns: 'Balance' or 'Phone'")
-        st.stop()
-
-    filtered_df[col_lookup("balance")] = pd.to_numeric(filtered_df[col_lookup("balance")], errors="coerce").fillna(0.0)
-    filtered_df[col_lookup("phone")] = filtered_df[col_lookup("phone")].astype(str)
-
-    debtors = filtered_df[filtered_df[col_lookup("balance")] > 0]
-
-    def clean_phone(phone):
-        phone = str(phone).replace(" ", "").replace("+", "").replace("-", "")
-        if phone.startswith("0"):
-            phone = "233" + phone[1:]
-        return ''.join(filter(str.isdigit, phone))
-
-    if not debtors.empty:
-        for _, row in debtors.iterrows():
-            name = row.get(col_lookup("name"), "Unknown")
-            level = row.get(col_lookup("level"), "")
-            balance = float(row.get(col_lookup("balance"), 0.0))
-            code = row.get(col_lookup("studentcode"), "")
-            phone = clean_phone(row.get(col_lookup("phone"), ""))
-
-            # Dates
-            contract_start = row.get(col_lookup("contractstart"), "")
-            try:
-                if contract_start and not pd.isnull(contract_start):
-                    contract_start_dt = pd.to_datetime(contract_start, errors="coerce")
-                    contract_start_fmt = contract_start_dt.strftime("%d %B %Y")
-                    due_date_dt = contract_start_dt + timedelta(days=30)
-                    due_date_fmt = due_date_dt.strftime("%d %B %Y")
-                else:
-                    contract_start_fmt = "N/A"
-                    due_date_fmt = "soon"
-            except Exception:
-                contract_start_fmt = "N/A"
-                due_date_fmt = "soon"
-
-            # --- WhatsApp payment message ---
-            message = (
-                f"Dear {name}, this is a reminder that your balance for your {level} class is GHS {balance:.2f} "
-                f"and is due by {due_date_fmt}. "
-                f"Contract start: {contract_start_fmt}.\n"
-                "Kindly make the payment to continue learning with us. Thank you!\n\n"
-                "Payment Methods:\n"
-                "1. Mobile Money\n"
-                "   Number: 0245022743\n"
-                "   Name: Felix Asadu\n"
-                "2. Access Bank (Cedis)\n"
-                "   Account Number: 1050000008017\n"
-                "   Name: Learn Language Education Academy"
-            )
-            encoded_msg = urllib.parse.quote(message)
-            wa_url = f"https://wa.me/{phone}?text={encoded_msg}"
-
-            st.markdown(
-                f"🔔 <b>{name}</b> (<i>{level}</i>, <b>{balance:.2f} GHS due</b>) — "
-                f"<a href='{wa_url}' target='_blank'>📲 Remind via WhatsApp</a>",
-                unsafe_allow_html=True
-            )
+    if debtors.empty:
+        st.success("✅ No debtors matching criteria.")
     else:
-        st.success("✅ No students with unpaid balances.")
+        display_cols = [col_lookup("name"), level_key, balance_col, "due_date", "days_overdue"]
+        tbl = debtors[display_cols].rename(
+            columns={
+                col_lookup("name"): "Name",
+                level_key: "Level",
+                balance_col: "Balance (GHS)",
+                "due_date": "Due Date",
+                "days_overdue": "Days Overdue"
+            }
+        )
+        st.dataframe(tbl, use_container_width=True)
+
+        # 7) Generate WhatsApp URLs and provide links
+        st.markdown("### 📲 Send Reminders via WhatsApp")
+        def clean_phone(ph):
+            ph = str(ph).replace("+", "").replace("-", "").replace(" ", "")
+            if ph.startswith("0"): ph = "233" + ph[1:]
+            return ''.join(filter(str.isdigit, ph))
+
+        links = []
+        for _, r in debtors.iterrows():
+            name  = r[col_lookup("name")]
+            level = r.get(level_key, "")
+            bal   = r[balance_col]
+            phone = clean_phone(r.get(col_lookup("phone"), ""))
+            due   = r["due_date"].strftime("%d %b %Y") if pd.notnull(r["due_date"]) else "soon"
+            # Compose message
+            msg = (
+                f"Dear {name}, your balance for {level} is GHS {bal:.2f} "
+                f"due by {due}. Please pay to continue. Thank you!"
+            )
+            wa_url = f"https://wa.me/{phone}?text={urllib.parse.quote(msg)}"
+            links.append((name, wa_url))
+
+        # Display links in a table
+        for name, url in links:
+            st.markdown(f"- **{name}**: [Remind via WhatsApp]({url})")
+
+        # 8) Download links CSV
+        csv_df = pd.DataFrame(links, columns=["Name", "WhatsApp URL"] )
+        st.download_button(
+            "📁 Download Reminder Links CSV",
+            csv_df.to_csv(index=False).encode('utf-8'),
+            file_name="debtor_whatsapp_links.csv",
+            mime="text/csv"
+        )
+
 
 # === AGREEMENT TEMPLATE STATE ===
 if "agreement_template" not in st.session_state:
@@ -944,12 +942,6 @@ Signatures:
 Date: [DATE]
 Asadu Felix
 """
-
-import pandas as pd
-import base64
-import tempfile
-from datetime import date, timedelta
-from fpdf import FPDF
 
 # --- Tab 5: Generate & Edit Receipt/Contract PDF ---
 with tabs[5]:
