@@ -1450,8 +1450,7 @@ with tabs[9]:
         ],
         "Lesen und Hören 4": [
             "1. C) Neun", "2. B) Polnisch", "3. D) Niederländisch", "4. A) Deutsch", "5. C) Paris", "6. B) Amsterdam", "7. C) In der Schweiz"
-        ],
-        "Hören Übung (Rund um die Welt)": [
+             "",  # blank line for spacing
             "1. C) In Italien und Frankreich", "2. C) Rom", "3. B) Das Essen", "4. B) Paris", "5. A) Nach Spanien"
         ],
         "Lesen und Hören 5": [
