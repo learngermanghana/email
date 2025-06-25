@@ -13,114 +13,312 @@ from sendgrid.helpers.mail import (
     Mail, Attachment, FileContent, FileName, FileType, Disposition
 )
 import openai
-import sqlite3
 
 # ===== Project-Specific Imports =====
 from pdf_utils import generate_receipt_and_contract_pdf
 from email_utils import send_emails
 
+# ===== SQLite for Persistent Data Storage =====
+import sqlite3
+
 # ===== Helper Functions =====
 def clean_phone(phone):
+    """
+    Convert any Ghanaian phone number to WhatsApp-friendly format:
+    - Remove spaces, dashes, and '+'
+    - If starts with '0', replace with '233'
+    - If starts with '233', leave as is
+    - Returns only digits
+    """
     phone = str(phone).replace(" ", "").replace("+", "").replace("-", "")
     if phone.startswith("0"):
         phone = "233" + phone[1:]
-    return ''.join(filter(str.isdigit, phone))
+    phone = ''.join(filter(str.isdigit, phone))
+    return phone
 
-# ===== PAGE CONFIG =====
-st.set_page_config(page_title="Learn Language Education Academy Dashboard", layout="wide")
+# ===== PAGE CONFIG (must be first Streamlit command!) =====
+st.set_page_config(
+    page_title="Learn Language Education Academy Dashboard",
+    layout="wide"
+)
 
-# === Session State ===
+# === Session State Initialization ===
 st.session_state.setdefault("emailed_expiries", set())
 st.session_state.setdefault("dismissed_notifs", set())
 
-# === School Info ===
+
+# === SCHOOL INFO ===
 SCHOOL_NAME    = "Learn Language Education Academy"
 SCHOOL_EMAIL   = "Learngermanghana@gmail.com"
 SCHOOL_WEBSITE = "www.learngermanghana.com"
 SCHOOL_PHONE   = "233205706589"
 SCHOOL_ADDRESS = "Awoshie, Accra, Ghana"
 
-# === Email Config ===
+# === EMAIL CONFIG ===
 school_sendgrid_key = st.secrets.get("general", {}).get("SENDGRID_API_KEY")
 school_sender_email = st.secrets.get("general", {}).get("SENDER_EMAIL", SCHOOL_EMAIL)
 
-# === Load Students (local or GitHub) ===
-student_file = "students_simple.csv"
-github_students_url = "https://raw.githubusercontent.com/learngermanghana/email/main/students_simple.csv"
+# === PDF GENERATION FUNCTION ===
+def generate_receipt_and_contract_pdf(
+    student_row,
+    agreement_text,
+    payment_amount,
+    payment_date=None,
+    first_instalment=1500,
+    course_length=12
+):
+    if payment_date is None:
+        payment_date = date.today()
+    elif isinstance(payment_date, str):
+        payment_date = pd.to_datetime(payment_date, errors="coerce").date()
 
-def load_students():
-    # 1) Try local
-    if os.path.exists(student_file):
-        try:
-            return pd.read_csv(student_file)
-        except:
-            st.warning(f"⚠️ Could not read local {student_file}, fetching from GitHub…")
-    # 2) Fallback to GitHub
+    paid = float(student_row.get("Paid", 0))
+    balance = float(student_row.get("Balance", 0))
+    total_fee = paid + balance
+
     try:
-        df = pd.read_csv(github_students_url)
+        second_due_date = payment_date + timedelta(days=30)
+    except Exception:
+        second_due_date = payment_date
+
+    payment_status = "FULLY PAID" if balance == 0 else "INSTALLMENT PLAN"
+
+    # Replace placeholders in agreement
+    filled = agreement_text.replace("[STUDENT_NAME]", str(student_row.get("Name", ""))) \
+        .replace("[DATE]", str(payment_date)) \
+        .replace("[CLASS]", str(student_row.get("Level", ""))) \
+        .replace("[AMOUNT]", str(payment_amount)) \
+        .replace("[FIRST_INSTALMENT]", str(first_instalment)) \
+        .replace("[SECOND_INSTALMENT]", str(balance)) \
+        .replace("[SECOND_DUE_DATE]", str(second_due_date)) \
+        .replace("[COURSE_LENGTH]", str(course_length))
+
+    def safe(txt):
+        return str(txt).encode("latin-1", "replace").decode("latin-1")
+
+    pdf = FPDF()
+    pdf.add_page()
+
+    # Header
+    pdf.set_font("Arial", size=14)
+    pdf.cell(200, 10, safe(f"{SCHOOL_NAME} Payment Receipt"), ln=True, align="C")
+
+    pdf.set_font("Arial", 'B', size=12)
+    pdf.set_text_color(0, 128, 0)
+    pdf.cell(200, 10, safe(payment_status), ln=True, align="C")
+    pdf.set_text_color(0, 0, 0)
+
+    pdf.set_font("Arial", size=12)
+    pdf.ln(10)
+    pdf.cell(200, 10, safe(f"Name: {student_row.get('Name','')}"), ln=True)
+    pdf.cell(200, 10, safe(f"Student Code: {student_row.get('StudentCode','')}"), ln=True)
+    pdf.cell(200, 10, safe(f"Phone: {student_row.get('Phone','')}"), ln=True)
+    pdf.cell(200, 10, safe(f"Level: {student_row.get('Level','')}"), ln=True)
+    pdf.cell(200, 10, f"Amount Paid: GHS {paid:.2f}", ln=True)
+    pdf.cell(200, 10, f"Balance Due: GHS {balance:.2f}", ln=True)
+    pdf.cell(200, 10, f"Total Course Fee: GHS {total_fee:.2f}", ln=True)
+    pdf.cell(200, 10, safe(f"Contract Start: {student_row.get('ContractStart','')}"), ln=True)
+    pdf.cell(200, 10, safe(f"Contract End: {student_row.get('ContractEnd','')}"), ln=True)
+    pdf.cell(200, 10, f"Receipt Date: {payment_date}", ln=True)
+    pdf.ln(10)
+    pdf.cell(0, 10, safe("Thank you for your payment!"), ln=True)
+    pdf.cell(0, 10, safe("Signed: Felix Asadu"), ln=True)
+
+    # Contract Section
+    pdf.ln(15)
+    pdf.set_font("Arial", size=14)
+    pdf.cell(200, 10, safe(f"{SCHOOL_NAME} Student Contract"), ln=True, align="C")
+
+    pdf.set_font("Arial", size=12)
+    pdf.ln(10)
+    for line in filled.split("\n"):
+        pdf.multi_cell(0, 10, safe(line))
+
+    pdf.ln(10)
+    pdf.cell(0, 10, safe("Signed: Felix Asadu"), ln=True)
+
+    # Footer timestamp
+    pdf.set_y(-15)
+    pdf.set_font("Arial", "I", 8)
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    pdf.cell(0, 10, safe(f"Generated on {now_str}"), align="C")
+
+    filename = f"{student_row.get('Name','').replace(' ', '_')}_receipt_contract.pdf"
+    pdf.output(filename)
+    return filename
+
+# === INITIALIZE STUDENT FILE ===
+student_file = "students_simple.csv"
+def load_students():
+    if os.path.exists(student_file):
+        return pd.read_csv(student_file)
+    else:
+        df = pd.DataFrame(columns=[
+            "Name", "Phone", "Location", "Level", "Paid", "Balance", "ContractStart", "ContractEnd", "StudentCode", "Email"
+        ])
         df.to_csv(student_file, index=False)
         return df
-    except Exception as e:
-        st.error(f"❌ Failed to load students from GitHub: {e}")
-        cols = ["Name","Phone","Location","Level","Paid","Balance","ContractStart","ContractEnd","StudentCode","Email"]
-        empty = pd.DataFrame(columns=cols)
-        empty.to_csv(student_file, index=False)
-        return empty
 
 df_main = load_students()
 
-# === Agreement Template ===
+# === GOOGLE SHEET REGISTRATION FORM (PENDING STUDENTS) ===
+sheet_url = "https://docs.google.com/spreadsheets/d/1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo/export?format=csv"
+
+# === AGREEMENT TEMPLATE STATE ===
 if "agreement_template" not in st.session_state:
     st.session_state["agreement_template"] = """
 PAYMENT AGREEMENT
-...
-[DATE]
+
+This Payment Agreement is entered into on [DATE] for [CLASS] students of Learn Language Education Academy and Felix Asadu ("Teacher").
+
+Terms of Payment:
+1. Payment Amount: The student agrees to pay the teacher a total of [AMOUNT] cedis for the course.
+2. Payment Schedule: The payment can be made in full or in two installments: GHS [FIRST_INSTALMENT] for the first installment, and the remaining balance for the second installment. The second installment must be paid by [SECOND_DUE_DATE].
+3. Late Payments: In the event of late payment, the school may revoke access to all learning platforms. No refund will be made.
+4. Refunds: Once a deposit is made and a receipt is issued, no refunds will be provided.
+5. Additional Service: The course lasts [COURSE_LENGTH] weeks. Free supervision for Goethe Exams is valid only if the student remains consistent.
+
+Cancellation and Refund Policy:
+1. If the teacher cancels a lesson, it will be rescheduled.
+
+Miscellaneous Terms:
+1. Attendance: The student agrees to attend lessons punctually.
+2. Communication: Both parties agree to communicate changes promptly.
+3. Termination: Either party may terminate this Agreement with written notice if the other party breaches any material term.
+
+Signatures:
+[STUDENT_NAME]
+Date: [DATE]
+Asadu Felix
 """
 
-# === UI: Header & Summary ===
-st.title(f"🏫 {SCHOOL_NAME} Dashboard")
+st.title("🏫 Learn Language Education Academy Dashboard")
 st.caption(f"📍 {SCHOOL_ADDRESS} | ✉️ {SCHOOL_EMAIL} | 🌐 {SCHOOL_WEBSITE} | 📞 {SCHOOL_PHONE}")
 
+# 📊 Summary Stats
 total_students = len(df_main)
-total_paid     = df_main["Paid"].sum() if "Paid" in df_main.columns else 0.0
-# expenses…
-expenses_file = "expenses_all.csv"
-total_expenses = pd.read_csv(expenses_file)["Amount"].sum() if os.path.exists(expenses_file) else 0.0
-net_profit     = total_paid - total_expenses
+total_paid = df_main["Paid"].sum() if "Paid" in df_main.columns else 0.0
 
+# Load expenses if available
+expenses_file = "expenses_all.csv"
+if os.path.exists(expenses_file):
+    exp_df = pd.read_csv(expenses_file)
+    total_expenses = exp_df["Amount"].sum() if "Amount" in exp_df.columns else 0.0
+else:
+    total_expenses = 0.0
+
+net_profit = total_paid - total_expenses
+
+# === SUMMARY BOX ===
 st.markdown(f"""
-<div style='background:#f9f9f9;border:1px solid #ccc;padding:12px;border-radius:8px'>
-  👨‍🎓 **Total Students:** {total_students}  
-  💰 **Total Collected:** GHS {total_paid:,.2f}  
-  💸 **Total Expenses:** GHS {total_expenses:,.2f}  
-  📈 **Net Profit:** GHS {net_profit:,.2f}
+<div style='background-color:#f9f9f9;border:1px solid #ccc;border-radius:10px;padding:15px;margin-top:10px'>
+    <h4>📋 Summary</h4>
+    <ul>
+        <li>👨‍🎓 <b>Total Students:</b> {total_students}</li>
+        <li>💰 <b>Total Collected:</b> GHS {total_paid:,.2f}</li>
+        <li>💸 <b>Total Expenses:</b> GHS {total_expenses:,.2f}</li>
+        <li>📈 <b>Net Profit:</b> GHS {net_profit:,.2f}</li>
+    </ul>
 </div>
 """, unsafe_allow_html=True)
 
-# === Notifications Tab (Debtors) ===
+# --- Persistent Dismissed Notifications Helper ---
+
+def clean_phone(phone):
+    phone = str(phone).replace(" ", "").replace("+", "")
+    # Converts '024XXXXXXX' to '23324XXXXXXX'
+    return "233" + phone[1:] if phone.startswith("0") else phone
+
+DISMISSED_FILE = "dismissed_notifs.json"
+
+def load_dismissed():
+    if os.path.exists(DISMISSED_FILE):
+        try:
+            with open(DISMISSED_FILE, "r") as f:
+                return set(json.load(f))
+        except Exception:
+            return set()
+    else:
+        return set()
+
+def save_dismissed(dismissed_set):
+    with open(DISMISSED_FILE, "w") as f:
+        json.dump(list(dismissed_set), f)
+
+# --- Load or create the dismissed set ---
+dismissed_notifs = load_dismissed()
+
+# --- Your notification creation logic ---
 notifications = []
-df_main["Balance"] = pd.to_numeric(df_main.get("Balance", 0), errors="coerce").fillna(0)
+
+# Example: Debtors
+if "Balance" not in df_main.columns:
+    df_main["Balance"] = 0.0
+else:
+    df_main["Balance"] = pd.to_numeric(df_main["Balance"], errors="coerce").fillna(0.0)
+
 for _, row in df_main[df_main["Balance"] > 0].iterrows():
-    phone = clean_phone(row["Phone"])
-    name  = row["Name"]
-    bal   = row["Balance"]
-    code  = row["StudentCode"]
-    msg   = f"Dear {name}, you owe GHS {bal:.2f} (code {code})."
-    wa    = f"https://wa.me/{phone}?text={urllib.parse.quote(msg)}"
-    html  = f"💰 <b>{name}</b> owes GHS {bal:.2f} [<a href='{wa}'>WhatsApp</a>]"
+    phone = clean_phone(row.get("Phone", ""))
+    name = row.get("Name", "Unknown")
+    balance = row["Balance"]
+    code = row.get("StudentCode", "")
+    message_text = (
+        f"Dear {name}, you owe GHS {balance:.2f} for your course ({code}). "
+        "Please settle it to remain active."
+    )
+    wa_url = f"https://wa.me/{phone}?text={urllib.parse.quote(message_text)}"
+    html = (
+        f"💰 <b>{name}</b> owes GHS {balance:.2f} "
+        f"[<a href='{wa_url}' target='_blank'>📲 WhatsApp</a>]"
+    )
     notifications.append((f"debtor_{code}", html))
 
+# Example: Expiries and expired contracts...
+# (your code to populate notifications continues here)
+
+# --- Render notifications ---
 if notifications:
-    st.markdown("### 🔔 Notifications")
+    st.markdown("""
+    <div style='background-color:#fff3cd;border:1px solid #ffc107;
+                border-radius:10px;padding:15px;margin-top:10px'>
+      <h4>🔔 <b>Notifications</b></h4>
+    </div>
+    """, unsafe_allow_html=True)
+
     for key, html in notifications:
-        if key in st.session_state["dismissed_notifs"]:
+        if key in dismissed_notifs:
             continue
-        col1, col2 = st.columns([9,1])
-        with col1: st.markdown(html, unsafe_allow_html=True)
+
+        col1, col2 = st.columns([9, 1])
+        with col1:
+            st.markdown(html, unsafe_allow_html=True)
         with col2:
-            if st.button("Dismiss", key=key):
-                st.session_state["dismissed_notifs"].add(key)
+            if st.button("Dismiss", key="dismiss_" + key):
+                dismissed_notifs.add(key)
+                save_dismissed(dismissed_notifs)
                 st.experimental_rerun()
+else:
+    st.markdown(f"""
+    <div style='background-color:#e8f5e9;border:1px solid #4caf50;
+                border-radius:10px;padding:15px;margin-top:10px'>
+      <h4>🔔 <b>Notifications</b></h4>
+      <p>No urgent alerts. You're all caught up ✅</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+tabs = st.tabs([
+    "📝 Pending",
+    "👩‍🎓 All Students",
+    "➕ Add Student",
+    "💵 Expenses",
+    "📲 Reminders",
+    "📄 Contract ",
+    "📧 Send Email",
+    "📊 Analytics & Export",
+    "📆 Schedule",
+    "📝 Marking"   # <--- New tab!
+])
 
 with tabs[0]:
     st.title("📝 Pending ")
