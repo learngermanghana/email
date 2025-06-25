@@ -212,6 +212,25 @@ def load_student_data(local, github_url):
         st.warning("⚠️ students.csv not found locally or on GitHub.")
         st.stop()
 
+import os
+import pandas as pd
+import base64
+from datetime import datetime, date
+import streamlit as st
+from functools import lru_cache
+
+@lru_cache(maxsize=1)
+def load_student_data(local, github_url):
+    if os.path.exists(local):
+        return pd.read_csv(local)
+    try:
+        df = pd.read_csv(github_url)
+        st.info("Loaded students from GitHub backup.")
+        return df
+    except Exception:
+        st.warning("⚠️ students.csv not found locally or on GitHub.")
+        st.stop()
+
 # --- Tab 1: All Students (Edit, Update, Delete, Receipt) ---
 with tabs[1]:
     st.title("👩‍🎓 All Students (Edit, Update, Delete, Receipt)")
@@ -338,29 +357,33 @@ with tabs[1]:
                     df_main.to_csv(student_file, index=False)
                     st.success('❌ Student deleted.')
                     st.experimental_rerun()
-            with c3:
+                        with c3:
                 if st.button('📄 Receipt', key=f'rct{unique_key}'):
                     total_fee = inputs['paid'] + inputs['balance']
                     pay_date = inputs['contractstart']
                     pdf_path = generate_receipt_and_contract_pdf(
-                        student_row, st.session_state['agreement_template'],
-                        payment_amount=total_fee, payment_date=pay_date
+                        student_row,
+                        st.session_state['agreement_template'],
+                        payment_amount=total_fee,
+                        payment_date=pay_date
                     )
-                    pdf_bytes = open(pdf_path, 'rb').read()
-                    b64 = base64.b64encode(pdf_bytes).decode()
-                    st.markdown(
-                        f'<a href="data:application/pdf;base64,{b64}" '
-                        f'download="{selected.replace(" ","_")}_receipt.pdf">Download Receipt</a>',
-                        unsafe_allow_html=True
-                    )
+                    if not pdf_path or not os.path.exists(pdf_path):
+                        st.error("⚠️ Could not generate receipt PDF.")
+                    else:
+                        try:
+                            with open(pdf_path, 'rb') as f:
+                                pdf_bytes = f.read()
+                            b64 = base64.b64encode(pdf_bytes).decode()
+                            st.markdown(
+                                f'<a href="data:application/pdf;base64,{b64}" '
+                                f'download="{selected.replace(" ","_")}_receipt.pdf">Download Receipt</a>',
+                                unsafe_allow_html=True
+                            )
+                        except Exception as e:
+                            st.error(f"⚠️ Error reading PDF: {e}")
 
         # Export limited columns
-        export_cols = [
-            name_col, code_col, lvl_col,
-            col_lookup('phone'), col_lookup('paid'), col_lookup('balance'), 'status'
-        ]
-        export_df = df_main[export_cols]
-        st.download_button(
+(
             '📁 Download Students CSV',
             export_df.to_csv(index=False).encode('utf-8'),
             file_name='students_backup.csv',
