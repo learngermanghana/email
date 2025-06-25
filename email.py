@@ -1584,6 +1584,11 @@ with tabs[9]:
             "",  # blank line
             "1. A)  Sie trinkt Tee", "2. B) Mensch aregre", "3. A) Sie geht jogeen ", "4. B) Die Suppe ist kalt", "5. B) Klassische Musik"           
         ],
+        "A2 3.6 Mobel und Raume Kennenlernen?": [
+            "1. b) Weil ich studiere", "2. b) Wenn es nicht regnet, sturmt ", "3. d) Es ist billig", "4. D) Haustiere", "5. C) Im Zoo"
+            "",  # blank line
+            "1. B", "2. A", "3. B ", "4. B", "5. B"           
+        ],
     }
 
     # --- Load Scores from Google Sheet CSV ---
