@@ -1683,7 +1683,7 @@ with tabs[9]:
                         )
                         conn_scores.commit()
                         st.success("Score deleted.")
-                        st.experimental_rerun()
+                        st.rerun()
         # Show PDF download as before
         avg = hist['Score'].mean()
         st.markdown(f"**Average Score:** {avg:.1f}")
