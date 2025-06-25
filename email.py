@@ -1579,8 +1579,8 @@ with tabs[9]:
         "A2 2.4 Wo möchten wir uns treffen?": [
             "1. B) faul sein", "2. d) Hockey spielen", "3. C) 3. a) schwimmen gehen", "4. d) zum See fahren und dort im Zelt übernachten", "5. b) eine Route mit dem Zug durch das ganze Land", 
             "1. B Um 10 Uhr", "2. B Eine Rucksack" "3. B Ein Piknik", "4. C in eienem restaurant", "5. A Spielen und Spazieren gehen"
-        ],
-               }
+        ]
+    }
 
     # --- Load Scores from Google Sheet CSV ---
     scores_sheet_url = (
