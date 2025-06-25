@@ -1677,7 +1677,7 @@ with tabs[9]:
                         )
                         conn_scores.commit()
                         st.success("Score updated.")
-                        st.experimental_rerun()
+                        st.rerun()
                 with col2:
                     if st.button("🗑️ Delete", key=f"delete_score_{idx}"):
                         cursor_scores.execute(
