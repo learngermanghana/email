@@ -1540,12 +1540,11 @@ with tabs[9]:
         "A2 2.4 Wo möchten wir uns treffen?": [
             "1. B) faul sein", "2. D) Hockey spielen", "3. A) schwimmen gehen", "4. D) zum See fahren und dort im Zelt übernachten", "5. B) eine Route mit dem Zug durch das ganze Land", "1. B) Um 10 Uhr", "2. B) Eine Rucksack", "3. B) Ein Piknik", "4. C) in einem Restaurant", "5. A) Spielen und Spazieren gehen"
         ],
-        "A2 2.5 Wo möchten wir uns treffen?": [
+        "A2 2.5 Was machst du in deiner Freizeit?": [
             "1. c) Nudeln, Pizza und Salat", "2. c) Den grünen Salat", "3. c) Schokoladenkuchen und Tiramisu", "4. b) in den Bergen", "5. c) In bar"
             "",  # blank line
-            "1. A)  Sie trinkt Tee", "2. B) Mensch aregre….", "3. A) Sie geht jogeen ", "4. B) Die Suppe ist kalt", "5. B) Klassische Musik"
-            
-        ]
+            "1. A)  Sie trinkt Tee", "2. B) Mensch aregre", "3. A) Sie geht jogeen ", "4. B) Die Suppe ist kalt", "5. B) Klassische Musik"           
+        ],
     }
 
     # --- Load Scores from Google Sheet CSV ---
