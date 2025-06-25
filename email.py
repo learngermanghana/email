@@ -30,7 +30,7 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import (
     Mail, Attachment, FileContent, FileName, FileType, Disposition
 )
-import openai
+
 
 # ===== Project-Specific Imports =====
 from pdf_utils import generate_receipt_and_contract_pdf
@@ -88,11 +88,6 @@ tabs = st.tabs([
     "📆 Schedule",
     "📝 Marking"   # <--- New tab!
 ])
-
-import os
-import pandas as pd
-import streamlit as st
-from datetime import date, timedelta
 
 with tabs[0]:
     st.title("📝 Pending")
@@ -222,10 +217,10 @@ with tabs[1]:
     st.title("👩‍🎓 All Students (Edit, Update, Delete, Receipt)")
 
     student_file = "students.csv"
-    github_csv   = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
-    df_main      = load_student_data(student_file, github_csv)
+    github_csv = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
+    df_main = load_student_data(student_file, github_csv)
 
-    # Normalize columns and build lookup map
+    # Normalize columns
     df_main.columns = [
         c.strip().lower()
          .replace(' ', '_')
@@ -235,69 +230,74 @@ with tabs[1]:
          .replace('/', '_')
         for c in df_main.columns
     ]
-    col_map = {c.replace('_',''): c for c in df_main.columns}
+    col_map = {c.replace('_', ''): c for c in df_main.columns}
     def col_lookup(key):
-        k = key.strip().lower().replace(' ','_').replace('_','')
+        k = key.strip().lower().replace(' ', '_').replace('_', '')
         return col_map.get(k, key)
 
     # Parse date columns
-    start_col  = col_lookup('contractstart')
-    end_col    = col_lookup('contractend')
-    today      = date.today()
+    start_col = col_lookup('contractstart')
+    end_col = col_lookup('contractend')
+    today = date.today()
     for dt_col in (start_col, end_col):
         if dt_col in df_main.columns:
             df_main[dt_col] = pd.to_datetime(df_main[dt_col], errors='coerce')
 
-    # Compute status based on contractend
+    # Compute status
+    df_main['status'] = 'Unknown'
     if end_col in df_main.columns:
-        df_main['status'] = 'Unknown'
-        mask = df_main[end_col].notna()
-        df_main.loc[mask, 'status'] = df_main.loc[mask, end_col].dt.date.lt(today).map({True:'Completed', False:'Enrolled'})
-    else:
-        df_main['status'] = 'Unknown'
+        df_main.loc[df_main[end_col].notna(), 'status'] = (
+            df_main.loc[df_main[end_col].notna(), end_col]
+            .dt.date
+            .apply(lambda d: 'Completed' if d < today else 'Enrolled')
+        )
 
     # Filters and search
     search = st.text_input('🔍 Search Student by Name or Code').lower()
     lvl_col = col_lookup('level')
-    levels  = ['All'] + sorted(df_main.get(lvl_col, []).dropna().unique().tolist())
+    levels = ['All'] + sorted(df_main[lvl_col].dropna().unique().tolist()) if lvl_col in df_main.columns else ['All']
     sel_lvl = st.selectbox('📋 Filter by Class Level', levels)
-    statuses = ['All','Enrolled','Completed','Unknown']
-    sel_st   = st.selectbox('Filter by Status', statuses)
+    statuses = ['All', 'Enrolled', 'Completed', 'Unknown']
+    sel_st = st.selectbox('Filter by Status', statuses)
 
     view = df_main.copy()
     name_col = col_lookup('name')
     code_col = col_lookup('studentcode')
     if search:
-        m1 = view[name_col].astype(str).str.lower().str.contains(search)
-        m2 = view[code_col].astype(str).str.lower().str.contains(search)
-        view = view[m1 | m2]
-    if sel_lvl != 'All': view = view[view[lvl_col] == sel_lvl]
-    if sel_st  != 'All': view = view[view['status'] == sel_st]
+        mask_name = view[name_col].astype(str).str.lower().str.contains(search)
+        mask_code = view[code_col].astype(str).str.lower().str.contains(search)
+        view = view[mask_name | mask_code]
+    if sel_lvl != 'All':
+        view = view[view[lvl_col] == sel_lvl]
+    if sel_st != 'All':
+        view = view[view['status'] == sel_st]
 
-    # Table & Pagination
+    # Pagination
     if view.empty:
         st.info('No students found.')
     else:
         per_page = 10
-        total    = len(view)
-        pages    = (total - 1) // per_page + 1
-        pg       = st.number_input(f'Page (1-{pages})', 1, pages, 1, key='pg1')
-        start, end = (pg - 1) * per_page, pg * per_page
-        page_df  = view.iloc[start:end]
+        total = len(view)
+        pages = (total - 1) // per_page + 1
+        pg = st.number_input(f'Page (1-{pages})', 1, pages, 1, key='page1')
+        start = (pg - 1) * per_page
+        end = start + per_page
+        page_df = view.iloc[start:end]
+
         display_cols = [
             name_col, code_col, lvl_col,
             col_lookup('phone'), col_lookup('paid'), col_lookup('balance'), 'status'
         ]
         st.dataframe(page_df[display_cols], use_container_width=True)
 
-        # Detail Edit UI using schema-driven loop
-        sel = st.selectbox('Select a student', page_df[name_col].tolist(), key='sel1')
-        row = page_df[page_df[name_col] == sel].iloc[0]
-        idx = view[view[name_col] == sel].index[0]
-        key = f"{row[code_col]}_{idx}"
-        color = '🟢' if row['status']=='Enrolled' else ('🔴' if row['status']=='Completed' else '⚪')
-        with st.expander(f"{color} {sel} ({row[code_col]}) [{row['status']}]", expanded=True):
-            # Define schema: field -> (widget, label)
+        # Detail-edit UI
+        selected = st.selectbox('Select a student', page_df[name_col].tolist(), key='sel1')
+        student_row = page_df[page_df[name_col] == selected].iloc[0]
+        idx_main = view[view[name_col] == selected].index[0]
+        unique_key = f"{student_row[code_col]}_{idx_main}"
+        status_emoji = '🟢' if student_row['status'] == 'Enrolled' else ('🔴' if student_row['status'] == 'Completed' else '⚪')
+
+        with st.expander(f"{status_emoji} {selected} ({student_row[code_col]}) [{student_row['status']}]", expanded=True):
             schema = {
                 'name': ('text_input', 'Name'),
                 'phone': ('text_input', 'Phone'),
@@ -314,46 +314,47 @@ with tabs[1]:
             inputs = {}
             for field, (widget, label) in schema.items():
                 col = col_lookup(field)
-                val = row.get(col)
-                widget_key = f"{field}_{key}"
+                val = student_row.get(col)
+                key_widget = f"{field}_{unique_key}"
                 if widget == 'text_input':
-                    inputs[field] = st.text_input(label, value=str(val) if val is not None else '', key=widget_key)
+                    inputs[field] = st.text_input(label, value=str(val) if val is not None else '', key=key_widget)
                 elif widget == 'number_input':
-                    inputs[field] = st.number_input(label, value=float(val or 0), key=widget_key)
+                    inputs[field] = st.number_input(label, value=float(val or 0), key=key_widget)
                 elif widget == 'date_input':
-                    default_date = val.date() if pd.notna(val) else today
-                    inputs[field] = st.date_input(label, value=default_date, key=widget_key)
+                    default = val.date() if pd.notna(val) else today
+                    inputs[field] = st.date_input(label, value=default, key=key_widget)
 
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                if st.button('💾 Update', key='upd'+key):
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                if st.button('💾 Update', key=f'upd{unique_key}'):
                     for f, v in inputs.items():
-                        df_main.at[idx, col_lookup(f)] = v
+                        df_main.at[idx_main, col_lookup(f)] = v
                     df_main.to_csv(student_file, index=False)
                     st.success('✅ Student updated.')
                     st.experimental_rerun()
-            with col2:
-                if st.button('🗑️ Delete', key='del'+key):
-                    df_main = df_main.drop(idx).reset_index(drop=True)
+            with c2:
+                if st.button('🗑️ Delete', key=f'del{unique_key}'):
+                    df_main = df_main.drop(idx_main).reset_index(drop=True)
                     df_main.to_csv(student_file, index=False)
                     st.success('❌ Student deleted.')
                     st.experimental_rerun()
-            with col3:
-                if st.button('📄 Receipt', key='rct'+key):
+            with c3:
+                if st.button('📄 Receipt', key=f'rct{unique_key}'):
                     total_fee = inputs['paid'] + inputs['balance']
-                    dt = inputs['contractstart']
+                    pay_date = inputs['contractstart']
                     pdf_path = generate_receipt_and_contract_pdf(
-                        row, st.session_state['agreement_template'],
-                        payment_amount=total_fee, payment_date=dt
+                        student_row, st.session_state['agreement_template'],
+                        payment_amount=total_fee, payment_date=pay_date
                     )
-                    b64 = base64.b64encode(open(pdf_path,'rb').read()).decode()
+                    pdf_bytes = open(pdf_path, 'rb').read()
+                    b64 = base64.b64encode(pdf_bytes).decode()
                     st.markdown(
                         f'<a href="data:application/pdf;base64,{b64}" '
-                        f'download="{sel.replace(" ","_")}_receipt.pdf">Download Receipt</a>',
+                        f'download="{selected.replace(" ","_")}_receipt.pdf">Download Receipt</a>',
                         unsafe_allow_html=True
                     )
 
-        # Export limited columns to reduce memory
+        # Export limited columns
         export_cols = [
             name_col, code_col, lvl_col,
             col_lookup('phone'), col_lookup('paid'), col_lookup('balance'), 'status'
