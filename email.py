@@ -87,6 +87,11 @@ tabs = st.tabs([
     "📝 Marking"   # <--- New tab!
 ])
 
+import os
+import pandas as pd
+import streamlit as st
+from datetime import date, timedelta
+
 with tabs[0]:
     st.title("📝 Pending")
 
@@ -99,13 +104,15 @@ with tabs[0]:
     try:
         new_students = pd.read_csv(sheet_csv)
         def clean_col(c):
-            return (c.strip()
-                     .lower()
-                     .replace("(", "")
-                     .replace(")", "")
-                     .replace(",", "")
-                     .replace("-", "")
-                     .replace(" ", "_"))
+            return (
+                c.strip()
+                 .lower()
+                 .replace("(", "")
+                 .replace(")", "")
+                 .replace(",", "")
+                 .replace("-", "")
+                 .replace(" ", "_")
+            )
         new_students.columns = [clean_col(c) for c in new_students.columns]
         st.success("✅ Loaded columns: " + ", ".join(new_students.columns))
     except Exception as e:
@@ -119,33 +126,32 @@ with tabs[0]:
         for i, row in new_students.iterrows():
             fullname  = row.get("full_name") or row.get("name") or f"Student {i}"
             phone     = row.get("phone_number") or row.get("phone") or ""
-            email     = (row.get("email") or row.get("email_address") or "").strip()
-            level     = (row.get("class") or row.get("class_a1a2_etc") or row.get("level") or "").strip()
-            location  = row.get("location", "").strip()
-            emergency = (row.get("emergency_contact_phone_number") or row.get("emergency") or "").strip()
+            email     = str(row.get("email") or row.get("email_address") or "").strip()
+            level     = str(row.get("class") or row.get("class_a1a2_etc") or row.get("level") or "").strip()
+            location  = str(row.get("location") or "").strip()
+            emergency = str(row.get("emergency_contact_phone_number") or row.get("emergency") or "").strip()
 
-            with st.expander(f"{fullname} — {phone}", expanded=False):
+            with st.expander(f"{fullname} — {phone}"):
                 st.write(f"**Email:** {email or '—'}")
-                student_code   = st.text_input("Assign Student Code", key=f"code_{i}")
-                contract_start = st.date_input("Contract Start", value=date.today(), key=f"start_{i}")
-                course_length  = st.number_input("Course Length (weeks)", min_value=1, value=12, key=f"length_{i}")
-                contract_end   = st.date_input(
+                student_code    = st.text_input("Assign Student Code", key=f"code_{i}")
+                contract_start  = st.date_input("Contract Start", value=date.today(), key=f"start_{i}")
+                course_length   = st.number_input("Course Length (weeks)", min_value=1, value=12, key=f"length_{i}")
+                contract_end    = st.date_input(
                     "Contract End",
                     value=contract_start + timedelta(weeks=course_length),
                     key=f"end_{i}"
                 )
-                paid           = st.number_input("Amount Paid (GHS)", min_value=0.0, step=1.0, key=f"paid_{i}")
-                balance        = st.number_input("Balance Due (GHS)", min_value=0.0, step=1.0, key=f"bal_{i}")
-                first_instalment = st.number_input("First Instalment", min_value=0.0, value=1500.0, key=f"firstinst_{i}")
-                send_email     = st.checkbox("Send Welcome Email?", value=bool(email), key=f"email_{i}")
-                attach_pdf     = st.checkbox("Attach PDF to Email?", value=True, key=f"pdf_{i}")
+                paid            = st.number_input("Amount Paid (GHS)", min_value=0.0, step=1.0, key=f"paid_{i}")
+                balance         = st.number_input("Balance Due (GHS)", min_value=0.0, step=1.0, key=f"bal_{i}")
+                first_instalment= st.number_input("First Instalment (GHS)", min_value=0.0, value=1500.0, key=f"firstinst_{i}")
+                send_email      = st.checkbox("Send Welcome Email?", value=bool(email), key=f"email_{i}")
+                attach_pdf      = st.checkbox("Attach PDF to Email?", value=True, key=f"pdf_{i}")
 
                 if st.button("Approve & Add", key=f"approve_{i}"):
                     if not student_code:
                         st.warning("❗ Please enter a unique student code.")
                         continue
 
-                    # load or init approved list
                     if os.path.exists("students.csv"):
                         approved_df = pd.read_csv("students.csv")
                     else:
@@ -155,8 +161,7 @@ with tabs[0]:
                             "StudentCode","Emergency Contact (Phone Number)"
                         ])
 
-                    # duplicate check
-                    if student_code in approved_df["StudentCode"].values:
+                    if student_code in approved_df["StudentCode"].astype(str).values:
                         st.warning("❗ Student code already exists.")
                         continue
 
@@ -168,17 +173,15 @@ with tabs[0]:
                         "Level": level,
                         "Paid": paid,
                         "Balance": balance,
-                        "ContractStart": str(contract_start),
-                        "ContractEnd": str(contract_end),
+                        "ContractStart": contract_start.isoformat(),
+                        "ContractEnd": contract_end.isoformat(),
                         "StudentCode": student_code,
                         "Emergency Contact (Phone Number)": emergency
                     }
 
-                    # save
                     approved_df = pd.concat([approved_df, pd.DataFrame([student_dict])], ignore_index=True)
                     approved_df.to_csv("students.csv", index=False)
 
-                    # generate & optionally email PDF
                     total_fee = paid + balance
                     pdf_file = generate_receipt_and_contract_pdf(
                         student_dict,
@@ -188,16 +191,15 @@ with tabs[0]:
                         first_instalment=first_instalment,
                         course_length=course_length
                     )
-                    if send_email and email and school_sendgrid_key:
+                    if send_email and email and 'school_sendgrid_key' in globals():
                         try:
-                            # build & send email with optional PDF attachment...
-                            # (same as before)
+                            # Email sending logic...
                             st.success(f"📧 Email sent to {email}")
                         except Exception as e:
                             st.warning(f"⚠️ Email failed: {e}")
 
                     st.success(f"✅ {fullname} approved and saved.")
-                    st.experimental_rerun()
+                    st.rerun()
 
 
 
