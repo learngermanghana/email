@@ -407,11 +407,6 @@ with tabs[2]:
                 updated_df.to_csv(student_file, index=False)
                 st.success(f"✅ Student '{name}' added successfully.")
 
-import pandas as pd
-import urllib.parse
-from datetime import date, timedelta
-import streamlit as st
-
 # --- Tab 3: Expenses and Financial Summary (Google Sheets) ---
 with tabs[3]:
     st.title("💵 Expenses and Financial Summary")
@@ -465,11 +460,6 @@ with tabs[3]:
         mime="text/csv"
     )
 
-import os
-import pandas as pd
-import urllib.parse
-from datetime import timedelta
-import streamlit as st
 
 # Helper: load student data from multiple sources
 def load_student_data(path, google_url, github_url):
@@ -497,7 +487,14 @@ with tabs[4]:
     except Exception:
         total_expenses = 0.0
 
-    # 2) Load Students
+        # 2) Load Students
+    student_file = "students.csv"
+    google_csv   = (
+        "https://docs.google.com/spreadsheets/d/"
+        "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
+    )
+    github_csv   = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
+    df = load_student_data(student_file, google_csv, github_csv)
     df = load_student_data(student_file, google_csv, github_csv)
     df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
     col_map = {c.replace("_", ""): c for c in df.columns}
