@@ -788,12 +788,6 @@ with tabs[3]:
     # === Close SQLite connection ===
     conn.close()
 
-import os
-import pandas as pd
-import urllib.parse
-from datetime import datetime, timedelta
-import streamlit as st
-
 # --- Tab 4: WhatsApp Reminders for Debtors ---
 with tabs[4]:
     st.title("📲 WhatsApp Reminders for Debtors")
@@ -811,10 +805,8 @@ with tabs[4]:
             st.warning("No student data found. Upload students.csv in 📝 Pending tab to continue.")
             st.stop()
 
-    # 2) Normalize columns: strip, lower, replace spaces
+    # 2) Normalize columns
     df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
-
-    # Helper to lookup flexible column names
     def col_lookup(key):
         key = key.strip().lower().replace(" ", "_")
         for c in df.columns:
@@ -822,25 +814,24 @@ with tabs[4]:
                 return c
         return key
 
-    # 3) Compute summary metrics
+    # 3) Summary metrics
     paid_col    = col_lookup("paid")
     balance_col = col_lookup("balance")
-
     df[paid_col]    = pd.to_numeric(df.get(paid_col, []), errors="coerce").fillna(0)
     df[balance_col] = pd.to_numeric(df.get(balance_col, []), errors="coerce").fillna(0)
     total_students = len(df)
     total_paid     = df[paid_col].sum()
-    total_expenses = 0.0  # load if available
+    total_expenses = 0.0
     net_profit     = total_paid - total_expenses
 
-    # Display summary metrics
+    # Display key metrics
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Total Students", total_students)
     c2.metric("Total Collected (GHS)", f"{total_paid:,.2f}")
     c3.metric("Total Expenses", f"{total_expenses:,.2f}")
     c4.metric("Net Profit", f"{net_profit:,.2f}")
 
-    # 4) Filters: name/code search, level, overdue days slider
+    # 4) Filters: name/code search, level, minimum overdue days
     st.markdown("---")
     st.subheader("🔎 Filter Debtors")
     name_search = st.text_input("Search by name or code", key="wa_search")
@@ -850,15 +841,16 @@ with tabs[4]:
         selected_level = st.selectbox("Filter by Level", levels, key="wa_level")
     else:
         selected_level = "All"
-    slider_days = st.slider("Days Past Due ≥", 0, 90, 0, key="wa_overdue_days")
+    # default minimum overdue days set to 10
+    slider_days = st.slider("Days Past Due ≥ (default 10 days)", 0, 90, 10, key="wa_overdue_days")
 
-    # 5) Prepare date fields and overdue calculation
+    # 5) Calculate due_date and days_overdue
     cs_col = col_lookup("contractstart")
     df[cs_col] = pd.to_datetime(df.get(cs_col, ''), errors="coerce")
     df["due_date"] = df[cs_col] + pd.to_timedelta(30, unit="d")
     df["days_overdue"] = (pd.Timestamp.today() - df["due_date"]).dt.days.fillna(-1)
 
-    # Apply filters
+    # Apply filters to find debtors
     filtered = df.copy()
     if name_search:
         filtered = filtered[
@@ -869,23 +861,25 @@ with tabs[4]:
         filtered = filtered[filtered[level_key] == selected_level]
     debtors = filtered[(filtered[balance_col] > 0) & (filtered["days_overdue"] >= slider_days)]
 
-    # 6) Display debtors
+    # 6) Display all debtors
     st.markdown("---")
     if debtors.empty:
         st.success("✅ No debtors matching criteria.")
     else:
         display_cols = [col_lookup("name"), level_key, balance_col, "due_date", "days_overdue"]
-        tbl = debtors[display_cols].rename(columns={
-            col_lookup("name"): "Name",
-            level_key: "Level",
-            balance_col: "Balance (GHS)",
-            "due_date": "Due Date",
-            "days_overdue": "Days Overdue"
-        })
+        tbl = debtors[display_cols].rename(
+            columns={
+                col_lookup("name"): "Name",
+                level_key: "Level",
+                balance_col: "Balance (GHS)",
+                "due_date": "Due Date",
+                "days_overdue": "Days Overdue"
+            }
+        )
         st.dataframe(tbl, use_container_width=True)
 
-        # 7) WhatsApp reminder links
-        st.markdown("### 📲 Send Reminders via WhatsApp")
+        # 7) WhatsApp reminder links with friendly message
+        st.markdown("### 📲 Send Friendly Reminders via WhatsApp")
         def clean_phone(ph):
             ph = str(ph).replace("+", "").replace("-", "").replace(" ", "")
             if ph.startswith("0"): ph = "233" + ph[1:]
@@ -897,13 +891,20 @@ with tabs[4]:
             level = r.get(level_key, "")
             bal   = r[balance_col]
             phone = clean_phone(r.get(col_lookup("phone"), ""))
-            due   = r["due_date"].strftime("%d %b %Y") if pd.notnull(r["due_date"]) else "soon"
-            msg   = f"Dear {name}, your balance for {level} is GHS {bal:.2f} due by {due}. Please pay to continue. Thank you!"
+            due_dt = r["due_date"]
+            due   = due_dt.strftime("%d %b %Y") if pd.notnull(due_dt) else "soon"
+            # Friendly reminder text mentioning 1-month payment schedule
+            msg   = (
+                f"Hi {name}! Friendly reminder: your payment for the {level} class "
+                f"was due by {due} (one month after your first payment). "
+                f"Current balance: GHS {bal:.2f}. Please let us know if you need help settling this. "
+                "Thanks for being with us!"
+            )
             url   = f"https://wa.me/{phone}?text={urllib.parse.quote(msg)}"
             links.append((name, url))
-            st.markdown(f"- **{name}**: [Remind via WhatsApp]({url})")
+            st.markdown(f"- **{name}**: [Send WhatsApp Reminder]({url})")
 
-        # 8) Download links CSV
+        # 8) Download reminder links CSV
         csv_df = pd.DataFrame(links, columns=["Name", "WhatsApp URL"])
         st.download_button(
             "📁 Download Reminder Links CSV",
@@ -911,8 +912,7 @@ with tabs[4]:
             file_name="debtor_whatsapp_links.csv",
             mime="text/csv"
         )
-
-
+        
 # === AGREEMENT TEMPLATE STATE ===
 if "agreement_template" not in st.session_state:
     st.session_state["agreement_template"] = """
