@@ -1690,6 +1690,7 @@ with tabs[9]:
                         st.success("Score deleted.")
                         st.rerun()
         # Show PDF download as before
+        hist['Score'] = pd.to_numeric(hist['Score'], errors='coerce')
         avg = hist['Score'].mean()
         st.markdown(f"**Average Score:** {avg:.1f}")
         pdf = FPDF()
