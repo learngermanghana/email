@@ -465,6 +465,17 @@ with tabs[3]:
         mime="text/csv"
     )
 
+# Helper: load student data from multiple sources
+ def load_student_data(path, google_url, github_url):
+     if os.path.exists(path):
+         return pd.read_csv(path)
+     for url in (google_url, github_url):
+         try:
+             return pd.read_csv(url)
+         except Exception:
+             continue
+     st.warning("No student data found. Please provide students.csv locally or ensure the remote sheet is accessible.")
+     st.stop()
 
 # --- Tab 4: WhatsApp Reminders for Debtors (with Expenses) ---
 with tabs[4]:
