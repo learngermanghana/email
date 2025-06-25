@@ -247,7 +247,7 @@ with st.expander("📝 Assignment Marking & Scores", expanded=True):
         pdf.cell(0,10,safe(f"Report – {stu['name']}"), ln=1)
         pdf.ln(5)
         for _, r in hist.iterrows():
-            pdf.set_font("Arial","B",12); pdf.cell(0,8,safe(f\"{r['Assignment']}: {r['Score']}\"),ln=1)
+            pdf.set_font("Arial", "B", 12); pdf.cell(0, 8, safe(f"{r['Assignment']}: {r['Score']}"), ln=1)
             pdf.set_font("Arial","",11); pdf.multi_cell(0,8,safe(f\"Comments: {r['Comments']}\")) 
             if r['Assignment'] in ref_answers:
                 pdf.set_font("Arial","I",11); pdf.multi_cell(0,8,safe(\"Reference Answers:\"))
