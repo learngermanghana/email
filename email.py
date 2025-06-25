@@ -465,17 +465,23 @@ with tabs[3]:
         mime="text/csv"
     )
 
+import os
+import pandas as pd
+import urllib.parse
+from datetime import timedelta
+import streamlit as st
+
 # Helper: load student data from multiple sources
- def load_student_data(path, google_url, github_url):
-     if os.path.exists(path):
-         return pd.read_csv(path)
-     for url in (google_url, github_url):
-         try:
-             return pd.read_csv(url)
-         except Exception:
-             continue
-     st.warning("No student data found. Please provide students.csv locally or ensure the remote sheet is accessible.")
-     st.stop()
+def load_student_data(path, google_url, github_url):
+    if os.path.exists(path):
+        return pd.read_csv(path)
+    for url in (google_url, github_url):
+        try:
+            return pd.read_csv(url)
+        except Exception:
+            continue
+    st.warning("No student data found. Please provide students.csv locally or ensure the remote sheet is accessible.")
+    st.stop()
 
 # --- Tab 4: WhatsApp Reminders for Debtors (with Expenses) ---
 with tabs[4]:
@@ -595,6 +601,7 @@ with tabs[4]:
             file_name="debtor_whatsapp_links.csv",
             mime="text/csv"
         )
+
 
 # === Tab 5: Generate Contract & Receipt PDF for Any Student ===
 with tabs[5]:
