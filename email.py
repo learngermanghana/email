@@ -5,6 +5,22 @@ import urllib.parse
 from datetime import date, datetime, timedelta
 
 import pandas as pd
+import os
+import json
+import base64
+import urllib.parse
+from datetime import date, datetime, timedelta
+
+import pandas as pd
+import numpy as np
+import streamlit as st
+from fpdf import FPDF
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import (
+    Mail, Attachment, FileContent, FileName, FileType, Disposition
+)
+import openai
+
 import numpy as np
 import streamlit as st
 from fpdf import FPDF
@@ -1012,15 +1028,16 @@ with tabs[5]:
             pdf = FPDF()
             pdf.add_page()
 
-            # Add logo if provided: save to temp file
+            # Add logo if provided: preserve original extension
             if logo_file:
-                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+                ext = logo_file.name.split('.')[-1]
+                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
                 tmp.write(logo_file.getbuffer())
                 tmp.close()
                 pdf.image(tmp.name, x=10, y=8, w=33)
                 pdf.ln(25)
 
-            # Payment status banner
+            # Payment status banner: if balance==0 fully paid
             status = "FULLY PAID" if balance == 0 else "INSTALLMENT PLAN"
             pdf.set_font("Arial", "B", 12)
             pdf.set_text_color(0, 128, 0)
@@ -1086,6 +1103,7 @@ with tabs[5]:
                 mime="application/pdf"
             )
             st.success("✅ PDF generated and ready to download.")
+
 
 
 with tabs[7]:
