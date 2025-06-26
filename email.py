@@ -16,6 +16,10 @@ from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileT
 import openai
 import sqlite3
 
+from pdf_utils import generate_receipt_and_contract_pdf
+from email_utils import send_emails
+
+
 # Project utilities (must exist in your project)
 from pdf_utils import generate_receipt_and_contract_pdf
 from email_utils import send_emails
