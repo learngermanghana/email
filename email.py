@@ -1217,15 +1217,17 @@ with tabs[9]:
     all_assignments = get_all_assignments(df_scores, ref_answers)
 
     # Mode switch
-    mode = st.radio("Select Marking Mode", ["Classic","Batch"], horizontal=True)
+    mode = st.radio("Select Marking Mode", ["Classic","Batch"], horizontal=True)   
 
     # Student search/select
     st.subheader("Find Student")
     search = st.text_input("Search name or code")
     students = df_students.copy()
     if search:
-        mask = students['name'].str.lower().str.contains(search.lower(), na=False) |
-               students['studentcode'].astype(str).str.lower().str.contains(search.lower(), na=False)
+        mask = (
+            students['name'].str.lower().str.contains(search.lower(), na=False) |
+            students['studentcode'].astype(str).str.lower().str.contains(search.lower(), na=False)
+        )
         students = students[mask]
     if students.empty:
         st.info("No students found.")
