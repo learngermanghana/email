@@ -1148,7 +1148,7 @@ with tabs[9]:
                 df_scores = pd.concat([df_scores, pd.DataFrame([newrow])], ignore_index=True)
                 sync_scores_to_sqlite(df_scores)  # Save to SQLite as backup
                 st.success("✅ Score saved.")
-                st.experimental_rerun()
+                st.rerun()
 
         # --- Show Score History (all assignments, all dates) ---
         hist = df_scores[df_scores['studentcode'] == code].sort_values('date', ascending=False)
