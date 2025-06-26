@@ -1147,8 +1147,9 @@ with tabs[9]:
     st.title("📝 Assignment Marking & Scores (with Email)")
 
     # --- 1. Load Students & Scores ---
-    STUDENTS_URL = "https://docs.google.com/spreadsheets/d/1Axxxxxxx/export?format=csv"  # <-- your sheet
+    STUDENTS_URL = "https://docs.google.com/spreadsheets/d/1Axxxxxxx/export?format=csv"
     SCORES_URL = "https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/export?format=csv"
+    REF_ANSWERS_URL = "https://raw.githubusercontent.com/learngermanghana/email/main/ref_answers.json"
 
     @st.cache_data(show_spinner=False)
     def load_students():
@@ -1161,6 +1162,14 @@ with tabs[9]:
         df = pd.read_csv(SCORES_URL)
         df.columns = [c.strip().lower() for c in df.columns]
         return df.dropna(subset=['studentcode'])
+
+    @st.cache_data(show_spinner=False)
+    def load_ref_answers():
+        import requests
+        r = requests.get(REF_ANSWERS_URL)
+        return json.loads(r.text)
+
+    ref_answers = load_ref_answers()
 
     try:
         df_students = load_students()
@@ -1201,12 +1210,12 @@ with tabs[9]:
         stu_scores = df_scores[df_scores['studentcode'] == code]
         student_info = students[students['studentcode'] == code].iloc[0]
 
-        # Assignment
+        # Assignment search/filter
         search_assign = st.text_input("Search assignment", key="assign_search")
         filtered_assignments = [a for a in all_assignments if search_assign.lower() in a.lower()]
         assignment = st.selectbox("Select Assignment", filtered_assignments, key="classic_assign")
 
-        # Reference Answers
+        # Show reference answers if available
         if assignment in ref_answers:
             st.markdown("**Reference Answers:**")
             for ans in ref_answers[assignment]:
@@ -1233,7 +1242,6 @@ with tabs[9]:
                 }
                 df_scores = df_scores[~((df_scores['studentcode'] == code) & (df_scores['assignment'] == assignment))]
                 df_scores = pd.concat([df_scores, pd.DataFrame([newrow])], ignore_index=True)
-                sync_scores_to_sqlite(df_scores)
                 st.success("✅ Score saved.")
 
         # --- Show Score History ---
@@ -1261,10 +1269,10 @@ with tabs[9]:
         student_info = students[students['studentcode'] == code].iloc[0]
         st.markdown(f"#### Enter scores for {student_info['name']} ({sel_level})")
 
-        # Filter assignments for this level only (from your ref_answers or existing scores)
-        level_assignments = [a for a in all_assignments if sel_level in a or a in stu_scores['assignment'].values]
-        batch_scores = {}
+        # Filter assignments for this level only
         stu_scores = df_scores[df_scores['studentcode'] == code]
+        level_assignments = [a for a in all_assignments if sel_level.lower() in str(a).lower() or a in stu_scores['assignment'].values]
+        batch_scores = {}
         for a in level_assignments:
             prev = stu_scores[stu_scores['assignment'] == a]
             val = int(prev['score'].iloc[0]) if not prev.empty else 0
@@ -1286,7 +1294,6 @@ with tabs[9]:
                         'level': student_info['level']
                     }
                     df_scores = pd.concat([df_scores, pd.DataFrame([newrow])], ignore_index=True)
-                sync_scores_to_sqlite(df_scores)
                 st.success("✅ All scores saved.")
 
         hist = df_scores[df_scores['studentcode'] == code].sort_values('assignment')
@@ -1324,4 +1331,14 @@ with tabs[9]:
                     html_content=f"<p>Hello {student_name},<br><br>Your report is attached.</p>"
                 )
                 encoded = base64.b64encode(pdf_bytes).decode()
+                message.attachment = Attachment(
+                    FileContent(encoded),
+                    FileName(f"{student_name.replace(' ', '_')}_report.pdf"),
+                    FileType('application/pdf'),
+                    Disposition('attachment')
+                )
+                sg.send(message)
+                st.success(f"✅ Email sent to {student_email}!")
+            except Exception as e:
+                st.error(f"Failed to send email: {e}")
 
