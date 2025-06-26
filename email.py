@@ -1155,309 +1155,185 @@ with tabs[9]:
     code = chosen.split("(")[-1].replace(")", "").strip().lower()
     student_row = view_df[view_df['studentcode'].str.lower() == code].iloc[0]
 
-                    # --- Reference Answers ---
-    ref_answers = {
-        "Lesen und Horen 0.1": [
-            "1. C) Guten Morgen", "2. D) Guten Tag", "3. B) Guten Abend", "4. B) Gute Nacht", "5. C) Guten Morgen", "6. C) Wie geht es Ihnen?", "7. B) Auf Wiedersehen",
-            "8. C) Tschüss", "9. C) Guten Abend", "10. D) Gute Nacht"
-        ],
-        "Lesen und Horen 0.2": [
-            "1. C) 26", "2. A) A, O, U, B", "3. A) Eszett", "4. A) K", "5. A) A-Umlaut", "6. A) A, O, U, B", "7. B) 4",
-            "",  # blank line
-            "Wasser", "Kaffee", "Blume", "Schule", "Tisch"
-        ],
-        "Lesen und Horen 1.1": ["1. C", "2. C", "3. A", "4. B"],
-        "Lesen und Hören 1.2": [
-            "1. Ich heiße Anna", "2. Du heißt Max", "3. Er heißt Peter", "4. Wir kommen aus Italien", "5. Ihr kommt aus Brasilien", "6. Sie kommen aus Russland",
-            "7. Ich wohne in Berlin", "8. Du wohnst in Madrid", "9. Sie wohnt in Wien",
-            "",  # blank line
-            "1. A) Anna", "2. C) Aus Italien", "3. D) In Berlin", "4. B) Tom", "5. A) In Berlin"
-        ],
-        "Lesen und Horen 2": [
-            "1. A) sieben", "2. B) Drei", "3. B) Sechs", "4. B) Neun", "5. B) Sieben", "6. C) Fünf", "6. B) zweihundertzweiundzwanzig ", "7.  B) zweihundertzweiundzwanzig ",
-            "8.  B) zweihundertzweiundzwanzig ", "9.  A) zweitausendvierzig ", "10. A) funftausendfunfhundertneun ",
-            "",  # blank line
-            "1.  16 – sechzehn ", "2. 98 – achtundneunzig", "3. 555 – funfhundertfunfundfunfzig", "3. 1020 – tausendzwanzig", "3. 8553 – achttausendfunfhundertdreiundfundzig"
-        ],
-        "Lesen und Horen 3": [ 
-            "1. Es kostet 20 Euro", "2. Sie kostet  15 Euro", "3. Es kostet 25,000 Euro", "4. Er kostet 50 Euro", "5. Sie kostet 100 Euro",       
-        ],
-        "Lesen und Horen 4": [
-            "1. C) Neun", "2. B) Polnisch", "3. D) Niederländisch", "4. A) Deutsch", "5. C) Paris", "6. B) Amsterdam", "7. C) In der Schweiz",
-            "",  # blank line
-            "1. C) In Italien und Frankreich", "2. C) Rom", "3. B) Das Essen", "4. B) Paris", "5. A) Nach Spanien"
-        ],
-        "Lesen und Horen 5": [
-            # Part 1 – Vocabulary Review
-            "Der Tisch – the table",
-            "Die Lampe – the lamp",
-            "Das Buch – the book",
-            "Der Stuhl – the chair",
-            "Die Katze – the cat",
-            "Das Auto – the car",
-            "Der Hund – the dog",
-            "Die Blume – the flower",
-            "Das Fenster – the window",
-            "Der Computer – the computer",
-            "",  # blank line
-            # Part 2 – Nominative Case
-            "1. Der Tisch ist groß",
-            "2. Die Lampe ist neu",
-            "3. Das Buch ist interessant",
-            "4. Der Stuhl ist bequem",
-            "5. Die Katze ist süß",
-            "6. Das Auto ist schnell",
-            "7. Der Hund ist freundlich",
-            "8. Die Blume ist schön",
-            "9. Das Fenster ist offen",
-            "10. Der Computer ist teuer",
-            "",  # blank line
-            # Part 3 – Accusative Case
-            "1. Ich sehe den Tisch",
-            "2. Sie kauft die Lampe",
-            "3. Er liest das Buch",
-            "4. Wir brauchen den Stuhl",
-            "5. Du fütterst die Katze",
-            "6. Ich fahre das Auto",
-            "7. Sie streichelt den Hund",
-            "8. Er pflückt die Blume",
-            "9. Wir putzen das Fenster",
-            "10. Sie benutzen den Computer"
-        ],
-        "Lesen und Horen 6": [
-            "Das Wohnzimmer – the living room", "Die Küche – the kitchen", "Das Schlafzimmer – the bedroom", "Das Badezimmer – the bathroom", "Der Balkon – the balcony",
-            "",  # blank line
-            "Der Flur – the hallway", "Das Bett – the bed", "Der Tisch – the table", "Der Stuhl – the chair", "Der Schrank – the wardrobe",
-            "",  # blank line
-            "1. B) Vier", "2. A) Ein Sofa und ein Fernseher", "3. B) Einen Herd, einen Kühlschrank und einen Tisch mit vier Stühlen", "4. C) Ein großes Bett", "5. D) Eine Dusche, eine Badewanne und ein Waschbecken",    
-            "6. D) Klein und schön", "7. C) Blumen und einen kleinen Tisch mit zwei Stühlen"
-            "",  # blank line
-            " 1. B", " 2.  B", " 3. B", " 4. C", " 5. D", " 6. B", " 7. C"
-        ],
-        "Lesen und Horen 7": [
-            "1. B) Um sieben Uhr", "2. B) Um acht Uhr", "3. B) Um sechs Uhr", "4. B) Um zehn Uhr", "5. B) Um neun Uhr",
-            "",  # blank line
-            "6. C) Nachmittags", "7. A) Um sieben Uhr", "8. A) Montag", "9. B) Am Dienstag und Donnerstag", "10. B) Er ruht sich aus",
-            "",  # blank line
-            "1. B) Um neun Uhr", "2. B) Er geht in die Bibliothek", "3. B) Bis zwei Uhr nachmittags", "4. B) Um drei Uhr nachmittags", "5. A)",
-            "",  # blank line
-            "6. B) Um neun Uhr", "7. B) Er geht in die Bibliothek", "8. B) Bis zwei Uhr nachmittags", "9. B) Um drei Uhr nachmittags", "10. B) Um sieben Uhr"
-        ],
-        "Lesen und Horen 8": [
-            "1. B) Zwei Uhr nachmittags", "2. B) 29 Tage", "3. B) April", "4. C) 03.02.2024", "5. C) Mittwoch",
-            "",  # blank line
-            "1. Falsch", "2. Richtig", "3. Richtig", "4. Falsch", "5. Richtig",
-            "",  # blank line
-            "1. B) Um Mitternacht", "2. B) Vier Uhr nachmittags", "3. C) 28 Tage", "4. B) Tag. Monat. Jahr", "5. D) Montag"
-        ],
-        "Lesen und Horen 9": [
-            "1. B) Apfel und Karotten", "2. C) Karotten", "3. A) Weil er Vegetarier ist", "4. C) Käse", "5. B) Fleisch",
-            "",  # blank line
-            "6. B) Kekse", "7. A) Käse", "8. C) Kuchen", "9. C) Schokolade", "10. B) Der Bruder des Autors",
-            "",  # blank line
-            "1. A) Apfel, Bananen und Karotten", "2. A) Müsli mit Joghurt", "3. D) Karotten", "4. A) Käse", "5. C) Schokoladenkuchen"
-        ],
-        "Lesen und Horen 10": [
-            "1. Falsch", "2. Wahr", "3. Falsch", "4. Wahr", "5. Wahr", "6. Falsch", "7. Wahr", "8. Falsch", "9. Falsch", "10. Falsch",
-            "",  # blank line
-            "1. B) Einmal pro Woche", "2. C) Apfel und Bananen", "3. A) Ein halbes Kilo", "4. B) 10 Euro", "5. B) Einen schönen Tag"
-        ],
-        "Lesen und Horen 11": [
-            "1. B) Entschuldigung, wo ist der Bahnhof?", "2. B) Links abbiegen", "3. B) Auf der rechten Seite, direkt neben dem großen Supermarkt",
-            "4. B) Wie komme ich zur nächsten Apotheke?", "5. C) Gute Reise und einen schönen Tag noch",
-            "",  # blank line
-            "1. C) Wie komme ich zur nächsten Apotheke?", "2. C) Rechts abbiegen", "3. B) Auf der linken Seite, direkt neben der Bäckerei",
-            "4. A) Gehen Sie geradeaus bis zur Kreuzung, dann links", "5. C) Einen schönen Tag noch",
-            "",  # blank line
-            "Fragen nach dem Weg: Entschuldigung, wie komme ich zum Bahnhof", "Die Straße überqueren: Überqueren Sie die Straße",
-            "Geradeaus gehen: Gehen Sie geradeaus", "Links abbiegen: Biegen Sie links ab", "Rechts abbiegen: Biegen Sie rechts ab",
-            "On the left side: Das Kino ist auf der linken Seite"
-        ],
-        "Lesen und Horen 12.1": [
-            "1. B) Ärztin", "2. A) Weil sie keine Zeit hat", "3. B) Um 8 Uhr", "4. C) Viele verschiedene Fächer", "5. C) Einen Sprachkurs besuchen",
-            "",  # blank line
-            "1. B) Falsch", "2. B) Falsch", "3. B) Falsch", "4. B) Falsch", "5. B) Falsch",
-            "",  # blank line
-            "A) Richtig", "A) Richtig", "A) Richtig", "A) Richtig", "A) Richtig"
-        ],
-        "Lesen und Horen 12.2": [
-            "In Berlin", "Mit seiner Frau und seinen drei Kindern", "Mit seinem Auto", "Um 7:30 Uhr", "Barzahlung (cash)",
-            "",  # blank line
-            "1. B) Um 9:00 Uhr", "2. B) Um 12:00 Uhr", "3. B) Um 18:00 Uhr", "4. B) Um 21:00 Uhr", "5. D) Alles Genannte",
-            "",  # blank line
-            "1. B) Um 9 Uhr", "2. B) Um 12 Uhr", "3. A) ein Computer und ein Drucker", "4. C) in einer Bar", "5. C) bar"
-        ],
-        "Lesen und Horen 13": [
-            "A", "B", "A", "A", "B", "B",
-            "",  # blank line
-            "A", "B", "B",
-            "",  # blank line
-            "B", "B", "B"
-        ],
-        "Lesen und Horen 14.1": [
-            "Anzeige A", "Anzeige B", "Anzeige B", "Anzeige A", "Anzeige A",
-            "",  # blank line
-            "C) Guten Tag, Herr Doktor", "B) Halsschmerzen und Fieber", "C) Seit gestern", "C) Kopfschmerzen und Müdigkeit", "A) Ich verschreibe Ihnen Medikamente",
-            "",  # blank line
-            "Kopf – Head", "Arm – Arm", "Bein – Leg", "Auge – Eye", "Nase – Nose", "Ohr – Ear", "Mund – Mouth", "Hand – Hand", "Fuß – Foot", "Bauch – Stomach"
-        ],
-        "A2 1.1 Small Talk": [
-            "1. C) In einer Schule", "2. B) Weil sie gerne mit Kindern arbeitet", "3. A) In einem Büro", "4. B) Tennis", "5. B) Es war sonnig und warm", "6. B) Italien und Spanien", "7. C) Weil die Bäume so schön bunt sind"
-            "",  # blank line     
-            "1. B) Ins Kino gehen", "2. A) Weil sie spannende Geschichten liebt", "3. A) Tennis", "4. B) Es war sonnig und warm", "5. C) Einen Spaziergang machen"
-        ],
-        "A2 1.2 Personen Beschreiben": [
-            "1. B) Ein Jahr", "2. B) Er ist immer gut gelaunt und organisiert", "3. C) Einen Anzug und eine Brille", "4. B) Er geht geduldig auf ihre Anliegen ein", "5. B) Weil er seine Mitarbeiter regelmäßig lobt", "6. A) Wenn eine Aufgabe nicht rechtzeitig erledigt wird", "7. B) Dass er fair ist und die Leistungen der Mitarbeiter wertschätzt"
-            "",  # blank line 
-            "1. B) Weil er","2. C) Sprachkurse","3. A) Jeden Tag"
-        ],
-        "A2 1.3 Dinge und Personen Beschreiben": [
-            "1. B) Anna ist 25 Jahre alt", "2. B) In ihrer Freizeit liest Anna Bücher und geht spazieren", "3. C) Anna arbeitet in einem Krankenhaus", "4. C) Anna hat einen Hund", "5. B) Max unterrichtet Mathematik", "6. A) Max spielt oft Fußball mit seinen Freunden", "7. B) Am Wochenende machen Anna und Max Ausflüge oder"
-            "",  # blank line 
-            "1. B) Julia ist 26 Jahre alt", "2. c) Julia arbeitet als Architektin", "3. B) Tobias lebt in Frankfurt", "4. A) Tobias mochte ein eigenes Restaurant ", "5. B) Julia und Tobias kochen am Wochenende oft mit Sophie"           
-        ],
-        "A2 2.4 Wo möchten wir uns treffen?": [
-            "1. B) faul sein", "2. D) Hockey spielen", "3. A) schwimmen gehen", "4. D) zum See fahren und dort im Zelt übernachten", "5. B) eine Route mit dem Zug durch das ganze Land", "1. B) Um 10 Uhr", "2. B) Eine Rucksack", "3. B) Ein Piknik", "4. C) in einem Restaurant", "5. A) Spielen und Spazieren gehen"
-        ],
-        "A2 2.5 Was machst du in deiner Freizeit?": [
-            "1. c) Nudeln, Pizza und Salat", "2. c) Den grünen Salat", "3. c) Schokoladenkuchen und Tiramisu", "4. b) in den Bergen", "5. c) In bar"
-            "",  # blank line
-            "1. A)  Sie trinkt Tee", "2. B) Mensch aregre", "3. A) Sie geht jogeen ", "4. B) Die Suppe ist kalt", "5. B) Klassische Musik"           
-        ],
-        "A2 3.6 Mobel und Raume Kennenlernen?": [
-            "1. b) Weil ich studiere", "2. b) Wenn es nicht regnet, sturmt ", "3. d) Es ist billig", "4. D) Haustiere", "5. C) Im Zoo"
-            "",  # blank line
-            "1. B", "2. A", "3. B ", "4. B", "5. B"           
-        ],
-    }
+with tabs[9]:
+    st.title("📝 Assignment Marking & Scores")
 
-    # --- Load Scores from Google Sheet CSV ---
-    scores_sheet_url = (
-        "https://docs.google.com/spreadsheets/d/"
-        "1l66qurVjKkgM3YCYGN3GURT-Q86DEeHql8BL_Z6YfCY/export?format=csv"
-    )
-    try:
-        remote_df = pd.read_csv(scores_sheet_url)
-    except Exception:
-        st.warning("Could not load scores from Google Sheet. Using local database only.")
-        remote_df = pd.DataFrame(columns=["StudentCode", "Name", "Assignment", "Score", "Comments", "Date"])
+    import sqlite3
+    from datetime import datetime
+    import pandas as pd
+    import os
+    from fpdf import FPDF
 
-    # --- Load Scores from SQLite ---
-    rows = cursor_scores.execute(
-        "SELECT StudentCode, Name, Assignment, Score, Comments, Date FROM scores"
-    ).fetchall()
-    local_df = pd.DataFrame(rows, columns=["StudentCode", "Name", "Assignment", "Score", "Comments", "Date"])
-
-        # --- Combine remote and local scores ---
-    scores_df = pd.concat([remote_df, local_df], ignore_index=True)
-    # Normalize and dedupe by date
-    scores_df['Date'] = pd.to_datetime(scores_df['Date'], errors='coerce')
-    scores_df = scores_df.sort_values('Date').drop_duplicates(subset=['StudentCode','Assignment','Date'], keep='last')
-    scores_df['Date'] = scores_df['Date'].dt.strftime('%Y-%m-%d')
-    # --- Assignment Input UI ---
-    st.markdown("---")
-    st.subheader(f"Record Assignment Score for {student_row['name']} ({student_row['studentcode']})")
-    # Filter/search assignment titles
-    assign_filter = st.text_input("🔎 Filter assignment titles", key="assign_filter")
-    assign_options = [k for k in ref_answers.keys() if assign_filter.lower() in k.lower()]
-    assignment = st.selectbox("📋 Select Assignment", [""] + assign_options, key="assignment")
-    if not assignment:
-        assignment = st.text_input("Or enter assignment manually", key="assignment_manual")
-    score = st.number_input("Score", min_value=0, max_value=100, value=0, key="score_input")
-    comments = st.text_area("Comments / Feedback", key="comments_input")
-    if assignment in ref_answers:
-        st.markdown("**Reference Answers:**")
-        st.markdown("<br>".join(ref_answers[assignment]), unsafe_allow_html=True)
-
-    # --- Record New Score ---
-    if st.button("💾 Save Score", key="save_score"):
-        now = datetime.now().strftime("%Y-%m-%d")
-        # Save to SQLite
-        cursor_scores.execute(
-            "INSERT INTO scores (StudentCode, Name, Assignment, Score, Comments, Date) VALUES (?,?,?,?,?,?)",
-            (student_row['studentcode'], student_row['name'], assignment, score, comments, now)
+    # === Initialize SQLite for Scores ===
+    conn_scores = sqlite3.connect('scores.db')
+    cursor_scores = conn_scores.cursor()
+    cursor_scores.execute('''
+        CREATE TABLE IF NOT EXISTS scores (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            StudentCode TEXT,
+            Name TEXT,
+            Assignment TEXT,
+            Score REAL,
+            Comments TEXT,
+            Date TEXT
         )
-        conn_scores.commit()
-        st.success("Score saved to database.")
+    ''')
+    conn_scores.commit()
 
-        # --- Download All Scores CSV (from DB) ---
-    if not scores_df.empty:
-        # Merge in student level for export
-        export_df = scores_df.merge(
-            df_students[['studentcode','level']],
-            left_on='StudentCode', right_on='studentcode', how='left'
-        )
-        export_df = export_df[['StudentCode','Name','Assignment','Score','Comments','Date','level']]
-        export_df = export_df.rename(columns={'level':'Level'})
-
-        # Properly indent download button
-        st.download_button(
-            "📁 Download All Scores CSV",
-            data=export_df.to_csv(index=False).encode(),
-            file_name="scores_backup.csv",
-            mime="text/csv"
-        )
-
-    # --- Display & Edit Student History & PDF ---
-    hist = scores_df[scores_df['StudentCode'].str.lower() == student_row['studentcode'].lower()]
-    if not hist.empty:
-        st.markdown("### Student Score History & Edit")
-        # Show editable history
-        for idx, row in hist.iterrows():
-            with st.expander(f"{row['Assignment']} – {row['Score']}/100 ({row['Date']})", expanded=False):
-                # Prefill inputs
-                new_assignment = st.text_input("Assignment", value=row['Assignment'], key=f"edit_assign_{idx}")
-                new_score = st.number_input("Score", min_value=0, max_value=100, value=int(row['Score']), key=f"edit_score_{idx}")
-                new_comments = st.text_area("Comments", value=row['Comments'], key=f"edit_comments_{idx}")
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button("💾 Update", key=f"update_score_{idx}"):
-                        cursor_scores.execute(
-                            "UPDATE scores SET Assignment=?, Score=?, Comments=? WHERE StudentCode=? AND Assignment=? AND Date=?",
-                            (new_assignment, new_score, new_comments,
-                             student_row['studentcode'], row['Assignment'], row['Date'])
-                        )
-                        conn_scores.commit()
-                        st.success("Score updated.")
-                        st.rerun()
-                with col2:
-                    if st.button("🗑️ Delete", key=f"delete_score_{idx}"):
-                        cursor_scores.execute(
-                            "DELETE FROM scores WHERE StudentCode=? AND Assignment=? AND Date=?",
-                            (student_row['studentcode'], row['Assignment'], row['Date'])
-                        )
-                        conn_scores.commit()
-                        st.success("Score deleted.")
-                        st.rerun()
-        # Show PDF download as before
-        hist['Score'] = pd.to_numeric(hist['Score'], errors='coerce')
-        avg = hist['Score'].mean()
-        st.markdown(f"**Average Score:** {avg:.1f}")
-        pdf = FPDF()
-        pdf.add_page()
-        def safe(txt): return str(txt).encode('latin-1','replace').decode('latin-1')
-        pdf.set_font("Arial","B",14)
-        pdf.cell(0,10,safe(f"Report for {student_row['name']}"),ln=True)
-        pdf.ln(5)
-        for _, r in hist.iterrows():
-            pdf.set_font("Arial","B",12)
-            pdf.cell(0,8,safe(f"{r['Assignment']}: {r['Score']}/100"),ln=True)
-            pdf.set_font("Arial","",11)
-            pdf.multi_cell(0,8,safe(f"Comments: {r['Comments']}"))
-            if r['Assignment'] in ref_answers:
-                pdf.set_font("Arial","I",11)
-                pdf.multi_cell(0,8,safe("Reference Answers:"))
-                for ans in ref_answers.get(r['Assignment'], []): pdf.multi_cell(0,8,safe(ans))
-            pdf.ln(3)
-        pdf_bytes = pdf.output(dest='S').encode('latin-1','replace')
-        st.download_button(
-            "📄 Download Student Report PDF",
-            data=pdf_bytes,
-            file_name=f"{student_row['name']}_report.pdf",
-            mime="application/pdf"
-        )
+    # --- Load student database ---
+    github_csv_url = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
+    student_file = "students.csv"
+    if os.path.exists(student_file):
+        df_students = pd.read_csv(student_file)
     else:
-        st.info("No scores found for this student.")
+        try:
+            df_students = pd.read_csv(github_csv_url)
+        except Exception:
+            st.warning("Could not find student data. Please upload students.csv in 📝 Pending tab.")
+            st.stop()
+    df_students.columns = [c.lower().strip().replace(" ", "_") for c in df_students.columns]
+
+    # --- Load assignments & ref answers ---
+    ref_answers = {
+        # ... [Insert your big ref_answers dictionary here!] ...
+        "Lesen und Horen 0.1": ["1. C) Guten Morgen", "2. D) Guten Tag", "..."],
+        "Lesen und Horen 0.2": ["1. C) 26", "2. A) A, O, U, B", "..."],
+        # ... rest of your assignments ...
+    }
+    # --- Find ALL assignments in use ---
+    # Collect assignments from both ref_answers and previous scores
+    rows = cursor_scores.execute(
+        "SELECT DISTINCT Assignment FROM scores"
+    ).fetchall()
+    db_assignments = set(r[0] for r in rows if r[0])
+    all_assignments = sorted(set(list(ref_answers.keys()) + list(db_assignments)))
+
+    # === MODE SELECTION ===
+    mode = st.radio(
+        "Select marking mode:",
+        ["Mark single assignment (classic)", "Batch mark (all assignments for one student)"],
+        key="marking_mode"
+    )
+
+    # -------------------- SINGLE MODE (CLASSIC) --------------------
+    if mode == "Mark single assignment (classic)":
+        st.subheader("🔍 Filter/Search Students")
+        search_term = st.text_input("Search by name or code", key="search_term")
+        levels = ["All"] + sorted(df_students['level'].dropna().unique().tolist())
+        selected_level = st.selectbox("Filter by Level", levels, key="selected_level")
+        view_df = df_students.copy()
+        if search_term:
+            view_df = view_df[
+                view_df['name'].str.contains(search_term, case=False, na=False) |
+                view_df['studentcode'].astype(str).str.contains(search_term, case=False, na=False)
+            ]
+        if selected_level != "All":
+            view_df = view_df[view_df['level'] == selected_level]
+        if view_df.empty:
+            st.info("No students match your filter.")
+            st.stop()
+
+        student_list = view_df['name'] + " (" + view_df['studentcode'] + ")"
+        chosen = st.selectbox("Select a student", student_list, key="chosen_student")
+        code = chosen.split("(")[-1].replace(")", "").strip().lower()
+        student_row = view_df[view_df['studentcode'].str.lower() == code].iloc[0]
+
+        st.markdown("---")
+        st.subheader(f"Record Assignment Score for {student_row['name']} ({student_row['studentcode']})")
+        assign_filter = st.text_input("🔎 Filter assignment titles", key="assign_filter")
+        assign_options = [k for k in all_assignments if assign_filter.lower() in k.lower()]
+        assignment = st.selectbox("📋 Select Assignment", [""] + assign_options, key="assignment")
+        if not assignment:
+            assignment = st.text_input("Or enter assignment manually", key="assignment_manual")
+        score = st.number_input("Score", min_value=0, max_value=100, value=0, key="score_input")
+        comments = st.text_area("Comments / Feedback", key="comments_input")
+        if assignment in ref_answers:
+            st.markdown("**Reference Answers:**")
+            st.markdown("<br>".join(ref_answers[assignment]), unsafe_allow_html=True)
+
+        if st.button("💾 Save Score", key="save_score"):
+            now = datetime.now().strftime("%Y-%m-%d")
+            cursor_scores.execute(
+                "INSERT INTO scores (StudentCode, Name, Assignment, Score, Comments, Date) VALUES (?,?,?,?,?,?)",
+                (student_row['studentcode'], student_row['name'], assignment, score, comments, now)
+            )
+            conn_scores.commit()
+            st.success("Score saved to database.")
+
+        # --- Show student history
+        rows = cursor_scores.execute(
+            "SELECT Assignment, Score, Comments, Date FROM scores WHERE StudentCode = ?", (student_row['studentcode'],)
+        ).fetchall()
+        if rows:
+            st.markdown("### Student Score History")
+            hist = pd.DataFrame(rows, columns=["Assignment", "Score", "Comments", "Date"])
+            st.dataframe(hist)
+        else:
+            st.info("No scores found for this student.")
+
+    # -------------------- BATCH MODE --------------------
+    if mode == "Batch mark (all assignments for one student)":
+        # 1. Pick level
+        st.subheader("Batch Marking: All Assignments for One Student")
+        batch_levels = sorted(df_students['level'].dropna().unique().tolist())
+        batch_level = st.selectbox("Select Level", batch_levels, key="batch_level")
+        batch_df = df_students[df_students['level'] == batch_level]
+        if batch_df.empty:
+            st.warning("No students found at this level.")
+            st.stop()
+
+        # 2. Pick student
+        batch_students = batch_df['name'] + " (" + batch_df['studentcode'] + ")"
+        batch_chosen = st.selectbox("Select a student", batch_students, key="batch_chosen_student")
+        batch_code = batch_chosen.split("(")[-1].replace(")", "").strip().lower()
+        batch_row = batch_df[batch_df['studentcode'].str.lower() == batch_code].iloc[0]
+
+        # 3. List assignments (show all assignments for this level)
+        st.markdown(f"#### Enter scores for all assignments for {batch_row['name']} ({batch_row['studentcode']})")
+
+        # Get all scores already present for this student
+        score_rows = cursor_scores.execute(
+            "SELECT Assignment, Score FROM scores WHERE StudentCode = ?", (batch_row['studentcode'],)
+        ).fetchall()
+        existing_scores = {a: s for a, s in score_rows}
+
+        # Only show assignments for this level (by name convention)
+        # Example: assignments starting with "A2" for A2, etc, or all for now:
+        level_assignments = [a for a in all_assignments if batch_level.lower() in a.lower() or a[:2].lower() == batch_level.lower()]
+        if not level_assignments:
+            # fallback: show all assignments
+            level_assignments = all_assignments
+
+        batch_scores = {}
+        for assignment in level_assignments:
+            default_score = existing_scores.get(assignment, 0)
+            batch_scores[assignment] = st.number_input(
+                f"{assignment}", min_value=0, max_value=100, value=int(default_score), key=f"batch_score_{assignment}"
+            )
+
+        if st.button("💾 Save All Scores (Batch)", key="save_all_batch"):
+            now = datetime.now().strftime("%Y-%m-%d")
+            for assignment, score in batch_scores.items():
+                # Remove previous entry if any for the day, then insert new one
+                cursor_scores.execute(
+                    "DELETE FROM scores WHERE StudentCode=? AND Assignment=? AND Date=?",
+                    (batch_row['studentcode'], assignment, now)
+                )
+                cursor_scores.execute(
+                    "INSERT INTO scores (StudentCode, Name, Assignment, Score, Comments, Date) VALUES (?,?,?,?,?,?)",
+                    (batch_row['studentcode'], batch_row['name'], assignment, score, "", now)
+                )
+            conn_scores.commit()
+            st.success("All scores saved for this student!")
+
+        # --- Show quick summary table of scores entered
+        st.markdown("##### Summary of entered scores:")
+        st.dataframe(pd.DataFrame({
+            "Assignment": level_assignments,
+            "Score": [batch_scores[a] for a in level_assignments]
+        }))
+
+#end
 
 
 
