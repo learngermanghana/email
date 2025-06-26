@@ -1,6 +1,5 @@
 # ===== Imports =====
 import os
-import json
 import base64
 import urllib.parse
 from datetime import date, datetime, timedelta
@@ -9,13 +8,11 @@ import tempfile
 import sqlite3
 
 import pandas as pd
-import numpy as np
 import streamlit as st
 
 from fpdf import FPDF
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
-import openai
 
 from pdf_utils import generate_receipt_and_contract_pdf
 # from email_utils import send_emails
