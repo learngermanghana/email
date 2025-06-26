@@ -1157,8 +1157,8 @@ with tabs[9]:
     # --- Reference Answers ---
     ref_answers = {
         "Lesen und Horen 0.1": [
-            "1. C) Guten Morgen", "2. D) Guten Tag", "3. B) Guten Abend", "4. B) Gute Nacht", 
-            "5. C) Guten Morgen", "6. C) Wie geht es Ihnen?", "7. B) Auf Wiedersehen", 
+            "1. C) Guten Morgen", "2. D) Guten Tag", "3. B) Guten Abend", "4. B) Gute Nacht",
+            "5. C) Guten Morgen", "6. C) Wie geht es Ihnen?", "7. B) Auf Wiedersehen",
             "8. C) Tschüss", "9. C) Guten Abend", "10. D) Gute Nacht"
         ],
         # ... add other assignments here ...
@@ -1256,18 +1256,6 @@ with tabs[9]:
         st.markdown("#### Entered Batch Scores")
         st.dataframe(hist[['assignment','score']])
 
-    # 5️⃣ Summary Stats & CSV Downloads
-    st.markdown("---")
-    st.markdown("### 📊 Summary Statistics")
-    avg = df_scores.groupby('assignment')['score'].mean().reset_index().rename(columns={'score':'avg_score'})
-    st.table(avg)
-    failing = df_scores[df_scores['score']<50]
-    if not failing.empty:
-        st.markdown("**Failing Students:**")
-        st.dataframe(failing[['name','assignment','score']])
-        st.download_button("Download Failing Students", failing.to_csv(index=False).encode(), "failing_students.csv")
-    st.download_button("Download All Scores", df_scores.to_csv(index=False).encode(), "all_scores.csv")
-
     # 6️⃣ PDF & Email Report
     student_email = df_students.set_index('studentcode').loc[code,'email']
     student_name = chosen.split(' (')[0]
@@ -1287,7 +1275,10 @@ with tabs[9]:
         st.session_state[student_key] = pdf.output(dest='S').encode('latin-1','replace')
     pdf_bytes = st.session_state[student_key]
 
-    st.download_button("📄 Download Report PDF", pdf_bytes, f"{student_name.replace(' ','_')}_report.pdf", "application/pdf")
+    st.download_button("📄 Download Report PDF",
+                       pdf_bytes,
+                       f"{student_name.replace(' ','_')}_report.pdf",
+                       "application/pdf")
     if st.button(f"📧 Email PDF to {student_email}"):
         try:
             sg = SendGridAPIClient(st.secrets['general']['SENDGRID_API_KEY'])
@@ -1308,4 +1299,5 @@ with tabs[9]:
             st.success("✅ Email sent!")
         except Exception as e:
             st.error(f"Failed to send email: {e}")
+
 
