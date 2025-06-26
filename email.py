@@ -1163,9 +1163,9 @@ def normalize_cols(df):
 with tabs[9]:
     st.title("📝 Assignment Marking & Scores (with Email, Reference Answers, & PDF Report)")
 
-    # -- Load Students & Scores --
-    STUDENTS_CSV = "students.csv"
-    SCORES_SHEET_URL = "https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/export?format=csv"
+    # -- Load & normalize students and scores --
+    STUDENTS_CSV      = "students.csv"
+    SCORES_SHEET_URL  = "https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/export?format=csv"
 
     try:
         df_students = pd.read_csv(STUDENTS_CSV)
@@ -1181,142 +1181,152 @@ with tabs[9]:
         st.error("Couldn't load score history from Google Sheets.")
         df_scores = pd.DataFrame(columns=['studentcode','name','assignment','score','comments','date','level'])
 
-    # ---- Assignment totals ----
+    # -- Level totals and cached assignment list --
     LEVEL_TOTALS = {'A1': 18, 'A2': 28, 'B1': 26, 'B2': 30}
-
-    # ---- Combine Assignments ----
     @st.cache_data(show_spinner=False)
     def get_all_assignments(df_scores, ref_answers):
-        # Merge and sort only once!
-        assignments = set(df_scores['assignment'].dropna().unique())
-        assignments |= set(ref_answers.keys())
-        return sorted(assignments)
+        assigns = set(df_scores['assignment'].dropna().unique()) | set(ref_answers.keys())
+        return sorted(assigns)
     all_assignments = get_all_assignments(df_scores, ref_answers)
 
-    # ---- Search/Select Student ----
+    # -- Search & select student --
     st.subheader("Find Student")
-    search = st.text_input("Search student name or code")
+    query = st.text_input("Search student name or code")
     students = df_students.copy()
-    if search:
-        students = students[
-            students['name'].str.lower().str.contains(search.lower())
-            | students['studentcode'].astype(str).str.lower().str.contains(search.lower())
-        ]
+    if query:
+        mask = (
+            students['name'].str.lower().str.contains(query.lower()) |
+            students['studentcode'].astype(str).str.lower().str.contains(query.lower())
+        )
+        students = students[mask]
     if students.empty:
-        st.info("No students found with this filter.")
+        st.info("No students found.")
         st.stop()
-    sel_student = st.selectbox("Select Student", students['name'] + " (" + students['studentcode'] + ")")
-    code = sel_student.split('(')[-1].strip(')')
-    student_row = students[students['studentcode'] == code].iloc[0]
-    level = str(student_row.get('level', 'A1')).upper()
-    assignment_total = LEVEL_TOTALS.get(level, 30)
 
-    # ---- Assignment selection for marking ----
+    sel = st.selectbox("Select Student", students['name'] + " (" + students['studentcode'] + ")")
+    code = sel.split('(')[-1].strip(')')
+    student  = students[students['studentcode'] == code].iloc[0]
+    level    = student.get('level','A1').upper()
+    total_asg = LEVEL_TOTALS.get(level, 30)
+
     st.markdown("---")
     st.subheader("Mark Assignment")
-    assign_filter = st.text_input("Search assignment name")
-    filtered_assignments = [a for a in all_assignments if assign_filter.lower() in a.lower()]
-    selected_assignment = st.selectbox("Select Assignment", filtered_assignments)
-    prev = df_scores[(df_scores['studentcode'] == code) & (df_scores['assignment'] == selected_assignment)]
-    default_score = int(prev['score'].iloc[0]) if not prev.empty else 0
-    default_comments = prev['comments'].iloc[0] if not prev.empty else ""
 
-    with st.form(key="mark_form"):
-        score = st.number_input("Score", 0, 100, default_score)
-        comments = st.text_area("Comments / Feedback", default_comments)
-        submitted = st.form_submit_button("Save Score")
-        if submitted:
+    # -- Assignment marking form --
+    afilter = st.text_input("Search assignment")
+    opts = [a for a in all_assignments if afilter.lower() in a.lower()]
+    selected_assignment = st.selectbox("Select Assignment", opts)
+    prev = df_scores[
+        (df_scores['studentcode']==code)&
+        (df_scores['assignment']==selected_assignment)
+    ]
+    dscore = int(prev['score'].iloc[0]) if not prev.empty else 0
+    dcomm  = prev['comments'].iloc[0]       if not prev.empty else ""
+
+    with st.form("mark_form"):
+        score    = st.number_input("Score", 0, 100, dscore)
+        comments = st.text_area("Comments / Feedback", dcomm)
+        if st.form_submit_button("Save Score"):
             now = datetime.now().strftime("%Y-%m-%d")
-            newrow = {
+            new = {
                 'studentcode': code,
-                'name': student_row['name'],
-                'assignment': selected_assignment,
-                'score': score,
-                'comments': comments,
-                'date': now,
-                'level': student_row.get('level','')
+                'name':        student['name'],
+                'assignment':  selected_assignment,
+                'score':       score,
+                'comments':    comments,
+                'date':        now,
+                'level':       student['level']
             }
-            df_scores = df_scores[~((df_scores['studentcode'] == code) & (df_scores['assignment'] == selected_assignment))]
-            df_scores = pd.concat([df_scores, pd.DataFrame([newrow])], ignore_index=True)
+            df_scores = df_scores[~(
+                (df_scores['studentcode']==code)&
+                (df_scores['assignment']==selected_assignment)
+            )]
+            df_scores = pd.concat([df_scores, pd.DataFrame([new])], ignore_index=True)
             sync_scores_to_sqlite(df_scores)
             st.success("✅ Score saved!")
             st.experimental_rerun()
 
-    # ---- Show ALL assignments for this student ----
-    stu_scores = df_scores[df_scores['studentcode'] == code].sort_values('date', ascending=False)
-    completed_assignments = stu_scores['assignment'].nunique()
-    remaining_assignments = assignment_total - completed_assignments
-
-    st.markdown("### 📄 **Score History & Reference Answers**")
+    # -- Display score history with reference answers --
+    stu_scores = df_scores[df_scores['studentcode']==code].sort_values('date', ascending=False)
+    st.markdown("### 📄 Score History & Reference Answers")
     if not stu_scores.empty:
-        show_df = stu_scores[['assignment','score','comments','date']].copy()
-        show_df['reference_answer'] = show_df['assignment'].apply(lambda a: "; ".join(ref_answers.get(a, [])))
-        st.dataframe(show_df, use_container_width=True)
+        df_show = stu_scores[['assignment','score','comments','date']].copy()
+        df_show['reference_answer'] = df_show['assignment'].apply(
+            lambda a: "; ".join(ref_answers.get(a, []))
+        )
+        st.dataframe(df_show, use_container_width=True)
     else:
-        st.info("No scores found for this student.")
+        st.info("No scores yet for this student.")
 
-    # ---- Build PDF report for this student ----
-    def build_report_pdf(student, stu_scores, ref_answers, school_name, assignment_total=30):
+    # -- PDF helper that strips out all non-ASCII chars --
+    import re
+    def to_ascii(text):
+        return re.sub(r'[^\x00-\x7F]+','', str(text))
+
+    # -- Build PDF report, using to_ascii everywhere --
+    def build_report_pdf(student, stu_scores, ref_answers, school_name, total_assign):
         pdf = FPDF()
         pdf.add_page()
-        pdf.set_font('Arial', 'B', 15)
-        pdf.cell(0, 10, school_name, ln=1, align='C')
-        pdf.set_font('Arial', 'B', 12)
-        pdf.cell(0, 10, f"Assignment Report: {student['name']} ({student['studentcode']})", ln=1)
-        pdf.set_font('Arial', '', 11)
-        pdf.cell(0, 7, f"Email: {student.get('email','-')}", ln=1)
-        pdf.cell(0, 7, f"Level: {student.get('level','-')}", ln=1)
-        pdf.cell(0, 7, f"Total Assignments: {assignment_total}", ln=1)
-        pdf.cell(0, 7, f"Completed: {stu_scores['assignment'].nunique()}   Not Completed: {assignment_total - stu_scores['assignment'].nunique()}", ln=1)
+
+        pdf.set_font('Arial','B',15)
+        pdf.cell(0,10, to_ascii(school_name), ln=1, align='C')
+
+        pdf.set_font('Arial','B',12)
+        title = f"Assignment Report: {student['name']} ({student['studentcode']})"
+        pdf.cell(0,10, to_ascii(title), ln=1)
+
+        pdf.set_font('Arial','',11)
+        pdf.cell(0,7, to_ascii(f"Email: {student.get('email','-')}"), ln=1)
+        pdf.cell(0,7, to_ascii(f"Level: {student.get('level','-')}"), ln=1)
+        pdf.cell(0,7, to_ascii(f"Total Assignments: {total_assign}"), ln=1)
+        comp = stu_scores['assignment'].nunique()
+        pdf.cell(0,7, to_ascii(f"Completed: {comp}   Remaining: {total_assign-comp}"), ln=1)
         pdf.ln(6)
 
-        for idx, r in stu_scores.iterrows():
+        for _, r in stu_scores.iterrows():
             pdf.set_font('Arial','B',11)
-            pdf.cell(0, 7, f"{r['assignment']} — {r['score']}/100", ln=1)
+            line = f"{r['assignment']} — {r['score']}/100"
+            pdf.cell(0,7, to_ascii(line), ln=1)
+
             pdf.set_font('Arial','',10)
-            pdf.multi_cell(0, 6, f"Comments: {r['comments'] or '-'}")
-            # Reference answer(s)
+            pdf.multi_cell(0,6, to_ascii(f"Comments: {r['comments'] or '-'}"))
+
             answers = ref_answers.get(r['assignment'], [])
             if answers:
+                pdf.set_font('Arial','I',9)
                 for ans in answers:
-                    safe = ans.encode("latin-1", "replace").decode("latin-1")
-                    pdf.multi_cell(0, 6, f"Ref: {safe}")
+                    pdf.multi_cell(0,6, to_ascii(f"Ref: {ans}"))
             pdf.ln(2)
+
         pdf.ln(4)
         pdf.set_font('Arial','I',10)
-        pdf.cell(0, 8, f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=1, align='R')
-        return pdf.output(dest='S').encode('latin-1','replace')
+        gens = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        pdf.cell(0,8, to_ascii(f"Generated: {gens}"), ln=1, align='R')
 
-    # ---- PDF Download Button ----
-    pdf_bytes = build_report_pdf(student_row, stu_scores, ref_answers, "Learn Language Education Academy", assignment_total)
+        return pdf.output(dest='S').encode('latin-1')
+
+    # -- Download / Email buttons --
+    pdf_bytes = build_report_pdf(student, stu_scores, ref_answers,
+                                 "Learn Language Education Academy", total_asg)
+
     st.download_button(
         "📄 Download Full Report PDF",
         pdf_bytes,
-        file_name=f"{student_row['name'].replace(' ','_')}_assignment_report.pdf",
+        file_name=f"{student['name'].replace(' ','_')}_report.pdf",
         mime="application/pdf"
     )
 
-    # ---- Email PDF Button ----
-    student_email = student_row.get('email','')
-    if student_email:
-        if st.button(f"📧 Email PDF to {student_email}"):
+    email_addr = student.get('email','')
+    if email_addr:
+        if st.button(f"📧 Email PDF to {email_addr}"):
             try:
-                sg = SendGridAPIClient(st.secrets['general']['SENDGRID_API_KEY'])
-                message = Mail(
-                    from_email=st.secrets['general']['SENDER_EMAIL'],
-                    to_emails=student_email,
-                    subject="Your Assignment Results – Learn Language Education Academy",
-                    html_content=f"<p>Hello {student_row['name']},<br><br>Your full assignment report is attached.</p>"
+                send_email_with_pdf(
+                    student_email    = email_addr,
+                    student_name     = student['name'],
+                    pdf_bytes        = pdf_bytes,
+                    sendgrid_api_key = st.secrets['general']['SENDGRID_API_KEY'],
+                    sender_email     = st.secrets['general']['SENDER_EMAIL']
                 )
-                encoded = base64.b64encode(pdf_bytes).decode()
-                attached = Attachment(
-                    FileContent(encoded),
-                    FileName(f"{student_row['name'].replace(' ','_')}_assignment_report.pdf"),
-                    FileType('application/pdf'),
-                    Disposition('attachment')
-                )
-                message.attachment = attached
-                sg.send(message)
                 st.success("✅ Email sent!")
             except Exception as e:
                 st.error(f"Failed to send email: {e}")
