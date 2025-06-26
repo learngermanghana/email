@@ -196,18 +196,6 @@ def load_student_data(local, github_url):
         st.warning("⚠️ students.csv not found locally or on GitHub.")
         st.stop()
 
-@lru_cache(maxsize=1)
-def load_student_data(local, github_url):
-    if os.path.exists(local):
-        return pd.read_csv(local)
-    try:
-        df = pd.read_csv(github_url)
-        st.info("Loaded students from GitHub backup.")
-        return df
-    except Exception:
-        st.warning("⚠️ students.csv not found locally or on GitHub.")
-        st.stop()
-
 # --- All Students (Edit, Update, Delete, Receipt) ---
 with tabs[1]:
     st.title("👩‍🎓 All Students (Edit, Update, Delete, Receipt)")
