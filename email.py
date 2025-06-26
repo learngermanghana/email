@@ -1102,67 +1102,6 @@ with tabs[8]:
 with tabs[9]:
     st.title("📝 Assignment Marking & Scores")
 
-    import sqlite3
-    # === Initialize SQLite for Scores ===
-    conn_scores = sqlite3.connect('scores.db')
-    cursor_scores = conn_scores.cursor()
-    cursor_scores.execute('''
-        CREATE TABLE IF NOT EXISTS scores (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            StudentCode TEXT,
-            Name TEXT,
-            Assignment TEXT,
-            Score REAL,
-            Comments TEXT,
-            Date TEXT
-        )
-    ''')
-    conn_scores.commit()
-
-    # --- Load student database ---
-    github_csv_url = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
-    student_file = "students.csv"
-    if os.path.exists(student_file):
-        df_students = pd.read_csv(student_file)
-    else:
-        try:
-            df_students = pd.read_csv(github_csv_url)
-        except Exception:
-            st.warning("Could not find student data. Please upload students.csv in 📝 Pending tab.")
-            st.stop()
-    df_students.columns = [c.lower().strip().replace(" ", "_") for c in df_students.columns]
-
-    # --- Filter/Search Students ---
-    st.subheader("🔍 Filter/Search Students")
-    search_term = st.text_input("Search by name or code", key="search_term")
-    levels = ["All"] + sorted(df_students['level'].dropna().unique().tolist())
-    selected_level = st.selectbox("Filter by Level", levels, key="selected_level")
-    view_df = df_students.copy()
-    if search_term:
-        view_df = view_df[
-            view_df['name'].str.contains(search_term, case=False, na=False) |
-            view_df['studentcode'].astype(str).str.contains(search_term, case=False, na=False)
-        ]
-    if selected_level != "All":
-        view_df = view_df[view_df['level'] == selected_level]
-    if view_df.empty:
-        st.info("No students match your filter.")
-        st.stop()
-
-    # --- Select Student ---
-    student_list = view_df['name'] + " (" + view_df['studentcode'] + ")"
-    chosen = st.selectbox("Select a student", student_list, key="chosen_student")
-    code = chosen.split("(")[-1].replace(")", "").strip().lower()
-    student_row = view_df[view_df['studentcode'].str.lower() == code].iloc[0]
-
-with tabs[9]:
-    st.title("📝 Assignment Marking & Scores")
-
-    import sqlite3
-    from datetime import datetime
-    import pandas as pd
-    import os
-    from fpdf import FPDF
 
     # === Initialize SQLite for Scores ===
     conn_scores = sqlite3.connect('scores.db')
@@ -1334,6 +1273,5 @@ with tabs[9]:
         }))
 
 #end
-
 
 
