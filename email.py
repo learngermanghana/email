@@ -1296,11 +1296,69 @@ with tabs[9]:
 
     # PDF and Email
     pdf = build_report_pdf(student, hist, ref_answers, "Learn Language Education Academy", total)
-    st.download_button("Download PDF Report",pdf,f"{student['name'].replace(' ','_')}_report.pdf","application/pdf")
+    st.download_button(
+        "Download PDF Report",
+        pdf,
+        f"{student['name'].replace(' ','_')}_report.pdf",
+        "application/pdf"
+    )
     if student.get('email'):
         if st.button(f"Email PDF to {student['email']}"):
-            send_email_with_pdf(student['email'],student['name'],pdf,st.secrets['general']['SENDGRID_API_KEY'],st.secrets['general']['SENDER_EMAIL'])
-            st.success("Email sent!")
+            send_email_with_pdf(
+                student['email'],
+                student['name'],
+                pdf,
+                st.secrets['general']['SENDGRID_API_KEY'],
+                st.secrets['general']['SENDER_EMAIL']
+            )
+
+# ==== Updated PDF Builder Function ====
+def build_report_pdf(student, history_df, ref_answers, school_name, total_assignments):
+    from fpdf import FPDF
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+    pdf.set_font('Arial', 'B', 16)
+    # Header
+    pdf.cell(0, 10, school_name, ln=True, align='C')
+    pdf.ln(5)
+    pdf.set_font('Arial', '', 12)
+    pdf.cell(0, 8, f"Report for {student['name']} ({student['studentcode']}) - Level {student['level']}", ln=True)
+    pdf.cell(0, 8, f"Date: {datetime.now().strftime('%Y-%m-%d')}", ln=True)
+    pdf.ln(5)
+
+    # Summary
+    completed = history_df['assignment'].nunique()
+    pdf.cell(0, 8, f"Completed {completed} out of {total_assignments} assignments", ln=True)
+    pdf.ln(5)
+
+    # Table Header
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(60, 8, 'Assignment', border=1)
+    pdf.cell(20, 8, 'Score', border=1)
+    pdf.cell(30, 8, 'Date', border=1)
+    pdf.cell(80, 8, 'Reference Answers', border=1)
+    pdf.ln()
+
+    # Table Content
+    pdf.set_font('Arial', '', 11)
+    for _, row in history_df.iterrows():
+        assignment = row['assignment']
+        score = str(row['score'])
+        date = row['date']
+        ref = ", ".join(ref_answers.get(assignment, []))
+        # wrap long ref answers
+        pdf.multi_cell(60, 6, assignment, border=1)
+        x = pdf.get_x()
+        y = pdf.get_y() - 6
+        pdf.set_xy(x+60, y)
+        pdf.cell(20, 6, score, border=1)
+        pdf.cell(30, 6, date, border=1)
+        pdf.multi_cell(80, 6, ref, border=1)
+    
+    return pdf.output(dest='S').encode('latin1')
+
+#end
 
 
 
