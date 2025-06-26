@@ -637,13 +637,6 @@ with tabs[4]:
         )
 
 
-# === Tab 5: Generate Contract & Receipt PDF for Any Student ===
-with tabs[5]:
-    pass
-
-# --- Tab 5: Generate Contract & Receipt PDF for Any Student ---
-with tabs[5]:
-    pass
 
 # === AGREEMENT TEMPLATE STATE ===
 if "agreement_template" not in st.session_state:
