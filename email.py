@@ -1134,11 +1134,30 @@ with tabs[9]:
     st.title("📝 Assignment Marking & Scores (with Email)")
 
     # 1️⃣ Load and normalize data
-    BACKUP_SCORES_URL = "YOUR_BACKUP_SCORES_URL_HERE"  # e.g. the score.backup Google Sheet CSV URL
-    try:
-        df_scores = pd.read_csv(SCORES_URL)
-    except Exception:
-        df_scores = pd.read_csv(BACKUP_SCORES_URL)
+SCORES_URL = (
+    "https://docs.google.com/spreadsheets/d/"
+    "1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/"
+    "export?format=csv"
+)
+STUDENTS_URL = (
+    "https://docs.google.com/spreadsheets/d/"
+    "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/"
+    "export?format=csv"
+)
+# Try primary source, fallback to SQLite
+try:
+    df_scores = pd.read_csv(SCORES_URL)
+except Exception:
+    df_scores = load_scores_from_sqlite()
+
+try:
+    df_students = pd.read_csv(STUDENTS_URL)
+except Exception:
+    df_students = load_students_from_sqlite()
+
+# Normalize column names
+df_scores.columns = [c.strip().lower() for c in df_scores.columns]
+df_students.columns = [c.strip().lower() for c in df_students.columns]
 
     df_students = pd.read_csv(STUDENTS_URL)
     df_scores.columns = [c.strip().lower() for c in df_scores.columns]
@@ -1291,3 +1310,4 @@ with tabs[9]:
             st.success("✅ Email sent!" )
         except Exception as e:
             st.error(f"Failed to send email: {e}")
+
