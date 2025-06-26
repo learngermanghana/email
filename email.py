@@ -1097,6 +1097,14 @@ with tabs[9]:
     # df_students = load_students()
     # df_scores = load_scores()
 
+    # Fix: Normalize all columns to lowercase/strip spaces
+    df_scores.columns = [c.strip().lower() for c in df_scores.columns]
+    df_students.columns = [c.strip().lower() for c in df_students.columns]
+
+    # Optional debug (remove later)
+    # st.write("df_scores columns:", df_scores.columns.tolist())
+    # st.write("df_students columns:", df_students.columns.tolist())
+
     # ========== 2. Reference Answers (hardcoded) ==========
     ref_answers = {
         "Lesen und Horen 0.1": [
