@@ -1132,7 +1132,7 @@ with tabs[9]:
                 df_scores = pd.concat([df_scores,pd.DataFrame([new])],ignore_index=True)
                 sync_scores_to_sqlite(df_scores)
                 st.success("✅ Saved.")
-                st.experimental_rerun()
+                st.rerun()
         # history
         hist = df_scores[df_scores['studentcode']==code].sort_values('date',ascending=False)
         st.markdown("#### Score History")
