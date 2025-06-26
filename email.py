@@ -4,6 +4,7 @@ import json
 import base64
 import urllib.parse
 from datetime import date, datetime, timedelta
+from fpdf import FPDF
 from functools import lru_cache
 import tempfile
 import sqlite3
