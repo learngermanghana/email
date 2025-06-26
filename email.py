@@ -1118,48 +1118,99 @@ with tabs[8]:
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
 
-# ======== Helper: Load Google Sheets as DataFrame ========
-def load_gsheet_df(sheet_url, worksheet_index=0):
-    import gspread
-    from google.oauth2.service_account import Credentials
-    import pandas as pd
+# =========== GOOGLE SHEET SCORE WRITE/DELETE HELPERS ============
 
+def write_score_to_sheet(row):
+    """
+    Add or update a student's assignment score in Google Sheets.
+    Sheet: https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/edit
+    Row: dict with keys: StudentCode, Name, Assignment, Score, Comments, Date, Level
+    """
+    # Open Google Sheet with service account
+    gsheet_url = "https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/edit#gid=2121051612"
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive",
     ]
-    credentials = Credentials.from_service_account_file(
-        "service_account.json", scopes=scopes
-    )
+    credentials = Credentials.from_service_account_file("service_account.json", scopes=scopes)
     gc = gspread.authorize(credentials)
-    # Extract sheet key from URL
-    if "/d/" in sheet_url:
-        sheet_key = sheet_url.split("/d/")[1].split("/")[0]
-    else:
-        raise ValueError("Invalid Google Sheet URL")
+    sheet_key = gsheet_url.split("/d/")[1].split("/")[0]
     sh = gc.open_by_key(sheet_key)
-    worksheet = sh.get_worksheet(worksheet_index)
-    data = worksheet.get_all_records()
-    df = pd.DataFrame(data)
-    return df
+    worksheet = sh.get_worksheet(0)  # Edit this if you use a different tab
 
-# ======== Helper: Load Students DataFrame ========
-def load_students_df():
-    student_file = "students.csv"
-    gsheet_url = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/edit#gid=0"
-    if os.path.exists(student_file):
-        return pd.read_csv(student_file)
-    else:
-        return load_gsheet_df(gsheet_url)
+    # Check if row exists (by StudentCode + Assignment + Date)
+    all_data = worksheet.get_all_records()
+    found = False
+    for i, rec in enumerate(all_data, 2):  # +2 for 1-based index & header
+        if (str(rec.get("StudentCode", "")).lower() == str(row["StudentCode"]).lower() and
+            str(rec.get("Assignment", "")).lower() == str(row["Assignment"]).lower() and
+            str(rec.get("Date", "")) == str(row["Date"])):
+            # Update row
+            for k, v in row.items():
+                col_idx = worksheet.find(k).col
+                worksheet.update_cell(i, col_idx, v)
+            found = True
+            break
+    if not found:
+        worksheet.append_row([row.get(k, "") for k in worksheet.row_values(1)])
 
-# ======== Helper: Load Scores DataFrame ========
-def load_scores_df():
-    scores_file = "scores.csv"
+def delete_score_from_sheet(student_code, assignment, date):
+    """
+    Remove a score entry from Google Sheets.
+    """
     gsheet_url = "https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/edit#gid=2121051612"
-    if os.path.exists(scores_file):
-        return pd.read_csv(scores_file)
-    else:
-        return load_gsheet_df(gsheet_url)
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive",
+    ]
+    credentials = Credentials.from_service_account_file("service_account.json", scopes=scopes)
+    gc = gspread.authorize(credentials)
+    sheet_key = gsheet_url.split("/d/")[1].split("/")[0]
+    sh = gc.open_by_key(sheet_key)
+    worksheet = sh.get_worksheet(0)
+
+    all_data = worksheet.get_all_records()
+    for i, rec in enumerate(all_data, 2):  # +2 for 1-based index & header
+        if (str(rec.get("StudentCode", "")).lower() == str(student_code).lower() and
+            str(rec.get("Assignment", "")).lower() == str(assignment).lower() and
+            str(rec.get("Date", "")) == str(date)):
+            worksheet.delete_rows(i)
+            break
+def generate_pdf_report(name, studentcode, level, hist_df):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=14)
+    pdf.cell(0, 10, f"Score Report: {name} ({studentcode})", ln=True, align="C")
+    pdf.set_font("Arial", size=11)
+    pdf.cell(0, 10, f"Level: {level}", ln=True)
+    pdf.ln(5)
+    for idx, row in hist_df.iterrows():
+        pdf.multi_cell(0, 8, f"{row['Assignment']} – {row['Score']} ({row['Date']}): {row['Comments']}")
+    return pdf.output(dest="S").encode("latin-1")
+
+def send_score_email(name, email, pdf_bytes):
+    if not school_sendgrid_key or not school_sender_email:
+        return False
+    message = Mail(
+        from_email=school_sender_email,
+        to_emails=email,
+        subject=f"Your Assignment Score Report – {name}",
+        html_content=f"Dear {name},<br>Find attached your assignment score report.<br><br>Learn Language Education Academy",
+    )
+    attachment = Attachment(
+        FileContent(base64.b64encode(pdf_bytes).decode()),
+        FileName("score_report.pdf"),
+        FileType("application/pdf"),
+        Disposition("attachment"),
+    )
+    message.attachment = attachment
+    try:
+        sg = SendGridAPIClient(school_sendgrid_key)
+        sg.send(message)
+        return True
+    except Exception:
+        return False
+
 
 # ========== MAIN TAB ==============
 with tabs[9]:
