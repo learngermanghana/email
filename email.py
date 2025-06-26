@@ -717,6 +717,13 @@ Date: [DATE]
 Asadu Felix
 """
 
+@st.cache_data(show_spinner=False)
+def load_students_sheet(sheet_url):
+    try:
+        return pd.read_csv(sheet_url)
+    except Exception:
+        return pd.DataFrame()
+
 
 # --- Tab 5 ---
 with tabs[5]:
