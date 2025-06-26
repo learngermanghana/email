@@ -1223,13 +1223,14 @@ with tabs[9]:
                 df_scores = pd.concat([df_scores, pd.DataFrame([newrow])], ignore_index=True)
                 sync_scores_to_sqlite(df_scores)
                 st.success("✅ Score saved.")
+                st.experimental_rerun()
 
         # --- Show Score History ---
         hist = df_scores[df_scores['studentcode'] == code].sort_values('date', ascending=False)
         st.markdown("#### Score History")
         st.dataframe(hist[['assignment','score','comments','date']])
 
-    # --- 5. BATCH MODE (by Level only) ---
+    # --- 5. BATCH MODE (by Level only, assignments grouped by level) ---
     if mode == "Batch":
         st.subheader("Batch Mode: Enter all assignments for one student (by Level)")
         sel_level = st.selectbox("Select Level", all_levels, key="batch_level")
@@ -1249,16 +1250,19 @@ with tabs[9]:
         student_info = students[students['studentcode'] == code].iloc[0]
         st.markdown(f"#### Enter scores for {student_info['name']} ({sel_level})")
 
-        # Filter assignments for this level only (from ref_answers or existing scores)
-        level_assignments = [a for a in all_assignments if sel_level in a or a in df_scores[df_scores['studentcode'] == code]['assignment'].values]
-        batch_scores = {}
-        stu_scores = df_scores[df_scores['studentcode'] == code]
-        for a in level_assignments:
-            prev = stu_scores[stu_scores['assignment'] == a]
-            val = int(prev['score'].iloc[0]) if not prev.empty else 0
-            batch_scores[a] = st.number_input(a, 0, 100, val, key=f"batch_{a}")
+        # Filter assignments for this level only (from all_assignments)
+        level_assignments = [a for a in all_assignments if sel_level.lower() in a.lower()]
+        if not level_assignments:
+            st.warning("No assignments found for this level.")
+            st.stop()
 
+        stu_scores = df_scores[df_scores['studentcode'] == code]
+        batch_scores = {}
         with st.form(key="batch_form"):
+            for a in level_assignments:
+                prev = stu_scores[stu_scores['assignment'] == a]
+                val = int(prev['score'].iloc[0]) if not prev.empty else 0
+                batch_scores[a] = st.number_input(a, 0, 100, val, key=f"batch_{a}")
             submitted = st.form_submit_button("Save All Scores")
             if submitted:
                 now = datetime.now().strftime("%Y-%m-%d")
@@ -1276,6 +1280,7 @@ with tabs[9]:
                     df_scores = pd.concat([df_scores, pd.DataFrame([newrow])], ignore_index=True)
                 sync_scores_to_sqlite(df_scores)
                 st.success("✅ All scores saved.")
+                st.experimental_rerun()
 
         hist = df_scores[df_scores['studentcode'] == code].sort_values('assignment')
         st.markdown("#### Entered Batch Scores")
@@ -1312,13 +1317,20 @@ with tabs[9]:
                     html_content=f"<p>Hello {student_name},<br><br>Your report is attached.</p>"
                 )
                 encoded = base64.b64encode(pdf_bytes).decode()
-                message.attachment = Attachment(
-                    FileContent(encoded), FileName(f"{student_name.replace(' ', '_')}_report.pdf"), FileType('application/pdf'), Disposition('attachment')
+                attached = Attachment(
+                    FileContent(encoded),
+                    FileName(f"{student_name.replace(' ', '_')}_report.pdf"),
+                    FileType('application/pdf'),
+                    Disposition('attachment')
                 )
+                message.attachment = attached
                 sg.send(message)
                 st.success("✅ Email sent!")
             except Exception as e:
                 st.error(f"Failed to send email: {e}")
+
+# end
+
 
 #end
 
