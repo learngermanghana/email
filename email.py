@@ -1142,7 +1142,6 @@ with tabs[8]:
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
 
-# ------------- Marking Tab: "📝 Assignment Marking & Scores" -------------
 with tabs[9]:
     st.title("📝 Assignment Marking & Scores (with Email)")
 
@@ -1165,18 +1164,10 @@ with tabs[9]:
     all_levels = sorted(df_students['level'].dropna().unique())
     all_assignments = sorted(set(df_scores['assignment'].dropna().unique()) | set(ref_answers.keys()))
 
-    # --- 3. Download All Scores CSV ---
-    st.download_button(
-        "📁 Download All Scores as CSV",
-        data=df_scores.to_csv(index=False).encode(),
-        file_name="all_scores.csv",
-        mime="text/csv"
-    )
-
-    # --- 4. Marking Mode ---
+    # --- 3. Marking Mode ---
     mode = st.radio("Select marking mode:", ["Classic", "Batch"], key="mark_mode")
 
-    # --- 5. CLASSIC MODE ---
+    # --- 4. CLASSIC MODE ---
     if mode == "Classic":
         st.subheader("Classic Mode: Mark One Assignment")
         search_name = st.text_input("Search student by name or code")
@@ -1238,50 +1229,7 @@ with tabs[9]:
         st.markdown("#### Score History")
         st.dataframe(hist[['assignment','score','comments','date']])
 
-        # --- PDF/Email ---
-        student_email = student_info.get('email', None)
-        student_name = student_info['name']
-        student_key = f"report_pdf_{code}"
-        if student_key not in st.session_state:
-            pdf = FPDF()
-            pdf.add_page()
-            pdf.set_font('Arial', 'B', 14)
-            pdf.cell(0, 10, f"Report for {student_name}", ln=True)
-            pdf.ln(5)
-            for _, r in df_scores[df_scores['studentcode'] == code].iterrows():
-                pdf.set_font('Arial', 'B', 12)
-                pdf.cell(0, 8, f"{r['assignment']}: {r['score']}/100", ln=True)
-                pdf.set_font('Arial', '', 11)
-                pdf.multi_cell(0, 8, f"Comments: {r['comments']}")
-                pdf.ln(3)
-            st.session_state[student_key] = pdf.output(dest='S').encode('latin-1', 'replace')
-        pdf_bytes = st.session_state[student_key]
-        st.download_button("📄 Download Report PDF", pdf_bytes, f"{student_name.replace(' ', '_')}_report.pdf", "application/pdf")
-
-        if student_email:
-            if st.button(f"📧 Email PDF to {student_email}"):
-                try:
-                    sg = SendGridAPIClient(st.secrets['general']['SENDGRID_API_KEY'])
-                    message = Mail(
-                        from_email=st.secrets['general']['SENDER_EMAIL'],
-                        to_emails=student_email,
-                        subject="Your Assignment Results – Learn Language Education Academy",
-                        html_content=f"<p>Hello {student_name},<br><br>Your report is attached.</p>"
-                    )
-                    encoded = base64.b64encode(pdf_bytes).decode()
-                    attached = Attachment(
-                        FileContent(encoded),
-                        FileName(f"{student_name.replace(' ', '_')}_report.pdf"),
-                        FileType('application/pdf'),
-                        Disposition('attachment')
-                    )
-                    message.attachment = attached
-                    sg.send(message)
-                    st.success("✅ Email sent!")
-                except Exception as e:
-                    st.error(f"Failed to send email: {e}")
-
-    # --- 6. BATCH MODE (by Level only, assignments grouped by level) ---
+    # --- 5. BATCH MODE (by Level only, assignments grouped by level) ---
     if mode == "Batch":
         st.subheader("Batch Mode: Enter all assignments for one student (by Level)")
         sel_level = st.selectbox("Select Level", all_levels, key="batch_level")
@@ -1301,8 +1249,22 @@ with tabs[9]:
         student_info = students[students['studentcode'] == code].iloc[0]
         st.markdown(f"#### Enter scores for {student_info['name']} ({sel_level})")
 
-        # Filter assignments for this level only
-        level_assignments = [a for a in all_assignments if sel_level.lower() in a.lower()]
+        # --- Improved Assignment Picker for Batch ---
+        # Find all assignments attempted at this level
+        level_scores = df_scores[df_scores['level'] == sel_level]
+        assigns_from_scores = set(level_scores['assignment'].unique())
+
+        # Assignments from reference answers, by level
+        def is_for_level(a_key, level):
+            key_low = a_key.lower()
+            lvl_low = level.lower()
+            if lvl_low == "a1":
+                return not (key_low.startswith("a2") or key_low.startswith("b1") or key_low.startswith("b2"))
+            return lvl_low in key_low
+
+        assigns_from_refs = {a for a in ref_answers if is_for_level(a, sel_level)}
+        level_assignments = sorted(assigns_from_scores | assigns_from_refs)
+
         if not level_assignments:
             st.warning("No assignments found for this level.")
             st.stop()
@@ -1333,14 +1295,60 @@ with tabs[9]:
                 st.success("✅ All scores saved.")
                 st.experimental_rerun()
 
-        # Show entered batch scores (table)
+        # Show entered/edited batch scores for that student at this level
         hist = df_scores[df_scores['studentcode'] == code].sort_values('assignment')
         st.markdown("#### Entered Batch Scores")
         st.dataframe(hist[['assignment', 'score']])
 
+    # --- 6. Download all scores as CSV ---
+    st.markdown("### Download All Scores")
+    st.download_button("📁 Download All Scores CSV",
+        df_scores.to_csv(index=False).encode(), file_name="all_scores.csv")
+
+    # --- 7. PDF & EMAIL ---
+    # Use code and student_info from the last student selected (Classic or Batch)
+    student_email = student_info.get('email', None)
+    student_name = student_info['name']
+    student_key = f"report_pdf_{code}"
+    if student_key not in st.session_state:
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font('Arial', 'B', 14)
+        pdf.cell(0, 10, f"Report for {student_name}", ln=True)
+        pdf.ln(5)
+        for _, r in df_scores[df_scores['studentcode'] == code].iterrows():
+            pdf.set_font('Arial', 'B', 12)
+            pdf.cell(0, 8, f"{r['assignment']}: {r['score']}/100", ln=True)
+            pdf.set_font('Arial', '', 11)
+            pdf.multi_cell(0, 8, f"Comments: {r['comments']}")
+            pdf.ln(3)
+        st.session_state[student_key] = pdf.output(dest='S').encode('latin-1', 'replace')
+    pdf_bytes = st.session_state[student_key]
+    st.download_button("📄 Download Report PDF", pdf_bytes, f"{student_name.replace(' ', '_')}_report.pdf", "application/pdf")
+
+    if student_email:
+        if st.button(f"📧 Email PDF to {student_email}"):
+            try:
+                sg = SendGridAPIClient(st.secrets['general']['SENDGRID_API_KEY'])
+                message = Mail(
+                    from_email=st.secrets['general']['SENDER_EMAIL'],
+                    to_emails=student_email,
+                    subject="Your Assignment Results – Learn Language Education Academy",
+                    html_content=f"<p>Hello {student_name},<br><br>Your report is attached.</p>"
+                )
+                encoded = base64.b64encode(pdf_bytes).decode()
+                attached = Attachment(
+                    FileContent(encoded),
+                    FileName(f"{student_name.replace(' ', '_')}_report.pdf"),
+                    FileType('application/pdf'),
+                    Disposition('attachment')
+                )
+                message.attachment = attached
+                sg.send(message)
+                st.success("✅ Email sent!")
+            except Exception as e:
+                st.error(f"Failed to send email: {e}")
+
 # end
-
-
-#end
 
 
