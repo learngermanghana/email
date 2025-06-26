@@ -718,27 +718,36 @@ Asadu Felix
 """
 
 # --- Tab 5: Generate & Edit Receipt/Contract PDF ---
+
+# Cache the student sheet load globally to avoid repeated network calls
+@st.cache_data(show_spinner=False)
+def load_students_sheet():
+    try:
+        return pd.read_csv(STUDENTS_URL)
+    except Exception:
+        return pd.DataFrame()
+
 with tabs[5]:
     st.title("📄 Generate Contract & Receipt PDF for Any Student")
 
-    # 1) Load students DataFrame directly from Google Sheets via cached function to reduce repeated fetches
-    @st.cache_data(show_spinner=False)
-    def load_students_sheet():
-        return pd.read_csv(STUDENTS_URL)
-    try:
-        df = load_students_sheet()
-    except Exception:
+    # 1) Load student data
+    df = load_students_sheet()
+    if df.empty:
         st.error("Couldn't load student data from Google Sheets.")
         st.stop()
 
-    # 2) Normalize columns once at load time for consistency
+    # 2) Normalize columns
     df.columns = [
-        c.strip().lower().replace("(","").replace(")","")
-         .replace(" ","_").replace("-","_").replace("/","_")
+        c.strip().lower()
+         .replace("(", "")
+         .replace(")", "")
+         .replace(" ", "_")
+         .replace("-", "_")
+         .replace("/", "_")
         for c in df.columns
     ]
 
-    # Helper: robust column lookup (extracted to avoid repetition)
+    # Robust lookup helper
     def col_lookup(key):
         k = key.replace("_", "").lower()
         for c in df.columns:
@@ -746,34 +755,38 @@ with tabs[5]:
                 return c
         return None
 
-    # 3) Identify required columns dynamically
-    name_col, code_col = col_lookup("name"), col_lookup("studentcode")
+    name_col  = col_lookup("name")
+    code_col  = col_lookup("studentcode")
     if not name_col or not code_col:
-        st.error("Missing essential columns (name or studentcode) in student data.")
+        st.error("Missing essential 'name' or 'studentcode' columns.")
         st.stop()
 
-    # 4) Search bar and filtering
-    search_query = st.text_input("🔎 Search by student name or code").strip().lower()
-    df_search = df if not search_query else df[
-        df[name_col].str.lower().str.contains(search_query)
-        | df[code_col].astype(str).str.lower().str.contains(search_query)
+    # 3) Search filter
+    search = st.text_input("🔎 Search student by name or code").strip().lower()
+    df_search = df if not search else df[
+        df[name_col].str.lower().str.contains(search) |
+        df[code_col].astype(str).str.lower().str.contains(search)
     ]
     if df_search.empty:
-        st.info("No student found matching your search.")
+        st.info("No students match your search.")
         st.stop()
 
-    # 5) Select student and prepare fields
+    # 4) Student selection
     selected_name = st.selectbox("Select Student", df_search[name_col].tolist())
     row = df[df[name_col] == selected_name].iloc[0]
 
-    # Precompute defaults and reduce repeated parsing
+    # 5) Default values
     def parse_date(val, default):
         dt = pd.to_datetime(val, errors="coerce")
         return dt.date() if pd.notna(dt) else default
-    default_start = parse_date(row.get(col_lookup("contractstart"), ""), date.today())
-    default_end   = parse_date(row.get(col_lookup("contractend"), ""), default_start + timedelta(days=30))
-    default_paid  = float(row.get(col_lookup("paid"), 0) or 0)
-    default_bal   = float(row.get(col_lookup("balance"), 0) or 0)
+    start_col = col_lookup("contractstart")
+    end_col   = col_lookup("contractend")
+    default_start = parse_date(row.get(start_col, ""), date.today())
+    default_end   = parse_date(row.get(end_col,   ""), default_start + timedelta(days=30))
+    paid_col = col_lookup("paid")
+    bal_col  = col_lookup("balance")
+    default_paid = float(row.get(paid_col, 0) or 0)
+    default_bal  = float(row.get(bal_col, 0) or 0)
 
     st.subheader("🧾 Receipt Details")
     paid_input    = st.number_input("Amount Paid (GHS)", min_value=0.0, value=default_paid, step=1.0)
@@ -788,33 +801,27 @@ with tabs[5]:
     st.subheader("🖼️ Logo (optional)")
     logo_file = st.file_uploader("Upload logo image", type=["png","jpg","jpeg"])
 
-    # 6) Generate & Download PDF (extracted PDF creation to function for clarity)
-    def build_pdf(data_row, paid, bal, start, end, receipt_dt, sign, logo):
+    # 6) PDF builder
+    def build_pdf(r, paid, bal, start, end, receipt_dt, sign, logo):
         pdf = FPDF()
         pdf.add_page()
-        # Logo
         if logo:
             ext = logo.name.split('.')[-1]
             tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
             tmp.write(logo.getbuffer()); tmp.close()
             pdf.image(tmp.name, x=10, y=8, w=33); pdf.ln(25)
-        # Banner
         status = "FULLY PAID" if bal == 0 else "INSTALLMENT PLAN"
         pdf.set_font("Arial","B",12); pdf.set_text_color(0,128,0)
-        pdf.cell(0,10,status,ln=True,align="C"); pdf.ln(5)
-        pdf.set_text_color(0,0,0)
-        # Receipt header
+        pdf.cell(0,10,status,ln=True,align="C"); pdf.ln(5); pdf.set_text_color(0,0,0)
         pdf.set_font("Arial",size=14)
         pdf.cell(0,10,f"{SCHOOL_NAME} Payment Receipt",ln=True,align="C"); pdf.ln(10)
         pdf.set_font("Arial",size=12)
-        fields = [
-            ("Name", data_row[name_col]),
-            ("Student Code", data_row[code_col]),
+        for label, val in [
+            ("Name", r[name_col]), ("Student Code", r[code_col]),
             ("Contract Start", start), ("Contract End", end),
             ("Amount Paid", f"GHS {paid:.2f}"), ("Balance Due", f"GHS {bal:.2f}"),
             ("Receipt Date", receipt_dt)
-        ]
-        for label, val in fields:
+        ]:
             pdf.cell(0,8,f"{label}: {val}",ln=True)
         return pdf
 
@@ -823,62 +830,6 @@ with tabs[5]:
         pdf_bytes = pdf.output(dest='S').encode("latin-1","replace")
         st.download_button("📄 Download PDF", pdf_bytes, file_name=f"{selected_name.replace(' ','_')}_receipt.pdf", mime="application/pdf")
         st.success("✅ PDF ready to download.")
-
-with tabs[7]:
-    st.title("📊 Analytics & Export")
-
-    if os.path.exists("students_simple.csv"):
-        df_main = pd.read_csv("students_simple.csv")
-    else:
-        df_main = pd.DataFrame()
-
-    st.subheader("📈 Enrollment Over Time")
-
-    if not df_main.empty and "ContractStart" in df_main.columns:
-        df_main["EnrollDate"] = pd.to_datetime(df_main["ContractStart"], errors="coerce")
-
-        # ✅ Filter by year
-        valid_years = df_main["EnrollDate"].dt.year.dropna().unique()
-        valid_years = sorted([int(y) for y in valid_years if not pd.isna(y)])
-        selected_year = st.selectbox("📆 Filter by Year", valid_years) if valid_years else None
-
-        if df_main["EnrollDate"].notna().sum() == 0:
-            st.info("No valid enrollment dates found in 'ContractStart'. Please check your data.")
-        else:
-            try:
-                filtered_df = df_main[df_main["EnrollDate"].dt.year == selected_year] if selected_year else df_main
-                monthly = (
-                    filtered_df.groupby(filtered_df["EnrollDate"].dt.to_period("M"))
-                    .size()
-                    .reset_index(name="Count")
-                )
-                monthly["EnrollDate"] = monthly["EnrollDate"].astype(str)
-                st.line_chart(monthly.set_index("EnrollDate")["Count"])
-            except Exception as e:
-                st.warning(f"⚠️ Unable to generate enrollment chart: {e}")
-    else:
-        st.info("No enrollment data to visualize.")
-
-    st.subheader("📊 Students by Level")
-
-    if "Level" in df_main.columns and not df_main["Level"].dropna().empty:
-        level_counts = df_main["Level"].value_counts()
-        st.bar_chart(level_counts)
-    else:
-        st.info("No level information available to display.")
-
-    st.subheader("⬇️ Export CSV Files")
-
-    student_csv = df_main.to_csv(index=False)
-    st.download_button("📁 Download Students CSV", data=student_csv, file_name="students_data.csv")
-
-    expenses_file = "expenses_all.csv"
-    if os.path.exists(expenses_file):
-        exp_data = pd.read_csv(expenses_file)
-        expense_csv = exp_data.to_csv(index=False)
-        st.download_button("📁 Download Expenses CSV", data=expense_csv, file_name="expenses_data.csv")
-    else:
-        st.info("No expenses file found to export.")
 
 with tabs[8]:
 
