@@ -1147,16 +1147,19 @@ with tabs[9]:
     st.title("📝 Assignment Marking & Scores (with Email)")
 
     # --- 1. Load Data ---
+    STUDENTS_CSV = "students.csv"
+    SCORES_SHEET_URL = "https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/export?format=csv"
+
     try:
-        df_students = load_students_from_sqlite()
+        df_students = pd.read_csv(STUDENTS_CSV)
     except Exception:
         st.error("Couldn't load student list.")
         st.stop()
 
     try:
-        df_scores = load_scores_from_sqlite()
+        df_scores = pd.read_csv(SCORES_SHEET_URL)
     except Exception:
-        st.error("Couldn't load scores.")
+        st.error("Couldn't load score history from Google Sheets.")
         df_scores = pd.DataFrame(columns=['studentcode','name','assignment','score','comments','date','level'])
 
     # --- 2. Preprocess columns and options ---
@@ -1228,7 +1231,7 @@ with tabs[9]:
                 # Remove old and add new
                 df_scores = df_scores[~((df_scores['studentcode'] == code) & (df_scores['assignment'] == assignment))]
                 df_scores = pd.concat([df_scores, pd.DataFrame([newrow])], ignore_index=True)
-                sync_scores_to_sqlite(df_scores)
+                sync_scores_to_sqlite(df_scores)  # Save to SQLite as backup
                 st.success("✅ Score saved.")
                 st.experimental_rerun()
 
@@ -1260,12 +1263,12 @@ with tabs[9]:
         student_info = students[students['studentcode'] == code].iloc[0]
         st.markdown(f"#### Enter scores for {student_info['name']} ({sel_level})")
 
-        # Filter assignments for this level only (case-insensitive, robust for A1/A2/Lesen)
+        # Filter assignments for this level only (case-insensitive robust contains)
         level_assignments = [
             a for a in all_assignments
             if sel_level.lower() in a.lower()
             or a.lower().startswith(sel_level.lower() + " ")
-            or (sel_level == "A1" and "lesen" in a.lower())
+            or (sel_level.lower() == "a1" and a.lower().startswith("lesen und horen"))
         ]
         if not level_assignments:
             st.warning("No assignments found for this level.")
@@ -1358,4 +1361,5 @@ with tabs[9]:
                 except Exception as e:
                     st.error(f"Failed to send email: {e}")
 # end
+
 
