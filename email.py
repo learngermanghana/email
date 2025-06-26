@@ -136,6 +136,47 @@ def send_score_email(name, email, pdf_bytes):
     except Exception:
         return False
 
+# ===== Helper: Load Data from Google Sheets or CSV =====
+
+def load_gsheet_df(sheet_url, worksheet_index=0):
+    import gspread
+    from google.oauth2.service_account import Credentials
+    import pandas as pd
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive",
+    ]
+    credentials = Credentials.from_service_account_file(
+        "service_account.json", scopes=scopes
+    )
+    gc = gspread.authorize(credentials)
+    if "/d/" in sheet_url:
+        sheet_key = sheet_url.split("/d/")[1].split("/")[0]
+    else:
+        raise ValueError("Invalid Google Sheet URL")
+    sh = gc.open_by_key(sheet_key)
+    worksheet = sh.get_worksheet(worksheet_index)
+    data = worksheet.get_all_records()
+    df = pd.DataFrame(data)
+    return df
+
+def load_students_df():
+    student_file = "students.csv"
+    gsheet_url = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/edit#gid=0"
+    if os.path.exists(student_file):
+        return pd.read_csv(student_file)
+    else:
+        return load_gsheet_df(gsheet_url)
+
+def load_scores_df():
+    scores_file = "scores.csv"
+    gsheet_url = "https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/edit#gid=2121051612"
+    if os.path.exists(scores_file):
+        return pd.read_csv(scores_file)
+    else:
+        return load_gsheet_df(gsheet_url)
+
+
 # ===== PAGE CONFIG (must be first Streamlit command!) =====
 st.set_page_config(
     page_title="Learn Language Education Academy Dashboard",
@@ -1274,7 +1315,6 @@ def send_score_email(name, email, pdf_bytes):
         return False
 
 
-# ========== MAIN TAB ==============
 with tabs[9]:
     st.title("📝 Assignment Marking & Scores (Google Sheets Live)")
 
@@ -1282,10 +1322,8 @@ with tabs[9]:
     df_students = load_students_df()
     df_scores = load_scores_df()
 
-    # ---- (The rest of your tab logic goes here…) ----
-    st.write("Students:", df_students.head())
-    st.write("Scores:", df_scores.head())
-
+    st.write(df_students.head())
+    st.write(df_scores.head())
 
     # --- Mode ---
     mode = st.radio(
