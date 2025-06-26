@@ -1,3 +1,4 @@
+# ===== Imports =====
 import os
 import json
 import base64
@@ -16,69 +17,60 @@ from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileT
 import openai
 import sqlite3
 
-from pdf_utils import generate_receipt_and_contract_pdf
-from email_utils import send_emails
+# (Your utility imports if you use them)
+# from pdf_utils import generate_receipt_and_contract_pdf
+# from email_utils import send_emails
 
-
-# Project utilities (must exist in your project)
-from pdf_utils import generate_receipt_and_contract_pdf
-from email_utils import send_emails
-
-# ===== Project-Specific Imports =====
-from pdf_utils import generate_receipt_and_contract_pdf
-from email_utils import send_emails
-
-# ===== SQLite for Persistent Data Storage =====
-import sqlite3
-
-# ===== Helper Functions =====
-def clean_phone(phone):
-    """
-    Convert any Ghanaian phone number to WhatsApp-friendly format:
-    - Remove spaces, dashes, and '+'
-    - If starts with '0', replace with '233'
-    - If starts with '233', leave as is
-    - Returns only digits
-    """
-    phone = str(phone).replace(" ", "").replace("+", "").replace("-", "")
-    if phone.startswith("0"):
-        phone = "233" + phone[1:]
-    phone = ''.join(filter(str.isdigit, phone))
-    return phone
-
-# ===== PAGE CONFIG (must be first Streamlit command!) =====
+# ===== PAGE CONFIG =====
 st.set_page_config(
     page_title="Learn Language Education Academy Dashboard",
     layout="wide"
 )
 
-# === Session State Initialization ===
-st.session_state.setdefault("emailed_expiries", set())
-st.session_state.setdefault("dismissed_notifs", set())
-
-
-# === SCHOOL INFO ===
+# ===== School Info (constants) =====
 SCHOOL_NAME    = "Learn Language Education Academy"
 SCHOOL_EMAIL   = "Learngermanghana@gmail.com"
 SCHOOL_WEBSITE = "www.learngermanghana.com"
 SCHOOL_PHONE   = "233205706589"
 SCHOOL_ADDRESS = "Awoshie, Accra, Ghana"
 
-# === EMAIL CONFIG ===
-school_sendgrid_key = st.secrets.get("general", {}).get("SENDGRID_API_KEY")
-school_sender_email = st.secrets.get("general", {}).get("SENDER_EMAIL", SCHOOL_EMAIL)
+# ===== Streamlit session defaults =====
+st.session_state.setdefault("emailed_expiries", set())
+st.session_state.setdefault("dismissed_notifs", set())
 
+# ===== Google Sheets URLs =====
+STUDENTS_URL = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
+SCORES_URL   = "https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/export?format=csv"
+
+# ===== Data Loaders =====
+@st.cache_data(show_spinner=False)
+def load_students():
+    df = pd.read_csv(STUDENTS_URL)
+    df.columns = [c.lower().strip() for c in df.columns]
+    return df
+
+@st.cache_data(show_spinner=False)
+def load_scores():
+    df = pd.read_csv(SCORES_URL)
+    df.columns = [c.lower().strip() for c in df.columns]
+    return df
+
+# Load main dataframes (available for all tabs!)
+df_students = load_students()
+df_scores   = load_scores()
+
+# ====== MAIN TABS ======
 tabs = st.tabs([
     "📝 Pending",
     "👩‍🎓 All Students",
     "➕ Add Student",
     "💵 Expenses",
     "📲 Reminders",
-    "📄 Contract ",
+    "📄 Contract",
     "📧 Send Email",
     "📊 Analytics & Export",
     "📆 Schedule",
-    "📝 Marking"   # <--- New tab!
+    "📝 Marking"
 ])
 
 with tabs[0]:
@@ -1090,36 +1082,17 @@ with tabs[8]:
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
 
+# ------------- Marking Tab: "📝 Assignment Marking & Scores" -------------
 with tabs[9]:
-    import pandas as pd
-    import streamlit as st
-    from fpdf import FPDF
-    from sendgrid import SendGridAPIClient
-    from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
-    import base64
-
     st.title("📝 Assignment Marking & Scores (with Email)")
 
-    # ======= 1. Load Data =======
-    students_csv_url = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
-    scores_csv_url   = "https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/export?format=csv"
+    # ========== 1. Use loaded dataframes from Google Sheets ==========
+    # (already loaded at top as df_students and df_scores)
+    # If you need to reload in this tab only, you could uncomment:
+    # df_students = load_students()
+    # df_scores = load_scores()
 
-    @st.cache_data(show_spinner=False)
-    def load_students():
-        df = pd.read_csv(students_csv_url)
-        df.columns = [c.lower().strip() for c in df.columns]
-        return df
-
-    @st.cache_data(show_spinner=False)
-    def load_scores():
-        df = pd.read_csv(scores_csv_url)
-        df.columns = [c.lower().strip() for c in df.columns]
-        return df
-
-    df_students = load_students()
-    df_scores   = load_scores()
-
-    # ======= 2. Reference Answers (add your full dictionary here) =======
+    # ========== 2. Reference Answers (hardcoded) ==========
     ref_answers = {
         "Lesen und Horen 0.1": [
             "1. C) Guten Morgen", "2. D) Guten Tag", "3. B) Guten Abend", "4. B) Gute Nacht", "5. C) Guten Morgen",
@@ -1130,14 +1103,14 @@ with tabs[9]:
     all_assignments = sorted(list({*df_scores["assignment"].dropna().unique(), *ref_answers.keys()}))
     all_levels = sorted(df_students["level"].dropna().unique())
 
-    # ======= 3. Marking Modes =======
+    # ========== 3. Marking Modes ==========
     mode = st.radio(
         "Select marking mode:",
         ["Mark single assignment (classic)", "Batch mark (all assignments for one student)"],
         key="marking_mode"
     )
 
-    # -- SINGLE CLASSIC --
+    # ----- CLASSIC MODE -----
     if mode == "Mark single assignment (classic)":
         st.subheader("Classic Mode: Mark One Assignment")
         sel_level = st.selectbox("Filter by Level", ["All"] + all_levels, key="single_level")
@@ -1179,7 +1152,7 @@ with tabs[9]:
         st.markdown("### Student Score History")
         st.dataframe(hist[["assignment", "score", "comments", "date"]])
 
-    # -- BATCH MODE --
+    # ----- BATCH MODE -----
     if mode == "Batch mark (all assignments for one student)":
         st.subheader("Batch Mode: Enter all assignments for one student (fast)")
         sel_level = st.selectbox("Select Level", all_levels, key="batch_level")
@@ -1253,6 +1226,7 @@ with tabs[9]:
 
     # ======= 6. PDF & EMAIL =======
     st.markdown("### 📄 PDF/Email Student Full Report")
+    from fpdf import FPDF
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", "B", 14)
