@@ -22,6 +22,19 @@ from google.oauth2.service_account import Credentials
 from pdf_utils import generate_receipt_and_contract_pdf
 # from email_utils import send_emails
 
+import requests  # Needed for fetching JSON from GitHub
+
+# ===== Reference Answers: Load from GitHub JSON =====
+REF_ANSWERS_URL = "https://raw.githubusercontent.com/learngermanghana/email/main/ref_answers.json"
+
+@st.cache_data(show_spinner=False)
+def load_ref_answers():
+    resp = requests.get(REF_ANSWERS_URL)
+    resp.raise_for_status()
+    return json.loads(resp.text)
+
+ref_answers = load_ref_answers()
+
 # ====== SQLite Sync & Load Helpers ======
 def sync_google_sheet_to_sqlite(df):
     conn = sqlite3.connect("students_backup.db")
