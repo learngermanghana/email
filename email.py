@@ -1235,7 +1235,10 @@ with tabs[9]:
         # --- Show Score History (all assignments, all dates) ---
         hist = df_scores[df_scores['studentcode'] == code].sort_values('date', ascending=False)
         st.markdown("#### Score History")
-        st.dataframe(hist[['assignment','score','comments','date']])
+        if not hist.empty:
+            st.dataframe(hist[['assignment','score','comments','date']])
+        else:
+            st.info("No scores found for this student.")
 
     # ========== BATCH MODE ==========
     if mode == "Batch":
@@ -1257,8 +1260,13 @@ with tabs[9]:
         student_info = students[students['studentcode'] == code].iloc[0]
         st.markdown(f"#### Enter scores for {student_info['name']} ({sel_level})")
 
-        # Filter assignments for this level only (from all_assignments, case-insensitive contains)
-        level_assignments = [a for a in all_assignments if sel_level.lower() in a.lower()]
+        # Filter assignments for this level only (case-insensitive robust contains)
+        level_assignments = [
+            a for a in all_assignments
+            if sel_level.lower() in a.lower()
+            or a.lower().startswith(sel_level.lower() + " ")
+            or a.lower().startswith("lesen und horen")  # For A1/Lesen assignments
+        ]
         if not level_assignments:
             st.warning("No assignments found for this level.")
             st.stop()
@@ -1292,56 +1300,61 @@ with tabs[9]:
         # --- Show Entered Batch Scores (current values) ---
         hist = df_scores[(df_scores['studentcode'] == code) & (df_scores['assignment'].isin(level_assignments))].sort_values('assignment')
         st.markdown("#### Entered Batch Scores")
-        st.dataframe(hist[['assignment', 'score']])
+        if not hist.empty:
+            st.dataframe(hist[['assignment', 'score']])
+        else:
+            st.info("No batch scores entered yet for this student.")
 
         # --- Show Score History (all assignments, all dates) ---
         full_hist = df_scores[df_scores['studentcode'] == code].sort_values('date', ascending=False)
         st.markdown("#### Score History")
-        st.dataframe(full_hist[['assignment','score','comments','date']])
+        if not full_hist.empty:
+            st.dataframe(full_hist[['assignment','score','comments','date']])
+        else:
+            st.info("No scores found for this student.")
 
     # ========== PDF & EMAIL ==========
-    student_email = student_info.get('email', None)
-    student_name = student_info['name']
-    student_key = f"report_pdf_{code}"
-    if student_key not in st.session_state:
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font('Arial', 'B', 14)
-        pdf.cell(0, 10, f"Report for {student_name}", ln=True)
-        pdf.ln(5)
-        for _, r in df_scores[df_scores['studentcode'] == code].iterrows():
-            pdf.set_font('Arial', 'B', 12)
-            pdf.cell(0, 8, f"{r['assignment']}: {r['score']}/100", ln=True)
-            pdf.set_font('Arial', '', 11)
-            pdf.multi_cell(0, 8, f"Comments: {r['comments']}")
-            pdf.ln(3)
-        st.session_state[student_key] = pdf.output(dest='S').encode('latin-1', 'replace')
-    pdf_bytes = st.session_state[student_key]
-    st.download_button("📄 Download Report PDF", pdf_bytes, f"{student_name.replace(' ', '_')}_report.pdf", "application/pdf")
+    # Only show after student selected
+    if 'student_info' in locals():
+        student_email = student_info.get('email', None)
+        student_name = student_info['name']
+        student_key = f"report_pdf_{code}"
+        if student_key not in st.session_state:
+            pdf = FPDF()
+            pdf.add_page()
+            pdf.set_font('Arial', 'B', 14)
+            pdf.cell(0, 10, f"Report for {student_name}", ln=True)
+            pdf.ln(5)
+            for _, r in df_scores[df_scores['studentcode'] == code].iterrows():
+                pdf.set_font('Arial', 'B', 12)
+                pdf.cell(0, 8, f"{r['assignment']}: {r['score']}/100", ln=True)
+                pdf.set_font('Arial', '', 11)
+                pdf.multi_cell(0, 8, f"Comments: {r['comments']}")
+                pdf.ln(3)
+            st.session_state[student_key] = pdf.output(dest='S').encode('latin-1', 'replace')
+        pdf_bytes = st.session_state[student_key]
+        st.download_button("📄 Download Report PDF", pdf_bytes, f"{student_name.replace(' ', '_')}_report.pdf", "application/pdf")
 
-    if student_email:
-        if st.button(f"📧 Email PDF to {student_email}"):
-            try:
-                sg = SendGridAPIClient(st.secrets['general']['SENDGRID_API_KEY'])
-                message = Mail(
-                    from_email=st.secrets['general']['SENDER_EMAIL'],
-                    to_emails=student_email,
-                    subject="Your Assignment Results – Learn Language Education Academy",
-                    html_content=f"<p>Hello {student_name},<br><br>Your report is attached.</p>"
-                )
-                encoded = base64.b64encode(pdf_bytes).decode()
-                attached = Attachment(
-                    FileContent(encoded),
-                    FileName(f"{student_name.replace(' ', '_')}_report.pdf"),
-                    FileType('application/pdf'),
-                    Disposition('attachment')
-                )
-                message.attachment = attached
-                sg.send(message)
-                st.success("✅ Email sent!")
-            except Exception as e:
-                st.error(f"Failed to send email: {e}")
-
+        if student_email:
+            if st.button(f"📧 Email PDF to {student_email}"):
+                try:
+                    sg = SendGridAPIClient(st.secrets['general']['SENDGRID_API_KEY'])
+                    message = Mail(
+                        from_email=st.secrets['general']['SENDER_EMAIL'],
+                        to_emails=student_email,
+                        subject="Your Assignment Results – Learn Language Education Academy",
+                        html_content=f"<p>Hello {student_name},<br><br>Your report is attached.</p>"
+                    )
+                    encoded = base64.b64encode(pdf_bytes).decode()
+                    attached = Attachment(
+                        FileContent(encoded),
+                        FileName(f"{student_name.replace(' ', '_')}_report.pdf"),
+                        FileType('application/pdf'),
+                        Disposition('attachment')
+                    )
+                    message.attachment = attached
+                    sg.send(message)
+                    st.success("✅ Email sent!")
+                except Exception as e:
+                    st.error(f"Failed to send email: {e}")
 # end
-
-
