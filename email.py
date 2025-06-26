@@ -1260,12 +1260,12 @@ with tabs[9]:
         student_info = students[students['studentcode'] == code].iloc[0]
         st.markdown(f"#### Enter scores for {student_info['name']} ({sel_level})")
 
-        # Filter assignments for this level only (case-insensitive robust contains)
+        # Filter assignments for this level only (case-insensitive, robust for A1/A2/Lesen)
         level_assignments = [
             a for a in all_assignments
             if sel_level.lower() in a.lower()
             or a.lower().startswith(sel_level.lower() + " ")
-            or a.lower().startswith("lesen und horen")  # For A1/Lesen assignments
+            or (sel_level == "A1" and "lesen" in a.lower())
         ]
         if not level_assignments:
             st.warning("No assignments found for this level.")
@@ -1358,3 +1358,4 @@ with tabs[9]:
                 except Exception as e:
                     st.error(f"Failed to send email: {e}")
 # end
+
