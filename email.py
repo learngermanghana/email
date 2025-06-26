@@ -721,15 +721,15 @@ Asadu Felix
 with tabs[5]:
     st.title("📄 Generate Contract & Receipt PDF for Any Student")
 
-    # 1) Load students DataFrame directly from Google Sheets
+    # Google Sheet URL (your provided link)
     SHEET_URL = "https://docs.google.com/spreadsheets/d/1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo/export?format=csv"
     try:
         df = pd.read_csv(SHEET_URL)
     except Exception as e:
-        st.error("Couldn't load students list from Google Sheets.")
+        st.error("Couldn't load student data from Google Sheet.")
         st.stop()
 
-    # 2) Normalize columns to lowercase/underscores
+    # 1) Normalize columns (lowercase, underscores)
     df.columns = [
         c.strip()
          .replace(" ", "_")
@@ -741,151 +741,168 @@ with tabs[5]:
         for c in df.columns
     ]
 
-    if df.empty:
-        st.warning("No student data available.")
+    # 2) Helper for robust column lookups
+    def col_lookup(col):
+        col_key = col.replace("_", "").lower()
+        for c in df.columns:
+            if c.replace("_", "").lower() == col_key:
+                return c
+        return None
+
+    name_col    = col_lookup("name")
+    start_col   = col_lookup("contractstart")
+    end_col     = col_lookup("contractend")
+    paid_col    = col_lookup("paid")
+    bal_col     = col_lookup("balance")
+    code_col    = col_lookup("studentcode")
+    phone_col   = col_lookup("phone")
+    level_col   = col_lookup("level")
+
+    # 3) Error if missing essential columns
+    if not name_col or not code_col:
+        st.error("Missing essential columns in student data.")
+        st.stop()
+
+    # --- Search ---
+    search_query = st.text_input("🔎 Search by name or code")
+    if search_query:
+        df_search = df[
+            df[name_col].str.lower().str.contains(search_query.lower()) |
+            df[code_col].astype(str).str.lower().str.contains(search_query.lower())
+        ]
     else:
-        # Helper to find actual column names
-        def col_lookup(col):
-            for c in df.columns:
-                if c.replace("_", "").lower() == col.replace("_", "").lower():
-                    return c
-            return None
+        df_search = df
 
-        name_col    = col_lookup("name")
-        start_col   = col_lookup("contractstart")
-        end_col     = col_lookup("contractend")
-        paid_col    = col_lookup("paid")
-        bal_col     = col_lookup("balance")
-        code_col    = col_lookup("studentcode")
-        phone_col   = col_lookup("phone")
-        level_col   = col_lookup("level")
+    if df_search.empty:
+        st.warning("No student found matching your search.")
+        st.stop()
 
-        # 3) Select student
-        student_names = df[name_col].tolist()
-        selected_name = st.selectbox("Select Student", student_names)
-        row = df[df[name_col] == selected_name].iloc[0]
+    # --- Student selection ---
+    student_names = df_search[name_col].tolist()
+    selected_name = st.selectbox("Select Student", student_names)
+    row = df[df[name_col] == selected_name].iloc[0]
 
-        # 4) Editable fields before generation
-        default_paid    = float(row.get(paid_col, 0))
-        default_balance = float(row.get(bal_col, 0))
-        default_start = pd.to_datetime(row.get(start_col, ""), errors="coerce").date() if not pd.isnull(pd.to_datetime(row.get(start_col, ""), errors="coerce")) else date.today()
-        default_end   = pd.to_datetime(row.get(end_col,   ""), errors="coerce").date() if not pd.isnull(pd.to_datetime(row.get(end_col,   ""), errors="coerce")) else default_start + timedelta(days=30)
+    # 4) Editable fields before generation
+    default_paid    = float(row.get(paid_col, 0) or 0)
+    default_balance = float(row.get(bal_col, 0) or 0)
+    default_start = pd.to_datetime(row.get(start_col, ""), errors="coerce").date() if not pd.isnull(pd.to_datetime(row.get(start_col, ""), errors="coerce")) else date.today()
+    default_end   = pd.to_datetime(row.get(end_col,   ""), errors="coerce").date() if not pd.isnull(pd.to_datetime(row.get(end_col,   ""), errors="coerce")) else default_start + timedelta(days=30)
 
-        st.subheader("Receipt Details")
-        paid_input = st.number_input(
-            "Amount Paid (GHS)", min_value=0.0, value=default_paid, step=1.0, key="paid_input"
+    st.subheader("Receipt Details")
+    paid_input = st.number_input(
+        "Amount Paid (GHS)", min_value=0.0, value=default_paid, step=1.0, key="paid_input"
+    )
+    balance_input = st.number_input(
+        "Balance Due (GHS)", min_value=0.0, value=default_balance, step=1.0, key="balance_input"
+    )
+    total_input = paid_input + balance_input
+    receipt_date = st.date_input("Receipt Date", value=date.today(), key="receipt_date")
+    signature = st.text_input("Signature Text", value="Felix Asadu", key="receipt_signature")
+
+    st.subheader("Contract Details")
+    contract_start_input = st.date_input(
+        "Contract Start Date", value=default_start, key="contract_start_input"
+    )
+    contract_end_input = st.date_input(
+        "Contract End Date", value=default_end, key="contract_end_input"
+    )
+    course_length = (contract_end_input - contract_start_input).days
+
+    st.subheader("Logo (optional)")
+    logo_file = st.file_uploader(
+        "Upload logo image", type=["png", "jpg", "jpeg"], key="logo_upload"
+    )
+
+    # 5) Generate PDF on button click
+    if st.button("Generate & Download PDF"):
+        # Use inputs
+        paid    = paid_input
+        balance = balance_input
+        total   = total_input
+        contract_start = contract_start_input
+        contract_end   = contract_end_input
+
+        # Build PDF
+        pdf = FPDF()
+        pdf.add_page()
+
+        # Add logo if provided: preserve original extension
+        if logo_file:
+            ext = logo_file.name.split('.')[-1]
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
+            tmp.write(logo_file.getbuffer())
+            tmp.close()
+            pdf.image(tmp.name, x=10, y=8, w=33)
+            pdf.ln(25)
+
+        # Payment status banner: if balance==0 fully paid
+        status = "FULLY PAID" if balance == 0 else "INSTALLMENT PLAN"
+        pdf.set_font("Arial", "B", 12)
+        pdf.set_text_color(0, 128, 0)
+        pdf.cell(0, 10, status, ln=True, align="C")
+        pdf.set_text_color(0, 0, 0)
+        pdf.ln(5)
+
+        # Receipt header
+        pdf.set_font("Arial", size=14)
+        pdf.cell(0, 10, f"{SCHOOL_NAME} Payment Receipt", ln=True, align="C")
+        pdf.ln(10)
+
+        # Receipt details
+        pdf.set_font("Arial", size=12)
+        for label, val in [
+            ("Name",           selected_name),
+            ("Student Code",   row.get(code_col, "")),
+            ("Phone",          row.get(phone_col, "")),
+            ("Level",          row.get(level_col, "")),
+            ("Contract Start", contract_start),
+            ("Contract End",   contract_end),
+            ("Amount Paid",    f"GHS {paid:.2f}"),
+            ("Balance Due",    f"GHS {balance:.2f}"),
+            ("Total Fee",      f"GHS {total:.2f}"),
+            ("Receipt Date",   receipt_date)
+        ]:
+            pdf.cell(0, 8, f"{label}: {val}", ln=True)
+        pdf.ln(10)
+
+        # Contract section
+        pdf.ln(15)
+        pdf.set_font("Arial", size=14)
+        pdf.cell(0, 10, f"{SCHOOL_NAME} Student Contract", ln=True, align="C")
+        pdf.set_font("Arial", size=12)
+        pdf.ln(8)
+
+        template = st.session_state.get("agreement_template", "")
+        filled = (
+            template
+            .replace("[STUDENT_NAME]",     selected_name)
+            .replace("[DATE]",             str(receipt_date))
+            .replace("[CLASS]",            str(row.get(level_col, "")))
+            .replace("[AMOUNT]",           str(total))
+            .replace("[FIRST_INSTALLMENT]", f"{paid:.2f}")
+            .replace("[SECOND_INSTALLMENT]",f"{balance:.2f}")
+            .replace("[SECOND_DUE_DATE]",  str(contract_end))
+            .replace("[COURSE_LENGTH]",    f"{course_length} days")
         )
-        balance_input = st.number_input(
-            "Balance Due (GHS)", min_value=0.0, value=default_balance, step=1.0, key="balance_input"
+        for line in filled.split("\n"):
+            safe = line.encode("latin-1", "replace").decode("latin-1")
+            pdf.multi_cell(0, 8, safe)
+        pdf.ln(10)
+
+        # Signature
+        pdf.cell(0, 8, f"Signed: {signature}", ln=True)
+
+        # Download
+        pdf_bytes = pdf.output(dest="S").encode("latin-1", "replace")
+        st.download_button(
+            "📄 Download PDF",
+            data=pdf_bytes,
+            file_name=f"{selected_name.replace(' ', '_')}_receipt_contract.pdf",
+            mime="application/pdf"
         )
-        total_input = paid_input + balance_input
-        receipt_date = st.date_input("Receipt Date", value=date.today(), key="receipt_date")
-        signature = st.text_input("Signature Text", value="Felix Asadu", key="receipt_signature")
+        st.success("✅ PDF generated and ready to download.")
 
-        st.subheader("Contract Details")
-        contract_start_input = st.date_input(
-            "Contract Start Date", value=default_start, key="contract_start_input"
-        )
-        contract_end_input = st.date_input(
-            "Contract End Date", value=default_end, key="contract_end_input"
-        )
-        course_length = (contract_end_input - contract_start_input).days
-
-        st.subheader("Logo (optional)")
-        logo_file = st.file_uploader(
-            "Upload logo image", type=["png", "jpg", "jpeg"], key="logo_upload"
-        )
-
-        # 5) Generate PDF on button click
-        if st.button("Generate & Download PDF"):
-            # Use row from DataFrame + form values
-            paid    = paid_input
-            balance = balance_input
-            total   = total_input
-            contract_start = contract_start_input
-            contract_end   = contract_end_input
-
-            # Build PDF
-            pdf = FPDF()
-            pdf.add_page()
-
-            # Add logo if provided: preserve original extension
-            if logo_file:
-                ext = logo_file.name.split('.')[-1]
-                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
-                tmp.write(logo_file.getbuffer())
-                tmp.close()
-                pdf.image(tmp.name, x=10, y=8, w=33)
-                pdf.ln(25)
-
-            # Payment status banner: if balance==0 fully paid
-            status = "FULLY PAID" if balance == 0 else "INSTALLMENT PLAN"
-            pdf.set_font("Arial", "B", 12)
-            pdf.set_text_color(0, 128, 0)
-            pdf.cell(0, 10, status, ln=True, align="C")
-            pdf.set_text_color(0, 0, 0)
-            pdf.ln(5)
-
-            # Receipt header
-            pdf.set_font("Arial", size=14)
-            pdf.cell(0, 10, f"{SCHOOL_NAME} Payment Receipt", ln=True, align="C")
-            pdf.ln(10)
-
-            # Receipt details
-            pdf.set_font("Arial", size=12)
-            for label, val in [
-                ("Name",           selected_name),
-                ("Student Code",   row.get(code_col, "")),
-                ("Phone",          row.get(phone_col, "")),
-                ("Level",          row.get(level_col, "")),
-                ("Contract Start", contract_start),
-                ("Contract End",   contract_end),
-                ("Amount Paid",    f"GHS {paid:.2f}"),
-                ("Balance Due",    f"GHS {balance:.2f}"),
-                ("Total Fee",      f"GHS {total:.2f}"),
-                ("Receipt Date",   receipt_date)
-            ]:
-                pdf.cell(0, 8, f"{label}: {val}", ln=True)
-            pdf.ln(10)
-
-            # Contract section
-            pdf.ln(15)
-            pdf.set_font("Arial", size=14)
-            pdf.cell(0, 10, f"{SCHOOL_NAME} Student Contract", ln=True, align="C")
-            pdf.set_font("Arial", size=12)
-            pdf.ln(8)
-
-            template = st.session_state.get("agreement_template", "")
-            filled = (
-                template
-                .replace("[STUDENT_NAME]",     selected_name)
-                .replace("[DATE]",             str(receipt_date))
-                .replace("[CLASS]",            row.get(level_col, ""))
-                .replace("[AMOUNT]",           str(total))
-                .replace("[FIRST_INSTALLMENT]", f"{paid:.2f}")
-                .replace("[SECOND_INSTALLMENT]",f"{balance:.2f}")
-                .replace("[SECOND_DUE_DATE]",  str(contract_end))
-                .replace("[COURSE_LENGTH]",    f"{course_length} days")
-            )
-            for line in filled.split("\n"):
-                safe = line.encode("latin-1", "replace").decode("latin-1")
-                pdf.multi_cell(0, 8, safe)
-            pdf.ln(10)
-
-            # Signature
-            pdf.cell(0, 8, f"Signed: {signature}", ln=True)
-
-            # Download
-            pdf_bytes = pdf.output(dest="S").encode("latin-1", "replace")
-            st.download_button(
-                "📄 Download PDF",
-                data=pdf_bytes,
-                file_name=f"{selected_name.replace(' ', '_')}_receipt_contract.pdf",
-                mime="application/pdf"
-            )
-            st.success("✅ PDF generated and ready to download.")
-
-
+# end
 
 
 with tabs[7]:
