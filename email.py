@@ -3,35 +3,22 @@ import json
 import base64
 import urllib.parse
 from datetime import date, datetime, timedelta
-import streamlit as st
 from functools import lru_cache
-
-
-import pandas as pd
-import os
-import json
-import base64
-import urllib.parse
-from datetime import date, datetime, timedelta
+import tempfile
 
 import pandas as pd
 import numpy as np
 import streamlit as st
+
 from fpdf import FPDF
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import (
-    Mail, Attachment, FileContent, FileName, FileType, Disposition
-)
+from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
 import openai
+import sqlite3
 
-import numpy as np
-import streamlit as st
-from fpdf import FPDF
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import (
-    Mail, Attachment, FileContent, FileName, FileType, Disposition
-)
-
+# Project utilities (must exist in your project)
+from pdf_utils import generate_receipt_and_contract_pdf
+from email_utils import send_emails
 
 # ===== Project-Specific Imports =====
 from pdf_utils import generate_receipt_and_contract_pdf
