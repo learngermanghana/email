@@ -18,8 +18,9 @@ import openai
 import sqlite3
 
 # (Your utility imports if you use them)
-# from pdf_utils import generate_receipt_and_contract_pdf
+from pdf_utils import generate_receipt_and_contract_pdf
 # from email_utils import send_emails
+
 
 # ===== PAGE CONFIG =====
 st.set_page_config(
