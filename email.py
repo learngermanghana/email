@@ -1183,7 +1183,6 @@ def normalize_cols(df):
         for c in df.columns
     ]
     return df
-
 # ==== Marking Tab: Classic & Batch modes, history, PDF & Email ====
 with tabs[9]:
     st.title("Assignment Marking & Scores (Email, Reference Answers, PDF Report)")
@@ -1200,7 +1199,7 @@ with tabs[9]:
         df_students = normalize_cols(df_students)
     except Exception:
         st.error("Could not load student list.")
-        df_students = pd.DataFrame(columns=['name','studentcode','email','level'])
+        df_students = pd.DataFrame(columns=['name','studentcode','email','level'])  # Fallback schema if load fails
 
     try:
         df_scores = pd.read_csv(SCORES_SHEET_URL)
@@ -1211,18 +1210,18 @@ with tabs[9]:
 
     # Reference and totals
     LEVEL_TOTALS = {'A1': 18, 'A2': 28, 'B1': 26, 'B2': 30}
-    ref_answers = load_ref_answers()
+    ref_answers = load_ref_answers()  # consider caching if this is heavy
 
     @st.cache_data
     def get_all_assignments(df, refs):
-        keys = set(df['assignment'].dropna().unique()) | set(refs.keys())
-        return sorted(keys)
+        # Combines assignments from scores and reference list
+        return sorted(set(df['assignment'].dropna()) | set(refs.keys()))
     all_assignments = get_all_assignments(df_scores, ref_answers)
 
-    # Mode
+    # Mode selection UI
     mode = st.radio("Select Mode", ["Classic","Batch"], horizontal=True)
 
-    # Find student
+    # --- Student search ---
     st.subheader("Find Student")
     search = st.text_input("Search by name or code")
     students = df_students.copy()
@@ -1241,7 +1240,7 @@ with tabs[9]:
     level = student.get('level','').upper()
     total = LEVEL_TOTALS.get(level, 0)
 
-    # Classic mode
+    # Classic mode: single assignment
     if mode == "Classic":
         st.markdown("---")
         st.subheader("Classic Mark Single Assignment")
@@ -1259,7 +1258,7 @@ with tabs[9]:
             score = st.number_input("Score", 0, 100, default_score)
             comments = st.text_area("Comments", default_comments)
             if st.form_submit_button("Save Score"):
-                now = datetime.now().strftime("%Y-%m-%d")
+                now = datetime.now().strftime("%Y-%m-%d")  # ensure datetime is imported
                 new = dict(
                     studentcode=code,
                     name=student['name'],
@@ -1269,6 +1268,7 @@ with tabs[9]:
                     date=now,
                     level=student['level']
                 )
+                # filter out old record then append new (inefficient for large df; consider index-based update)
                 df_scores = df_scores[~(
                     (df_scores['studentcode']==code) &
                     (df_scores['assignment']==sel_a)
@@ -1278,7 +1278,7 @@ with tabs[9]:
                 st.success("Score saved.")
                 st.experimental_rerun()
     else:
-        # Batch mode
+        # Batch mode: all assignments of level
         st.markdown("---")
         st.subheader("Batch Mark Assignments")
         stu_scores = df_scores[df_scores['studentcode']==code]
@@ -1290,23 +1290,23 @@ with tabs[9]:
                 batch_scores[a] = st.number_input(a, 0, 100, val)
             if st.form_submit_button("Save All"):
                 now = datetime.now().strftime("%Y-%m-%d")
+                # build list of new dicts then concat once
+                new_rows = []
                 for a, v in batch_scores.items():
-                    df_scores = df_scores[~(
-                        (df_scores['studentcode']==code) &
-                        (df_scores['assignment']==a)
-                    )]
-                    df_scores = pd.concat([
-                        df_scores,
-                        pd.DataFrame([dict(
-                            studentcode=code,
-                            name=student['name'],
-                            assignment=a,
-                            score=v,
-                            comments='',
-                            date=now,
-                            level=student['level']
-                        )])
-                    ], ignore_index=True)
+                    new_rows.append(dict(
+                        studentcode=code,
+                        name=student['name'],
+                        assignment=a,
+                        score=v,
+                        comments='',
+                        date=now,
+                        level=student['level']
+                    ))
+                # remove old and add all at once
+                df_scores = df_scores[~(
+                    (df_scores['studentcode']==code) & df_scores['assignment'].isin(batch_scores)
+                )]
+                df_scores = pd.concat([df_scores, pd.DataFrame(new_rows)], ignore_index=True)
                 sync_scores_to_sqlite(df_scores)
                 st.success("All scores saved.")
                 st.experimental_rerun()
@@ -1314,7 +1314,7 @@ with tabs[9]:
     # History and PDF
     st.markdown("### Score History & PDF Report")
     history = df_scores[df_scores['studentcode']==code].sort_values('date', ascending=False)
-    st.write(f"Completed: {len(history)} / {total}")
+    st.write(f"Completed: {len(history)} / {total}")  # len(history) counts rows, not unique assignments
     if not history.empty:
         dfh = history[['assignment','score','comments','date']].copy()
         dfh['reference'] = dfh['assignment'].apply(lambda x: "; ".join(ref_answers.get(x, [])))
@@ -1341,9 +1341,10 @@ with tabs[9]:
             )
 
 # ==== Simple PDF Builder Function ====
+
 def build_simple_pdf(student, history_df, ref_answers, total):
     from fpdf import FPDF
-    # Use basic PDF without special unicode
+    # basic, monospaced font; may overflow page if too many records
     pdf = FPDF(format='A4')
     pdf.add_page()
     pdf.set_font('Courier', size=12)
@@ -1351,20 +1352,20 @@ def build_simple_pdf(student, history_df, ref_answers, total):
     pdf.ln(2)
     pdf.cell(0, 8, f"Student: {student['name']} ({student['studentcode']})", ln=True)
     pdf.cell(0, 8, f"Level: {student['level']}", ln=True)
-    pdf.cell(0, 8, f"Date: {datetime.now().strftime('%Y-%m-%d')}", ln=True)
+    pdf.cell(0, 8, f"Date: {datetime.now().strftime('%Y-%m-%d')}", ln=True)  # datetime must be imported
     pdf.ln(4)
 
     pdf.cell(0, 8, f"Assignments completed: {history_df.shape[0]} / {total}", ln=True)
     pdf.ln(4)
 
-    # Header line
+    # Table header
     pdf.cell(50, 6, 'Assignment', border=1)
     pdf.cell(20, 6, 'Score', border=1)
     pdf.cell(25, 6, 'Date', border=1)
     pdf.cell(0, 6, 'Reference', border=1, ln=True)
 
     for _, row in history_df.iterrows():
-        assign = row['assignment'][:45]
+        assign = row['assignment'][:45]  # truncation might cut key info
         sc = str(row['score'])
         dt = row['date']
         ref = ','.join(ref_answers.get(row['assignment'], []))[:45]
@@ -1373,8 +1374,7 @@ def build_simple_pdf(student, history_df, ref_answers, total):
         pdf.cell(25, 6, dt, border=1)
         pdf.cell(0, 6, ref, border=1, ln=True)
 
-    # Return as bytes
-    return pdf.output(dest='S')
+    return pdf.output(dest='S')  # consider adding error handling for empty history
 
 #end
 
