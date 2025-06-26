@@ -721,16 +721,13 @@ Asadu Felix
 with tabs[5]:
     st.title("📄 Generate Contract & Receipt PDF for Any Student")
 
-    # Local file and GitHub backup URL
-    student_file = "students.csv"
-    github_csv   = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
-
-    # 1) Load students DataFrame (local → GitHub fallback)
+    # 1) Load students DataFrame directly from Google Sheets
+    SHEET_URL = "https://docs.google.com/spreadsheets/d/1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo/export?format=csv"
     try:
-        df = pd.read_csv(student_file)
-    except FileNotFoundError:
-        df = pd.read_csv(github_csv)
-        st.info("Loaded students from GitHub backup.")
+        df = pd.read_csv(SHEET_URL)
+    except Exception as e:
+        st.error("Couldn't load students list from Google Sheets.")
+        st.stop()
 
     # 2) Normalize columns to lowercase/underscores
     df.columns = [
@@ -801,15 +798,7 @@ with tabs[5]:
 
         # 5) Generate PDF on button click
         if st.button("Generate & Download PDF"):
-            # Re-load CSV to get latest
-            try:
-                df_latest = pd.read_csv(student_file)
-            except FileNotFoundError:
-                df_latest = pd.read_csv(github_csv)
-            df_latest.columns = [c.strip().replace(" ", "_").replace("(", "").replace(")", "").replace("-", "_").replace("/", "_").lower() for c in df_latest.columns]
-            row = df_latest[df_latest[name_col] == selected_name].iloc[0]
-
-            # Use inputs
+            # Use row from DataFrame + form values
             paid    = paid_input
             balance = balance_input
             total   = total_input
@@ -895,6 +884,8 @@ with tabs[5]:
                 mime="application/pdf"
             )
             st.success("✅ PDF generated and ready to download.")
+
+
 
 
 with tabs[7]:
