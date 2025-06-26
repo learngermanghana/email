@@ -1147,7 +1147,7 @@ with tabs[9]:
     st.title("📝 Assignment Marking & Scores (with Email)")
 
     # --- 1. Load Students & Scores ---
-    STUDENTS_URL = "https://docs.google.com/spreadsheets/d/1Axxxxxxx/export?format=csv"
+    STUDENTS_URL = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
     SCORES_URL = "https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/export?format=csv"
     REF_ANSWERS_URL = "https://raw.githubusercontent.com/learngermanghana/email/main/ref_answers.json"
 
