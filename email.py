@@ -1146,44 +1146,22 @@ with tabs[8]:
 with tabs[9]:
     st.title("📝 Assignment Marking & Scores (with Email)")
 
-    # --- 1. Load Students & Scores ---
-    STUDENTS_URL = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
-    SCORES_URL = "https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/export?format=csv"
-    REF_ANSWERS_URL = "https://raw.githubusercontent.com/learngermanghana/email/main/ref_answers.json"
-
-    @st.cache_data(show_spinner=False)
-    def load_students():
-        df = pd.read_csv(STUDENTS_URL)
-        df.columns = [c.strip().lower() for c in df.columns]
-        return df.dropna(subset=['studentcode'])
-
-    @st.cache_data(show_spinner=False)
-    def load_scores():
-        df = pd.read_csv(SCORES_URL)
-        df.columns = [c.strip().lower() for c in df.columns]
-        return df.dropna(subset=['studentcode'])
-
-    @st.cache_data(show_spinner=False)
-    def load_ref_answers():
-        import requests
-        r = requests.get(REF_ANSWERS_URL)
-        return json.loads(r.text)
-
-    ref_answers = load_ref_answers()
-
+    # --- 1. Load Data ---
     try:
-        df_students = load_students()
+        df_students = load_students_from_sqlite()
     except Exception:
         st.error("Couldn't load student list.")
         st.stop()
 
     try:
-        df_scores = load_scores()
+        df_scores = load_scores_from_sqlite()
     except Exception:
         st.error("Couldn't load scores.")
-        df_scores = pd.DataFrame(columns=['studentcode','assignment','score','comments','date','level'])
+        df_scores = pd.DataFrame(columns=['studentcode','name','assignment','score','comments','date','level'])
 
-    # --- 2. Prepare selectors ---
+    # --- 2. Selectors & Preliminaries ---
+    df_students.columns = [c.strip().lower().replace(" ", "") for c in df_students.columns]
+    df_scores.columns = [c.strip().lower().replace(" ", "") for c in df_scores.columns]
     all_levels = sorted(df_students['level'].dropna().unique())
     all_assignments = sorted(set(df_scores['assignment'].dropna().unique()) | set(ref_answers.keys()))
 
@@ -1198,7 +1176,7 @@ with tabs[9]:
         students = df_students if sel_level == "All" else df_students[df_students['level'] == sel_level]
         if search_name:
             students = students[
-                students['name'].str.lower().str.contains(search_name.lower()) | 
+                students['name'].str.lower().str.contains(search_name.lower()) |
                 students['studentcode'].astype(str).str.lower().str.contains(search_name.lower())
             ]
         student_list = (students['name'] + " (" + students['studentcode'] + ")").unique()
@@ -1210,12 +1188,12 @@ with tabs[9]:
         stu_scores = df_scores[df_scores['studentcode'] == code]
         student_info = students[students['studentcode'] == code].iloc[0]
 
-        # Assignment search/filter
+        # Assignment selection
         search_assign = st.text_input("Search assignment", key="assign_search")
         filtered_assignments = [a for a in all_assignments if search_assign.lower() in a.lower()]
         assignment = st.selectbox("Select Assignment", filtered_assignments, key="classic_assign")
 
-        # Show reference answers if available
+        # Reference Answers
         if assignment in ref_answers:
             st.markdown("**Reference Answers:**")
             for ans in ref_answers[assignment]:
@@ -1240,8 +1218,10 @@ with tabs[9]:
                     'date': now,
                     'level': student_info['level']
                 }
+                # Remove old and add new
                 df_scores = df_scores[~((df_scores['studentcode'] == code) & (df_scores['assignment'] == assignment))]
                 df_scores = pd.concat([df_scores, pd.DataFrame([newrow])], ignore_index=True)
+                sync_scores_to_sqlite(df_scores)
                 st.success("✅ Score saved.")
 
         # --- Show Score History ---
@@ -1251,13 +1231,13 @@ with tabs[9]:
 
     # --- 5. BATCH MODE (by Level only) ---
     if mode == "Batch":
-        st.subheader("Batch Mode: Mark all assignments for one student (by Level)")
+        st.subheader("Batch Mode: Enter all assignments for one student (by Level)")
         sel_level = st.selectbox("Select Level", all_levels, key="batch_level")
         search_name = st.text_input("Search student by name or code", key="batch_name")
         students = df_students[df_students['level'] == sel_level]
         if search_name:
             students = students[
-                students['name'].str.lower().str.contains(search_name.lower()) | 
+                students['name'].str.lower().str.contains(search_name.lower()) |
                 students['studentcode'].astype(str).str.lower().str.contains(search_name.lower())
             ]
         student_list = (students['name'] + " (" + students['studentcode'] + ")").unique()
@@ -1269,10 +1249,10 @@ with tabs[9]:
         student_info = students[students['studentcode'] == code].iloc[0]
         st.markdown(f"#### Enter scores for {student_info['name']} ({sel_level})")
 
-        # Filter assignments for this level only
-        stu_scores = df_scores[df_scores['studentcode'] == code]
-        level_assignments = [a for a in all_assignments if sel_level.lower() in str(a).lower() or a in stu_scores['assignment'].values]
+        # Filter assignments for this level only (from ref_answers or existing scores)
+        level_assignments = [a for a in all_assignments if sel_level in a or a in df_scores[df_scores['studentcode'] == code]['assignment'].values]
         batch_scores = {}
+        stu_scores = df_scores[df_scores['studentcode'] == code]
         for a in level_assignments:
             prev = stu_scores[stu_scores['assignment'] == a]
             val = int(prev['score'].iloc[0]) if not prev.empty else 0
@@ -1294,6 +1274,7 @@ with tabs[9]:
                         'level': student_info['level']
                     }
                     df_scores = pd.concat([df_scores, pd.DataFrame([newrow])], ignore_index=True)
+                sync_scores_to_sqlite(df_scores)
                 st.success("✅ All scores saved.")
 
         hist = df_scores[df_scores['studentcode'] == code].sort_values('assignment')
@@ -1332,13 +1313,13 @@ with tabs[9]:
                 )
                 encoded = base64.b64encode(pdf_bytes).decode()
                 message.attachment = Attachment(
-                    FileContent(encoded),
-                    FileName(f"{student_name.replace(' ', '_')}_report.pdf"),
-                    FileType('application/pdf'),
-                    Disposition('attachment')
+                    FileContent(encoded), FileName(f"{student_name.replace(' ', '_')}_report.pdf"), FileType('application/pdf'), Disposition('attachment')
                 )
                 sg.send(message)
-                st.success(f"✅ Email sent to {student_email}!")
+                st.success("✅ Email sent!")
             except Exception as e:
                 st.error(f"Failed to send email: {e}")
+
+#end
+
 
