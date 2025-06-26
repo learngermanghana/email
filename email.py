@@ -718,14 +718,12 @@ Asadu Felix
 """
 
 
+# --- Tab 5 ---
 with tabs[5]:
     st.title("📄 Generate Contract & Receipt PDF for Any Student")
 
-    # Parameterized Google Sheet URL for student data
-    STUDENTS_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo/export?format=csv"
-
-    # 1) Load student data using the helper
-    df = load_students_sheet(STUDENTS.CSV)
+    STUDENTS_CSV_URL = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
+    df = load_students_sheet(STUDENTS_CSV_URL)
     if df.empty:
         st.error("Couldn't load student data from Google Sheets.")
         st.stop()
