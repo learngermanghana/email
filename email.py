@@ -6,6 +6,7 @@ import urllib.parse
 from datetime import date, datetime, timedelta
 from functools import lru_cache
 import tempfile
+import sqlite3
 
 import pandas as pd
 import numpy as np
@@ -15,14 +16,58 @@ from fpdf import FPDF
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
 import openai
-import sqlite3
 
-# (Your utility imports if you use them)
 from pdf_utils import generate_receipt_and_contract_pdf
 # from email_utils import send_emails
 
+# ====== SQLite Sync & Load Helpers ======
+def sync_google_sheet_to_sqlite(df):
+    conn = sqlite3.connect("students_backup.db")
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS students (
+            Name TEXT,
+            Phone TEXT,
+            Email TEXT,
+            Location TEXT,
+            Level TEXT,
+            Paid REAL,
+            Balance REAL,
+            ContractStart TEXT,
+            ContractEnd TEXT,
+            StudentCode TEXT PRIMARY KEY,
+            EmergencyContactPhoneNumber TEXT
+        )
+    ''')
+    c.execute("DELETE FROM students")
+    for _, row in df.iterrows():
+        c.execute('''
+            INSERT OR REPLACE INTO students
+            (Name, Phone, Email, Location, Level, Paid, Balance, ContractStart, ContractEnd, StudentCode, EmergencyContactPhoneNumber)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            row.get("Name", ""),
+            row.get("Phone", ""),
+            row.get("Email", ""),
+            row.get("Location", ""),
+            row.get("Level", ""),
+            float(row.get("Paid", 0) or 0),
+            float(row.get("Balance", 0) or 0),
+            row.get("ContractStart", ""),
+            row.get("ContractEnd", ""),
+            row.get("StudentCode", ""),
+            row.get("Emergency Contact (Phone Number)", "")
+        ))
+    conn.commit()
+    conn.close()
 
-# ===== PAGE CONFIG =====
+def load_students_from_sqlite():
+    conn = sqlite3.connect("students_backup.db")
+    df = pd.read_sql_query("SELECT * FROM students", conn)
+    conn.close()
+    return df
+
+# ====== PAGE CONFIG ======
 st.set_page_config(
     page_title="Learn Language Education Academy Dashboard",
     layout="wide"
@@ -35,30 +80,6 @@ SCHOOL_WEBSITE = "www.learngermanghana.com"
 SCHOOL_PHONE   = "233205706589"
 SCHOOL_ADDRESS = "Awoshie, Accra, Ghana"
 
-# ===== Streamlit session defaults =====
-st.session_state.setdefault("emailed_expiries", set())
-st.session_state.setdefault("dismissed_notifs", set())
-
-# ===== Google Sheets URLs =====
-STUDENTS_URL = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
-SCORES_URL   = "https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/export?format=csv"
-
-# ===== Data Loaders =====
-@st.cache_data(show_spinner=False)
-def load_students():
-    df = pd.read_csv(STUDENTS_URL)
-    df.columns = [c.lower().strip() for c in df.columns]
-    return df
-
-@st.cache_data(show_spinner=False)
-def load_scores():
-    df = pd.read_csv(SCORES_URL)
-    df.columns = [c.lower().strip() for c in df.columns]
-    return df
-
-# Load main dataframes (available for all tabs!)
-df_students = load_students()
-df_scores   = load_scores()
 
 # ====== MAIN TABS ======
 tabs = st.tabs([
@@ -132,78 +153,78 @@ with tabs[0]:
                 if st.button("Approve & Add", key=f"approve_{i}"):
                     if not student_code:
                         st.warning("❗ Please enter a unique student code.")
-                        continue
-
-                    if os.path.exists("students.csv"):
-                        approved_df = pd.read_csv("students.csv")
                     else:
-                        approved_df = pd.DataFrame(columns=[
-                            "Name","Phone","Email","Location","Level",
-                            "Paid","Balance","ContractStart","ContractEnd",
-                            "StudentCode","Emergency Contact (Phone Number)"
-                        ])
+                        # Load or create students.csv
+                        if os.path.exists("students.csv"):
+                            approved_df = pd.read_csv("students.csv")
+                        else:
+                            approved_df = pd.DataFrame(columns=[
+                                "Name", "Phone", "Email", "Location", "Level",
+                                "Paid", "Balance", "ContractStart", "ContractEnd",
+                                "StudentCode", "Emergency Contact (Phone Number)"
+                            ])
 
-                    if student_code in approved_df["StudentCode"].astype(str).values:
-                        st.warning("❗ Student code already exists.")
-                        continue
+                        if student_code in approved_df["StudentCode"].astype(str).values:
+                            st.warning("❗ Student code already exists.")
+                        else:
+                            student_dict = {
+                                "Name": fullname,
+                                "Phone": phone,
+                                "Email": email,
+                                "Location": location,
+                                "Level": level,
+                                "Paid": paid,
+                                "Balance": balance,
+                                "ContractStart": contract_start.isoformat(),
+                                "ContractEnd": contract_end.isoformat(),
+                                "StudentCode": student_code,
+                                "Emergency Contact (Phone Number)": emergency
+                            }
+                            approved_df = pd.concat([approved_df, pd.DataFrame([student_dict])], ignore_index=True)
+                            approved_df.to_csv("students.csv", index=False)
 
-                    student_dict = {
-                        "Name": fullname,
-                        "Phone": phone,
-                        "Email": email,
-                        "Location": location,
-                        "Level": level,
-                        "Paid": paid,
-                        "Balance": balance,
-                        "ContractStart": contract_start.isoformat(),
-                        "ContractEnd": contract_end.isoformat(),
-                        "StudentCode": student_code,
-                        "Emergency Contact (Phone Number)": emergency
-                    }
+                            total_fee = paid + balance
 
-                    approved_df = pd.concat([approved_df, pd.DataFrame([student_dict])], ignore_index=True)
-                    approved_df.to_csv("students.csv", index=False)
+                            # --- Generate PDF as bytes (no file save!) ---
+                            pdf_bytes = generate_receipt_and_contract_pdf(
+                                student_dict,
+                                st.session_state["agreement_template"],
+                                payment_amount=total_fee,
+                                payment_date=contract_start,
+                                first_instalment=first_instalment,
+                                course_length=course_length
+                            )
 
-                    total_fee = paid + balance
-                    pdf_file = generate_receipt_and_contract_pdf(
-                        student_dict,
-                        st.session_state["agreement_template"],
-                        payment_amount=total_fee,
-                        payment_date=contract_start,
-                        first_instalment=first_instalment,
-                        course_length=course_length
-                    )
-                    if send_email and email and 'school_sendgrid_key' in globals():
-                        try:
-                            # Email sending logic...
-                            st.success(f"📧 Email sent to {email}")
-                        except Exception as e:
-                            st.warning(f"⚠️ Email failed: {e}")
+                            # --- Show download button for PDF ---
+                            filename = f"{fullname.replace(' ', '_')}_receipt.pdf"
+                            st.download_button(
+                                "📄 Download Receipt PDF",
+                                data=pdf_bytes,
+                                file_name=filename,
+                                mime="application/pdf"
+                            )
 
-                    st.success(f"✅ {fullname} approved and saved.")
-                    st.rerun()
+                            # --- (Optional: Add email logic here, using pdf_bytes for attachment) ---
 
-
-
-@lru_cache(maxsize=1)
-def load_student_data(local, github_url):
-    if os.path.exists(local):
-        return pd.read_csv(local)
-    try:
-        df = pd.read_csv(github_url)
-        st.info("Loaded students from GitHub backup.")
-        return df
-    except Exception:
-        st.warning("⚠️ students.csv not found locally or on GitHub.")
-        st.stop()
+                            st.success(f"✅ {fullname} approved and saved.")
+                            st.rerun()
 
 # --- All Students (Edit, Update, Delete, Receipt) ---
 with tabs[1]:
     st.title("👩‍🎓 All Students (Edit, Update, Delete, Receipt)")
 
-    student_file = "students.csv"
-    github_csv   = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
-    df_main      = load_student_data(student_file, github_csv)
+    STUDENTS_SHEET_CSV = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
+    try:
+        df_main = pd.read_csv(STUDENTS_SHEET_CSV)
+    except Exception as e:
+        st.error(f"❌ Could not load students sheet: {e}")
+        df_main = pd.DataFrame(columns=[
+            "Name", "Phone", "Email", "Location", "Level",
+            "Paid", "Balance", "ContractStart", "ContractEnd",
+            "StudentCode", "Emergency Contact (Phone Number)"
+        ])
+    # Sync Google Sheet → SQLite (every page load)
+    sync_google_sheet_to_sqlite(df_main)
 
     # Normalize columns and build lookup
     df_main.columns = [
@@ -220,7 +241,6 @@ with tabs[1]:
         k = key.strip().lower().replace(' ', '_').replace('_', '')
         return col_map.get(k, key)
 
-    # Parse date columns
     today    = date.today()
     start_col = col_lookup('contractstart')
     end_col   = col_lookup('contractend')
@@ -228,7 +248,6 @@ with tabs[1]:
         if dt_field in df_main.columns:
             df_main[dt_field] = pd.to_datetime(df_main[dt_field], errors='coerce')
 
-    # Compute status
     df_main['status'] = 'Unknown'
     if end_col in df_main.columns:
         mask = df_main[end_col].notna()
@@ -238,7 +257,6 @@ with tabs[1]:
                    .apply(lambda d: 'Completed' if d < today else 'Enrolled')
         )
 
-    # Search & Filters
     search      = st.text_input('🔍 Search by Name or Code').lower()
     lvl_col     = col_lookup('level')
     level_opts  = ['All'] + sorted(df_main[lvl_col].dropna().unique().tolist()) if lvl_col in df_main.columns else ['All']
@@ -258,7 +276,6 @@ with tabs[1]:
     if sel_status != 'All':
         view_df = view_df[view_df['status'] == sel_status]
 
-    # Table & Pagination
     if view_df.empty:
         st.info('No students found.')
     else:
@@ -276,7 +293,6 @@ with tabs[1]:
         ]
         st.dataframe(page_df[display_cols], use_container_width=True)
 
-        # Detail editing
         selected   = st.selectbox('Select a student', page_df[name_col].tolist(), key='sel_student')
         row        = page_df[page_df[name_col] == selected].iloc[0]
         idx_main   = view_df[view_df[name_col] == selected].index[0]
@@ -284,7 +300,6 @@ with tabs[1]:
         status_emoji = '🟢' if row['status'] == 'Enrolled' else ('🔴' if row['status'] == 'Completed' else '⚪')
 
         with st.expander(f"{status_emoji} {selected} ({row[code_col]}) [{row['status']}]", expanded=True):
-            # Schema-driven form
             schema = {
                 'name': ('text_input', 'Name'),
                 'phone': ('text_input', 'Phone'),
@@ -308,7 +323,7 @@ with tabs[1]:
                 elif widget == 'number_input':
                     inputs[field] = st.number_input(label, value=float(val or 0), key=key_widget)
                 elif widget == 'date_input':
-                    default = val.date() if pd.notna(val) else today
+                    default = val.date() if pd.notna(val) and hasattr(val, "date") else today
                     inputs[field] = st.date_input(label, value=default, key=key_widget)
 
             c1, c2, c3 = st.columns(3)
@@ -316,41 +331,43 @@ with tabs[1]:
                 if st.button('💾 Update', key=f'upd{unique_key}'):
                     for f, v in inputs.items():
                         df_main.at[idx_main, col_lookup(f)] = v
-                    df_main.to_csv(student_file, index=False)
                     st.success('✅ Student updated.')
-                    st.experimental_rerun()
+                    st.download_button(
+                        '⬇️ Download Updated Students CSV (Upload to Google Sheets!)',
+                        data=df_main.to_csv(index=False).encode(),
+                        file_name='students.csv',
+                        mime='text/csv'
+                    )
+                    st.stop()
             with c2:
                 if st.button('🗑️ Delete', key=f'del{unique_key}'):
                     df_main = df_main.drop(idx_main).reset_index(drop=True)
-                    df_main.to_csv(student_file, index=False)
                     st.success('❌ Student deleted.')
-                    st.experimental_rerun()
+                    st.download_button(
+                        '⬇️ Download Updated Students CSV (Upload to Google Sheets!)',
+                        data=df_main.to_csv(index=False).encode(),
+                        file_name='students.csv',
+                        mime='text/csv'
+                    )
+                    st.stop()
             with c3:
                 if st.button('📄 Receipt', key=f'rct{unique_key}'):
                     total_fee = inputs['paid'] + inputs['balance']
                     pay_date  = inputs['contractstart']
-                    pdf_path  = generate_receipt_and_contract_pdf(
-                        row,
+                    student_dict = {k: inputs.get(k, '') for k in schema.keys()}
+                    pdf_bytes = generate_receipt_and_contract_pdf(
+                        student_dict,
                         st.session_state['agreement_template'],
                         payment_amount=total_fee,
                         payment_date=pay_date
                     )
-                    if not pdf_path or not os.path.exists(pdf_path):
-                        st.error("⚠️ Could not generate receipt PDF.")
-                    else:
-                        try:
-                            with open(pdf_path, 'rb') as f:
-                                pdf_bytes = f.read()
-                            b64 = base64.b64encode(pdf_bytes).decode()
-                            st.markdown(
-                                f'<a href="data:application/pdf;base64,{b64}" '
-                                f'download="{selected.replace(" ","_")}_receipt.pdf">Download Receipt</a>',
-                                unsafe_allow_html=True
-                            )
-                        except Exception as e:
-                            st.error(f"⚠️ Error reading PDF: {e}")
+                    st.download_button(
+                        "📄 Download Receipt PDF",
+                        data=pdf_bytes,
+                        file_name=f"{selected.replace(' ', '_')}_receipt.pdf",
+                        mime="application/pdf"
+                    )
 
-        # Export limited columns for download
         export_cols = [
             name_col, code_col, lvl_col,
             col_lookup('phone'), col_lookup('paid'), col_lookup('balance'), 'status'
@@ -362,6 +379,15 @@ with tabs[1]:
             file_name='students_backup.csv',
             mime='text/csv'
         )
+
+        # Download the SQLite DB as a backup
+        with open("students_backup.db", "rb") as f:
+            st.download_button(
+                "⬇️ Download SQLite DB Backup",
+                data=f,
+                file_name="students_backup.db",
+                mime="application/octet-stream"
+            )
 
 
 with tabs[2]:
