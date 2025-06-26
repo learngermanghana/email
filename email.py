@@ -1323,5 +1323,5 @@ with tabs[9]:
                     subject="Your Assignment Results – Learn Language Education Academy",
                     html_content=f"<p>Hello {student_name},<br><br>Your report is attached.</p>"
                 )
-                encoded = base64.b64encode(pdf_bytes).decode(_
+                encoded = base64.b64encode(pdf_bytes).decode()
 
