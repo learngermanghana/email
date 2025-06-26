@@ -725,7 +725,7 @@ with tabs[5]:
     STUDENTS_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo/export?format=csv"
 
     # 1) Load student data using the helper
-    df = load_students_sheet(STUDENTS_SHEET_CSV)
+    df = load_students_sheet(STUDENTS.CSV)
     if df.empty:
         st.error("Couldn't load student data from Google Sheets.")
         st.stop()
