@@ -1149,7 +1149,7 @@ with tabs[9]:
 
     # -- Load Students & Scores --
     STUDENTS_CSV = "students.csv"
-    SCORES_SHEET_URL = "https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36vNQ/export?format=csv"
+    SCORES_SHEET_URL = "https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/export?format=csv"
 
     try:
         df_students = pd.read_csv(STUDENTS_CSV)
