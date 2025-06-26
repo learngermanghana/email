@@ -1,5 +1,6 @@
 # ===== Imports =====
 import os
+import json
 import base64
 import urllib.parse
 from datetime import date, datetime, timedelta
@@ -8,11 +9,15 @@ import tempfile
 import sqlite3
 
 import pandas as pd
+import numpy as np
 import streamlit as st
 
 from fpdf import FPDF
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
+import openai
+import gspread
+from google.oauth2.service_account import Credentials
 
 from pdf_utils import generate_receipt_and_contract_pdf
 # from email_utils import send_emails
@@ -43,17 +48,11 @@ def sync_google_sheet_to_sqlite(df):
             (Name, Phone, Email, Location, Level, Paid, Balance, ContractStart, ContractEnd, StudentCode, EmergencyContactPhoneNumber)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
-            row.get("Name", ""),
-            row.get("Phone", ""),
-            row.get("Email", ""),
-            row.get("Location", ""),
-            row.get("Level", ""),
-            float(row.get("Paid", 0) or 0),
-            float(row.get("Balance", 0) or 0),
-            row.get("ContractStart", ""),
-            row.get("ContractEnd", ""),
-            row.get("StudentCode", ""),
-            row.get("Emergency Contact (Phone Number)", "")
+            row.get("Name", ""), row.get("Phone", ""), row.get("Email", ""),
+            row.get("Location", ""), row.get("Level", ""),
+            float(row.get("Paid", 0) or 0), float(row.get("Balance", 0) or 0),
+            row.get("ContractStart", ""), row.get("ContractEnd", ""),
+            row.get("StudentCode", ""), row.get("Emergency Contact (Phone Number)", "")
         ))
     conn.commit()
     conn.close()
@@ -63,6 +62,49 @@ def load_students_from_sqlite():
     df = pd.read_sql_query("SELECT * FROM students", conn)
     conn.close()
     return df
+
+# ====== Scores Sync & Load Helpers ======
+def sync_scores_to_sqlite(df):
+    conn = sqlite3.connect("students_backup.db")
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS scores (
+            studentcode TEXT,
+            name TEXT,
+            assignment TEXT,
+            score REAL,
+            comments TEXT,
+            date TEXT,
+            level TEXT
+        )
+    ''')
+    c.execute("DELETE FROM scores")
+    for _, row in df.iterrows():
+        c.execute('''
+            INSERT OR REPLACE INTO scores
+            (studentcode, name, assignment, score, comments, date, level)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            row.get("studentcode", ""), row.get("name", ""), row.get("assignment", ""),
+            float(row.get("score", 0) or 0), row.get("comments", ""), row.get("date", ""), row.get("level", "")
+        ))
+    conn.commit()
+    conn.close()
+
+def load_scores_from_sqlite():
+    conn = sqlite3.connect("students_backup.db")
+    df = pd.read_sql_query("SELECT * FROM scores", conn)
+    conn.close()
+    return df
+
+# ====== Google Sheets Sync Helpers ======
+def sync_scores_to_sheets(df):
+    creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"])
+    client = gspread.authorize(creds)
+    sheet = client.open_by_key("1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36vNQ").sheet1
+    data = [df.columns.tolist()] + df.values.tolist()
+    sheet.clear()
+    sheet.update(data)
 
 # ====== PAGE CONFIG ======
 st.set_page_config(
@@ -1091,211 +1133,174 @@ with tabs[8]:
 with tabs[9]:
     st.title("📝 Assignment Marking & Scores (with Email)")
 
-    # ========== 1. Use loaded dataframes from Google Sheets ==========
-    # (already loaded at top as df_students and df_scores)
-    # If you need to reload in this tab only, you could uncomment:
-    # df_students = load_students()
-    # df_scores = load_scores()
-
-    # Fix: Normalize all columns to lowercase/strip spaces
+    # 1️⃣ Load and normalize data from Google Sheets
+    SCORES_URL = (
+        "https://docs.google.com/spreadsheets/d/"
+        "1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/"
+        "export?format=csv"
+    )
+    STUDENTS_URL = (
+        "https://docs.google.com/spreadsheets/d/"
+        "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/"
+        "export?format=csv"
+    )
+    df_scores = pd.read_csv(SCORES_URL)
+    df_students = pd.read_csv(STUDENTS_URL)
     df_scores.columns = [c.strip().lower() for c in df_scores.columns]
     df_students.columns = [c.strip().lower() for c in df_students.columns]
 
-    # Optional debug (remove later)
-    # st.write("df_scores columns:", df_scores.columns.tolist())
-    # st.write("df_students columns:", df_students.columns.tolist())
+    # 2️⃣ Sync to SQLite and reload
+    sync_scores_to_sqlite(df_scores)
+    sync_google_sheet_to_sqlite(df_students)
+    df_scores = load_scores_from_sqlite()
 
-    # ========== 2. Reference Answers (hardcoded) ==========
+    # --- Reference Answers ---
     ref_answers = {
         "Lesen und Horen 0.1": [
-            "1. C) Guten Morgen", "2. D) Guten Tag", "3. B) Guten Abend", "4. B) Gute Nacht", "5. C) Guten Morgen",
-            "6. C) Wie geht es Ihnen?", "7. B) Auf Wiedersehen", "8. C) Tschüss", "9. C) Guten Abend", "10. D) Gute Nacht"
+            "1. C) Guten Morgen", "2. D) Guten Tag", "3. B) Guten Abend", "4. B) Gute Nacht", 
+            "5. C) Guten Morgen", "6. C) Wie geht es Ihnen?", "7. B) Auf Wiedersehen", 
+            "8. C) Tschüss", "9. C) Guten Abend", "10. D) Gute Nacht"
         ],
-        # ... add the rest of your assignments here ...
+        "Lesen und Horen 0.2": [
+            "1. C) 26", "2. A) A, O, U, B", "3. A) Eszett", "4. A) K", 
+            "5. A) A-Umlaut", "6. A) A, O, U, B", "7. B) 4", "",  # blank line
+            "Wasser", "Kaffee", "Blume", "Schule", "Tisch"
+        ],
+        "Lesen und Horen 1.1": ["1. C", "2. C", "3. A", "4. B"],
+        "Lesen und Horen 1.2": [
+            "1. Ich heiße Anna", "2. Du heißt Max", "3. Er heißt Peter", "4. Wir kommen aus Italien", 
+            "5. Ihr kommt aus Brasilien", "6. Sie kommen aus Russland", "7. Ich wohne in Berlin", 
+            "8. Du wohnst in Madrid", "9. Sie wohnt in Wien", "",  # blank line
+            "1. A) Anna", "2. C) Aus Italien", "3. D) In Berlin", "4. B) Tom", "5. A) In Berlin"
+        ],
+        # ... include additional assignments as needed ...
+        "4.10. Tourismus und Traditionelle Feste": [
+            "1. C) Barcelona", "2. B) Sagrada Familia und Park Güell", "3. C) Tapas", "4. B) Buñol", 
+            "5. C) Tomaten werfen", "6. B) Weil er die spanische Kultur erleben konnte", 
+            "7. D) Wieder nach Spanien reisen zu können", "",  # blank line
+            "1. C) München", "2. B) Zwei Wochen", "3. B) Brezeln, Bratwurst und Schweinebraten", 
+            "4. B) Lederhosen und Dirndl", "5. B) Fahrgeschäfte und Spiele"
+        ],
+        "4.11. Unterwegs: Verkehrsmittel vergleichen": [
+            "1. b) In Italien", "2. b) Weil sie in der Stadt fahren wird", "3. a) Eine gute Versicherung", 
+            "4. b) Führerschein und Personalausweis", "5. b) Der Angestellte der Autovermietung", 
+            "6. a) Viele Städte zu besuchen", "7. b) Sehr zufrieden", "",  # blank line
+            "1. B) in die Berge", "2. B) Ein Mietfahrzeug", "3. B) 50 Euro", "4. C) Führerschein und Kreditkarte", 
+            "5. B) Das Auto auf mögliche Schäden überprüfen"
+        ]
     }
-    all_assignments = sorted(list({*df_scores["assignment"].dropna().unique(), *ref_answers.keys()}))
-    all_levels = sorted(df_students["level"].dropna().unique())
+    all_assignments = sorted(set(df_scores['assignment'].dropna().unique()) | set(ref_answers.keys()))
+    all_levels = sorted(df_students['level'].dropna().unique())
 
-    # ========== 3. Marking Modes ==========
-    mode = st.radio(
-        "Select marking mode:",
-        ["Mark single assignment (classic)", "Batch mark (all assignments for one student)"],
-        key="marking_mode"
-    )
+    # 3️⃣ Sync button for manual Google Sheets update
+    if st.button("🔄 Sync Scores to Google Sheets"):
+        sync_scores_to_sheets(load_scores_from_sqlite())
+        st.success("✅ Scores synced back to Google Sheets.")
 
-    # ----- CLASSIC MODE -----
-    if mode == "Mark single assignment (classic)":
-        st.subheader("Classic Mode: Mark One Assignment")
-        sel_level = st.selectbox("Filter by Level", ["All"] + all_levels, key="single_level")
-        filtered_students = df_students if sel_level == "All" else df_students[df_students["level"] == sel_level]
-        student_list = filtered_students["name"] + " (" + filtered_students["studentcode"].astype(str) + ")"
-        chosen = st.selectbox("Select Student", student_list, key="single_student")
-        student_code = chosen.split("(")[-1].replace(")", "").strip()
-        stu_row = filtered_students[filtered_students["studentcode"] == student_code].iloc[0]
-
-        assign_filter = st.text_input("Filter assignment titles", key="assign_filter")
-        assignment_choices = [a for a in all_assignments if assign_filter.lower() in a.lower()]
-        assignment = st.selectbox("Select Assignment", assignment_choices, key="assignment_sel")
-        prev = df_scores[(df_scores["studentcode"] == student_code) & (df_scores["assignment"] == assignment)]
-        default_score = int(prev["score"].iloc[0]) if not prev.empty else 0
-        default_comment = prev["comments"].iloc[0] if not prev.empty else ""
-        score = st.number_input("Score", 0, 100, value=default_score, key="score_input")
-        comments = st.text_area("Comments / Feedback", value=default_comment, key="comments_input")
-        if assignment in ref_answers:
-            st.markdown("**Reference Answers:**")
-            st.markdown("<br>".join(ref_answers[assignment]), unsafe_allow_html=True)
-
-        if st.button("💾 Save Score", key="save_score_btn"):
-            now = pd.Timestamp.now().strftime("%Y-%m-%d")
-            newrow = pd.DataFrame([{
-                "studentcode": student_code,
-                "name": stu_row["name"],
-                "assignment": assignment,
-                "score": score,
-                "comments": comments,
-                "date": now,
-                "level": stu_row["level"]
-            }])
-            mask = (df_scores["studentcode"] == student_code) & (df_scores["assignment"] == assignment)
-            df_scores = df_scores[~mask]
-            df_scores = pd.concat([df_scores, newrow], ignore_index=True)
-            st.success("Score updated (session only, Google Sheet write-back coming soon!)")
-
-        hist = df_scores[df_scores["studentcode"] == student_code].sort_values("date", ascending=False)
-        st.markdown("### Student Score History")
-        st.dataframe(hist[["assignment", "score", "comments", "date"]])
-
-    # ----- BATCH MODE -----
-    if mode == "Batch mark (all assignments for one student)":
-        st.subheader("Batch Mode: Enter all assignments for one student (fast)")
-        sel_level = st.selectbox("Select Level", all_levels, key="batch_level")
-        filtered_students = df_students[df_students["level"] == sel_level]
-        student_list = filtered_students["name"] + " (" + filtered_students["studentcode"].astype(str) + ")"
-        chosen = st.selectbox("Select Student", student_list, key="batch_student")
-        student_code = chosen.split("(")[-1].replace(")", "").strip()
-        stu_row = filtered_students[filtered_students["studentcode"] == student_code].iloc[0]
-        st.markdown(f"#### Enter scores for all assignments for {stu_row['name']} ({stu_row['studentcode']})")
-        scored = df_scores[df_scores["studentcode"] == student_code]
-        batch_scores = {}
-        for assignment in all_assignments:
-            prev = scored[scored["assignment"] == assignment]
-            val = int(prev["score"].iloc[0]) if not prev.empty else 0
-            batch_scores[assignment] = st.number_input(
-                f"{assignment}", 0, 100, value=val, key=f"batch_score_{assignment}"
-            )
-        if st.button("💾 Save All Scores (Batch)", key="save_all_batch"):
-            now = pd.Timestamp.now().strftime("%Y-%m-%d")
-            for assignment, score in batch_scores.items():
-                mask = (df_scores["studentcode"] == student_code) & (df_scores["assignment"] == assignment)
-                df_scores = df_scores[~mask]
-                newrow = pd.DataFrame([{
-                    "studentcode": student_code, "name": stu_row["name"], "assignment": assignment,
-                    "score": score, "comments": "", "date": now, "level": stu_row["level"]
-                }])
-                df_scores = pd.concat([df_scores, newrow], ignore_index=True)
-            st.success("All scores updated (session only; Google Sheet write-back coming soon).")
-        st.markdown("##### Summary of entered scores:")
-        st.dataframe(pd.DataFrame({
-            "Assignment": all_assignments,
-            "Score": [batch_scores[a] for a in all_assignments]
-        }))
-
-    # ======= 4. Edit/Delete/Export =======
-    st.markdown("---")
-    st.header("✏️ Edit, Delete, or Export Scores")
+    # 4️⃣ Edit/Delete Individual Scores
+    st.markdown("### ✏️ Edit or Delete Individual Scores")
+    df_scores = load_scores_from_sqlite()
     edit_student = st.selectbox(
-        "Pick student for history export/edit",
-        df_students["name"] + " (" + df_students["studentcode"].astype(str) + ")",
-        key="edit_student"
+        "Select student:", df_students['name'] + ' (' + df_students['studentcode'] + ')'
     )
-    edit_code = edit_student.split("(")[-1].replace(")", "").strip()
-    stu_row = df_students[df_students["studentcode"] == edit_code].iloc[0]
-    hist = df_scores[df_scores["studentcode"] == edit_code].sort_values("date", ascending=False)
-    st.dataframe(hist[["assignment", "score", "comments", "date"]])
-
-    # Edit/Delete per assignment
-    for idx, row in hist.iterrows():
-        with st.expander(f"{row['assignment']} – {row['score']}/100 ({row['date']})", expanded=False):
-            new_score = st.number_input("Edit Score", 0, 100, int(row["score"]), key=f"edit_score_{idx}")
-            new_comments = st.text_area("Edit Comments", row["comments"], key=f"edit_comments_{idx}")
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("Update", key=f"update_{idx}"):
-                    df_scores.at[idx, "score"] = new_score
-                    df_scores.at[idx, "comments"] = new_comments
-                    st.success("Score updated (session only)")
-            with col2:
-                if st.button("Delete", key=f"delete_{idx}"):
+    code = edit_student.split('(')[-1].strip(')')
+    student_scores = df_scores[df_scores['studentcode'] == code]
+    if student_scores.empty:
+        st.info("No scores for this student.")
+    else:
+        for idx, row in student_scores.iterrows():
+            with st.expander(f"{row['assignment']} - {row['score']}/100"):
+                with st.form(f"edit_form_{idx}"):
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        new_score = st.number_input(
+                            "Score", 0, 100, int(row['score']), key=f"score_{idx}"
+                        )
+                    with c2:
+                        new_comments = st.text_input(
+                            "Comments", row['comments'], key=f"comments_{idx}"
+                        )
+                    with c3:
+                        submitted = st.form_submit_button("Update")
+                    if submitted:
+                        df_scores.at[idx, 'score'] = new_score
+                        df_scores.at[idx, 'comments'] = new_comments
+                        sync_scores_to_sqlite(df_scores)
+                        st.success("✅ Score updated.")
+                        st.experimental_rerun()
+                if st.button("Delete this entry", key=f"del_{idx}"):
                     df_scores = df_scores.drop(idx)
-                    st.success("Deleted (session only)")
+                    sync_scores_to_sqlite(df_scores)
+                    st.success("❌ Score deleted.")
+                    st.experimental_rerun()
 
-    # ======= 5. Download CSV =======
+    # 5️⃣ Summary Statistics & CSV Downloads
+    st.markdown("### 📊 Summary Statistics")
+    avg = df_scores.groupby('assignment')['score'].mean().reset_index().rename(columns={'score':'avg_score'})
+    st.table(avg)
+    failing = df_scores[df_scores['score'] < 50]
+    if not failing.empty:
+        st.markdown("**Failing Students:**")
+        st.dataframe(failing[['name', 'assignment', 'score']])
+        st.download_button(
+            "Download Failing Students", 
+            failing.to_csv(index=False).encode(),
+            file_name='failing_students.csv'
+        )
     st.download_button(
-        "📁 Download All Scores CSV",
-        data=df_scores.to_csv(index=False).encode(),
-        file_name="all_scores_export.csv",
-        mime="text/csv"
+        "Download All Scores", 
+        df_scores.to_csv(index=False).encode(),
+        file_name='all_scores.csv'
     )
 
-    # ======= 6. PDF & EMAIL =======
-    st.markdown("### 📄 PDF/Email Student Full Report")
-    from fpdf import FPDF
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", "B", 14)
-    pdf.cell(0, 10, f"Report for {stu_row['name']}", ln=True)
-    pdf.ln(5)
-    for _, r in hist.iterrows():
-        pdf.set_font("Arial", "B", 12)
-        pdf.cell(0, 8, f"{r['assignment']}: {r['score']}/100", ln=True)
-        pdf.set_font("Arial", "", 11)
-        pdf.multi_cell(0, 8, f"Comments: {r['comments']}")
-        pdf.ln(3)
-    pdf_bytes = pdf.output(dest="S").encode("latin-1", "replace")
+    # 6️⃣ PDF & EMAIL Report
+    student_key = f"report_pdf_{code}"
+    if student_key not in st.session_state:
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", "B", 14)
+        pdf.cell(0, 10, f"Report for {edit_student.split(' (')[0]}", ln=True)
+        pdf.ln(5)
+        for _, r in student_scores.iterrows():
+            pdf.set_font("Arial", "B", 12)
+            pdf.cell(0, 8, f"{r['assignment']}: {r['score']}/100", ln=True)
+            pdf.set_font("Arial", "", 11)
+            pdf.multi_cell(0, 8, f"Comments: {r['comments']}")
+            pdf.ln(3)
+        st.session_state[student_key] = pdf.output(dest="S").encode("latin-1", "replace")
+    pdf_bytes = st.session_state[student_key]
+
     st.download_button(
         "📄 Download Student Report PDF",
         data=pdf_bytes,
-        file_name=f"{stu_row['name'].replace(' ', '_')}_report.pdf",
+        file_name=f"{edit_student.split(' (')[0].replace(' ', '_')}_report.pdf",
         mime="application/pdf"
     )
-
-    # ======= 7. SendGrid Email Button =======
     st.markdown("#### 📧 Email this report to the student")
-    student_email = stu_row.get("email", "")
-    sender_email = st.secrets["general"]["SENDER_EMAIL"]
-    sendgrid_key = st.secrets["general"]["SENDGRID_API_KEY"]
-    email_sent = False
-
-    if student_email and st.button(f"📧 Send PDF to {student_email}"):
+    student_email = df_students.set_index('studentcode').loc[code, 'email']
+    if st.button(f"📧 Send PDF to {student_email}"):
         try:
-            sg = SendGridAPIClient(sendgrid_key)
+            sg = SendGridAPIClient(st.secrets['general']['SENDGRID_API_KEY'])
             message = Mail(
-                from_email=sender_email,
+                from_email=st.secrets['general']['SENDER_EMAIL'],
                 to_emails=student_email,
-                subject=f"Your Assignment Results from Learn Language Education Academy",
-                html_content=f"""
-                <p>Hello {stu_row['name']},<br><br>
-                Please find attached your latest assignment scores.<br><br>
-                Best regards,<br>Learn Language Education Academy
-                </p>
-                """
+                subject="Your Assignment Results – Learn Language Education Academy",
+                html_content=(
+                    f"<p>Hello {edit_student.split(' (')[0]},<br><br>"
+                    "Your report is attached below."
+                    "</p>"
+                )
             )
             encoded = base64.b64encode(pdf_bytes).decode()
-            attached = Attachment(
+            message.attachment = Attachment(
                 FileContent(encoded),
-                FileName(f"{stu_row['name'].replace(' ', '_')}_report.pdf"),
+                FileName(f"{edit_student.split(' (')[0].replace(' ', '_')}_report.pdf"),
                 FileType('application/pdf'),
                 Disposition('attachment')
             )
-            message.attachment = attached
             sg.send(message)
-            email_sent = True
-            st.success(f"Email sent to {student_email}!")
+            st.success("✅ Email sent!")
         except Exception as e:
             st.error(f"Failed to send email: {e}")
-    elif not student_email:
-        st.info("No email found for this student.")
-
-#end
 
 
