@@ -1133,18 +1133,13 @@ with tabs[8]:
 with tabs[9]:
     st.title("📝 Assignment Marking & Scores (with Email)")
 
-    # 1️⃣ Load and normalize data from Google Sheets
-    SCORES_URL = (
-        "https://docs.google.com/spreadsheets/d/"
-        "1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/"
-        "export?format=csv"
-    )
-    STUDENTS_URL = (
-        "https://docs.google.com/spreadsheets/d/"
-        "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/"
-        "export?format=csv"
-    )
-    df_scores = pd.read_csv(SCORES_URL)
+    # 1️⃣ Load and normalize data
+    BACKUP_SCORES_URL = "YOUR_BACKUP_SCORES_URL_HERE"  # e.g. the score.backup Google Sheet CSV URL
+    try:
+        df_scores = pd.read_csv(SCORES_URL)
+    except Exception:
+        df_scores = pd.read_csv(BACKUP_SCORES_URL)
+
     df_students = pd.read_csv(STUDENTS_URL)
     df_scores.columns = [c.strip().lower() for c in df_scores.columns]
     df_students.columns = [c.strip().lower() for c in df_students.columns]
@@ -1157,8 +1152,8 @@ with tabs[9]:
     # --- Reference Answers ---
     ref_answers = {
         "Lesen und Horen 0.1": [
-            "1. C) Guten Morgen", "2. D) Guten Tag", "3. B) Guten Abend", "4. B) Gute Nacht",
-            "5. C) Guten Morgen", "6. C) Wie geht es Ihnen?", "7. B) Auf Wiedersehen",
+            "1. C) Guten Morgen", "2. D) Guten Tag", "3. B) Guten Abend", "4. B) Gute Nacht", 
+            "5. C) Guten Morgen", "6. C) Wie geht es Ihnen?", "7. B) Auf Wiedersehen", 
             "8. C) Tschüss", "9. C) Guten Abend", "10. D) Gute Nacht"
         ],
         # ... add other assignments here ...
@@ -1256,7 +1251,7 @@ with tabs[9]:
         st.markdown("#### Entered Batch Scores")
         st.dataframe(hist[['assignment','score']])
 
-    # 6️⃣ PDF & Email Report
+    # 6️⃣ PDF & Email Report (Summary section removed)
     student_email = df_students.set_index('studentcode').loc[code,'email']
     student_name = chosen.split(' (')[0]
     student_key = f"report_pdf_{code}"
@@ -1275,10 +1270,7 @@ with tabs[9]:
         st.session_state[student_key] = pdf.output(dest='S').encode('latin-1','replace')
     pdf_bytes = st.session_state[student_key]
 
-    st.download_button("📄 Download Report PDF",
-                       pdf_bytes,
-                       f"{student_name.replace(' ','_')}_report.pdf",
-                       "application/pdf")
+    st.download_button("📄 Download Report PDF", pdf_bytes, f"{student_name.replace(' ','_')}_report.pdf", "application/pdf")
     if st.button(f"📧 Email PDF to {student_email}"):
         try:
             sg = SendGridAPIClient(st.secrets['general']['SENDGRID_API_KEY'])
@@ -1296,8 +1288,6 @@ with tabs[9]:
                 Disposition('attachment')
             )
             sg.send(message)
-            st.success("✅ Email sent!")
+            st.success("✅ Email sent!" )
         except Exception as e:
             st.error(f"Failed to send email: {e}")
-
-
