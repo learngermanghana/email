@@ -717,15 +717,6 @@ Date: [DATE]
 Asadu Felix
 """
 
-# --- Tab 5: Generate & Edit Receipt/Contract PDF ---
-
-# Cache the student sheet load globally to avoid repeated network calls
-@st.cache_data(show_spinner=False)
-def load_students_sheet(sheet_url):
-    try:
-        return pd.read_csv(sheet_url)
-    except Exception:
-        return pd.DataFrame()
 
 with tabs[5]:
     st.title("📄 Generate Contract & Receipt PDF for Any Student")
@@ -864,6 +855,13 @@ with tabs[5]:
             mime="application/pdf"
         )
 
+with tabs[6]:
+    st.title("📧 Send Email")
+    st.info("Email-sending UI coming soon")
+
+with tabs[7]:
+    st.title("📊 Analytics & Export")
+    st.info("Analytics dashboard and export options coming soon")
 
 with tabs[8]:
 
