@@ -1142,6 +1142,7 @@ with tabs[8]:
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
 
+# ------------- Marking Tab: "📝 Assignment Marking & Scores" -------------
 with tabs[9]:
     st.title("📝 Assignment Marking & Scores (with Email)")
 
@@ -1158,16 +1159,23 @@ with tabs[9]:
         st.error("Couldn't load scores.")
         df_scores = pd.DataFrame(columns=['studentcode','name','assignment','score','comments','date','level'])
 
-    # --- 2. Selectors & Preliminaries ---
+    # --- 2. Preprocess columns and options ---
     df_students.columns = [c.strip().lower().replace(" ", "") for c in df_students.columns]
     df_scores.columns = [c.strip().lower().replace(" ", "") for c in df_scores.columns]
     all_levels = sorted(df_students['level'].dropna().unique())
     all_assignments = sorted(set(df_scores['assignment'].dropna().unique()) | set(ref_answers.keys()))
 
-    # --- 3. Marking Mode ---
+    # --- 3. Download All Scores ---
+    st.download_button(
+        "📁 Download All Scores as CSV",
+        df_scores.to_csv(index=False).encode(),
+        file_name="all_scores.csv"
+    )
+
+    # --- 4. Marking Mode Switch ---
     mode = st.radio("Select marking mode:", ["Classic", "Batch"], key="mark_mode")
 
-    # --- 4. CLASSIC MODE ---
+    # ========== CLASSIC MODE ==========
     if mode == "Classic":
         st.subheader("Classic Mode: Mark One Assignment")
         search_name = st.text_input("Search student by name or code")
@@ -1224,12 +1232,12 @@ with tabs[9]:
                 st.success("✅ Score saved.")
                 st.experimental_rerun()
 
-        # --- Show Score History ---
+        # --- Show Score History (all assignments, all dates) ---
         hist = df_scores[df_scores['studentcode'] == code].sort_values('date', ascending=False)
         st.markdown("#### Score History")
         st.dataframe(hist[['assignment','score','comments','date']])
 
-    # --- 5. BATCH MODE (by Level only, assignments grouped by level) ---
+    # ========== BATCH MODE ==========
     if mode == "Batch":
         st.subheader("Batch Mode: Enter all assignments for one student (by Level)")
         sel_level = st.selectbox("Select Level", all_levels, key="batch_level")
@@ -1249,22 +1257,8 @@ with tabs[9]:
         student_info = students[students['studentcode'] == code].iloc[0]
         st.markdown(f"#### Enter scores for {student_info['name']} ({sel_level})")
 
-        # --- Improved Assignment Picker for Batch ---
-        # Find all assignments attempted at this level
-        level_scores = df_scores[df_scores['level'] == sel_level]
-        assigns_from_scores = set(level_scores['assignment'].unique())
-
-        # Assignments from reference answers, by level
-        def is_for_level(a_key, level):
-            key_low = a_key.lower()
-            lvl_low = level.lower()
-            if lvl_low == "a1":
-                return not (key_low.startswith("a2") or key_low.startswith("b1") or key_low.startswith("b2"))
-            return lvl_low in key_low
-
-        assigns_from_refs = {a for a in ref_answers if is_for_level(a, sel_level)}
-        level_assignments = sorted(assigns_from_scores | assigns_from_refs)
-
+        # Filter assignments for this level only (from all_assignments, case-insensitive contains)
+        level_assignments = [a for a in all_assignments if sel_level.lower() in a.lower()]
         if not level_assignments:
             st.warning("No assignments found for this level.")
             st.stop()
@@ -1295,18 +1289,17 @@ with tabs[9]:
                 st.success("✅ All scores saved.")
                 st.experimental_rerun()
 
-        # Show entered/edited batch scores for that student at this level
-        hist = df_scores[df_scores['studentcode'] == code].sort_values('assignment')
+        # --- Show Entered Batch Scores (current values) ---
+        hist = df_scores[(df_scores['studentcode'] == code) & (df_scores['assignment'].isin(level_assignments))].sort_values('assignment')
         st.markdown("#### Entered Batch Scores")
         st.dataframe(hist[['assignment', 'score']])
 
-    # --- 6. Download all scores as CSV ---
-    st.markdown("### Download All Scores")
-    st.download_button("📁 Download All Scores CSV",
-        df_scores.to_csv(index=False).encode(), file_name="all_scores.csv")
+        # --- Show Score History (all assignments, all dates) ---
+        full_hist = df_scores[df_scores['studentcode'] == code].sort_values('date', ascending=False)
+        st.markdown("#### Score History")
+        st.dataframe(full_hist[['assignment','score','comments','date']])
 
-    # --- 7. PDF & EMAIL ---
-    # Use code and student_info from the last student selected (Classic or Batch)
+    # ========== PDF & EMAIL ==========
     student_email = student_info.get('email', None)
     student_name = student_info['name']
     student_key = f"report_pdf_{code}"
