@@ -119,6 +119,7 @@ def send_email_with_pdf(student_email, student_name, pdf_bytes, sendgrid_api_key
 
 
 def build_simple_pdf(student, history_df, ref_answers, total):
+    from fpdf import FPDF
     pdf = FPDF(format='A4')
     pdf.add_page()
     pdf.set_font('Arial', size=12)
@@ -131,24 +132,46 @@ def build_simple_pdf(student, history_df, ref_answers, total):
     pdf.cell(0, 8, safe_pdf(f"Assignments completed: {history_df['assignment'].nunique()} / {total}"), ln=True)
     pdf.ln(4)
 
+    # Table headers
     col_widths = [60, 20, 30, 80]
     headers = ['Assignment', 'Score', 'Date', 'Reference']
     for w, h in zip(col_widths, headers):
         pdf.cell(w, 8, safe_pdf(h), border=1)
     pdf.ln()
 
+    # Table rows
     for _, row in history_df.iterrows():
-        assignment = safe_pdf(str(row['assignment']))
+        assignment = safe_pdf(str(row['assignment'])[:40])
         score = safe_pdf(str(row['score']))
         date_str = safe_pdf(str(row['date']))
-        # Get the reference answers as a single string (first 180 chars)
         reference_raw = '; '.join(ref_answers.get(row['assignment'], []))
-        reference = safe_pdf(reference_raw[:180])  # show first 180 chars
-        pdf.cell(col_widths[0], 6, assignment[:40], border=1)
-        pdf.cell(col_widths[1], 6, score, border=1)
-        pdf.cell(col_widths[2], 6, date_str, border=1)
-        pdf.cell(col_widths[3], 6, reference, border=1)
-        pdf.ln()
+        reference = safe_pdf(reference_raw)
+        
+        # --- Calculate required height for this row
+        # Find the cell that needs the most vertical space (number of lines)
+        line_height = 6
+        ref_lines = pdf.multi_cell(col_widths[3], line_height, reference, border=0, align='L', split_only=True)
+        num_lines = max(len(ref_lines), 1)
+        row_height = num_lines * line_height
+
+        # Save x and y
+        x_left = pdf.get_x()
+        y_top = pdf.get_y()
+
+        # Assignment
+        pdf.multi_cell(col_widths[0], row_height, assignment, border=1, align='L', ln=3, max_line_height=line_height)
+        pdf.set_xy(x_left + col_widths[0], y_top)
+        # Score
+        pdf.multi_cell(col_widths[1], row_height, score, border=1, align='L', ln=3, max_line_height=line_height)
+        pdf.set_xy(x_left + col_widths[0] + col_widths[1], y_top)
+        # Date
+        pdf.multi_cell(col_widths[2], row_height, date_str, border=1, align='L', ln=3, max_line_height=line_height)
+        pdf.set_xy(x_left + col_widths[0] + col_widths[1] + col_widths[2], y_top)
+        # Reference (multi-line, uses full height)
+        pdf.multi_cell(col_widths[3], line_height, reference, border=1, align='L')
+        # Move to next line for the next row
+        pdf.ln(0)
+
     return pdf.output(dest='S').encode('latin-1')
 
 
