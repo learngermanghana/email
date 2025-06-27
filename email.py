@@ -144,6 +144,11 @@ def build_simple_pdf(student, history_df, ref_answers, total):
         pdf.multi_cell(col_widths[3], 6, reference, border=1)
     return pdf.output(dest='S')
 
+def sync_google_sheet_to_sqlite(df):
+    conn = sqlite3.connect("students_backup.db")
+    df.to_sql("students", conn, if_exists="replace", index=False)
+    conn.close()
+
 # =========== TABS ===========
 tabs = st.tabs([
     "Dashboard",           # tab 0
