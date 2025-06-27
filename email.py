@@ -1219,13 +1219,23 @@ with tabs[9]:
                 now = datetime.now().strftime("%Y-%m-%d")
                 row = dict(studentcode=code, name=student['name'], assignment=sel_a,
                            score=score, comments=comments, date=now, level=student['level'])
+                # Remove previous record for this assignment/student
                 df_scores = df_scores[~(
                     (df_scores['studentcode'] == code) & (df_scores['assignment'] == sel_a)
                 )]
                 df_scores = pd.concat([df_scores, pd.DataFrame([row])], ignore_index=True)
                 sync_scores_to_sqlite(df_scores)
-                st.success("Score saved.")
-                st.rerun()
+                df_scores.to_csv("scores.csv", index=False)   # Save local for download
+
+                st.success("Score saved **locally**. Download and upload 'scores.csv' to Google Sheets to make permanent!")
+                st.download_button(
+                    '⬇️ Download Updated Scores CSV (Upload to Google Sheets!)',
+                    data=df_scores.to_csv(index=False).encode(),
+                    file_name='scores.csv',
+                    mime='text/csv'
+                )
+                st.stop()
+
     else:
         # Batch mode: all assignments of level
         st.markdown("---")
