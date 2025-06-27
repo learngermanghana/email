@@ -273,12 +273,11 @@ ref_answers = {
     ]
 }
           
-    st.write("Assignments in scores:", df_scores[assign_col].unique())
-    st.write("Reference answer keys:", list(ref_answers.keys()))
+st.write("Assignments in scores:", df_scores[assign_col].unique())
+st.write("Reference answer keys:", list(ref_answers.keys()))
 
-    all_assignments = sorted(list({*df_scores[assign_col].dropna().unique(), *ref_answers.keys()}))
-    all_levels = sorted(df_students[level_col].dropna().unique())
-
+all_assignments = sorted(list({*df_scores[assign_col].dropna().unique(), *ref_answers.keys()}))
+all_levels = sorted(df_students[level_col].dropna().unique())
 
 # ==== 5. TABS LAYOUT ====
 tabs = st.tabs([
@@ -293,6 +292,7 @@ tabs = st.tabs([
     "📆 Schedule",                # 8
     "📝 Marking"                  # 9
 ])
+
 
 # ==== 6. AGREEMENT TEMPLATE (Persisted in Session State) ====
 if "agreement_template" not in st.session_state:
