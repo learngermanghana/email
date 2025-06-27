@@ -1138,16 +1138,24 @@ with tabs[8]:
                        data=pdf.output(dest='S').encode('latin-1'),
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
-# ==== TAB 9: Assignment Marking & Scores (with Email) ====
+
 with tabs[9]:
     st.title("📝 Assignment Marking & Scores (with Email)")
 
-    # 1. Load students from your Google Sheet
+    # 0. point load‐URL at the top of this tab
+    students_csv_url = (
+      "https://docs.google.com/spreadsheets/d/"
+      "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U"
+      "/export?format=csv"
+    )
+
     @st.cache_data(show_spinner=False)
     def load_students():
         df = pd.read_csv(students_csv_url)
         return normalize_columns(df)
+
     df_students = load_students()
+    …
 
     # 2. Supabase helpers — **reads** use anon_supabase, **writes/deletes** use service_supabase
     def fetch_scores_supabase():
