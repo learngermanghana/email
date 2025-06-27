@@ -122,31 +122,32 @@ def build_simple_pdf(student, history_df, ref_answers, total):
     pdf = FPDF(format='A4')
     pdf.add_page()
     pdf.set_font('Arial', size=12)
-    pdf.cell(0, 10, 'Learn Language Education Academy', ln=True, align='C')
+    pdf.cell(0, 10, safe_pdf('Learn Language Education Academy'), ln=True, align='C')
     pdf.ln(4)
-    pdf.cell(0, 8, f"Student: {student['name']} ({student['studentcode']})", ln=True)
-    pdf.cell(0, 8, f"Level: {student['level']}", ln=True)
-    pdf.cell(0, 8, f"Date: {datetime.now():%Y-%m-%d}", ln=True)
+    pdf.cell(0, 8, safe_pdf(f"Student: {student['name']} ({student['studentcode']})"), ln=True)
+    pdf.cell(0, 8, safe_pdf(f"Level: {student['level']}"), ln=True)
+    pdf.cell(0, 8, safe_pdf(f"Date: {datetime.now():%Y-%m-%d}"), ln=True)
     pdf.ln(4)
-    pdf.cell(0, 8, f"Assignments completed: {history_df['assignment'].nunique()} / {total}", ln=True)
+    pdf.cell(0, 8, safe_pdf(f"Assignments completed: {history_df['assignment'].nunique()} / {total}"), ln=True)
     pdf.ln(4)
 
     col_widths = [60, 20, 30, 80]
     headers = ['Assignment', 'Score', 'Date', 'Reference']
     for w, h in zip(col_widths, headers):
-        pdf.cell(w, 8, h, border=1)
+        pdf.cell(w, 8, safe_pdf(h), border=1)
     pdf.ln()
 
     for _, row in history_df.iterrows():
-        assignment = row['assignment']
-        score = str(row['score'])
-        date_str = row['date']
-        reference = '; '.join(ref_answers.get(assignment, []))
+        assignment = safe_pdf(row['assignment'])
+        score = safe_pdf(str(row['score']))
+        date_str = safe_pdf(str(row['date']))
+        reference = safe_pdf('; '.join(ref_answers.get(row['assignment'], [])))
         pdf.cell(col_widths[0], 6, assignment[:40], border=1)
         pdf.cell(col_widths[1], 6, score, border=1)
         pdf.cell(col_widths[2], 6, date_str, border=1)
         pdf.multi_cell(col_widths[3], 6, reference, border=1)
     return pdf.output(dest='S').encode('latin-1')
+
 
 
 def sync_google_sheet_to_sqlite(df):
