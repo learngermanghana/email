@@ -1235,7 +1235,7 @@ with tabs[9]:
             )
             st.success("✅ Email sent successfully!")
             except Exception as e:
-                st.error(f"❌ Email failed to send: {e}")
+            st.error(f"❌ Email failed to send: {e}")
 #end
 
 
