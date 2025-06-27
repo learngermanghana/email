@@ -1643,7 +1643,8 @@ with tabs[8]:
                        data=pdf.output(dest='S').encode('latin-1'),
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
-# ==== Assignment Marking & Scores Tab ====
+
+# ============== Assignment Marking & Scores Tab ==============
 
 with tabs[9]:
     st.title("Assignment Marking & Scores (Email, Reference, PDF)")
@@ -1668,16 +1669,27 @@ with tabs[9]:
         st.error("Could not load score history.")
         df_scores = pd.DataFrame(columns=['studentcode', 'name', 'assignment', 'score', 'comments', 'date', 'level'])
 
-    # --- All Assignments ---
+    # --- All Assignments & Categorization ---
     @st.cache_data
     def all_assignments(ds, ra):
         return sorted(set(ds['assignment'].dropna()) | set(ra.keys()))
+
+    # Group assignments by level (A1, A2, B1, B2)
+    def group_assignments_by_level(all_assigns):
+        grouped = {'A1': [], 'A2': [], 'B1': [], 'B2': []}
+        for a in all_assigns:
+            lvl = a[:2].upper()
+            if lvl in grouped:
+                grouped[lvl].append(a)
+        return grouped
+
     all_assigns = all_assignments(df_scores, REF_ANSWERS)
+    assigns_by_level = group_assignments_by_level(all_assigns)
 
     # --- Marking Mode Switch ---
     mode = st.radio("Marking Mode", ["Classic", "Batch"], horizontal=True)
 
-    # --- Student Search & Selection ---
+    # --- Student Search & Selection (DEFENSIVE, strips spaces and blanks) ---
     st.subheader("Find Student")
     search = st.text_input("Search name or code")
     students = df_students.copy()
@@ -1686,7 +1698,6 @@ with tabs[9]:
     students = students.dropna(subset=['name', 'studentcode'])
     students = students[(students['name'] != "") & (students['studentcode'] != "")]
 
-    # Filter if searching
     if search:
         s = search.strip().lower()
         mask = (
@@ -1695,10 +1706,9 @@ with tabs[9]:
         )
         students = students[mask]
 
-    # Defensive: if empty, show names for debugging
     if students.empty:
         st.warning("No students found. Try different search, or check for extra spaces in the sheet.")
-        st.write("Current available students:", df_students[['name','studentcode']])
+        st.write("Current available students:", df_students[['name', 'studentcode']])
         st.stop()
 
     student_options = students['name'] + " (" + students['studentcode'] + ")"
@@ -1713,8 +1723,10 @@ with tabs[9]:
     if mode == "Classic":
         st.markdown("---")
         st.subheader("Classic: Mark Single Assignment")
+        opts = assigns_by_level.get(level, [])
         af = st.text_input("Filter assignments")
-        opts = [a for a in all_assigns if af.lower() in a.lower()]
+        if af:
+            opts = [a for a in opts if af.lower() in a.lower()]
         sel_a = st.selectbox("Assignment", opts)
         prev = df_scores[(df_scores['studentcode'] == code) & (df_scores['assignment'] == sel_a)]
         ds = int(prev['score'].iloc[0]) if not prev.empty else 0
@@ -1725,7 +1737,6 @@ with tabs[9]:
                 maxlen = 100
                 st.write(f"- {ans[:maxlen]}{'...' if len(ans) > maxlen else ''}")
 
-        # Form to submit single score
         with st.form(f"mark_single_assignment_{code}_{sel_a}"):
             score = st.number_input("Score", 0, 100, ds)
             comments = st.text_area("Comments", dc)
@@ -1740,6 +1751,7 @@ with tabs[9]:
             )]
             df_scores = pd.concat([df_scores, pd.DataFrame([row])], ignore_index=True)
             st.success("Score saved (local only). Download and upload to Google Sheets to make permanent.")
+
             st.download_button(
                 '⬇️ Download Updated Scores CSV (Upload to Google Sheets!)',
                 data=df_scores.to_csv(index=False).encode(),
@@ -1752,10 +1764,11 @@ with tabs[9]:
     else:
         st.markdown("---")
         st.subheader("Batch: Mark Assignments")
-        stu_scores = df_scores[df_scores['studentcode']==code]
+        opts = assigns_by_level.get(level, [])
+        stu_scores = df_scores[df_scores['studentcode'] == code]
         with st.form(f"batch_marking_form_{code}"):
             batch = {}
-            for a in [x for x in all_assigns if x.startswith(level)]:
+            for a in opts:
                 pr = stu_scores[stu_scores['assignment'] == a]
                 val = int(pr['score'].iloc[0]) if not pr.empty else 0
                 batch[a] = st.number_input(a, 0, 100, val)
@@ -1770,6 +1783,7 @@ with tabs[9]:
             )]
             df_scores = pd.concat([df_scores, pd.DataFrame(new)], ignore_index=True)
             st.success("All scores saved (local only). Download and upload to Google Sheets to make permanent.")
+
             st.download_button(
                 '⬇️ Download Updated Scores CSV (Upload to Google Sheets!)',
                 data=df_scores.to_csv(index=False).encode(),
@@ -1780,7 +1794,11 @@ with tabs[9]:
 
     # --- Score History and PDF Report ---
     st.markdown("### Score History & PDF Report")
-    history = df_scores[df_scores['studentcode'] == code].sort_values('date', ascending=False)
+    opts = assigns_by_level.get(level, [])
+    history = df_scores[
+        (df_scores['studentcode'] == code) &
+        (df_scores['assignment'].isin(opts))
+    ].sort_values('date', ascending=False)
     st.write(f"Completed: {history['assignment'].nunique()} / {total}")
     if not history.empty:
         dfh = history[['assignment', 'score', 'comments', 'date']].copy()
@@ -1803,6 +1821,7 @@ with tabs[9]:
         except Exception as e:
             st.error(f"❌ Email failed to send: {e}")
 
-# ==== END Assignment Marking Tab ====
+# ============== END OF MARKING TAB ==============
+
 
 
