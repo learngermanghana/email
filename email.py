@@ -71,11 +71,17 @@ def getcol(df, name):
     return col_lookup(df, name)
 
 def safe_text(s):
+    """Ensure string is Latin-1 safe for PDF."""
     return str(s).encode("latin-1","replace").decode("latin-1")
+
+def safe_pdf(text):
+    """Encode to Latin-1 with replacement to avoid PDF Unicode errors."""
+    return str(text).encode("latin-1","replace").decode("latin-1")
 
 # keep session state across reruns
 st.session_state.setdefault("emailed_expiries", set())
 st.session_state.setdefault("dismissed_notifs", set())
+
 
 # ==== 5. OPTIONAL LOCAL DB (SQLite) ====
 conn = sqlite3.connect("scores.db", check_same_thread=False)
