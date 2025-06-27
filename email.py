@@ -1232,11 +1232,11 @@ with tabs[9]:
         if st.button(f"Email PDF to {student['email']}"):
             try:
                 send_email_with_pdf(
-                student['email'], 
-                student['name'], 
-                pdf_bytes,
-                st.secrets['general']['SENDGRID_API_KEY'],
-                st.secrets['general']['SENDER_EMAIL']
+                    student['email'], 
+                    student['name'], 
+                    pdf_bytes,
+                    st.secrets['general']['SENDGRID_API_KEY'],
+                    st.secrets['general']['SENDER_EMAIL']
             )
             st.success("✅ Email sent successfully!")
         except Exception as e:
