@@ -1130,8 +1130,7 @@ with tabs[9]:
     df_students = load_students()
 
     # 2️⃣ Ensure unique constraint exists (run once)
-    service_supabase.postgrest.rpc("sql", {
-        "query": """
+    _constraint_sql = """
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -1146,7 +1145,7 @@ BEGIN
 END
 $$;
 """
-    }).execute()
+    service_supabase.rpc("sql", {"q": _constraint_sql}).execute()
 
     # 3️⃣ Supabase helpers
     def fetch_scores_supabase():
