@@ -1,5 +1,7 @@
 import base64
 import json
+import difflib
+import unicodedata
 import os
 import re
 import sqlite3
@@ -22,7 +24,6 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import (
     Mail, Attachment, FileContent, FileName, FileType, Disposition
 )
-
 
 
 
@@ -1653,17 +1654,26 @@ with tabs[8]:
 with tabs[9]:
     st.title("Assignment Marking & Scores (Email, Reference, PDF)")
 
-    import re
+    # --- Helper: Fuzzy, accent-insensitive assignment match ---
+    def normalize_assignment_for_match(s):
+        # Remove accents (umlauts -> o/u/a), lower, strip all non-alphanumeric
+        if not s:
+            return ""
+        s = str(s)
+        s = unicodedata.normalize('NFKD', s).encode('ascii', 'ignore').decode('ascii')
+        s = s.lower()
+        s = re.sub(r'[^a-z0-9]', '', s)
+        s = s.replace('exercise','')
+        return s
 
-    # --- Helper for assignment normalization ---
-    def normalize_assignment(s):
-        return re.sub(r'[^a-zA-Z0-9]', '', str(s).lower())
-
-    def match_reference_key(assignment):
-        a_norm = normalize_assignment(assignment)
-        for key in REF_ANSWERS.keys():
-            if normalize_assignment(key) == a_norm:
-                return key
+    def best_ref_key(assignment):
+        candidates = list(REF_ANSWERS.keys())
+        norm_a = normalize_assignment_for_match(assignment)
+        norm_keys = [normalize_assignment_for_match(k) for k in candidates]
+        matches = difflib.get_close_matches(norm_a, norm_keys, n=1, cutoff=0.6)
+        if matches:
+            idx = norm_keys.index(matches[0])
+            return candidates[idx]
         return None
 
     # --- Load students from Google Sheets ---
@@ -1706,7 +1716,7 @@ with tabs[9]:
     # --- Marking Mode Switch ---
     mode = st.radio("Marking Mode", ["Classic", "Batch"], horizontal=True)
 
-    # --- Student Search & Selection ---
+    # --- Student Search & Selection (DEFENSIVE, strips spaces and blanks) ---
     st.subheader("Find Student")
     search = st.text_input("Search name or code")
     students = df_students.copy()
@@ -1747,13 +1757,13 @@ with tabs[9]:
         sel_a = st.selectbox("Assignment", opts)
         # Normalized match for previous
         def norm_match(row):
-            return (row['studentcode'] == code) and (normalize_assignment(row['assignment']) == normalize_assignment(sel_a))
+            return (row['studentcode'] == code) and (normalize_assignment_for_match(row['assignment']) == normalize_assignment_for_match(sel_a))
         prev = df_scores[df_scores.apply(norm_match, axis=1)]
         ds = int(prev['score'].iloc[0]) if not prev.empty else 0
         dc = prev['comments'].iloc[0] if not prev.empty else ''
-        matched_key = match_reference_key(sel_a)
+        matched_key = best_ref_key(sel_a)
         if matched_key:
-            st.subheader("Reference Answers")
+            st.subheader(f"Reference Answers ({matched_key})")
             for ans in REF_ANSWERS[matched_key]:
                 maxlen = 100
                 st.write(f"- {ans[:maxlen]}{'...' if len(ans) > maxlen else ''}")
@@ -1794,7 +1804,7 @@ with tabs[9]:
             for a in opts:
                 # Match using normalization
                 def norm_batch(row):
-                    return (row['studentcode'] == code) and (normalize_assignment(row['assignment']) == normalize_assignment(a))
+                    return (row['studentcode'] == code) and (normalize_assignment_for_match(row['assignment']) == normalize_assignment_for_match(a))
                 pr = df_scores[df_scores.apply(norm_batch, axis=1)]
                 val = int(pr['score'].iloc[0]) if not pr.empty else 0
                 batch[a] = st.number_input(a, 0, 100, val)
@@ -1806,8 +1816,8 @@ with tabs[9]:
                    for a, v in batch.items()]
             # Remove old assignments by normalized assignment name
             def not_in_batch(row):
-                normed_batch = [normalize_assignment(a) for a in batch]
-                return not ((row['studentcode'] == code) and (normalize_assignment(row['assignment']) in normed_batch))
+                normed_batch = [normalize_assignment_for_match(a) for a in batch]
+                return not ((row['studentcode'] == code) and (normalize_assignment_for_match(row['assignment']) in normed_batch))
             df_scores = df_scores[df_scores.apply(not_in_batch, axis=1)]
             df_scores = pd.concat([df_scores, pd.DataFrame(new)], ignore_index=True)
             st.success("All scores saved (local only). Download and upload to Google Sheets to make permanent.")
@@ -1823,16 +1833,16 @@ with tabs[9]:
     # --- Score History and PDF Report ---
     st.markdown("### Score History & PDF Report")
     opts = assigns_by_level.get(level, [])
-    normed_opts = set([normalize_assignment(a) for a in opts])
+    normed_opts = set([normalize_assignment_for_match(a) for a in opts])
     # Show history with normalized assignment matching
     def match_history(row):
-        return (row['studentcode'] == code) and (normalize_assignment(row['assignment']) in normed_opts)
+        return (row['studentcode'] == code) and (normalize_assignment_for_match(row['assignment']) in normed_opts)
     history = df_scores[df_scores.apply(match_history, axis=1)].sort_values('date', ascending=False)
     st.write(f"Completed: {history['assignment'].nunique()} / {total}")
     if not history.empty:
         dfh = history[['assignment', 'score', 'comments', 'date']].copy()
         def ref_preview(x):
-            matched_key = match_reference_key(x)
+            matched_key = best_ref_key(x)
             return "; ".join(ans[:100]+'...' if len(ans) > 100 else ans for ans in REF_ANSWERS.get(matched_key, []))
         dfh['reference'] = dfh['assignment'].apply(ref_preview)
         st.dataframe(dfh)
@@ -1852,6 +1862,4 @@ with tabs[9]:
             st.error(f"❌ Email failed to send: {e}")
 
 # ============== END OF MARKING TAB ==============
-
-
 
