@@ -131,7 +131,7 @@ def save_score_supabase(student_code, name, assignment, score, comments, date, l
         "student_code": student_code,
         "name": name,
         "assignment": assignment,
-        "score": scores,
+        "score": score,
         "comments": comments,
         "date": date,
         "level": level
