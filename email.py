@@ -1118,141 +1118,139 @@ with tabs[9]:
     date_col        = get_safe_col(df_scores, ["date"], "Date")
     email_col       = get_safe_col(df_students, ["email"], "Email")
 
-ref_answers = {
-    "Lesen und Horen 0.1": [
-        "1. C) Guten Morgen", "2. D) Guten Tag", "3. B) Guten Abend", "4. B) Gute Nacht", "5. C) Guten Morgen",
-        "6. C) Wie geht es Ihnen?", "7. B) Auf Wiedersehen", "8. C) Tschüss", "9. C) Guten Abend", "10. D) Gute Nacht"
-    ],
-    "Lesen und Horen 0.2": [
-        "1. C) 26", "2. A) A, O,U, B", "3. A) Eszett", "4. A) K", "5. A) A-Umlaut", "6. A) A, O, U, B", "7. B) 4",
-        "1. Wasser", "2. Kaffee", "3. Blume", "4. Schule", "5. Tisch"
-    ],
-    "Lesen und Horen 1.1": [
-        "1. C", "2. C", "3. A", "4. B"
-    ],
-    "Lesen und Horen 1.2": [
-        "1. Ich heiße Anna", "2. Du heißt Max", "3. Er heißt Peter", "4. Wir kommen aus Italien", "5. Ihr kommt aus Brasilien",
-        "6. Sie kommt/kommen aus Russland", "7. Ich wohne in Berlin", "8. Du wohnst in Madrid", "9. Sie wohnt in Wien",
-        "1. A) Anna", "2. C) Aus Italien", "3. D) In Berlin", "4. B) Tom", "5. A) In Berlin"
-    ],
-    "Lesen und Horen 2": [
-        "1. A) sieben", "2. B) Drei", "3. B) Sechs", "4. B) Neun", "5. B) Sieben", "6. C) Fünf", "7. B) zweihundertzweiundzwanzig",
-        "8. A) Fünfhundertneun", "9. A) zweitausendvierzig", "10. A) fünftausendfünfhundertneun",
-        "1. 16 – sechzehn", "2. 98 – achtundneunzig", "3. 555 – fünfhundertfünfundfünfzig", "4. 1020 – tausendzwanzig", "5. 8553 – achttausendfünfhundertdreiundfünfzig"
-    ],
-    "Lesen und Horen 4 (Lesen)": [
-        "1. C) Neun", "2. B) Polnisch", "3. D) Niederländisch", "4. A) Deutsch", "5. C) Paris", "6. B) Amsterdam", "7. C) In der Schweiz"
-    ],
-    "Lesen und Horen 4 (Hören)": [
-        "1. C) In Italien und Frankreich", "2. C) Rom", "3. B) Das Essen", "4. B) Paris", "5. A) Nach Spanien"
-    ],
-    "Lesen und Horen 5 (Vocab)": [
-        "1. Der Tisch – j. the table", "2. Die Lampe – c. the lamp", "3. Das Buch – g. the book", "4. Der Stuhl – e. the chair", "5. Der Katze – f. the cat",
-        "6. Das Auto – h. the car", "7. Der Hund – a. the dog", "8. Die Blume – d. the flower", "9. Das Fenster – d. the window", "10. Der Computer – i. The computer"
-    ],
-    "Lesen und Horen 5 (Nominative)": [
-        "1. Der Tisch ist groß", "2. Die Lampe ist neu", "3. Das Buch ist interessant", "4. Der Stuhl ist bequem", "5. Die Katze ist süß",
-        "6. Das Auto ist schnell", "7. Der Hund ist freundlich", "8. Die Blume ist schön", "9. Das Fenster ist offen", "10. Der Computer ist teuer"
-    ],
-    "Lesen und Horen 5 (Accusative)": [
-        "1. Ich sehe den Tisch", "2. Sie kauft die Lampe", "3. Er liest das Buch", "4. Wir brauchen den Stuhl", "5. Du fütterst die Katze",
-        "6. Ich fahre das Auto", "7. Sie streichelt den Hund", "8. Er pflückt die Blume", "9. Wir putzen das Fenster", "10. Sie benutzen Computer"
-    ],
-    "Lesen und Horen 6 (Teil 1)": [
-        "1. Das Wohnzimmer – the living room", "2. Die Küche - the kitchen", "3. Das Schlafzimmer – the bedroom", "4. Das Badezimmer - the bathroom", "5. Der Balkon – the balcony",
-        "6. Der Flur – the hallway", "7. Das Bett – the bed", "8. Der Tisch - the table", "9. Der Stuhl – the chair", "10. Der Schrank – the wardrobe"
-    ],
-    "Lesen und Horen 6 (Teil 2)": [
-        "1. B) Vier", "2. A) Ein Sofa und ein Fernseher", "3. B) Einen Herd, einen Kühlschrank und einen Tisch mit vier Stühlen", "4. C) Ein großes Bett",
-        "5. D) Eine Dusche, eine Badewanne und ein Waschbecken", "6. D) Klein und Schön", "7. C) Blumen und einen kleinen Tisch mit zwei Stühlen"
-    ],
-    "Lesen und Horen 6 (Teil 3)": [
-        "1. B", "2. B", "3. B", "4. C", "5. D", "6. B", "7. C"
-    ],
-    "Lesen und Horen 7 (Lesen)": [
-        "1. B) Um sieben Uhr", "2. B) Um acht Uhr", "3. B) Um sechs Uhr", "4. B) Um zehn Uhr", "5. B) Um neun Uhr",
-        "6. C) Nachmittags", "7. A) Um sieben Uhr", "8. A) Montag", "9. B) Am Dienstag und Donnerstag", "10. B) Er ruht sich aus"
-    ],
-    "Lesen und Horen 7 (Hören)": [
-        "1. B) Um neun Uhr", "2. B) Er geht in die Bibliothek", "3. B) Bis zwei Uhr nachmittags", "4. B) Um drei Uhr nachmittags", "5. A)",
-        "6. B) Um neun Uhr", "7. B) Er geht in die Bibliothek", "8. B) Bis zwei Uhr nachmittags", "9. B) Um drei Uhr nachmittags", "10. B) Um sieben Uhr"
-    ],
-    "Lesen und Horen 8 (Lesen)": [
-        "1. B) Zwei Uhr nachmittags", "2. B) 29 Tage", "3. B) April", "4. C) 03.02.2024", "5. C) Mittwoch"
-    ],
-    "Lesen und Horen 8 (Lesen Teil 2)": [
-        "1. Falsch", "2. Richtig", "3. Richtig", "4. Falsch", "5. Richtig"
-    ],
-    "Lesen und Horen 8 (Hören)": [
-        "1. B) Um Mitternacht", "2. B) Vier Uhr nachmittags", "3. C) 28 Tage", "4. B) Tag. Monat. Jahr", "5. D) Montag"
-    ],
-    "Lesen und Horen 9 (Lesen)": [
-        "1. B) Apfel und Karotten", "2. C) Karotten", "3. A) Weil er Vegetarier ist", "4. C) Käse", "5. B) Fleisch",
-        "6. B) Kekse", "7. A) Käse", "8. C) Kuchen", "9. C) Schokolade", "10. B) Der Bruder des Autors"
-    ],
-    "Lesen und Horen 9 (Lesen Teil 2)": [
-        "1. A) Apfel, Bananen, und Karotten", "2. A) Müsli mit Joghurt", "3. D) Karotten", "4. A) Käse", "5. C) Schokoladenkuchen"
-    ],
-    "Lesen und Horen 10 (Lesen)": [
-        "1. Falsch", "2. Wahr", "3. Falsch", "4. Wahr", "5. Wahr", "6. Falsch", "7. Wahr", "8. Falsch", "9. Falsch", "10. Falsch"
-    ],
-    "Lesen und Horen 10 (Hören)": [
-        "1. B) Einmal pro Woche", "2. C) Apfel und Bananen", "3. A) Ein halbes Kilo", "4. B) 10 Euro", "5. B) Einen schönen Tag"
-    ],
-    "Lesen und Horen 11 (Teil 1)": [
-        "1. B) Entschuldigung, wo ist der Bahnhof?", "2. B) Links abbiegen", "3. B) Auf der rechten Seite, direkt neben dem großen Supermarkt",
-        "4. B) Wie komme ich zur nächsten Apotheke?", "5. C) Gute Reise und einen schönen Tag noch"
-    ],
-    "Lesen und Horen 11 (Teil 2)": [
-        "1. C) Wie komme ich zur nächsten Apotheke?", "2. C) Rechts abbiegen", "3. B) Auf der linken Seite, direkt neben der Bäckerei",
-        "4. A) Gehen Sie geradeaus bis zur Kreuzung, dann links", "5. C) Einen schönen Tag noch"
-    ],
-    "Lesen und Horen 11 (Teil 3)": [
-        "1. Fragen nach dem Weg: 'Entschuldigung, wie komme ich zum Bahnhof'",
-        "2. Die Straße überqueren: 'Überqueren Sie die Straße'",
-        "3. Geradeaus gehen: 'Gehen Sie geradeaus'", "4. Links abbiegen: 'Biegen Sie links ab'",
-        "5. Rechts abbiegen: 'Biegen Sie rechts ab'", "6. On the left side: 'Das Kino ist auf der linken Seite'"
-    ],
-    "Lesen und Horen 12.1 (Teil 1)": [
-        "1. B) Ärztin", "2. A) Weil sie keine Zeit hat", "3. B) Um 8 Uhr", "4. C) Viele verschiedene Fächer", "5. C) Einen Sprachkurs besuchen"
-    ],
-    "Lesen und Horen 12.1 (Teil 2)": [
-        "1. B) Falsch (Der Supermarkt hat jeden Tag von 8 Uhr bis 20 Uhr geöffnet.)",
-        "2. B) Falsch (Die Theoriestunden finden dienstags und donnerstags statt.)",
-        "3. B) Falsch (Das Büro ist von Montag bis Freitag geöffnet.)",
-        "4. B) Falsch (Der Englischkurs findet dreimal pro Woche statt)",
-        "5. B) Falsch (Das Fitnessstudio ist jeden Tag von 6 Uhr bis 22 Uhr geöffnet.)"
-    ],
-    "Lesen und Horen 12.1 (Teil 3)": [
-        "1. A) Richtig", "2. A) Richtig", "3. A) Richtig", "4. A) Richtig", "5. A) Richtig"
-    ],
-    "Lesen und Horen 12.2 (Teil 1)": [
-        "In Berlin", "Mit seiner Frau und seinen drei Kindern", "Mit seinem Auto", "Um 7:30 Uhr", "a) Barzahlung (cash)"
-    ],
-    "Lesen und Horen 12.2 (Teil 2)": [
-        "1. B) Um 9:00 Uhr", "2. B) Um 12:00 Uhr", "3. B) Um 18:00 Uhr", "4. B) Um 21:00 Uhr", "5. D) Alles Genannte"
-    ],
-    "Lesen und Horen 12.2 (Teil 3)": [
-        "1. B) Um 9 Uhr", "2. B) Um 12 Uhr", "3. A) ein Computer und ein Drucker", "4. C) in einer Bar", "5. C) bar"
-    ],
-    "Lesen und Horen 13 (Teil 1)": [
-        "1. A", "2. B", "3. A", "4. A", "5. B", "6. B"
-    ],
-    "Lesen und Horen 13 (Teil 2)": [
-        "1. A", "2. B", "3. B"
-    ],
-    "Lesen und Horen 13 (Teil 3)": [
-        "1. B", "2. B", "3. B"
-    ],
-    "Lesen und Horen 14.1 (Teil 1)": [
-        "Frage 1: Anzeige A", "Frage 2: Anzeige B", "Frage 3: Anzeige B", "Frage 4: Anzeige A", "Frage 5: Anzeige A"
-    ],
-    "Lesen und Horen 14.1 (Teil 2)": [
-        "1. C) Guten Tag, Herr Doktor", "2. B) Halsschmerzen und Fieber", "3. C) Seit gestern", "4. C) Kopfschmerzen und Müdigkeit", "5. A) Ich verschreibe Ihnen Medikamente",
-        "A) Kopf – Head", "B) Arm – Arm", "C) Bein – Leg", "D) Auge – Eye", "E) Nase – Nose", "F) Ohr – Ear", "G) Mund – Mouth", "H) Hand – Hand", "I) Fuß – Foot", "J) Bauch – Stomach"
-    ]
-    # ... Continue with more as needed ...
-}
+def get_ref_answers():
+    return {
+        "Lesen und Horen 0.2": [
+            "1. C) 26", "2. A) A, O,U, B", "3. A) Eszett", "4. A) K", "5. A) A-Umlaut", "6. A) A, O, U, B", "7. B) 4",
+            "1. Wasser", "2. Kaffee", "3. Blume", "4. Schule", "5. Tisch"
+        ],
+        "Lesen und Horen 1.1": [
+            "1. C", "2. C", "3. A", "4. B"
+        ],
+        "Lesen und Horen 1.2": [
+            "1. Ich heiße Anna", "2. Du heißt Max", "3. Er heißt Peter", "4. Wir kommen aus Italien", "5. Ihr kommt aus Brasilien",
+            "6. Sie kommt/kommen aus Russland", "7. Ich wohne in Berlin", "8. Du wohnst in Madrid", "9. Sie wohnt in Wien",
+            "1. A) Anna", "2. C) Aus Italien", "3. D) In Berlin", "4. B) Tom", "5. A) In Berlin"
+        ],
+        "Lesen und Horen 2": [
+            "1. A) sieben", "2. B) Drei", "3. B) Sechs", "4. B) Neun", "5. B) Sieben", "6. C) Fünf", "7. B) zweihundertzweiundzwanzig",
+            "8. A) Fünfhundertneun", "9. A) zweitausendvierzig", "10. A) fünftausendfünfhundertneun",
+            "1. 16 – sechzehn", "2. 98 – achtundneunzig", "3. 555 – fünfhundertfünfundfünfzig", "4. 1020 – tausendzwanzig", "5. 8553 – achttausendfünfhundertdreiundfünfzig"
+        ],
+        "Lesen und Horen 4 (Lesen)": [
+            "1. C) Neun", "2. B) Polnisch", "3. D) Niederländisch", "4. A) Deutsch", "5. C) Paris", "6. B) Amsterdam", "7. C) In der Schweiz"
+        ],
+        "Lesen und Horen 4 (Hören)": [
+            "1. C) In Italien und Frankreich", "2. C) Rom", "3. B) Das Essen", "4. B) Paris", "5. A) Nach Spanien"
+        ],
+        "Lesen und Horen 5 (Vocab)": [
+            "1. Der Tisch – j. the table", "2. Die Lampe – c. the lamp", "3. Das Buch – g. the book", "4. Der Stuhl – e. the chair", "5. Der Katze – f. the cat",
+            "6. Das Auto – h. the car", "7. Der Hund – a. the dog", "8. Die Blume – d. the flower", "9. Das Fenster – d. the window", "10. Der Computer – i. The computer"
+        ],
+        "Lesen und Horen 5 (Nominative)": [
+            "1. Der Tisch ist Groß", "2. Die Lampe ist neu", "3. Das Buch ist interessant", "4. Der Stuhl ist bequem", "5. Die Katze ist süß",
+            "6. Das Auto ist Schnell", "7. Der Hund ist Freundlich", "8. Die Blume ist schön", "9. Das Fenster ist offen", "10. Der Computer ist teuer"
+        ],
+        "Lesen und Horen 5 (Accusative)": [
+            "1. Ich sehe den Tisch", "2. Sie kauft die Lampe", "3. Er liest das Buch", "4. Wir brauchen den Stuhl", "5. Du fütterst die Katze",
+            "6. Ich fahre das Auto", "7. Sie streichelt den Hund", "8. Er pflückt die Blume", "9. Wir putzen das Fenster", "10. Sie benutzen computer"
+        ],
+        "Lesen und Horen 6 (Teil 1)": [
+            "1. Das Wohnzimmer – the living room", "2. Die Küche - the kitchen", "3. Das Schlafzimmer – the bedroom", "4. Das Badezimmer - the bathroom", "5. Der Balkon – the balcony",
+            "6. Der Flur – the hallway", "7. Das Bett – the bed", "8. Der Tisch - the table", "9. Der Stuhl – the chair", "10. Der Schrank – the wardrobe"
+        ],
+        "Lesen und Horen 6 (Teil 2)": [
+            "1. B) Vier", "2. A) Ein Sofa und ein Fernseher", "3. B) Einen Herd, einen Kühlschrank und einen Tisch mit vier Stühlen", "4. C) Ein großes Bett",
+            "5. D) Eine Dusche, eine Badewanne und ein Waschbecken", "6. D) Klein und Schön", "7. C) Blumen und einen kleinen Tisch mit zwei Stühlen"
+        ],
+        "Lesen und Horen 6 (Teil 3)": [
+            "1. B", "2. B", "3. B", "4. C", "5. D", "6. B", "7. C"
+        ],
+        "Lesen und Horen 7 (Lesen)": [
+            "1. B) Um sieben Uhr", "2. B) Um acht Uhr", "3. B) Um sechs Uhr", "4. B) Um zehn Uhr", "5. B) Um neun Uhr",
+            "6. C) Nachmittags", "7. A) Um sieben Uhr", "8. A) Montag", "9. B) Am Dienstag und Donnerstag", "10. B) Er ruht sich aus"
+        ],
+        "Lesen und Horen 7 (Hören)": [
+            "1. B) Um neun Uhr", "2. B) Er geht in die Bibliothek", "3. B) Bis zwei Uhr nachmittags", "4. B) Um drei Uhr nachmittags", "5. A)",
+            "6. B) Um neun Uhr", "7. B) Er geht in die Bibliothek", "8. B) Bis zwei Uhr nachmittags", "9. B) Um drei Uhr nachmittags", "10. B) Um sieben Uhr"
+        ],
+        "Lesen und Horen 8 (Lesen)": [
+            "1. B) Zwei Uhr nachmittags", "2. B) 29 Tage", "3. B) April", "4. C) 03.02.2024", "5. C) Mittwoch"
+        ],
+        "Lesen und Horen 8 (Lesen Teil 2)": [
+            "1. Falsch", "2. Richtig", "3. Richtig", "4. Falsch", "5. Richtig"
+        ],
+        "Lesen und Horen 8 (Hören)": [
+            "1. B) Um Mitternacht", "2. B) Vier Uhr nachmittags", "3. C) 28 Tage", "4. B) Tag. Monat. Jahr", "5. D) Montag"
+        ],
+        "Lesen und Horen 9 (Teil 1)": [
+            "1. B) Apfel und Karotten", "2. C) Karotten", "3. A) Weil er Vegetarier ist", "4. C) Käse", "5. B) Fleisch",
+            "6. B) Kekse", "7. A) Käse", "8. C) Kuchen", "9. C) Schokolade", "10. B) Der Bruder des Autors"
+        ],
+        "Lesen und Horen 9 (Teil 2)": [
+            "1. A) Apfel, Bananen, und Karotten", "2. A) Müsli mit Joghurt", "3. D) Karotten", "4. A) Käse", "5. C) Schokoladenkuchen"
+        ],
+        "Lesen und Horen 10 (Lesen)": [
+            "1. Falsch", "2. Wahr", "3. Falsch", "4. Wahr", "5. Wahr", "6. Falsch", "7. Wahr", "8. Falsch", "9. Falsch", "10. Falsch"
+        ],
+        "Lesen und Horen 10 (Hören)": [
+            "1. B) Einmal pro Woche", "2. C) Apfel und Bananen", "3. A) Ein halbes Kilo", "4. B) 10 Euro", "5. B) Einen schönen Tag"
+        ],
+        "Lesen und Horen 11 (Teil 1)": [
+            "1. B) Entschuldigung, wo ist der Bahnhof?", "2. B) Links abbiegen", "3. B) Auf der rechten Seite, direkt neben dem großen Supermarkt",
+            "4. B) Wie komme ich zur nächsten Apotheke?", "5. C) Gute Reise und einen schönen Tag noch"
+        ],
+        "Lesen und Horen 11 (Teil 2)": [
+            "1. C) Wie komme ich zur nächsten Apotheke?", "2. C) Rechts abbiegen", "3. B) Auf der linken Seite, direkt neben der Bäckerei",
+            "4. A) Gehen Sie geradeaus bis zur Kreuzung, dann links", "5. C) Einen schönen Tag noch"
+        ],
+        "Lesen und Horen 11 (Teil 3)": [
+            "1. Fragen nach dem Weg: Entschuldigung, wie komme ich zum Bahnhof",
+            "2. Die Straße überqueren: Überqueren Sie die Straße",
+            "3. Geradeaus gehen: Gehen Sie geradeaus", "4. Links abbiegen: Biegen Sie rechts ab",
+            "5. Rechts abbiegen: Biegen Sie rechts ab", "6. On the left side: Das Kino ist auf der linken Seite"
+        ],
+        "Lesen und Horen 12.1 (Teil 1)": [
+            "1. B) Ärztin", "2. A) Weil sie keine Zeit hat", "3. B) Um 8 Uhr", "4. C) Viele verschiedene Fächer", "5. C) Einen Sprachkurs besuchen"
+        ],
+        "Lesen und Horen 12.1 (Teil 2)": [
+            "1. Der Supermarkt ist nur am Wochenende geöffnet. Antwort: B) Falsch (Der Supermarkt hat jeden Tag von 8 Uhr bis 20 Uhr geöffnet.)",
+            "2. Die Theoriestunden sind jeden Tag. Antwort: B) Falsch (Die Theoriestunden finden dienstags und donnerstags statt.)",
+            "3. Das Büro ist auch am Wochenende geöffnet. Antwort: B) Falsch (Das Büro ist von Montag bis Freitag geöffnet.)",
+            "4. Der Englischkurs ist zweimal pro Woche. Antwort: B) Falsch (Der Englischkurs findet dreimal pro Woche statt)",
+            "5. Das Fitnessstudio ist nur vormittags geöffnet. Antwort: B) Falsch (Das Fitnessstudio ist jeden Tag von 6 Uhr bis 22 Uhr geöffnet.)"
+        ],
+        "Lesen und Horen 12.1 (Teil 3)": [
+            "1. A) Richtig", "2. A) Richtig", "3. A) Richtig", "4. A) Richtig", "5. A) Richtig"
+        ],
+        "Lesen und Horen 12.2 (Teil 1)": [
+            "In Berlin", "Mit seiner Frau und seinen drei Kindern", "Mit seinem Auto", "Um 7:30 Uhr", "a) Barzahlung (cash)"
+        ],
+        "Lesen und Horen 12.2 (Teil 2)": [
+            "1. B) Um 9:00 Uhr", "2. B) Um 12:00 Uhr", "3. B) Um 18:00 Uhr", "4. B) Um 21:00 Uhr", "5. D) Alles Genannte"
+        ],
+        "Lesen und Horen 12.2 (Teil 3)": [
+            "1. B) Um 9 Uhr", "2. B) Um 12 Uhr", "3. A) ein Computer und ein Drucker", "4. C) in einem Bar", "5. C) bar"
+        ],
+        "Lesen und Horen 13 (Teil 1)": [
+            "1. A", "2. B", "3. A", "4. A", "5. B", "6. B"
+        ],
+        "Lesen und Horen 13 (Teil 2)": [
+            "1. A", "2. B", "3. B"
+        ],
+        "Lesen und Horen 13 (Teil 3)": [
+            "1. B", "2. B", "3. B"
+        ],
+        "Lesen und Horen 14.1 (Teil 1)": [
+            "Frage 1: Anzeige A", "Frage 2: Anzeige B", "Frage 3: Anzeige B", "Frage 4: Anzeige A", "Frage 5: Anzeige A"
+        ],
+        "Lesen und Horen 14.1 (Teil 2)": [
+            "1. C) Guten Tag, Herr Doktor", "2. B) Halsschmerzen und Fieber", "3. C) Seit gestern", "4. C) Kopfschmerzen und Müdigkeit", "5. A) Ich verschreibe Ihnen Medikamente",
+            "A) Kopf – Head", "B) Arm – Arm", "C) Bein – Leg", "D) Auge – Eye", "E) Nase – Nose", "F) Ohr – Ear", "G) Mund – Mouth", "H) Hand – Hand", "I) Fuß – Foot", "J) Bauch – Stomach"
+        ]
+        # Add more as you build...
+    }
+
 
     all_assignments = sorted(list({*df_scores[assign_col].dropna().unique(), *ref_answers.keys()}))
     all_levels = sorted(df_students[level_col].dropna().unique())
