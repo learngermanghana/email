@@ -99,25 +99,29 @@ CREATE TABLE IF NOT EXISTS scores (
 )""")
 conn.commit()
 
+# ==== 6. SUPABASE DB HELPERS ====
 def fetch_scores_supabase():
+    # reads (anyone/anon)
     resp = anon_supabase.table("scores").select("*").execute()
-    return normalize_columns(pd.DataFrame(resp.data))
+    return pd.DataFrame(resp.data)
 
 def save_score_supabase(student_code, name, assignment, score, comments, date, level):
     data = {
         "student_code": student_code,
-        "name": name,
-        "assignment": assignment,
-        "score": score,
-        "comments": comments,
-        "date": date,
-        "level": level
+        "name":         name,
+        "assignment":   assignment,
+        "score":        score,
+        "comments":     comments,
+        "date":         date,
+        "level":        level,
     }
+    # writes (bypass RLS)
     service_supabase.table("scores") \
-        .upsert(data, on_conflict=["student_code", "assignment"]) \
+        .upsert(data, on_conflict=["student_code","assignment"]) \
         .execute()
 
 def delete_score_supabase(student_code, assignment):
+    # deletes (bypass RLS)
     service_supabase.table("scores") \
         .delete() \
         .eq("student_code", student_code) \
