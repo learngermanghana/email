@@ -165,14 +165,6 @@ def normalize_text(text):
 
 def normalize_key(k):
     return re.sub(r'[^A-Za-z0-9]+', '', k).lower()
-
-A1_REF_ANSWERS = {...}
-A2_REF_ANSWERS = {...}
-
-REF_ANSWERS = {**A1_REF_ANSWERS, **A2_REF_ANSWERS}
-
-all_keys = list(A1_REF_ANSWERS.keys()) + list(A2_REF_ANSWERS.keys()
-
                                               
 # ==== Reference Answers: A1 ====
 A1_REF_ANSWERS = {
@@ -668,9 +660,11 @@ A2_REF_ANSWERS = {
     ]
 }
 
-# Combine for now if you want:
+# 2. Combine
 REF_ANSWERS = {**A1_REF_ANSWERS, **A2_REF_ANSWERS}
-LEVEL_TOTALS = {'A1': 18, 'A2': 28, 'B1': 26, 'B2': 30}
+
+# 3. Example: Get a list of all assignment keys
+all_keys = list(A1_REF_ANSWERS.keys()) + list(A2_REF_ANSWERS.keys())
 
 # ====== PAGE CONFIG ======
 st.set_page_config(
