@@ -176,123 +176,39 @@ all_assignments = sorted(list(ref_answers.keys()))
 
 # ==== 8. Reference Answers (no indent, just after your configs and before you use all_assignments) ====
 
+# 1. Reference answers dictionary first:
 ref_answers = {
-    # --- A1 Section ---
     "A1 0.1": [
         "1. C) Guten Morgen",
         "2. D) Guten Tag",
-        "3. B) Guten Abend",
-        "4. B) Gute Nacht",
-        "5. C) Guten Morgen",
-        "6. C) Wie geht es Ihnen",
-        "7. B) Auf Wiedersehen",
-        "8. C) Tschuss",
-        "9. C) Guten Abend",
-        "10. D) Guten Nacht"
+        # ... etc ...
     ],
-    "A1 0.2": [
-        "1. C) 26",
-        "2. A) A, O, U, B",
-        "3. A) Eszett",
-        "4. A) K",
-        "5. A) A-Umlaut",
-        "6. A) A, O, U, B",
-        "7. B 4",
-        "",
-        "Wasser", "Kaffee", "Blume", "Schule", "Tisch"
-    ],
-    "A1 1.1": [
-        "1. C",
-        "2. C",
-        "3. A",
-        "4. B"
-    ],
-    "A1 1.2": [
-        "1. Ich heiße Anna",
-        "2. Du heißt Max",
-        "3. Er heißt Peter",
-        "4. Wir kommen aus Italien",
-        "",
-        "5. Ihr kommt aus Brasilien",
-        "6. Sie kommt/k kommen aus Russland",
-        "7. Ich wohne in Berlin",
-        "",
-        "8. Du wohnst in Madrid",
-        "9. Sie wohnt in Wien",
-        "",
-        "1. A) Anna",
-        "2. C) Aus Italien",
-        "3. D) In Berlin",
-        "4. B) Tom",
-        "5. A) In Berlin"
-    ],
-    "A1 2": [
-        "1. A) sieben",
-        "2. B) Drei",
-        "3. B) Sechs",
-        "4. B) Neun",
-        "5. B) Sieben",
-        "6. C) Fünf",
-        "",
-        "7. B) zweihundertzweiundzwanzig",
-        "8. A) fünfhundertneun",
-        "9. A) zweitausendvierzig",
-        "10. A) fünftausendfünfhundertneun",
-        "",
-        "1. 16 – sechzehn",
-        "2. 98 – achtundneunzig",
-        "3. 555 – fünfhundertfünfundfünfzig",
-        "",
-        "4. 1020 – tausendzwanzig",
-        "5. 8553 – achttausendfünfhundertdreiundfünfzig"
-    ],
-    "A1 4": [
-        "1. C) Neun",
-        "2. B) Polnisch",
-        "3. D) Niederländisch",
-        "4. A) Deutsch",
-        "5. C) Paris",
-        "6. B) Amsterdam",
-        "7. C) In der Schweiz",
-        "",
-        "1. C) In Italien und Frankreich",
-        "2. C) Rom",
-        "3. B) Das Essen",
-        "4. B) Paris",
-        "5. A) Nach Spanien"
-    ],
-    # ... (all your other keys) ...
+    # ... (rest of your dictionary) ...
     "A2 10.28": [
         "1. c) Einen gültigen Reisepass",
-        "2. b) Bei der Deutschen Botschaft im Heimatland",
-        "3. c) Einen Aufenthaltstitel",
-        "4. b) Ein Kurs für Deutsch und Leben in Deutschland",
-        "5. c) Man muss sie übersetzen und anerkennen lassen",
-        "6. c) Die Arbeitsagentur",
-        "7. c) Kranken-, Renten- und Pflegeversicherung"
+        # ... etc ...
     ]
 }
-          
-st.write("Assignments in scores:", df_scores[assign_col].unique())
+
+# 2. Now you can use it!
 st.write("Reference answer keys:", list(ref_answers.keys()))
 
 all_assignments = sorted(list({*df_scores[assign_col].dropna().unique(), *ref_answers.keys()}))
 all_levels = sorted(df_students[level_col].dropna().unique())
 
-# ==== 5. TABS LAYOUT ====
+# 3. Tabs setup
 tabs = st.tabs([
-    "📝 Pending",                 # 0
-    "👩‍🎓 All Students",          # 1
-    "➕ Add Student",             # 2
-    "💵 Expenses",                # 3
-    "📲 Reminders",               # 4
-    "📄 Contract",                # 5
-    "📧 Send Email",              # 6 (placeholder, for future use)
-    "📊 Analytics & Export",      # 7
-    "📆 Schedule",                # 8
-    "📝 Marking"                  # 9
+    "📝 Pending",                 
+    "👩‍🎓 All Students",          
+    "➕ Add Student",             
+    "💵 Expenses",                
+    "📲 Reminders",               
+    "📄 Contract",                
+    "📧 Send Email",              
+    "📊 Analytics & Export",      
+    "📆 Schedule",                
+    "📝 Marking"                  
 ])
-
 
 # ==== 6. AGREEMENT TEMPLATE (Persisted in Session State) ====
 if "agreement_template" not in st.session_state:
