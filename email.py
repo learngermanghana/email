@@ -1,27 +1,27 @@
+# === Standard Library Imports ===
+import base64
 import json
-import requests
+import os
 import re
 import sqlite3
-import base64
-import urllib.parse 
-from datetime import date, datetime, timedelta
-import os
 import traceback
 import unicodedata
+import urllib.parse
+from datetime import date, datetime, timedelta
 
-
-
+# === Third-Party Imports ===
 import pandas as pd
+import requests
 import streamlit as st
 from fpdf import FPDF
-
 import gspread
 from google.oauth2.service_account import Credentials
-
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
+from sendgrid.helpers.mail import (
+    Mail, Attachment, FileContent, FileName, FileType, Disposition
+)
 
-# External utilities (assumed available)
+# === Local Utilities / Helpers ===
 from utils import normalize_cols, load_ref_answers, sync_scores_to_sqlite
 from email_utils import send_email_with_pdf
 
