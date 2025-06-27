@@ -1074,7 +1074,6 @@ with tabs[8]:
                        mime="application/pdf")
 # --- End of Stage 10 ---
 
-# ==== TAB 9: ASSIGNMENT MARKING & SCORES ====
 with tabs[9]:
     st.title("📝 Assignment Marking & Scores (with Email)")
 
@@ -1095,16 +1094,29 @@ with tabs[9]:
     df_students = load_students()
     df_scores   = load_scores()
 
-    # Column lookups (consistent everywhere!)
-    name_col        = col_lookup(df_students, "name")
-    code_col        = col_lookup(df_students, "studentcode")
-    level_col       = col_lookup(df_students, "level")
-    assign_col      = col_lookup(df_scores, "assignment")
-    studentcode_col = col_lookup(df_scores, "studentcode")
-    comments_col    = col_lookup(df_scores, "comments")
-    score_col       = col_lookup(df_scores, "score")
-    date_col        = col_lookup(df_scores, "date")
-    email_col       = col_lookup(df_students, "email")
+    # --- Show current columns for debugging ---
+    st.write("df_students columns:", df_students.columns.tolist())
+    st.write("df_scores columns:", df_scores.columns.tolist())
+
+    # --- Lookup all required columns, with robust fallback and checks ---
+    def get_safe_col(df, keys, label="Column"):
+        for key in keys:
+            try:
+                return col_lookup(df, key)
+            except KeyError:
+                continue
+        st.error(f"{label} not found! Tried: {keys}. Found columns: {df.columns.tolist()}")
+        st.stop()
+
+    name_col        = get_safe_col(df_students, ["name", "fullname"], "Name column")
+    code_col        = get_safe_col(df_students, ["studentcode", "code"], "Student Code")
+    level_col       = get_safe_col(df_students, ["level", "class", "course"], "Level")
+    assign_col      = get_safe_col(df_scores, ["assignment", "title"], "Assignment")
+    studentcode_col = get_safe_col(df_scores, ["studentcode", "code"], "StudentCode in scores")
+    comments_col    = get_safe_col(df_scores, ["comments", "feedback"], "Comments")
+    score_col       = get_safe_col(df_scores, ["score", "marks"], "Score")
+    date_col        = get_safe_col(df_scores, ["date"], "Date")
+    email_col       = get_safe_col(df_students, ["email"], "Email")
 
     # 2. Reference Answers (extend as needed)
     ref_answers = {
@@ -1128,7 +1140,10 @@ with tabs[9]:
     if mode == "Mark single assignment (classic)":
         st.subheader("Classic Mode: Mark One Assignment")
         sel_level = st.selectbox("Filter by Level", ["All"] + all_levels, key="single_level")
-        filtered_students = df_students if sel_level == "All" else df_students[df_students[level_col] == sel_level]
+        if sel_level == "All":
+            filtered_students = df_students
+        else:
+            filtered_students = df_students[df_students[level_col] == sel_level]
         student_list = filtered_students[name_col] + " (" + filtered_students[code_col].astype(str) + ")"
         chosen = st.selectbox("Select Student", student_list, key="single_student")
         student_code = chosen.split("(")[-1].replace(")", "").strip()
