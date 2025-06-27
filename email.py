@@ -1,59 +1,14 @@
-import os
-import json
-import base64
-import urllib.parse
-from datetime import date, datetime, timedelta
 import streamlit as st
-from functools import lru_cache
-
-
 import pandas as pd
 import os
-import json
-import base64
-import urllib.parse
 from datetime import date, datetime, timedelta
-
-import pandas as pd
-import numpy as np
-import streamlit as st
 from fpdf import FPDF
+import base64
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import (
-    Mail, Attachment, FileContent, FileName, FileType, Disposition
-)
-import openai
-
+from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
+import urllib.parse
+import calendar
 import numpy as np
-import streamlit as st
-from fpdf import FPDF
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import (
-    Mail, Attachment, FileContent, FileName, FileType, Disposition
-)
-
-
-# ===== Project-Specific Imports =====
-from pdf_utils import generate_receipt_and_contract_pdf
-from email_utils import send_emails
-
-# ===== SQLite for Persistent Data Storage =====
-import sqlite3
-
-# ===== Helper Functions =====
-def clean_phone(phone):
-    """
-    Convert any Ghanaian phone number to WhatsApp-friendly format:
-    - Remove spaces, dashes, and '+'
-    - If starts with '0', replace with '233'
-    - If starts with '233', leave as is
-    - Returns only digits
-    """
-    phone = str(phone).replace(" ", "").replace("+", "").replace("-", "")
-    if phone.startswith("0"):
-        phone = "233" + phone[1:]
-    phone = ''.join(filter(str.isdigit, phone))
-    return phone
 
 # ===== PAGE CONFIG (must be first Streamlit command!) =====
 st.set_page_config(
@@ -61,10 +16,17 @@ st.set_page_config(
     layout="wide"
 )
 
-# === Session State Initialization ===
-st.session_state.setdefault("emailed_expiries", set())
-st.session_state.setdefault("dismissed_notifs", set())
+# --- Session State Initialization ---
+def init_state():
+    st.session_state.setdefault("should_rerun", False)
+    st.session_state.setdefault("emailed_expiries", set())
 
+init_state()
+
+# 2) HANDLE RERUN FLAG
+if st.session_state["should_rerun"]:
+    st.session_state["should_rerun"] = False
+    st.experimental_rerun()
 
 # === SCHOOL INFO ===
 SCHOOL_NAME    = "Learn Language Education Academy"
@@ -77,30 +39,277 @@ SCHOOL_ADDRESS = "Awoshie, Accra, Ghana"
 school_sendgrid_key = st.secrets.get("general", {}).get("SENDGRID_API_KEY")
 school_sender_email = st.secrets.get("general", {}).get("SENDER_EMAIL", SCHOOL_EMAIL)
 
+# === PDF GENERATION FUNCTION ===
+def generate_receipt_and_contract_pdf(
+    student_row,
+    agreement_text,
+    payment_amount,
+    payment_date=None,
+    first_instalment=1500,
+    course_length=12
+):
+    if payment_date is None:
+        payment_date = date.today()
+    elif isinstance(payment_date, str):
+        payment_date = pd.to_datetime(payment_date, errors="coerce").date()
+
+    paid = float(student_row.get("Paid", 0))
+    balance = float(student_row.get("Balance", 0))
+    total_fee = paid + balance
+
+    try:
+        second_due_date = payment_date + timedelta(days=30)
+    except Exception:
+        second_due_date = payment_date
+
+    payment_status = "FULLY PAID" if balance == 0 else "INSTALLMENT PLAN"
+
+    # Replace placeholders in agreement
+    filled = agreement_text.replace("[STUDENT_NAME]", str(student_row.get("Name", ""))) \
+        .replace("[DATE]", str(payment_date)) \
+        .replace("[CLASS]", str(student_row.get("Level", ""))) \
+        .replace("[AMOUNT]", str(payment_amount)) \
+        .replace("[FIRST_INSTALMENT]", str(first_instalment)) \
+        .replace("[SECOND_INSTALMENT]", str(balance)) \
+        .replace("[SECOND_DUE_DATE]", str(second_due_date)) \
+        .replace("[COURSE_LENGTH]", str(course_length))
+
+    def safe(txt):
+        return str(txt).encode("latin-1", "replace").decode("latin-1")
+
+    pdf = FPDF()
+    pdf.add_page()
+
+    # Header
+    pdf.set_font("Arial", size=14)
+    pdf.cell(200, 10, safe(f"{SCHOOL_NAME} Payment Receipt"), ln=True, align="C")
+
+    pdf.set_font("Arial", 'B', size=12)
+    pdf.set_text_color(0, 128, 0)
+    pdf.cell(200, 10, safe(payment_status), ln=True, align="C")
+    pdf.set_text_color(0, 0, 0)
+
+    pdf.set_font("Arial", size=12)
+    pdf.ln(10)
+    pdf.cell(200, 10, safe(f"Name: {student_row.get('Name','')}"), ln=True)
+    pdf.cell(200, 10, safe(f"Student Code: {student_row.get('StudentCode','')}"), ln=True)
+    pdf.cell(200, 10, safe(f"Phone: {student_row.get('Phone','')}"), ln=True)
+    pdf.cell(200, 10, safe(f"Level: {student_row.get('Level','')}"), ln=True)
+    pdf.cell(200, 10, f"Amount Paid: GHS {paid:.2f}", ln=True)
+    pdf.cell(200, 10, f"Balance Due: GHS {balance:.2f}", ln=True)
+    pdf.cell(200, 10, f"Total Course Fee: GHS {total_fee:.2f}", ln=True)
+    pdf.cell(200, 10, safe(f"Contract Start: {student_row.get('ContractStart','')}"), ln=True)
+    pdf.cell(200, 10, safe(f"Contract End: {student_row.get('ContractEnd','')}"), ln=True)
+    pdf.cell(200, 10, f"Receipt Date: {payment_date}", ln=True)
+    pdf.ln(10)
+    pdf.cell(0, 10, safe("Thank you for your payment!"), ln=True)
+    pdf.cell(0, 10, safe("Signed: Felix Asadu"), ln=True)
+
+    # Contract Section
+    pdf.ln(15)
+    pdf.set_font("Arial", size=14)
+    pdf.cell(200, 10, safe(f"{SCHOOL_NAME} Student Contract"), ln=True, align="C")
+
+    pdf.set_font("Arial", size=12)
+    pdf.ln(10)
+    for line in filled.split("\n"):
+        pdf.multi_cell(0, 10, safe(line))
+
+    pdf.ln(10)
+    pdf.cell(0, 10, safe("Signed: Felix Asadu"), ln=True)
+
+    # Footer timestamp
+    pdf.set_y(-15)
+    pdf.set_font("Arial", "I", 8)
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    pdf.cell(0, 10, safe(f"Generated on {now_str}"), align="C")
+
+    filename = f"{student_row.get('Name','').replace(' ', '_')}_receipt_contract.pdf"
+    pdf.output(filename)
+    return filename
+
+# === INITIALIZE STUDENT FILE ===
+student_file = "students_simple.csv"
+def load_students():
+    if os.path.exists(student_file):
+        return pd.read_csv(student_file)
+    else:
+        df = pd.DataFrame(columns=[
+            "Name", "Phone", "Location", "Level", "Paid", "Balance", "ContractStart", "ContractEnd", "StudentCode", "Email"
+        ])
+        df.to_csv(student_file, index=False)
+        return df
+
+df_main = load_students()
+
+# === GOOGLE SHEET REGISTRATION FORM (PENDING STUDENTS) ===
+sheet_url = "https://docs.google.com/spreadsheets/d/1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo/export?format=csv"
+
+# === AGREEMENT TEMPLATE STATE ===
+if "agreement_template" not in st.session_state:
+    st.session_state["agreement_template"] = """
+PAYMENT AGREEMENT
+
+This Payment Agreement is entered into on [DATE] for [CLASS] students of Learn Language Education Academy and Felix Asadu ("Teacher").
+
+Terms of Payment:
+1. Payment Amount: The student agrees to pay the teacher a total of [AMOUNT] cedis for the course.
+2. Payment Schedule: The payment can be made in full or in two installments: GHS [FIRST_INSTALMENT] for the first installment, and the remaining balance for the second installment. The second installment must be paid by [SECOND_DUE_DATE].
+3. Late Payments: In the event of late payment, the school may revoke access to all learning platforms. No refund will be made.
+4. Refunds: Once a deposit is made and a receipt is issued, no refunds will be provided.
+5. Additional Service: The course lasts [COURSE_LENGTH] weeks. Free supervision for Goethe Exams is valid only if the student remains consistent.
+
+Cancellation and Refund Policy:
+1. If the teacher cancels a lesson, it will be rescheduled.
+
+Miscellaneous Terms:
+1. Attendance: The student agrees to attend lessons punctually.
+2. Communication: Both parties agree to communicate changes promptly.
+3. Termination: Either party may terminate this Agreement with written notice if the other party breaches any material term.
+
+Signatures:
+[STUDENT_NAME]
+Date: [DATE]
+Asadu Felix
+"""
+
+st.title("🏫 Learn Language Education Academy Dashboard")
+st.caption(f"📍 {SCHOOL_ADDRESS} | ✉️ {SCHOOL_EMAIL} | 🌐 {SCHOOL_WEBSITE} | 📞 {SCHOOL_PHONE}")
+
+# 📊 Summary Stats
+total_students = len(df_main)
+total_paid = df_main["Paid"].sum() if "Paid" in df_main.columns else 0.0
+
+# Load expenses if available
+expenses_file = "expenses_all.csv"
+if os.path.exists(expenses_file):
+    exp_df = pd.read_csv(expenses_file)
+    total_expenses = exp_df["Amount"].sum() if "Amount" in exp_df.columns else 0.0
+else:
+    total_expenses = 0.0
+
+net_profit = total_paid - total_expenses
+
+# === SUMMARY BOX ===
+st.markdown(f"""
+<div style='background-color:#f9f9f9;border:1px solid #ccc;border-radius:10px;padding:15px;margin-top:10px'>
+    <h4>📋 Summary</h4>
+    <ul>
+        <li>👨‍🎓 <b>Total Students:</b> {total_students}</li>
+        <li>💰 <b>Total Collected:</b> GHS {total_paid:,.2f}</li>
+        <li>💸 <b>Total Expenses:</b> GHS {total_expenses:,.2f}</li>
+        <li>📈 <b>Net Profit:</b> GHS {net_profit:,.2f}</li>
+    </ul>
+</div>
+""", unsafe_allow_html=True)
+
+# === NOTIFICATIONS ===
+today = date.today()
+notifications = []
+
+def clean_phone(phone):
+    phone = str(phone).replace(" ", "").replace("+", "")
+    return "233" + phone[1:] if phone.startswith("0") else phone
+
+# 1. Debtors
+# — make sure “Balance” exists and is numeric before filtering
+if "Balance" not in df_main.columns:
+    df_main["Balance"] = 0.0
+else:
+    df_main["Balance"] = pd.to_numeric(df_main["Balance"], errors="coerce").fillna(0.0)
+
+debtors = df_main[df_main["Balance"] > 0]
+for _, row in debtors.iterrows():
+    phone = clean_phone(row.get("Phone", ""))
+    name = row.get("Name", "Unknown")
+    balance = row["Balance"]
+    student_code = row.get("StudentCode", "")
+    msg = (
+        f"Dear {name}, you owe GHS {balance:.2f} for your course ({student_code}). "
+        "Please settle it to remain active."
+    )
+    wa_url = f"https://wa.me/{phone}?text={urllib.parse.quote(msg)}"
+    notifications.append(
+        f"💰 <b>{name}</b> owes GHS {balance:.2f} "
+        f"[<a href='{wa_url}' target='_blank'>📲 WhatsApp</a>]"
+    )
+
+# === Ensure ContractEnd column exists and is datetime ===
+if "ContractEnd" not in df_main.columns:
+    df_main["ContractEnd"] = pd.NaT
+df_main["ContractEnd"] = pd.to_datetime(df_main["ContractEnd"], errors="coerce")
+
+# 2. Expiring contracts (next 30 days)
+expiring = df_main[
+    (df_main["ContractEnd"] >= pd.Timestamp(today)) &
+    (df_main["ContractEnd"] <= pd.Timestamp(today + timedelta(days=30)))
+]
+for _, row in expiring.iterrows():
+    name = row.get("Name", "Unknown")
+    end_date = row["ContractEnd"].date()
+    email = row.get("Email", "")
+    student_code = row.get("StudentCode", "")
+    key = f"{name}_{student_code}"
+
+    message = f"⏳ <b>{name}</b>'s contract ends on {end_date}"
+    if email and school_sendgrid_key and key not in st.session_state["emailed_expiries"]:
+        try:
+            msg = Mail(
+                from_email=school_sender_email,
+                to_emails=email,
+                subject=f"Your contract with {SCHOOL_NAME} ends soon",
+                html_content=f"Dear {name},<br>Your contract ends on {end_date}. Please contact us to extend it.<br>{SCHOOL_NAME}"
+            )
+            SendGridAPIClient(school_sendgrid_key).send(msg)
+            message += " ✅ Email sent"
+            st.session_state["emailed_expiries"].add(key)
+        except Exception as e:
+            message += f" ⚠️ Email failed: {e}"
+
+    notifications.append(message)
+
+# 3. Expired contracts
+expired = df_main[df_main["ContractEnd"] < pd.Timestamp(today)]
+for _, row in expired.iterrows():
+    name = row.get("Name", "Unknown")
+    end_date = row["ContractEnd"].date()
+    notifications.append(f"❌ <b>{name}</b>'s contract expired on {end_date}")
+
+# Show notifications
+if notifications:
+    st.markdown(f"""
+    <div style='background-color:#fff3cd;border:1px solid #ffc107;border-radius:10px;padding:15px;margin-top:10px'>
+        <h4>🔔 <b>Notifications</b></h4>
+        <ul>{"".join([f"<li>{n}</li>" for n in notifications])}</ul>
+    </div>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown(f"""
+    <div style='background-color:#e8f5e9;border:1px solid #4caf50;border-radius:10px;padding:15px;margin-top:10px'>
+        <h4>🔔 <b>Notifications</b></h4>
+        <p>No urgent alerts. You're all caught up ✅</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# === TABS ===
 tabs = st.tabs([
-    "📝 Pending",
+    "📝 Pending Registrations",
     "👩‍🎓 All Students",
     "➕ Add Student",
     "💵 Expenses",
-    "📲 Reminders",
-    "📄 Contract ",
+    "📲 WhatsApp Reminders",
+    "📄 Generate Contract PDF",
     "📧 Send Email",
     "📊 Analytics & Export",
-    "📆 Schedule",
-    "📝 Marking"   # <--- New tab!
+    "📆 A1 Course Schedule"  
 ])
 
 with tabs[0]:
-    st.title("📝 Pending")
+    st.title("📝 Pending Student Registrations")
 
-    # 1) Fetch registrations from Google Sheets (CSV export)
-    sheet_csv = (
-        "https://docs.google.com/spreadsheets/d/"
-        "1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo"
-        "/export?format=csv"
-    )
+    # --- Load new pending students from form sheet ---
     try:
-        new_students = pd.read_csv(sheet_csv)
+        new_students = pd.read_csv(sheet_url)
         def clean_col(c):
             return (
                 c.strip()
@@ -117,41 +326,63 @@ with tabs[0]:
         st.error(f"❌ Could not load registration sheet: {e}")
         new_students = pd.DataFrame()
 
-    # 2) Approve & add each new student
-    if new_students.empty:
-        st.info("No new registrations to process.")
-    else:
-        for i, row in new_students.iterrows():
-            fullname  = row.get("full_name") or row.get("name") or f"Student {i}"
-            phone     = row.get("phone_number") or row.get("phone") or ""
-            email     = str(row.get("email") or row.get("email_address") or "").strip()
-            level     = str(row.get("class") or row.get("class_a1a2_etc") or row.get("level") or "").strip()
-            location  = str(row.get("location") or "").strip()
-            emergency = str(row.get("emergency_contact_phone_number") or row.get("emergency") or "").strip()
+    # --- Upload CSV overrides ---
+    with st.expander("📤 Upload Data"):
+        st.subheader("Upload Student CSV")
+        uploaded_student_csv = st.file_uploader("Upload students_simple.csv", type=["csv"])
+        if uploaded_student_csv is not None:
+            pd.read_csv(uploaded_student_csv).to_csv("students_simple.csv", index=False)
+            st.success("✅ Student file replaced.")
+            st.session_state["should_rerun"] = True
 
-            with st.expander(f"{fullname} — {phone}"):
+        st.subheader("Upload Expenses CSV")
+        uploaded_expenses_csv = st.file_uploader("Upload expenses_all.csv", type=["csv"])
+        if uploaded_expenses_csv is not None:
+            pd.read_csv(uploaded_expenses_csv).to_csv("expenses_all.csv", index=False)
+            st.success("✅ Expenses file replaced.")
+            st.session_state["should_rerun"] = True
+
+    # --- Top‐level rerun check ---
+    if st.session_state["should_rerun"]:
+        st.session_state["should_rerun"] = False
+        st.experimental_rerun()
+
+    # --- Helper: Clean any email source ---
+    def get_clean_email(row):
+        raw = row.get("email") or row.get("email_address") or row.get("Email Address") or ""
+        return "" if pd.isna(raw) else str(raw).strip()
+
+    # --- Show and approve pending students ---
+    if not new_students.empty:
+        for i, row in new_students.iterrows():
+            fullname   = row.get("full_name") or row.get("name") or f"Student {i}"
+            phone      = row.get("phone_number") or row.get("phone") or ""
+            email      = get_clean_email(row)
+            level      = row.get("class_a1a2_etc") or row.get("class") or row.get("level") or ""
+            location   = row.get("location", "")
+            emergency  = row.get("emergency_contact_phone_number") or row.get("emergency", "")
+
+            with st.expander(f"{fullname} ({phone})"):
                 st.write(f"**Email:** {email or '—'}")
-                student_code    = st.text_input("Assign Student Code", key=f"code_{i}")
-                contract_start  = st.date_input("Contract Start", value=date.today(), key=f"start_{i}")
-                course_length   = st.number_input("Course Length (weeks)", min_value=1, value=12, key=f"length_{i}")
-                contract_end    = st.date_input(
-                    "Contract End",
-                    value=contract_start + timedelta(weeks=course_length),
-                    key=f"end_{i}"
-                )
-                paid            = st.number_input("Amount Paid (GHS)", min_value=0.0, step=1.0, key=f"paid_{i}")
-                balance         = st.number_input("Balance Due (GHS)", min_value=0.0, step=1.0, key=f"bal_{i}")
-                first_instalment= st.number_input("First Instalment (GHS)", min_value=0.0, value=1500.0, key=f"firstinst_{i}")
-                send_email      = st.checkbox("Send Welcome Email?", value=bool(email), key=f"email_{i}")
-                attach_pdf      = st.checkbox("Attach PDF to Email?", value=True, key=f"pdf_{i}")
+                emergency_input  = st.text_input("Emergency Contact (optional)", value=emergency, key=f"emergency_{i}")
+                student_code     = st.text_input("Assign Student Code", key=f"code_{i}")
+                contract_start   = st.date_input("Contract Start", value=date.today(), key=f"start_{i}")
+                course_length    = st.number_input("Course Length (weeks)", min_value=1, value=12, key=f"length_{i}")
+                contract_end     = st.date_input("Contract End", value=contract_start + timedelta(weeks=course_length), key=f"end_{i}")
+                paid             = st.number_input("Amount Paid (GHS)", min_value=0.0, step=1.0, key=f"paid_{i}")
+                balance          = st.number_input("Balance Due (GHS)", min_value=0.0, step=1.0, key=f"bal_{i}")
+                first_instalment = st.number_input("First Instalment", min_value=0.0, value=1500.0, key=f"firstinst_{i}")
+                attach_pdf       = st.checkbox("Attach PDF to Email?", value=True, key=f"pdf_{i}")
+                send_email       = st.checkbox("Send Welcome Email?", value=bool(email), key=f"email_{i}")
 
                 if st.button("Approve & Add", key=f"approve_{i}"):
                     if not student_code:
-                        st.warning("❗ Please enter a unique student code.")
+                        st.warning("Enter a unique student code.")
                         continue
 
-                    if os.path.exists("students.csv"):
-                        approved_df = pd.read_csv("students.csv")
+                    # load or init approved_df
+                    if os.path.exists("students_simple.csv"):
+                        approved_df = pd.read_csv("students_simple.csv")
                     else:
                         approved_df = pd.DataFrame(columns=[
                             "Name","Phone","Email","Location","Level",
@@ -159,8 +390,8 @@ with tabs[0]:
                             "StudentCode","Emergency Contact (Phone Number)"
                         ])
 
-                    if student_code in approved_df["StudentCode"].astype(str).values:
-                        st.warning("❗ Student code already exists.")
+                    if student_code in approved_df["StudentCode"].values:
+                        st.warning("❗ Student Code exists. Choose another.")
                         continue
 
                     student_dict = {
@@ -171,14 +402,14 @@ with tabs[0]:
                         "Level": level,
                         "Paid": paid,
                         "Balance": balance,
-                        "ContractStart": contract_start.isoformat(),
-                        "ContractEnd": contract_end.isoformat(),
+                        "ContractStart": str(contract_start),
+                        "ContractEnd": str(contract_end),
                         "StudentCode": student_code,
-                        "Emergency Contact (Phone Number)": emergency
+                        "Emergency Contact (Phone Number)": emergency_input
                     }
 
                     approved_df = pd.concat([approved_df, pd.DataFrame([student_dict])], ignore_index=True)
-                    approved_df.to_csv("students.csv", index=False)
+                    approved_df.to_csv("students_simple.csv", index=False)
 
                     total_fee = paid + balance
                     pdf_file = generate_receipt_and_contract_pdf(
@@ -189,208 +420,178 @@ with tabs[0]:
                         first_instalment=first_instalment,
                         course_length=course_length
                     )
-                    if send_email and email and 'school_sendgrid_key' in globals():
+
+                    # optional welcome email
+                    if send_email and email and school_sendgrid_key:
                         try:
-                            # Email sending logic...
+                            msg = Mail(
+                                from_email=school_sender_email,
+                                to_emails=email,
+                                subject=f"Welcome to {SCHOOL_NAME}",
+                                html_content=(
+                                    f"Dear {fullname},<br><br>"
+                                    f"Welcome to {SCHOOL_NAME}!<br>"
+                                    f"Student Code: <b>{student_code}</b><br>"
+                                    f"Class: {level}<br>"
+                                    f"Contract: {contract_start} to {contract_end}<br>"
+                                    f"Paid: GHS {paid}<br>"
+                                    f"Balance: GHS {balance}<br><br>"
+                                    f"For help, contact us at {SCHOOL_EMAIL} or {SCHOOL_PHONE}."
+                                )
+                            )
+                            if attach_pdf:
+                                with open(pdf_file, "rb") as f:
+                                    encoded = base64.b64encode(f.read()).decode()
+                                    msg.attachment = Attachment(
+                                        FileContent(encoded),
+                                        FileName(pdf_file),
+                                        FileType("application/pdf"),
+                                        Disposition("attachment")
+                                    )
+                            SendGridAPIClient(school_sendgrid_key).send(msg)
                             st.success(f"📧 Email sent to {email}")
                         except Exception as e:
                             st.warning(f"⚠️ Email failed: {e}")
 
                     st.success(f"✅ {fullname} approved and saved.")
-                    st.rerun()
+                    st.session_state["should_rerun"] = True
+                    st.stop()
 
 
-
-@lru_cache(maxsize=1)
-def load_student_data(local, github_url):
-    if os.path.exists(local):
-        return pd.read_csv(local)
-    try:
-        df = pd.read_csv(github_url)
-        st.info("Loaded students from GitHub backup.")
-        return df
-    except Exception:
-        st.warning("⚠️ students.csv not found locally or on GitHub.")
-        st.stop()
-
-@lru_cache(maxsize=1)
-def load_student_data(local, github_url):
-    if os.path.exists(local):
-        return pd.read_csv(local)
-    try:
-        df = pd.read_csv(github_url)
-        st.info("Loaded students from GitHub backup.")
-        return df
-    except Exception:
-        st.warning("⚠️ students.csv not found locally or on GitHub.")
-        st.stop()
-
-# --- All Students (Edit, Update, Delete, Receipt) ---
 with tabs[1]:
     st.title("👩‍🎓 All Students (Edit, Update, Delete, Receipt)")
+    today = date.today()
 
-    student_file = "students.csv"
-    github_csv   = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
-    df_main      = load_student_data(student_file, github_csv)
+    # Load or initialize students
+    if os.path.exists(student_file):
+        df_main = pd.read_csv(student_file)
+    else:
+        df_main = pd.DataFrame()
 
-    # Normalize columns and build lookup
-    df_main.columns = [
-        c.strip().lower()
-         .replace(' ', '_')
-         .replace('(', '')
-         .replace(')', '')
-         .replace('-', '_')
-         .replace('/', '_')
-        for c in df_main.columns
+    # Ensure required columns exist
+    required_cols = [
+        "Name", "Phone", "Email", "Location", "Level",
+        "Paid", "Balance", "ContractStart", "ContractEnd",
+        "StudentCode", "Emergency Contact (Phone Number)"
     ]
-    col_map = {c.replace('_', ''): c for c in df_main.columns}
-    def col_lookup(key):
-        k = key.strip().lower().replace(' ', '_').replace('_', '')
-        return col_map.get(k, key)
+    for col in required_cols:
+        if col not in df_main.columns:
+            df_main[col] = ""
 
-    # Parse date columns
-    today    = date.today()
-    start_col = col_lookup('contractstart')
-    end_col   = col_lookup('contractend')
-    for dt_field in (start_col, end_col):
-        if dt_field in df_main.columns:
-            df_main[dt_field] = pd.to_datetime(df_main[dt_field], errors='coerce')
+    # — Coerce numeric columns to avoid ValueError —
+    df_main["Paid"] = pd.to_numeric(df_main["Paid"], errors="coerce").fillna(0.0)
+    df_main["Balance"] = pd.to_numeric(df_main["Balance"], errors="coerce").fillna(0.0)
 
-    # Compute status
-    df_main['status'] = 'Unknown'
-    if end_col in df_main.columns:
-        mask = df_main[end_col].notna()
-        df_main.loc[mask, 'status'] = (
-            df_main.loc[mask, end_col]
-                   .dt.date
-                   .apply(lambda d: 'Completed' if d < today else 'Enrolled')
-        )
+    # — Coerce ContractEnd to datetime & compute Status vectorized —
+    df_main["ContractEnd"] = pd.to_datetime(df_main["ContractEnd"], errors="coerce")
+    df_main["Status"] = "Unknown"
+    mask_valid = df_main["ContractEnd"].notna()
+    df_main.loc[mask_valid, "Status"] = np.where(
+        df_main.loc[mask_valid, "ContractEnd"].dt.date < today,
+        "Completed",
+        "Enrolled"
+    )
 
-    # Search & Filters
-    search      = st.text_input('🔍 Search by Name or Code').lower()
-    lvl_col     = col_lookup('level')
-    level_opts  = ['All'] + sorted(df_main[lvl_col].dropna().unique().tolist()) if lvl_col in df_main.columns else ['All']
-    sel_level   = st.selectbox('📋 Filter by Class Level', level_opts)
-    status_opts = ['All', 'Enrolled', 'Completed', 'Unknown']
-    sel_status  = st.selectbox('Filter by Status', status_opts)
+    # 🔄 Live Search and Filters
+    search_term    = st.text_input("🔍 Search Student by Name or Code")
+    levels         = ["All"] + sorted(df_main["Level"].dropna().unique().tolist())
+    selected_level = st.selectbox("📋 Filter by Class Level", levels)
+    statuses       = ["All", "Enrolled", "Completed", "Unknown"]
+    status_filter  = st.selectbox("Filter by Status", statuses)
 
     view_df = df_main.copy()
-    name_col = col_lookup('name')
-    code_col = col_lookup('studentcode')
-    if search:
-        m1 = view_df[name_col].astype(str).str.lower().str.contains(search)
-        m2 = view_df[code_col].astype(str).str.lower().str.contains(search)
-        view_df = view_df[m1 | m2]
-    if sel_level != 'All':
-        view_df = view_df[view_df[lvl_col] == sel_level]
-    if sel_status != 'All':
-        view_df = view_df[view_df['status'] == sel_status]
+    if search_term:
+        view_df = view_df[
+            view_df["Name"].str.contains(search_term, case=False, na=False) |
+            view_df["StudentCode"].str.contains(search_term, case=False, na=False)
+        ]
+    if selected_level != "All":
+        view_df = view_df[view_df["Level"] == selected_level]
+    if status_filter != "All":
+        view_df = view_df[view_df["Status"] == status_filter]
 
-    # Table & Pagination
     if view_df.empty:
-        st.info('No students found.')
+        st.info("No students found in your database.")
     else:
-        per_page = 10
-        total    = len(view_df)
-        pages    = (total - 1) // per_page + 1
-        page     = st.number_input(f'Page (1-{pages})', 1, pages, 1, key='students_page')
-        start    = (page - 1) * per_page
-        end      = start + per_page
-        page_df  = view_df.iloc[start:end]
+        for idx, row in view_df.iterrows():
+            name           = row["Name"]
+            phone          = row["Phone"]
+            email          = row["Email"]
+            location       = row["Location"]
+            level          = row["Level"]
+            paid           = row["Paid"]
+            balance        = row["Balance"]
+            contract_start = str(row["ContractStart"])
+            contract_end   = row["ContractEnd"].date() if pd.notna(row["ContractEnd"]) else ""
+            student_code   = row["StudentCode"]
+            emergency      = row["Emergency Contact (Phone Number)"]
+            status         = row["Status"]
 
-        display_cols = [
-            name_col, code_col, lvl_col,
-            col_lookup('phone'), col_lookup('paid'), col_lookup('balance'), 'status'
-        ]
-        st.dataframe(page_df[display_cols], use_container_width=True)
+            unique_key = f"{student_code}_{idx}"
+            status_color = (
+                "🟢" if status == "Enrolled" else
+                "🔴" if status == "Completed" else
+                "⚪"
+            )
 
-        # Detail editing
-        selected   = st.selectbox('Select a student', page_df[name_col].tolist(), key='sel_student')
-        row        = page_df[page_df[name_col] == selected].iloc[0]
-        idx_main   = view_df[view_df[name_col] == selected].index[0]
-        unique_key = f"{row[code_col]}_{idx_main}"
-        status_emoji = '🟢' if row['status'] == 'Enrolled' else ('🔴' if row['status'] == 'Completed' else '⚪')
+            with st.expander(f"{status_color} {name} ({student_code}) [{status}]"):
+                # Editable fields
+                name_input           = st.text_input("Name", value=name, key=f"name_{unique_key}")
+                phone_input          = st.text_input("Phone", value=phone, key=f"phone_{unique_key}")
+                email_input          = st.text_input("Email", value=email, key=f"email_{unique_key}")
+                location_input       = st.text_input("Location", value=location, key=f"loc_{unique_key}")
+                level_input          = st.text_input("Level", value=level, key=f"level_{unique_key}")
+                paid_input           = st.number_input("Paid", value=paid, key=f"paid_{unique_key}")
+                balance_input        = st.number_input("Balance", value=balance, key=f"bal_{unique_key}")
+                contract_start_input = st.text_input("Contract Start", value=contract_start, key=f"cs_{unique_key}")
+                contract_end_input   = st.text_input("Contract End", value=contract_end, key=f"ce_{unique_key}")
+                code_input           = st.text_input("Student Code", value=student_code, key=f"code_{unique_key}")
+                emergency_input      = st.text_input("Emergency Contact", value=emergency, key=f"em_{unique_key}")
 
-        with st.expander(f"{status_emoji} {selected} ({row[code_col]}) [{row['status']}]", expanded=True):
-            # Schema-driven form
-            schema = {
-                'name': ('text_input', 'Name'),
-                'phone': ('text_input', 'Phone'),
-                'email': ('text_input', 'Email'),
-                'location': ('text_input', 'Location'),
-                'level': ('text_input', 'Level'),
-                'paid': ('number_input', 'Paid'),
-                'balance': ('number_input', 'Balance'),
-                'contractstart': ('date_input', 'Contract Start'),
-                'contractend': ('date_input', 'Contract End'),
-                'studentcode': ('text_input', 'Student Code'),
-                'emergencycontactphonenumber': ('text_input', 'Emergency Contact')
-            }
-            inputs = {}
-            for field, (widget, label) in schema.items():
-                col = col_lookup(field)
-                val = row.get(col)
-                key_widget = f"{field}_{unique_key}"
-                if widget == 'text_input':
-                    inputs[field] = st.text_input(label, value=str(val) if pd.notna(val) else '', key=key_widget)
-                elif widget == 'number_input':
-                    inputs[field] = st.number_input(label, value=float(val or 0), key=key_widget)
-                elif widget == 'date_input':
-                    default = val.date() if pd.notna(val) else today
-                    inputs[field] = st.date_input(label, value=default, key=key_widget)
+                col1, col2, col3 = st.columns(3)
 
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                if st.button('💾 Update', key=f'upd{unique_key}'):
-                    for f, v in inputs.items():
-                        df_main.at[idx_main, col_lookup(f)] = v
-                    df_main.to_csv(student_file, index=False)
-                    st.success('✅ Student updated.')
-                    st.experimental_rerun()
-            with c2:
-                if st.button('🗑️ Delete', key=f'del{unique_key}'):
-                    df_main = df_main.drop(idx_main).reset_index(drop=True)
-                    df_main.to_csv(student_file, index=False)
-                    st.success('❌ Student deleted.')
-                    st.experimental_rerun()
-            with c3:
-                if st.button('📄 Receipt', key=f'rct{unique_key}'):
-                    total_fee = inputs['paid'] + inputs['balance']
-                    pay_date  = inputs['contractstart']
-                    pdf_path  = generate_receipt_and_contract_pdf(
-                        row,
-                        st.session_state['agreement_template'],
-                        payment_amount=total_fee,
-                        payment_date=pay_date
-                    )
-                    if not pdf_path or not os.path.exists(pdf_path):
-                        st.error("⚠️ Could not generate receipt PDF.")
-                    else:
-                        try:
-                            with open(pdf_path, 'rb') as f:
-                                pdf_bytes = f.read()
-                            b64 = base64.b64encode(pdf_bytes).decode()
-                            st.markdown(
-                                f'<a href="data:application/pdf;base64,{b64}" '
-                                f'download="{selected.replace(" ","_")}_receipt.pdf">Download Receipt</a>',
-                                unsafe_allow_html=True
-                            )
-                        except Exception as e:
-                            st.error(f"⚠️ Error reading PDF: {e}")
+                with col1:
+                    if st.button("💾 Update", key=f"update_{unique_key}"):
+                        df_main.at[idx, "Name"]  = name_input
+                        df_main.at[idx, "Phone"] = phone_input
+                        df_main.at[idx, "Email"] = email_input
+                        df_main.at[idx, "Location"] = location_input
+                        df_main.at[idx, "Level"] = level_input
+                        df_main.at[idx, "Paid"] = paid_input
+                        df_main.at[idx, "Balance"] = balance_input
+                        df_main.at[idx, "ContractStart"] = contract_start_input
+                        df_main.at[idx, "ContractEnd"] = contract_end_input
+                        df_main.at[idx, "StudentCode"] = code_input
+                        df_main.at[idx, "Emergency Contact (Phone Number)"] = emergency_input
+                        df_main.to_csv(student_file, index=False)
+                        st.success("✅ Student updated.")
+                        st.experimental_rerun()
 
-        # Export limited columns for download
-        export_cols = [
-            name_col, code_col, lvl_col,
-            col_lookup('phone'), col_lookup('paid'), col_lookup('balance'), 'status'
-        ]
-        export_df = df_main[export_cols]
-        st.download_button(
-            '📁 Download Students CSV',
-            export_df.to_csv(index=False).encode('utf-8'),
-            file_name='students_backup.csv',
-            mime='text/csv'
-        )
+                with col2:
+                    if st.button("🗑️ Delete", key=f"delete_{unique_key}"):
+                        df_main = df_main.drop(idx).reset_index(drop=True)
+                        df_main.to_csv(student_file, index=False)
+                        st.success("❌ Student deleted.")
+                        st.experimental_rerun()
 
+                with col3:
+                    if st.button("📄 Receipt", key=f"receipt_{unique_key}"):
+                        total_fee   = paid_input + balance_input
+                        parsed_date = pd.to_datetime(contract_start_input, errors="coerce").date()
+                        pdf_path    = generate_receipt_and_contract_pdf(
+                            row,
+                            st.session_state["agreement_template"],
+                            payment_amount=total_fee,
+                            payment_date=parsed_date
+                        )
+                        with open(pdf_path, "rb") as f:
+                            pdf_bytes = f.read()
+                        b64 = base64.b64encode(pdf_bytes).decode()
+                        download_link = (
+                            f'<a href="data:application/pdf;base64,{b64}" '
+                            f'download="{name.replace(" ", "_")}_receipt.pdf">Download Receipt</a>'
+                        )
+                        st.markdown(download_link, unsafe_allow_html=True)
 
 with tabs[2]:
     st.title("➕ Add Student Manually")
@@ -445,414 +646,324 @@ with tabs[2]:
                 updated_df = pd.concat([existing_df, new_row], ignore_index=True)
                 updated_df.to_csv(student_file, index=False)
                 st.success(f"✅ Student '{name}' added successfully.")
+                st.rerun()
 
-# --- Tab 3: Expenses and Financial Summary (Google Sheets) ---
 with tabs[3]:
     st.title("💵 Expenses and Financial Summary")
 
-    # 1) Load expenses from Google Sheets CSV export
-    sheet_id   = "1I5mGFcWbWdK6YQrJtabTg_g-XBEVaIRK1aMFm72vDEM"
-    sheet_csv  = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
-    try:
-        df_expenses = pd.read_csv(sheet_csv)
-        df_expenses.columns = [c.strip().lower().replace(" ", "_") for c in df_expenses.columns]
-        st.success("✅ Loaded expenses from Google Sheets.")
-    except Exception as e:
-        st.error(f"❌ Could not load expenses sheet: {e}")
-        df_expenses = pd.DataFrame(columns=["type", "item", "amount", "date"])
+    expenses_file = "expenses_all.csv"
 
-    # 2) Add new expense via form
+    # ✅ Load or initialize expense data
+    if os.path.exists(expenses_file):
+        exp = pd.read_csv(expenses_file)
+    else:
+        exp = pd.DataFrame(columns=["Type", "Item", "Amount", "Date"])
+        exp.to_csv(expenses_file, index=False)
+
+    # ✅ Add new expense
     with st.form("add_expense_form"):
-        exp_type   = st.selectbox("Type", ["Bill","Rent","Salary","Marketing","Other"])
-        exp_item   = st.text_input("Expense Item")
+        exp_type = st.selectbox("Type", ["Bill", "Rent", "Salary", "Marketing", "Other"])
+        exp_item = st.text_input("Expense Item")
         exp_amount = st.number_input("Amount (GHS)", min_value=0.0, step=1.0)
-        exp_date   = st.date_input("Date", value=date.today())
-        submit     = st.form_submit_button("Add Expense")
-        if submit and exp_item and exp_amount > 0:
-            new_row = {"type": exp_type, "item": exp_item, "amount": exp_amount, "date": exp_date}
-            df_expenses = pd.concat([df_expenses, pd.DataFrame([new_row])], ignore_index=True)
+        exp_date = st.date_input("Date", value=date.today())
+        submit_exp = st.form_submit_button("Add Expense")
+
+        if submit_exp and exp_item and exp_amount > 0:
+            new_exp = pd.DataFrame([{
+                "Type": exp_type,
+                "Item": exp_item,
+                "Amount": exp_amount,
+                "Date": exp_date
+            }])
+            exp = pd.concat([exp, new_exp], ignore_index=True)
+            exp.to_csv(expenses_file, index=False)
+
+            # ✅ Reload fresh and convert date column
+            exp = pd.read_csv(expenses_file)
+            exp["Date"] = pd.to_datetime(exp["Date"], errors="coerce")
+            exp["Month"] = exp["Date"].dt.strftime("%B %Y")
+            exp["Year"] = exp["Date"].dt.year
+
             st.success(f"✅ Recorded: {exp_type} – {exp_item}")
-            st.experimental_rerun()
+            st.session_state["should_rerun"] = True
 
-    # 3) Display all expenses with pagination
+    # ✅ Convert dates if not done
+    exp["Date"] = pd.to_datetime(exp["Date"], errors="coerce")
+    exp["Month"] = exp["Date"].dt.strftime("%B %Y")
+    exp["Year"] = exp["Date"].dt.year
+
     st.write("### All Expenses")
-    ROWS_PER_PAGE = 10
-    total_rows    = len(df_expenses)
-    total_pages   = (total_rows - 1) // ROWS_PER_PAGE + 1
-    page = st.number_input(
-        f"Page (1-{total_pages})", min_value=1, max_value=total_pages, value=1, step=1, key="exp_page"
-    ) if total_pages > 1 else 1
-    start = (page - 1) * ROWS_PER_PAGE
-    end   = start + ROWS_PER_PAGE
-    st.dataframe(df_expenses.iloc[start:end].reset_index(drop=True), use_container_width=True)
+    st.dataframe(exp[["Type", "Item", "Amount", "Date"]], use_container_width=True)
 
-    # 4) Expense summary
-    total_expenses = df_expenses["amount"].sum() if not df_expenses.empty else 0.0
+    # ✅ Summary Section
+    st.write("### Summary")
+    if os.path.exists("students_simple.csv"):
+        df_main = pd.read_csv("students_simple.csv")
+        total_paid = df_main["Paid"].sum() if "Paid" in df_main.columns else 0.0
+    else:
+        total_paid = 0.0
+
+    total_expenses = exp["Amount"].sum() if not exp.empty else 0.0
+    net_profit = total_paid - total_expenses
+
+    st.info(f"💰 **Total Collected:** GHS {total_paid:,.2f}")
     st.info(f"💸 **Total Expenses:** GHS {total_expenses:,.2f}")
+    st.success(f"📈 **Net Profit:** GHS {net_profit:,.2f}")
 
-    # 5) Export to CSV
-    csv_data = df_expenses.to_csv(index=False)
-    st.download_button(
-        "📁 Download Expenses CSV",
-        data=csv_data,
-        file_name="expenses_data.csv",
-        mime="text/csv"
-    )
+    # ✅ Monthly and Yearly Groupings
+    if not exp.empty:
+        st.write("### Expenses by Month")
+        st.dataframe(exp.groupby("Month")["Amount"].sum().reset_index())
 
+        st.write("### Expenses by Year")
+        st.dataframe(exp.groupby("Year")["Amount"].sum().reset_index())
 
-# Helper: load student data from multiple sources
-def load_student_data(path, google_url, github_url):
-    if os.path.exists(path):
-        return pd.read_csv(path)
-    for url in (google_url, github_url):
-        try:
-            return pd.read_csv(url)
-        except Exception:
-            continue
-    st.warning("No student data found. Please provide students.csv locally or ensure the remote sheet is accessible.")
-    st.stop()
-
-# --- Tab 4: WhatsApp Reminders for Debtors (with Expenses) ---
 with tabs[4]:
     st.title("📲 WhatsApp Reminders for Debtors")
 
-    # 1) Load Expenses from Google Sheets
-    exp_sheet_id = "1I5mGFcWbWdK6YQrJtabTg_g-XBEVaIRK1aMFm72vDEM"
-    exp_csv_url  = f"https://docs.google.com/spreadsheets/d/{exp_sheet_id}/export?format=csv"
-    try:
-        df_exp = pd.read_csv(exp_csv_url)
-        df_exp.columns = [c.strip().lower().replace(" ", "_") for c in df_exp.columns]
-        total_expenses = pd.to_numeric(df_exp.get("amount", []), errors="coerce").fillna(0).sum()
-    except Exception:
-        total_expenses = 0.0
-
-        # 2) Load Students
-    student_file = "students.csv"
-    google_csv   = (
-        "https://docs.google.com/spreadsheets/d/"
-        "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
-    )
-    github_csv   = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
-    df = load_student_data(student_file, google_csv, github_csv)
-    df = load_student_data(student_file, google_csv, github_csv)
-    df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
-    col_map = {c.replace("_", ""): c for c in df.columns}
-    def col_lookup(key):
-        return col_map.get(key.strip().lower().replace(" ", "_").replace("_", ""), key)
-
-    cs  = col_lookup("contractstart")
-    paid = col_lookup("paid")
-    bal  = col_lookup("balance")
-
-    # Parse dates & amounts
-    df[cs]   = pd.to_datetime(df.get(cs, pd.NaT), errors="coerce").fillna(pd.Timestamp.today())
-    df[paid] = pd.to_numeric(df.get(paid, 0), errors="coerce").fillna(0)
-    df[bal]  = pd.to_numeric(df.get(bal, 0), errors="coerce").fillna(0)
-
-    # 3) Financial Metrics
-    total_collected = df[paid].sum()
-    net_profit      = total_collected - total_expenses
-
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Total Students", len(df))
-    m2.metric("Total Collected (GHS)", f"{total_collected:,.2f}")
-    m3.metric("Total Expenses (GHS)",  f"{total_expenses:,.2f}")
-    m4.metric("Net Profit (GHS)",      f"{net_profit:,.2f}")
-
-    st.markdown("---")
-
-    # 4) Filters
-    search = st.text_input("Search by name or code", key="wa_search")
-    lvl    = col_lookup("level")
-    if lvl in df.columns:
-        opts     = ["All"] + sorted(df[lvl].dropna().unique().tolist())
-        selected = st.selectbox("Filter by Level", opts, key="wa_level")
+    if os.path.exists("students_simple.csv"):
+        df_main = pd.read_csv("students_simple.csv")
     else:
-        selected = "All"
+        df_main = pd.DataFrame()
 
-    # 5) Compute Due Dates
-    df["due_date"]  = df[cs] + timedelta(days=30)
-    df["days_left"] = (df["due_date"] - pd.Timestamp.today()).dt.days.astype(int)
+    if not df_main.empty and "Balance" in df_main.columns and "Phone" in df_main.columns:
+        df_main["Balance"] = pd.to_numeric(df_main["Balance"], errors="coerce").fillna(0.0)
+        df_main["Phone"] = df_main["Phone"].astype(str)
 
-    # 6) Identify Debtors
-    filt = df[df[bal] > 0]
-    if search:
-        mask1 = filt[col_lookup("name")].str.contains(search, case=False, na=False)
-        mask2 = filt[col_lookup("studentcode")].str.contains(search, case=False, na=False)
-        filt  = filt[mask1 | mask2]
-    if selected != "All":
-        filt = filt[filt[lvl] == selected]
+        debtors = df_main[df_main["Balance"] > 0]
 
-    st.markdown("---")
+        if not debtors.empty:
+            st.write("### Students with Outstanding Balances")
 
-    if filt.empty:
-        st.success("✅ No students currently owing a balance.")
+            for _, row in debtors.iterrows():
+                name = row.get("Name", "Unknown")
+                level = row.get("Level", "")
+                balance = float(row.get("Balance", 0.0))
+                phone = row.get("Phone", "")
+
+                contract_start = row.get("ContractStart", "")
+                if contract_start and not pd.isnull(contract_start):
+                    contract_start_dt = pd.to_datetime(contract_start, errors="coerce")
+                    due_date_dt = contract_start_dt + timedelta(days=30)
+                    due_date_fmt = due_date_dt.strftime("%d %B %Y")
+                else:
+                    due_date_fmt = "soon"
+
+                message = (
+                    f"Dear {name}, this is a reminder that your balance for your {level} class is GHS {balance:.2f} "
+                    f"and is due by {due_date_fmt}. Kindly make the payment to continue learning with us. Thank you!\n\n"
+                    "Payment Methods:\n"
+                    "1. Mobile Money\n"
+                    "   Number: 0245022743\n"
+                    "   Name: Felix Asadu\n"
+                    "2. Access Bank (Cedis)\n"
+                    "   Account Number: 1050000008017\n"
+                    "   Name: Learn Language Education Academy"
+                )
+
+                phone_clean = phone.replace(" ", "").replace("+", "")
+                if phone_clean.startswith("0"):
+                    phone_clean = "233" + phone_clean[1:]
+
+                encoded_msg = urllib.parse.quote(message)
+                wa_url = f"https://wa.me/{phone_clean}?text={encoded_msg}"
+
+                st.markdown(
+                    f"**{name}** (GHS {balance:.2f} due) – "
+                    f"[📲 Remind via WhatsApp](<{wa_url}>)"
+                )
+        else:
+            st.success("✅ No students with unpaid balances.")
     else:
-        st.metric("Number of Debtors", len(filt))
-        tbl_cols = [col_lookup("name"), lvl, bal, "due_date", "days_left"]
-        tbl = filt[tbl_cols].rename(columns={
-            col_lookup("name"): "Name",
-            lvl:                 "Level",
-            bal:                 "Balance (GHS)",
-            "due_date":          "Due Date",
-            "days_left":         "Days Until Due"
-        })
-        st.dataframe(tbl, use_container_width=True)
-
-        # 7) Build WhatsApp links
-        def clean_phone(s):
-            p = s.astype(str).str.replace(r"[+\- ]", "", regex=True)
-            p = p.where(~p.str.startswith("0"), "233" + p.str[1:])
-            return p.str.extract(r"(\d+)")[0]
-
-        ws = filt.assign(
-            phone    = clean_phone(filt[col_lookup("phone")]),
-            due_str  = filt["due_date"].dt.strftime("%d %b %Y"),
-            bal_str  = filt[bal].map(lambda x: f"GHS {x:.2f}"),
-            days     = filt["days_left"].astype(int)
-        )
-
-        def make_link(row):
-            if row.days >= 0:
-                msg = f"You have {row.days} {'day' if row.days==1 else 'days'} left to settle the {row.bal_str} balance."
-            else:
-                od = abs(row.days)
-                msg = f"Your payment is overdue by {od} {'day' if od==1 else 'days'}. Please settle as soon as possible."
-            text = (
-                f"Hi {row[col_lookup('name')]}! Friendly reminder: your payment for the {row[lvl]} class "
-                f"is due by {row.due_str}. {msg} Thank you!"
-            )
-            return f"https://wa.me/{row.phone}?text={urllib.parse.quote(text)}"
-
-        ws["link"] = ws.apply(make_link, axis=1)
-        for nm, lk in ws[[col_lookup("name"), "link"]].itertuples(index=False):
-            st.markdown(f"- **{nm}**: [Send Reminder]({lk})")
-
-        dl = ws[[col_lookup("name"), "link"]].rename(columns={
-            col_lookup("name"): "Name", "link": "WhatsApp URL"
-        })
-        st.download_button(
-            "📁 Download Reminder Links CSV",
-            dl.to_csv(index=False).encode("utf-8"),
-            file_name="debtor_whatsapp_links.csv",
-            mime="text/csv"
-        )
+        st.warning("⚠️ Required columns 'Balance' or 'Phone' are missing in your data.")
 
 
-# === Tab 5: Generate Contract & Receipt PDF for Any Student ===
 with tabs[5]:
-    pass
+    st.title("📄 Generate Contract PDF for Any Student")
 
-# --- Tab 5: Generate Contract & Receipt PDF for Any Student ---
-with tabs[5]:
-    pass
-
-# === AGREEMENT TEMPLATE STATE ===
-if "agreement_template" not in st.session_state:
-    st.session_state["agreement_template"] = """
-PAYMENT AGREEMENT
-
-This Payment Agreement is entered into on [DATE] for [CLASS] students of Learn Language Education Academy and Felix Asadu ("Teacher").
-
-Terms of Payment:
-1. Payment Amount: The student agrees to pay the teacher a total of [AMOUNT] cedis for the course.
-2. Payment Schedule: The payment can be made in full or in two installments: GHS [FIRST_INSTALLMENT] for the first installment, and the remaining balance for the second installment after one month of payment. 
-3. Late Payments: In the event of late payment, the school may revoke access to all learning platforms. No refund will be made.
-4. Refunds: Once a deposit is made and a receipt is issued, no refunds will be provided.
-
-Cancellation and Refund Policy:
-1. If the teacher cancels a lesson, it will be rescheduled.
-
-Miscellaneous Terms:
-1. Attendance: The student agrees to attend lessons punctually.
-2. Communication: Both parties agree to communicate changes promptly.
-3. Termination: Either party may terminate this Agreement with written notice if the other party breaches any material term.
-
-Signatures:
-[STUDENT_NAME]
-Date: [DATE]
-Asadu Felix
-"""
-
-# --- Tab 5: Generate & Edit Receipt/Contract PDF ---
-with tabs[5]:
-    st.title("📄 Generate Contract & Receipt PDF for Any Student")
-
-    # Local file and GitHub backup URL
-    student_file = "students.csv"
-    github_csv   = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
-
-    # 1) Load students DataFrame (local → GitHub fallback)
-    try:
-        df = pd.read_csv(student_file)
-    except FileNotFoundError:
-        df = pd.read_csv(github_csv)
-        st.info("Loaded students from GitHub backup.")
-
-    # 2) Normalize columns to lowercase/underscores
-    df.columns = [
-        c.strip()
-         .replace(" ", "_")
-         .replace("(", "")
-         .replace(")", "")
-         .replace("-", "_")
-         .replace("/", "_")
-         .lower()
-        for c in df.columns
-    ]
-
-    if df.empty:
-        st.warning("No student data available.")
-    else:
-        # Helper to find actual column names
-        def col_lookup(col):
-            for c in df.columns:
-                if c.replace("_", "").lower() == col.replace("_", "").lower():
-                    return c
-            return None
-
-        name_col    = col_lookup("name")
-        start_col   = col_lookup("contractstart")
-        end_col     = col_lookup("contractend")
-        paid_col    = col_lookup("paid")
-        bal_col     = col_lookup("balance")
-        code_col    = col_lookup("studentcode")
-        phone_col   = col_lookup("phone")
-        level_col   = col_lookup("level")
-
-        # 3) Select student
-        student_names = df[name_col].tolist()
+    if not df_main.empty and "Name" in df_main.columns:
+        student_names = df_main["Name"].tolist()
         selected_name = st.selectbox("Select Student", student_names)
-        row = df[df[name_col] == selected_name].iloc[0]
 
-        # 4) Editable fields before generation
-        default_paid    = float(row.get(paid_col, 0))
-        default_balance = float(row.get(bal_col, 0))
-        default_start = pd.to_datetime(row.get(start_col, ""), errors="coerce").date() if not pd.isnull(pd.to_datetime(row.get(start_col, ""), errors="coerce")) else date.today()
-        default_end   = pd.to_datetime(row.get(end_col,   ""), errors="coerce").date() if not pd.isnull(pd.to_datetime(row.get(end_col,   ""), errors="coerce")) else default_start + timedelta(days=30)
+        if st.button("Generate PDF"):
+            # Fetch student data
+            student_row = df_main[df_main["Name"] == selected_name].iloc[0]
 
-        st.subheader("Receipt Details")
-        paid_input = st.number_input(
-            "Amount Paid (GHS)", min_value=0.0, value=default_paid, step=1.0, key="paid_input"
-        )
-        balance_input = st.number_input(
-            "Balance Due (GHS)", min_value=0.0, value=default_balance, step=1.0, key="balance_input"
-        )
-        total_input = paid_input + balance_input
-        receipt_date = st.date_input("Receipt Date", value=date.today(), key="receipt_date")
-        signature = st.text_input("Signature Text", value="Felix Asadu", key="receipt_signature")
+            # Parse ContractStart date safely
+            raw_date = student_row.get("ContractStart", date.today())
+            pd_date = pd.to_datetime(raw_date, errors="coerce")
+            payment_date = pd_date.date() if not pd.isnull(pd_date) else date.today()
 
-        st.subheader("Contract Details")
-        contract_start_input = st.date_input(
-            "Contract Start Date", value=default_start, key="contract_start_input"
-        )
-        contract_end_input = st.date_input(
-            "Contract End Date", value=default_end, key="contract_end_input"
-        )
-        course_length = (contract_end_input - contract_start_input).days
+            # Calculate amounts
+            paid = float(student_row.get("Paid", 0))
+            balance = float(student_row.get("Balance", 0))
+            total_fee = paid + balance
 
-        st.subheader("Logo (optional)")
-        logo_file = st.file_uploader(
-            "Upload logo image", type=["png", "jpg", "jpeg"], key="logo_upload"
-        )
-
-        # 5) Generate PDF on button click
-        if st.button("Generate & Download PDF"):
-            # Re-load CSV to get latest
-            try:
-                df_latest = pd.read_csv(student_file)
-            except FileNotFoundError:
-                df_latest = pd.read_csv(github_csv)
-            df_latest.columns = [c.strip().replace(" ", "_").replace("(", "").replace(")", "").replace("-", "_").replace("/", "_").lower() for c in df_latest.columns]
-            row = df_latest[df_latest[name_col] == selected_name].iloc[0]
-
-            # Use inputs
-            paid    = paid_input
-            balance = balance_input
-            total   = total_input
-            contract_start = contract_start_input
-            contract_end   = contract_end_input
-
-            # Build PDF
+            # Create PDF (no logo)
             pdf = FPDF()
             pdf.add_page()
 
-            # Add logo if provided: preserve original extension
-            if logo_file:
-                ext = logo_file.name.split('.')[-1]
-                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
-                tmp.write(logo_file.getbuffer())
-                tmp.close()
-                pdf.image(tmp.name, x=10, y=8, w=33)
-                pdf.ln(25)
-
-            # Payment status banner: if balance==0 fully paid
-            status = "FULLY PAID" if balance == 0 else "INSTALLMENT PLAN"
+            # 1) Payment status banner
+            payment_status = "FULLY PAID" if balance == 0 else "INSTALLMENT PLAN"
             pdf.set_font("Arial", "B", 12)
             pdf.set_text_color(0, 128, 0)
-            pdf.cell(0, 10, status, ln=True, align="C")
+            pdf.cell(200, 10, payment_status, ln=True, align="C")
             pdf.set_text_color(0, 0, 0)
             pdf.ln(5)
 
-            # Receipt header
+            # 2) Receipt header
             pdf.set_font("Arial", size=14)
-            pdf.cell(0, 10, f"{SCHOOL_NAME} Payment Receipt", ln=True, align="C")
-            pdf.ln(10)
+            pdf.cell(200, 10, f"{SCHOOL_NAME} Payment Receipt", ln=True, align="C")
 
-            # Receipt details
+            # 3) Receipt details
             pdf.set_font("Arial", size=12)
-            for label, val in [
-                ("Name",           selected_name),
-                ("Student Code",   row.get(code_col, "")),
-                ("Phone",          row.get(phone_col, "")),
-                ("Level",          row.get(level_col, "")),
-                ("Contract Start", contract_start),
-                ("Contract End",   contract_end),
-                ("Amount Paid",    f"GHS {paid:.2f}"),
-                ("Balance Due",    f"GHS {balance:.2f}"),
-                ("Total Fee",      f"GHS {total:.2f}"),
-                ("Receipt Date",   receipt_date)
-            ]:
-                pdf.cell(0, 8, f"{label}: {val}", ln=True)
             pdf.ln(10)
+            pdf.cell(200, 10, f"Name: {student_row.get('Name','')}", ln=True)
+            pdf.cell(200, 10, f"Student Code: {student_row.get('StudentCode','')}", ln=True)
+            pdf.cell(200, 10, f"Phone: {student_row.get('Phone','')}", ln=True)
+            pdf.cell(200, 10, f"Level: {student_row.get('Level','')}", ln=True)
+            pdf.cell(200, 10, f"Amount Paid: GHS {paid:.2f}", ln=True)
+            pdf.cell(200, 10, f"Balance Due: GHS {balance:.2f}", ln=True)
+            pdf.cell(200, 10, f"Total Course Fee: GHS {total_fee:.2f}", ln=True)
+            pdf.cell(200, 10, f"Contract Start: {student_row.get('ContractStart','')}", ln=True)
+            pdf.cell(200, 10, f"Contract End: {student_row.get('ContractEnd','')}", ln=True)
+            pdf.cell(200, 10, f"Receipt Date: {payment_date}", ln=True)
 
-            # Contract section
+            # 4) Thank-you and signature
+            pdf.ln(10)
+            pdf.cell(0, 10, "Thank you for your payment!", ln=True)
+            pdf.cell(0, 10, "Signed: Felix Asadu", ln=True)
+
+            # 5) Contract section
             pdf.ln(15)
             pdf.set_font("Arial", size=14)
-            pdf.cell(0, 10, f"{SCHOOL_NAME} Student Contract", ln=True, align="C")
-            pdf.set_font("Arial", size=12)
-            pdf.ln(8)
+            pdf.cell(200, 10, f"{SCHOOL_NAME} Student Contract", ln=True, align="C")
 
-            template = st.session_state.get("agreement_template", "")
+            pdf.set_font("Arial", size=12)
+            pdf.ln(10)
+            contract_text = st.session_state.get("agreement_template", "")
             filled = (
-                template
-                .replace("[STUDENT_NAME]",     selected_name)
-                .replace("[DATE]",             str(receipt_date))
-                .replace("[CLASS]",            row.get(level_col, ""))
-                .replace("[AMOUNT]",           str(total))
-                .replace("[FIRST_INSTALLMENT]", f"{paid:.2f}")
-                .replace("[SECOND_INSTALLMENT]",f"{balance:.2f}")
-                .replace("[SECOND_DUE_DATE]",  str(contract_end))
-                .replace("[COURSE_LENGTH]",    f"{course_length} days")
+                contract_text
+                .replace("[STUDENT_NAME]", str(student_row.get("Name","")))
+                .replace("[DATE]", str(payment_date))
+                .replace("[CLASS]", str(student_row.get("Level","")))
+                .replace("[AMOUNT]", str(total_fee))
+                .replace("[FIRST_INSTALMENT]", "1500")
+                .replace("[SECOND_INSTALMENT]", str(balance))
+                .replace("[SECOND_DUE_DATE]", str(payment_date + timedelta(days=30)))
+                .replace("[COURSE_LENGTH]", "12")
             )
             for line in filled.split("\n"):
-                safe = line.encode("latin-1", "replace").decode("latin-1")
-                pdf.multi_cell(0, 8, safe)
+                safe_line = line.encode("latin-1", "replace").decode("latin-1")
+                pdf.multi_cell(0, 10, safe_line)
+
             pdf.ln(10)
+            pdf.cell(0, 10, "Signed: Felix Asadu", ln=True)
 
-            # Signature
-            pdf.cell(0, 8, f"Signed: {signature}", ln=True)
-
-            # Download
-            pdf_bytes = pdf.output(dest="S").encode("latin-1", "replace")
+            # 6) Download button
+            pdf_bytes = pdf.output(dest="S").encode("latin-1", errors="replace")
             st.download_button(
                 "📄 Download PDF",
                 data=pdf_bytes,
-                file_name=f"{selected_name.replace(' ', '_')}_receipt_contract.pdf",
+                file_name=f"{selected_name.replace(' ', '_')}_contract.pdf",
                 mime="application/pdf"
             )
-            st.success("✅ PDF generated and ready to download.")
+            st.success("✅ PDF contract generated.")
+    else:
+        st.warning("No student data available.")
 
+with tabs[6]:
+    st.title("📧 Send Email to Student(s)")
+
+    # Normalize column names
+    df_main.columns = [c.strip().lower() for c in df_main.columns]
+
+    # Ensure 'email' column exists
+    if "email" not in df_main.columns:
+        df_main["email"] = ""
+
+    # Get students with valid emails
+    email_entries = [(row["name"], row["email"]) for _, row in df_main.iterrows()
+                     if isinstance(row.get("email", ""), str) and "@" in row.get("email", "")]
+    email_options = [f"{name} ({email})" for name, email in email_entries]
+    email_lookup = {f"{name} ({email})": email for name, email in email_entries}
+
+    st.markdown("### 👤 Choose Recipients")
+
+    mode = st.radio("Send email to:", ["Individual student", "All students with email", "Manual entry"])
+
+    recipients = []
+
+    if mode == "Individual student":
+        if email_options:
+            selected = st.selectbox("Select student", email_options)
+            recipients = [email_lookup[selected]]
+        else:
+            st.warning("⚠️ No valid student emails found in your database.")
+
+    elif mode == "All students with email":
+        if email_entries:
+            recipients = [email for _, email in email_entries]
+            st.info(f"✅ {len(recipients)} student(s) will receive this email.")
+        else:
+            st.warning("⚠️ No student emails found. Upload a proper student file or update emails.")
+
+    elif mode == "Manual entry":
+        manual_email = st.text_input("Enter email address manually")
+        if "@" in manual_email:
+            recipients = [manual_email]
+        else:
+            st.warning("Enter a valid email address to proceed.")
+
+    st.markdown("### ✍️ Compose Message")
+    subject = st.text_input("Email Subject", value="Information from Learn Language Education Academy")
+    message = st.text_area("Message Body (HTML or plain text)", value="Dear Student,\n\n...", height=200)
+
+    file_upload = st.file_uploader("📎 Attach a file (optional)", type=["pdf", "doc", "jpg", "png", "jpeg"])
+
+    if st.button("Send Email"):
+        if not recipients:
+            st.warning("❗ Please select or enter at least one email address.")
+            st.stop()
+
+        sent = 0
+        failed = []
+        attachment = None
+
+        if file_upload:
+            try:
+                file_data = file_upload.read()
+                encoded = base64.b64encode(file_data).decode()
+                attachment = Attachment(
+                    FileContent(encoded),
+                    FileName(file_upload.name),
+                    FileType(file_upload.type),
+                    Disposition("attachment")
+                )
+            except Exception as e:
+                st.error(f"❌ Failed to process attachment: {e}")
+                st.stop()
+
+        for email in recipients:
+            try:
+                msg = Mail(
+                    from_email=school_sender_email,
+                    to_emails=email,
+                    subject=subject,
+                    html_content=message.replace("\n", "<br>")
+                )
+                if attachment:
+                    msg.attachment = attachment
+
+                client = SendGridAPIClient(school_sendgrid_key)
+                client.send(msg)
+                sent += 1
+            except Exception as e:
+                failed.append(email)
+
+        st.success(f"✅ Sent to {sent} student(s).")
+        if failed:
+            st.warning(f"⚠️ Failed to send to: {', '.join(failed)}")
 
 with tabs[7]:
     st.title("📊 Analytics & Export")
@@ -911,20 +1022,29 @@ with tabs[7]:
         st.info("No expenses file found to export.")
 
 with tabs[8]:
-
-    # ---- Helper for safe PDF encoding ----
-    def safe_pdf(text):
-        return str(text).encode('latin-1', 'replace').decode('latin-1')
+    st.title("Generate A1 Course Schedule")
 
     st.markdown("""
-    <div style='background:#e3f2fd;padding:1.2em 1em 0.8em 1em;border-radius:12px;margin-bottom:1em'>
-      <h2 style='color:#1565c0;'>📆 <b>Intelligenter Kursplan-Generator (A1, A2, B1)</b></h2>
-      <p style='font-size:1.08em;color:#333'>Erstellen Sie einen vollständigen, individuell angepassten Kursplan zum Download (TXT oder PDF) – <b>mit Ferien und flexiblem Wochenrhythmus!</b></p>
-    </div>
-    """, unsafe_allow_html=True)
+    🛠️ **Create and download a personalized A1 course schedule.**
 
-    # ---- Schedule templates ----
-    raw_schedule_a1 = [
+    Choose a start date and class days. The schedule will follow the official classroom structure (Lesen & Hören, Schreiben & Sprechen).
+    """)
+
+    from datetime import datetime, timedelta
+    import calendar
+    from fpdf import FPDF
+
+    # User inputs
+    st.subheader("🗓️ Configuration")
+    start_date = st.date_input("Select Start Date", value=date.today())
+    selected_days = st.multiselect(
+        "Select Class Days",
+        options=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+        default=["Monday", "Tuesday", "Wednesday"]
+    )
+
+    # Schedule structure (fixed)
+    raw_schedule = [
         ("Week One", ["Chapter 0.1 - Lesen & Horen"]),
         ("Week Two", [
             "Chapters 0.2 and 1.1 - Lesen & Horen",
@@ -967,357 +1087,72 @@ with tabs[8]:
             "Exam tips - Schreiben & Sprechen recap"
         ])
     ]
-    raw_schedule_a2 = [
-        ("Woche 1", ["1.1. Small Talk (Exercise)", "1.2. Personen Beschreiben (Exercise)", "1.3. Dinge und Personen vergleichen"]),
-        ("Woche 2", ["2.4. Wo möchten wir uns treffen?", "2.5. Was machst du in deiner Freizeit?"]),
-        ("Woche 3", ["3.6. Möbel und Räume kennenlernen", "3.7. Eine Wohnung suchen (Übung)", "3.8. Rezepte und Essen (Exercise)"]),
-        ("Woche 4", ["4.9. Urlaub", "4.10. Tourismus und Traditionelle Feste", "4.11. Unterwegs: Verkehrsmittel vergleichen"]),
-        ("Woche 5", ["5.12. Ein Tag im Leben (Übung)", "5.13. Ein Vorstellungsgesprach (Exercise)", "5.14. Beruf und Karriere (Exercise)"]),
-        ("Woche 6", ["6.15. Mein Lieblingssport", "6.16. Wohlbefinden und Entspannung", "6.17. In die Apotheke gehen"]),
-        ("Woche 7", ["7.18. Die Bank Anrufen", "7.19. Einkaufen – Wo und wie? (Exercise)", "7.20. Typische Reklamationssituationen üben"]),
-        ("Woche 8", ["8.21. Ein Wochenende planen", "8.22. Die Woche Plannung"]),
-        ("Woche 9", ["9.23. Wie kommst du zur Schule / zur Arbeit?", "9.24. Einen Urlaub planen", "9.25. Tagesablauf (Exercise)"]),
-        ("Woche 10", ["10.26. Gefühle in verschiedenen Situationen beschr", "10.27. Digitale Kommunikation", "10.28. Über die Zukunft sprechen"])
-    ]
-    raw_schedule_b1 = [
-        ("Woche 1", ["1.1. Traumwelten (Übung)", "1.2. Freundes für Leben (Übung)", "1.3. Erfolgsgeschichten (Übung)"]),
-        ("Woche 2", ["2.4. Wohnung suchen (Übung)", "2.5. Der Besichtigungsg termin (Übung)", "2.6. Leben in der Stadt oder auf dem Land?"]),
-        ("Woche 3", ["3.7. Fast Food vs. Hausmannskost", "3.8. Alles für die Gesundheit", "3.9. Work-Life-Balance im modernen Arbeitsumfeld"]),
-        ("Woche 4", ["4.10. Digitale Auszeit und Selbstfürsorge", "4.11. Teamspiele und Kooperative Aktivitäten", "4.12. Abenteuer in der Natur", "4.13. Eigene Filmkritik schreiben"]),
-        ("Woche 5", ["5.14. Traditionelles vs. digitales Lernen", "5.15. Medien und Arbeiten im Homeoffice", "5.16. Prüfungsangst und Stressbewältigung", "5.17. Wie lernt man am besten?"]),
-        ("Woche 6", ["6.18. Wege zum Wunschberuf", "6.19. Das Vorstellungsgespräch", "6.20. Wie wird man …? (Ausbildung und Qu)"]),
-        ("Woche 7", ["7.21. Lebensformen heute – Familie, Wohnge", "7.22. Was ist dir in einer Beziehung wichtig?", "7.23. Erstes Date – Typische Situationen"]),
-        ("Woche 8", ["8.24. Konsum und Nachhaltigkeit", "8.25. Online einkaufen – Rechte und Risiken"]),
-        ("Woche 9", ["9.26. Reiseprobleme und Lösungen"]),
-        ("Woche 10", ["10.27. Umweltfreundlich im Alltag", "10.28. Klimafreundlich leben"])
-    ]
 
-    # ---- Step 1: Course level ----
-    st.markdown("### 1️⃣ **Kursniveau wählen**")
-    course_levels = {"A1": raw_schedule_a1, "A2": raw_schedule_a2, "B1": raw_schedule_b1}
-    selected_level = st.selectbox("🗂️ **Kursniveau (A1/A2/B1):**", list(course_levels.keys()))
-    topic_structure = course_levels[selected_level]
-    st.markdown("---")
+    def sanitize(text):
+        return text.encode('latin-1', 'replace').decode('latin-1')
 
-    # ---- Step 2: Basic info & breaks ----
-    st.markdown("### 2️⃣ **Kursdaten, Ferien, Modus**")
-    col1, col2 = st.columns([2,1])
-    with col1:
-        start_date = st.date_input("📅 **Kursstart**", value=date.today())
-        holiday_dates = st.date_input("🔔 Ferien oder Feiertage (Holiday/Break Dates)", [], help="Kein Unterricht an diesen Tagen.")
-    with col2:
-        advanced_mode = st.toggle("⚙️ Erweiterter Wochen-Rhythmus (Custom weekly pattern)", value=False)
-    st.markdown("---")
+    def generate_schedule(start_date, weekdays, raw_schedule):
+        output = []
+        current_date = start_date
+        day_number = 1
 
-    # ---- Step 3: Weekly pattern ----
-    st.markdown("### 3️⃣ **Unterrichtstage festlegen**")
-    days_of_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-    default_days = ["Monday", "Tuesday", "Wednesday"]
+        day_map = {day: i for i, day in enumerate(calendar.day_name)}
+        selected_indices = sorted([day_map[day] for day in weekdays])
 
-    week_patterns = []
-    if not advanced_mode:
-        days_per_week = st.multiselect("📌 **Unterrichtstage wählen:**", options=days_of_week, default=default_days)
-        for _ in topic_structure:
-            week_patterns.append((len(_[1]), days_per_week))
-    else:
-        st.info("Für jede Woche individuelle Unterrichtstage einstellen.")
-        for i, (week_label, sessions) in enumerate(topic_structure):
-            with st.expander(f"{week_label}", expanded=True):
-                week_days = st.multiselect(f"Unterrichtstage {week_label}", options=days_of_week, default=default_days, key=f"week_{i}_days")
-                week_patterns.append((len(sessions), week_days or default_days))
-    st.markdown("---")
+        for week_label, sessions in raw_schedule:
+            output.append(f"\n{week_label.upper()}")
+            for session in sessions:
+                while current_date.weekday() not in selected_indices:
+                    current_date += timedelta(days=1)
+                session_day = calendar.day_name[current_date.weekday()]
+                session_date = current_date.strftime("%d %B %Y")
+                output.append(f"Day {day_number} ({session_date}, {session_day}): {session}")
+                current_date += timedelta(days=1)
+                day_number += 1
+        return output
 
-    # ---- Generate dates skipping holidays ----
-    total_sessions = sum(wp[0] for wp in week_patterns)
-    session_labels = [(w, s) for w, sess in topic_structure for s in sess]
-    dates = []
-    cur = start_date
-    for num_classes, week_days in week_patterns:
-        week_dates = []
-        while len(week_dates) < num_classes:
-            if cur.strftime("%A") in week_days and cur not in holiday_dates:
-                week_dates.append(cur)
-            cur += timedelta(days=1)
-        dates.extend(week_dates)
+    if st.button("📅 Generate Schedule"):
+        schedule_lines = generate_schedule(start_date, selected_days, raw_schedule)
+        schedule_text = f"""
+Learn Language Education Academy
+Contact: 0205706589 | Website: www.learngermanghana.com
+Course Schedule: Auto-generated
+Meeting Days: {', '.join(selected_days)}
+First Week: Begins {start_date.strftime('%A, %d %B %Y')}
 
-    if len(dates) < total_sessions:
-        st.error("⚠️ **Nicht genug Unterrichtstage!** Passen Sie Ferien/Modus an.")
+""" + "\n".join(schedule_lines)
 
-    # ---- Preview ----
-    rows = [{"Week": wl, "Day": f"Day {i+1}", "Date": d.strftime("%A, %d %B %Y"), "Topic": tp}
-            for i, ((wl, tp), d) in enumerate(zip(session_labels, dates))]
-    df = pd.DataFrame(rows)
-    st.markdown(f"""
-    <div style='background:#fffde7;border:1px solid #ffe082;border-radius:10px;padding:1em;margin:1em 0'>
-      <b>📝 Kursüberblick:</b>
-      <ul>
-        <li><b>Kurs:</b> {selected_level}</li>
-        <li><b>Start:</b> {start_date.strftime('%A, %d %B %Y')}</li>
-        <li><b>Sessions:</b> {total_sessions}</li>
-        <li><b>Ferien:</b> {', '.join(d.strftime('%d.%m.%Y') for d in holiday_dates) or '–'}</li>
-      </ul>
-    </div>
-    """, unsafe_allow_html=True)
-    st.dataframe(df, use_container_width=True)
-    st.markdown("---")
+        st.text_area("📄 Schedule Preview", value=schedule_text, height=600)
 
-    # ---- Filenames ----
-    file_date = start_date.strftime("%Y-%m-%d")
-    file_prefix = f"{selected_level}_{file_date}_course_schedule"
+        # TXT download
+        st.download_button(
+            label="📁 Download as TXT",
+            data=schedule_text,
+            file_name="a1_course_schedule.txt",
+            mime="text/plain"
+        )
 
-    # ---- TXT download ----
-    txt = f"Learn Language Education Academy\nContact: 0205706589 | www.learngermanghana.com\nSchedule: {selected_level}\nStart: {start_date.strftime('%Y-%m-%d')}\n\n" + \
-          "\n".join(f"- {r['Day']} ({r['Date']}): {r['Topic']}" for r in rows)
-    st.download_button("📁 TXT Download", txt, file_name=f"{file_prefix}.txt")
+        # PDF download
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", size=12)
 
-    # ---- PDF download ----
-    class ColorHeaderPDF(FPDF):
-        def header(self):
-            self.set_fill_color(21, 101, 192)
-            self.set_text_color(255,255,255)
-            self.set_font('Arial','B',14)
-            self.cell(0,12,safe_pdf("Learn Language Education Academy – Course Schedule"),ln=1,align='C',fill=True)
-            self.ln(2)
-            self.set_text_color(0,0,0)
+        for line in schedule_text.split("\n"):
+            safe_line = sanitize(line)
+            if safe_line.strip().startswith("WEEK"):
+                pdf.set_font("Arial", "B", 12)
+                pdf.cell(0, 10, safe_line.strip(), ln=True)
+                pdf.set_font("Arial", size=12)
+            else:
+                pdf.multi_cell(0, 10, safe_line)
 
-    pdf = ColorHeaderPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=11)
-    pdf.multi_cell(0,8, safe_pdf(f"Schedule: {selected_level}"))
-    pdf.multi_cell(0,8, safe_pdf(f"Start: {start_date.strftime('%Y-%m-%d')}"))
-    if holiday_dates:
-        pdf.multi_cell(0,8, safe_pdf("Holidays: " + ", ".join(d.strftime("%d.%m.%Y") for d in holiday_dates)))
-    pdf.ln(2)
-    for r in rows:
-        pdf.multi_cell(0,8, safe_pdf(f"{r['Day']} ({r['Date']}): {r['Topic']}"))
-    pdf.ln(6)
-    pdf.set_font("Arial",'I',11)
-    pdf.cell(0,10, safe_pdf("Signed: Felix Asadu"), ln=1, align='R')
+        pdf_bytes = pdf.output(dest='S').encode('latin-1')
 
-    st.download_button("📄 PDF Download",
-                       data=pdf.output(dest='S').encode('latin-1'),
-                       file_name=f"{file_prefix}.pdf",
-                       mime="application/pdf")
-
-with tabs[9]:
-    import pandas as pd
-    import streamlit as st
-    from fpdf import FPDF
-    from sendgrid import SendGridAPIClient
-    from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
-    import base64
-
-    st.title("📝 Assignment Marking & Scores (with Email)")
-
-    # ======= 1. Load Data =======
-    students_csv_url = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
-    scores_csv_url   = "https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/export?format=csv"
-
-    @st.cache_data(show_spinner=False)
-    def load_students():
-        df = pd.read_csv(students_csv_url)
-        df.columns = [c.lower().strip() for c in df.columns]
-        return df
-
-    @st.cache_data(show_spinner=False)
-    def load_scores():
-        df = pd.read_csv(scores_csv_url)
-        df.columns = [c.lower().strip() for c in df.columns]
-        return df
-
-    df_students = load_students()
-    df_scores   = load_scores()
-
-    # ======= 2. Reference Answers (add your full dictionary here) =======
-    ref_answers = {
-        "Lesen und Horen 0.1": [
-            "1. C) Guten Morgen", "2. D) Guten Tag", "3. B) Guten Abend", "4. B) Gute Nacht", "5. C) Guten Morgen",
-            "6. C) Wie geht es Ihnen?", "7. B) Auf Wiedersehen", "8. C) Tschüss", "9. C) Guten Abend", "10. D) Gute Nacht"
-        ],
-        # ... add the rest of your assignments here ...
-    }
-    all_assignments = sorted(list({*df_scores["assignment"].dropna().unique(), *ref_answers.keys()}))
-    all_levels = sorted(df_students["level"].dropna().unique())
-
-    # ======= 3. Marking Modes =======
-    mode = st.radio(
-        "Select marking mode:",
-        ["Mark single assignment (classic)", "Batch mark (all assignments for one student)"],
-        key="marking_mode"
-    )
-
-    # -- SINGLE CLASSIC --
-    if mode == "Mark single assignment (classic)":
-        st.subheader("Classic Mode: Mark One Assignment")
-        sel_level = st.selectbox("Filter by Level", ["All"] + all_levels, key="single_level")
-        filtered_students = df_students if sel_level == "All" else df_students[df_students["level"] == sel_level]
-        student_list = filtered_students["name"] + " (" + filtered_students["studentcode"].astype(str) + ")"
-        chosen = st.selectbox("Select Student", student_list, key="single_student")
-        student_code = chosen.split("(")[-1].replace(")", "").strip()
-        stu_row = filtered_students[filtered_students["studentcode"] == student_code].iloc[0]
-
-        assign_filter = st.text_input("Filter assignment titles", key="assign_filter")
-        assignment_choices = [a for a in all_assignments if assign_filter.lower() in a.lower()]
-        assignment = st.selectbox("Select Assignment", assignment_choices, key="assignment_sel")
-        prev = df_scores[(df_scores["studentcode"] == student_code) & (df_scores["assignment"] == assignment)]
-        default_score = int(prev["score"].iloc[0]) if not prev.empty else 0
-        default_comment = prev["comments"].iloc[0] if not prev.empty else ""
-        score = st.number_input("Score", 0, 100, value=default_score, key="score_input")
-        comments = st.text_area("Comments / Feedback", value=default_comment, key="comments_input")
-        if assignment in ref_answers:
-            st.markdown("**Reference Answers:**")
-            st.markdown("<br>".join(ref_answers[assignment]), unsafe_allow_html=True)
-
-        if st.button("💾 Save Score", key="save_score_btn"):
-            now = pd.Timestamp.now().strftime("%Y-%m-%d")
-            newrow = pd.DataFrame([{
-                "studentcode": student_code,
-                "name": stu_row["name"],
-                "assignment": assignment,
-                "score": score,
-                "comments": comments,
-                "date": now,
-                "level": stu_row["level"]
-            }])
-            mask = (df_scores["studentcode"] == student_code) & (df_scores["assignment"] == assignment)
-            df_scores = df_scores[~mask]
-            df_scores = pd.concat([df_scores, newrow], ignore_index=True)
-            st.success("Score updated (session only, Google Sheet write-back coming soon!)")
-
-        hist = df_scores[df_scores["studentcode"] == student_code].sort_values("date", ascending=False)
-        st.markdown("### Student Score History")
-        st.dataframe(hist[["assignment", "score", "comments", "date"]])
-
-    # -- BATCH MODE --
-    if mode == "Batch mark (all assignments for one student)":
-        st.subheader("Batch Mode: Enter all assignments for one student (fast)")
-        sel_level = st.selectbox("Select Level", all_levels, key="batch_level")
-        filtered_students = df_students[df_students["level"] == sel_level]
-        student_list = filtered_students["name"] + " (" + filtered_students["studentcode"].astype(str) + ")"
-        chosen = st.selectbox("Select Student", student_list, key="batch_student")
-        student_code = chosen.split("(")[-1].replace(")", "").strip()
-        stu_row = filtered_students[filtered_students["studentcode"] == student_code].iloc[0]
-        st.markdown(f"#### Enter scores for all assignments for {stu_row['name']} ({stu_row['studentcode']})")
-        scored = df_scores[df_scores["studentcode"] == student_code]
-        batch_scores = {}
-        for assignment in all_assignments:
-            prev = scored[scored["assignment"] == assignment]
-            val = int(prev["score"].iloc[0]) if not prev.empty else 0
-            batch_scores[assignment] = st.number_input(
-                f"{assignment}", 0, 100, value=val, key=f"batch_score_{assignment}"
-            )
-        if st.button("💾 Save All Scores (Batch)", key="save_all_batch"):
-            now = pd.Timestamp.now().strftime("%Y-%m-%d")
-            for assignment, score in batch_scores.items():
-                mask = (df_scores["studentcode"] == student_code) & (df_scores["assignment"] == assignment)
-                df_scores = df_scores[~mask]
-                newrow = pd.DataFrame([{
-                    "studentcode": student_code, "name": stu_row["name"], "assignment": assignment,
-                    "score": score, "comments": "", "date": now, "level": stu_row["level"]
-                }])
-                df_scores = pd.concat([df_scores, newrow], ignore_index=True)
-            st.success("All scores updated (session only; Google Sheet write-back coming soon).")
-        st.markdown("##### Summary of entered scores:")
-        st.dataframe(pd.DataFrame({
-            "Assignment": all_assignments,
-            "Score": [batch_scores[a] for a in all_assignments]
-        }))
-
-    # ======= 4. Edit/Delete/Export =======
-    st.markdown("---")
-    st.header("✏️ Edit, Delete, or Export Scores")
-    edit_student = st.selectbox(
-        "Pick student for history export/edit",
-        df_students["name"] + " (" + df_students["studentcode"].astype(str) + ")",
-        key="edit_student"
-    )
-    edit_code = edit_student.split("(")[-1].replace(")", "").strip()
-    stu_row = df_students[df_students["studentcode"] == edit_code].iloc[0]
-    hist = df_scores[df_scores["studentcode"] == edit_code].sort_values("date", ascending=False)
-    st.dataframe(hist[["assignment", "score", "comments", "date"]])
-
-    # Edit/Delete per assignment
-    for idx, row in hist.iterrows():
-        with st.expander(f"{row['assignment']} – {row['score']}/100 ({row['date']})", expanded=False):
-            new_score = st.number_input("Edit Score", 0, 100, int(row["score"]), key=f"edit_score_{idx}")
-            new_comments = st.text_area("Edit Comments", row["comments"], key=f"edit_comments_{idx}")
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("Update", key=f"update_{idx}"):
-                    df_scores.at[idx, "score"] = new_score
-                    df_scores.at[idx, "comments"] = new_comments
-                    st.success("Score updated (session only)")
-            with col2:
-                if st.button("Delete", key=f"delete_{idx}"):
-                    df_scores = df_scores.drop(idx)
-                    st.success("Deleted (session only)")
-
-    # ======= 5. Download CSV =======
-    st.download_button(
-        "📁 Download All Scores CSV",
-        data=df_scores.to_csv(index=False).encode(),
-        file_name="all_scores_export.csv",
-        mime="text/csv"
-    )
-
-    # ======= 6. PDF & EMAIL =======
-    st.markdown("### 📄 PDF/Email Student Full Report")
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", "B", 14)
-    pdf.cell(0, 10, f"Report for {stu_row['name']}", ln=True)
-    pdf.ln(5)
-    for _, r in hist.iterrows():
-        pdf.set_font("Arial", "B", 12)
-        pdf.cell(0, 8, f"{r['assignment']}: {r['score']}/100", ln=True)
-        pdf.set_font("Arial", "", 11)
-        pdf.multi_cell(0, 8, f"Comments: {r['comments']}")
-        pdf.ln(3)
-    pdf_bytes = pdf.output(dest="S").encode("latin-1", "replace")
-    st.download_button(
-        "📄 Download Student Report PDF",
-        data=pdf_bytes,
-        file_name=f"{stu_row['name'].replace(' ', '_')}_report.pdf",
-        mime="application/pdf"
-    )
-
-    # ======= 7. SendGrid Email Button =======
-    st.markdown("#### 📧 Email this report to the student")
-    student_email = stu_row.get("email", "")
-    sender_email = st.secrets["general"]["SENDER_EMAIL"]
-    sendgrid_key = st.secrets["general"]["SENDGRID_API_KEY"]
-    email_sent = False
-
-    if student_email and st.button(f"📧 Send PDF to {student_email}"):
-        try:
-            sg = SendGridAPIClient(sendgrid_key)
-            message = Mail(
-                from_email=sender_email,
-                to_emails=student_email,
-                subject=f"Your Assignment Results from Learn Language Education Academy",
-                html_content=f"""
-                <p>Hello {stu_row['name']},<br><br>
-                Please find attached your latest assignment scores.<br><br>
-                Best regards,<br>Learn Language Education Academy
-                </p>
-                """
-            )
-            encoded = base64.b64encode(pdf_bytes).decode()
-            attached = Attachment(
-                FileContent(encoded),
-                FileName(f"{stu_row['name'].replace(' ', '_')}_report.pdf"),
-                FileType('application/pdf'),
-                Disposition('attachment')
-            )
-            message.attachment = attached
-            sg.send(message)
-            email_sent = True
-            st.success(f"Email sent to {student_email}!")
-        except Exception as e:
-            st.error(f"Failed to send email: {e}")
-    elif not student_email:
-        st.info("No email found for this student.")
-
-#end
+        st.download_button(
+            label="📄 Download as PDF",
+            data=pdf_bytes,
+            file_name="a1_course_schedule.pdf",
+            mime="application/pdf"
+        )
 
 
