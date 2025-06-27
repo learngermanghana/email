@@ -69,6 +69,13 @@ def col_lookup(df, name):
 def safe_pdf(text):
     return str(text).encode('latin-1', 'replace').decode('latin-1')
 
+def safe_text(s):
+    """Ensure text can be written to PDF without Unicode errors."""
+    if isinstance(s, str):
+        return s.encode("latin-1", "replace").decode("latin-1")
+    return str(s)
+
+
 # ---- Add more helpers as needed (PDF, Email) in future stages ----
 
 # ==== 4. SESSION STATE INITIALIZATION ====
@@ -2144,80 +2151,85 @@ with tabs[9]:
         mime="text/csv"
     )
 
-    # 6. PDF & EMAIL (with Reference Answers in PDF)
-    st.markdown("### 📄 PDF/Email Student Full Report (with Reference Answers)")
 
-    from fpdf import FPDF
-    import base64
-    from sendgrid import SendGridAPIClient
-    from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
+# 6. PDF & EMAIL (with Reference Answers in PDF)
+st.markdown("### 📄 PDF/Email Student Full Report (with Reference Answers)")
 
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", "B", 14)
-    pdf.cell(0, 10, f"Report for {stu_row[name_col]}", ln=True)
-    pdf.ln(5)
-    for _, r in hist.iterrows():
-        pdf.set_font("Arial", "B", 12)
-        pdf.cell(0, 8, f"{r[assign_col]}: {r[score_col]}/100", ln=True)
-        pdf.set_font("Arial", "", 11)
-        pdf.multi_cell(0, 8, f"Comments: {r[comments_col]}")
-        # ---- Add Reference Answers section ----
-        ref_ans = ref_answers.get(r[assign_col])
-        pdf.ln(1)
-        pdf.set_font("Arial", "I", 10)
-        if ref_ans:
-            pdf.multi_cell(0, 8, "Reference Answers:")
-            pdf.set_font("Arial", "", 10)
-            for ans in ref_ans:
-                pdf.multi_cell(0, 7, ans)
-        else:
-            pdf.multi_cell(0, 7, "Reference Answers: N/A")
-        pdf.ln(3)
+from fpdf import FPDF
+import base64
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
 
-    pdf_bytes = pdf.output(dest="S").encode("latin-1", "replace")
-    st.download_button(
-        "📄 Download Student Report PDF (with Reference Answers)",
-        data=pdf_bytes,
-        file_name=f"{stu_row[name_col].replace(' ', '_')}_report_with_ref.pdf",
-        mime="application/pdf"
-    )
+def safe_text(s):
+    """Convert to Latin-1 with replacement to avoid PDF Unicode error."""
+    if isinstance(s, str):
+        return s.encode("latin-1", "replace").decode("latin-1")
+    return str(s)
 
-    # 7. SendGrid Email Button
-    st.markdown("#### 📧 Email this report to the student")
-    student_email = stu_row.get(email_col, "")
-    sender_email = st.secrets["general"]["SENDER_EMAIL"]
-    sendgrid_key = st.secrets["general"]["SENDGRID_API_KEY"]
+pdf = FPDF()
+pdf.add_page()
+pdf.set_font("Arial", "B", 14)
+pdf.cell(0, 10, safe_text(f"Report for {stu_row[name_col]}"), ln=True)
+pdf.ln(5)
+for _, r in hist.iterrows():
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(0, 8, safe_text(f"{r[assign_col]}: {r[score_col]}/100"), ln=True)
+    pdf.set_font("Arial", "", 11)
+    pdf.multi_cell(0, 8, safe_text(f"Comments: {r[comments_col]}"))
+    # ---- Add Reference Answers section ----
+    ref_ans = ref_answers.get(r[assign_col])
+    pdf.ln(1)
+    pdf.set_font("Arial", "I", 10)
+    if ref_ans:
+        pdf.multi_cell(0, 8, safe_text("Reference Answers:"))
+        pdf.set_font("Arial", "", 10)
+        for ans in ref_ans:
+            pdf.multi_cell(0, 7, safe_text(ans))
+    else:
+        pdf.multi_cell(0, 7, safe_text("Reference Answers: N/A"))
+    pdf.ln(3)
 
-    if student_email and st.button(f"📧 Send PDF to {student_email}"):
-        try:
-            sg = SendGridAPIClient(sendgrid_key)
-            message = Mail(
-                from_email=sender_email,
-                to_emails=student_email,
-                subject=f"Your Assignment Results from Learn Language Education Academy",
-                html_content=f"""
-                <p>Hello {stu_row[name_col]},<br><br>
-                Please find attached your latest assignment scores <b>with official reference answers</b>.<br><br>
-                Best regards,<br>Learn Language Education Academy
-                </p>
-                """
-            )
-            encoded = base64.b64encode(pdf_bytes).decode()
-            attached = Attachment(
-                FileContent(encoded),
-                FileName(f"{stu_row[name_col].replace(' ', '_')}_report_with_ref.pdf"),
-                FileType('application/pdf'),
-                Disposition('attachment')
-            )
-            message.attachment = attached
-            sg.send(message)
-            st.success(f"Email sent to {student_email}!")
-        except Exception as e:
-            st.error(f"Failed to send email: {e}")
-    elif not student_email:
-        st.info("No email found for this student.")
+pdf_bytes = pdf.output(dest="S").encode("latin-1", "replace")
+st.download_button(
+    "📄 Download Student Report PDF (with Reference Answers)",
+    data=pdf_bytes,
+    file_name=f"{stu_row[name_col].replace(' ', '_')}_report_with_ref.pdf",
+    mime="application/pdf"
+)
+
+# 7. SendGrid Email Button
+st.markdown("#### 📧 Email this report to the student")
+student_email = stu_row.get(email_col, "")
+sender_email = st.secrets["general"]["SENDER_EMAIL"]
+sendgrid_key = st.secrets["general"]["SENDGRID_API_KEY"]
+
+if student_email and st.button(f"📧 Send PDF to {student_email}"):
+    try:
+        sg = SendGridAPIClient(sendgrid_key)
+        message = Mail(
+            from_email=sender_email,
+            to_emails=student_email,
+            subject=f"Your Assignment Results from Learn Language Education Academy",
+            html_content=f"""
+            <p>Hello {safe_text(stu_row[name_col])},<br><br>
+            Please find attached your latest assignment scores <b>with official reference answers</b>.<br><br>
+            Best regards,<br>Learn Language Education Academy
+            </p>
+            """
+        )
+        encoded = base64.b64encode(pdf_bytes).decode()
+        attached = Attachment(
+            FileContent(encoded),
+            FileName(f"{stu_row[name_col].replace(' ', '_')}_report_with_ref.pdf"),
+            FileType('application/pdf'),
+            Disposition('attachment')
+        )
+        message.attachment = attached
+        sg.send(message)
+        st.success(f"Email sent to {student_email}!")
+    except Exception as e:
+        st.error(f"Failed to send email: {e}")
+elif not student_email:
+    st.info("No email found for this student.")
 
 # --- End of Full Tab 9 ---
-
-
