@@ -118,12 +118,18 @@ def delete_score_supabase(student_code, assignment):
         .eq("student_code", student_code) \
         .eq("assignment", assignment) \
         .execute()
-
 # ==== 7. REFERENCE ANSWERS ====
 ref_answers = {
-    "A1 0.1": ["1. C) Guten Morgen", "2. D) Guten Tag", /* … */],
-    # … your full dictionary …
-    "A2 10.28": ["1. c) Einen gültigen Reisepass", /* … */]
+    "A1 0.1": [
+        "1. C) Guten Morgen",
+        "2. D) Guten Tag",
+        # …add the rest of the answers for A1 0.1 here…
+    ],
+    # …continue with all other keys…
+    "A2 10.28": [
+        "1. c) Einen gültigen Reisepass",
+        # …etc…
+    ],
 }
 
 
