@@ -29,16 +29,7 @@ st.set_page_config(
 school_sendgrid_key = st.secrets.get("general", {}).get("SENDGRID_API_KEY")
 school_sender_email = st.secrets.get("general", {}).get("SENDER_EMAIL", SCHOOL_EMAIL)
 
-admin.postgrest.rpc("sql", {
-  "query": """
-    ALTER TABLE public.scores
-      DROP CONSTRAINT IF EXISTS scores_student_code_assignment_unique;
-    ALTER TABLE public.scores
-      ADD CONSTRAINT scores_student_code_assignment_unique
-        UNIQUE (student_code, assignment);
-    -- etc...
-  """
-}).execute()
+
 
 
 SUPABASE_URL = "https://uzwgfvxrtagmmoaebxye.supabase.co"
@@ -50,6 +41,19 @@ anon_supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 # elevated operations (RLS bypass, inserts, upserts, DDL, etc.)
 service_supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+service_supabase.postgrest.rpc("sql", {
+  "query": """
+    -- drop any old constraint
+    ALTER TABLE public.scores
+      DROP CONSTRAINT IF EXISTS scores_student_code_assignment_unique;
+    -- add the UNIQUE constraint you need
+    ALTER TABLE public.scores
+      ADD CONSTRAINT scores_student_code_assignment_unique
+      UNIQUE (student_code, assignment);
+  """
+}).execute()
+
 
 # ==== 3. HELPER FUNCTIONS (no changes needed here, just keep them above your data loads) ====
 def safe_read_csv(local_path, backup_url=None):
