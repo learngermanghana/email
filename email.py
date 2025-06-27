@@ -29,18 +29,13 @@ st.set_page_config(
 school_sendgrid_key = st.secrets.get("general", {}).get("SENDGRID_API_KEY")
 school_sender_email = st.secrets.get("general", {}).get("SENDER_EMAIL", SCHOOL_EMAIL)
 
+SUPABASE_URL              = st.secrets["general"]["SUPABASE_URL"]
+SUPABASE_ANON_KEY         = st.secrets["general"]["SUPABASE_ANON_KEY"]
+SUPABASE_SERVICE_ROLE_KEY = st.secrets["general"]["SUPABASE_SERVICE_ROLE_KEY"]
 
+anon_supabase    = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+service_supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-
-SUPABASE_URL = "https://uzwgfvxrtagmmoaebxye.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6d2dmdnhydGFnbW1vYWVieHllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTEwNDY4OTEsImV4cCI6MjA2NjYyMjg5MX0.g6gSYYxuMICK2zcaru8wULPjpAMbSo0oC4VfOTz4a2U"
-SUPABASE_SERVICE_KEY = st.secrets["general"]["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6d2dmdnhydGFnbW1vYWVieHllIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MTA0Njg5MSwiZXhwIjoyMDY2NjIyODkxfQ.bg3NrXd-odkVEX883w5bg6LU8zj5ewFioCp1scuIzb4"]
-
-# read‐only / public operations
-anon_supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
-
-# elevated operations (RLS bypass, inserts, upserts, DDL, etc.)
-service_supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 service_supabase.postgrest.rpc("sql", {
   "query": """
