@@ -6,6 +6,7 @@ import base64
 import urllib.parse 
 from datetime import date, datetime, timedelta
 import os
+import traceback
 
 
 
@@ -97,7 +98,6 @@ def load_scores_from_sqlite():
     conn.close()
     return df
 
-# ====== Send PDF by email using SendGrid ======
 def send_email_with_pdf(student_email, student_name, pdf_bytes, sendgrid_api_key, sender_email):
     message = Mail(
         from_email=sender_email,
@@ -114,7 +114,9 @@ def send_email_with_pdf(student_email, student_name, pdf_bytes, sendgrid_api_key
     )
     message.attachment = attached
     sg = SendGridAPIClient(sendgrid_api_key)
-    sg.send(message)
+    response = sg.send(message)
+    return response.status_code  # Add this line!
+
 
 def build_simple_pdf(student, history_df, ref_answers, total):
     pdf = FPDF(format='A4')
@@ -1230,5 +1232,10 @@ with tabs[9]:
             send_email_with_pdf(student['email'], student['name'], pdf_bytes,
                                 st.secrets['general']['SENDGRID_API_KEY'],
                                 st.secrets['general']['SENDER_EMAIL'])
+            )
+            st.success("✅ Email sent successfully!")
+            except Exception as e:
+                st.error(f"❌ Email failed to send: {e}")
 #end
+
 
