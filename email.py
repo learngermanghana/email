@@ -655,16 +655,56 @@ A2_REF_ANSWERS = {
     ]
 }
 
-# 2. Combine
+# ==== Reference Answers: A1 ====
+A1_REF_ANSWERS = {
+    "Lesen und Horen 0.2": [
+        "1. C) 26",
+        "2. A) A, O, U, B",
+        "3. A) Eszett",
+        "4. A) K",
+        "5. A) A-Umlaut",
+        "6. A) A, O, U, B",
+        "7. B 4",
+        "",
+        "1. Wasser",
+        "2. Kaffee",
+        "3. Blume",
+        "4. Schule",
+        "5. Tisch"
+    ],
+    "Lesen und Horen 1.1": [
+        "1. C",
+        "2. C",
+        "3. A",
+        "4. B"
+    ],
+    "Lesen und Horen 1.2": [
+        "1. Ich heiBe Anna",
+        "2. Du heiBt Max",
+        "3. Er heiBt Peter",
+        "4. Wir Kommen aus Italien",
+        "5. Ihr kommt aus Brasilien",
+        "6. Sie Kommt/Kommen aus Russland",
+        "7. Ich wohne in Berlin",
+        "8. Du wohnst in Madrid",
+        "9. Sie wohnst on wien",
+        "",
+        "1. A) Anna",
+        "2. C) Aus Italien",
+        "3. D) In Berlin",
+        "4. B) Tom",
+        "5. A) In Berlin"
+    ],
+    # ...add the rest of your A1 keys in this format...
+}
+
+# ==== Combine Reference Answers ====
 REF_ANSWERS = {**A1_REF_ANSWERS, **A2_REF_ANSWERS}
 
-# 3. Example: Get a list of all assignment keys
-all_keys = list(A1_REF_ANSWERS.keys()) + list(A2_REF_ANSWERS.keys())
-
-A1_REF_ANSWERS = { ... }
-A2_REF_ANSWERS = { ... }
-REF_ANSWERS = {**A1_REF_ANSWERS, **A2_REF_ANSWERS}
+# ==== Assignment Totals Per Level ====
 LEVEL_TOTALS = {'A1': 18, 'A2': 28, 'B1': 26, 'B2': 30}
+
+# ==== END REFERENCE ANSWERS BLOCK ====
 
 
 # ====== PAGE CONFIG ======
