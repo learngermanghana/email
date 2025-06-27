@@ -1,9 +1,9 @@
-# === Standard Library Imports ===
 import base64
 import json
 import os
 import re
 import sqlite3
+import tempfile
 import traceback
 import unicodedata
 import urllib.parse
@@ -23,11 +23,6 @@ from sendgrid.helpers.mail import (
     Mail, Attachment, FileContent, FileName, FileType, Disposition
 )
 
-# ===== PAGE CONFIG =====
-st.set_page_config(
-    page_title="Learn Language Education Academy Dashboard",
-    layout="wide"
-)
 
 # ===== Helper: Make PDF text safe (no Unicode crash) =====
 def safe_pdf(text):
@@ -1136,7 +1131,6 @@ with tabs[4]:
         "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
     )
     github_csv   = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
-    df = load_student_data(student_file, google_csv, github_csv)
     df = load_student_data(student_file, google_csv, github_csv)
     df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
     col_map = {c.replace("_", ""): c for c in df.columns}
