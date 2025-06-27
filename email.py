@@ -21,10 +21,6 @@ from sendgrid.helpers.mail import (
     Mail, Attachment, FileContent, FileName, FileType, Disposition
 )
 
-# === Local Utilities / Helpers ===
-from utils import normalize_cols, load_ref_answers, sync_scores_to_sqlite
-from email_utils import send_email_with_pdf
-
 # ===== PAGE CONFIG =====
 st.set_page_config(
     page_title="Learn Language Education Academy Dashboard",
