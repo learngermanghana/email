@@ -99,7 +99,6 @@ CREATE TABLE IF NOT EXISTS scores (
 )""")
 conn.commit()
 
-# === 2. Load all scores from Supabase ===
 def fetch_scores_supabase():
     resp = anon_supabase.table("scores").select("*").execute()
     return normalize_columns(pd.DataFrame(resp.data))
@@ -124,6 +123,7 @@ def delete_score_supabase(student_code, assignment):
         .eq("student_code", student_code) \
         .eq("assignment", assignment) \
         .execute()
+
 
 # ==== 7. REFERENCE ANSWERS ====
 ref_answers = {
@@ -1134,43 +1134,44 @@ with tabs[8]:
                        data=pdf.output(dest='S').encode('latin-1'),
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
+# ==== TAB 9: Assignment Marking & Scores (with Email) ====
 with tabs[9]:
     st.title("📝 Assignment Marking & Scores (with Email)")
 
-    # === 1. Load data (students and scores) ===
-    students_csv_url = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
-
-    def normalize_columns(df):
-        return df.rename(columns={c: c.strip().lower().replace(' ', '_') for c in df.columns})
-
+    # 1. Load students from your Google Sheet
     @st.cache_data(show_spinner=False)
     def load_students():
         df = pd.read_csv(students_csv_url)
         return normalize_columns(df)
-
     df_students = load_students()
 
-    # === 2. Load all scores from Supabase ===
+    # 2. Supabase helpers — **reads** use anon_supabase, **writes/deletes** use service_supabase
     def fetch_scores_supabase():
-        res = supabase.table("scores").select("*").execute()
-        df = pd.DataFrame(res.data)
-        return normalize_columns(df)
+        resp = anon_supabase.table("scores").select("*").execute()
+        return normalize_columns(pd.DataFrame(resp.data))
 
     def save_score_supabase(student_code, name, assignment, score, comments, date, level):
         data = {
             "student_code": student_code,
-            "name": name,
-            "assignment": assignment,
-            "score": score,
-            "comments": comments,
-            "date": date,
-            "level": level
+            "name":         name,
+            "assignment":   assignment,
+            "score":        score,
+            "comments":     comments,
+            "date":         date,
+            "level":        level,
         }
-        supabase.table("scores").upsert(data, on_conflict=["student_code", "assignment"]).execute()
+        service_supabase.table("scores") \
+            .upsert(data, on_conflict=["student_code","assignment"]) \
+            .execute()
 
     def delete_score_supabase(student_code, assignment):
-        supabase.table("scores").delete().eq("student_code", student_code).eq("assignment", assignment).execute()
+        service_supabase.table("scores") \
+            .delete() \
+            .eq("student_code", student_code) \
+            .eq("assignment", assignment) \
+            .execute()
 
+    # 3. Now fetch once:
     df_scores = fetch_scores_supabase()
 
     # --- Show columns for debugging (optional) ---
