@@ -1651,12 +1651,14 @@ with tabs[8]:
 
 # ============== Assignment Marking & Scores Tab ==============
 
+import difflib
+
 with tabs[9]:
     st.title("Assignment Marking & Scores (Email, Reference, PDF)")
 
     # --- Helper: Fuzzy, accent-insensitive assignment match ---
     def normalize_assignment_for_match(s):
-        # Remove accents (umlauts -> o/u/a), lower, strip all non-alphanumeric
+        import unicodedata, re
         if not s:
             return ""
         s = str(s)
@@ -1670,7 +1672,7 @@ with tabs[9]:
         candidates = list(REF_ANSWERS.keys())
         norm_a = normalize_assignment_for_match(assignment)
         norm_keys = [normalize_assignment_for_match(k) for k in candidates]
-        matches = difflib.get_close_matches(norm_a, norm_keys, n=1, cutoff=0.6)
+        matches = difflib.get_close_matches(norm_a, norm_keys, n=1, cutoff=0.7)
         if matches:
             idx = norm_keys.index(matches[0])
             return candidates[idx]
@@ -1701,7 +1703,6 @@ with tabs[9]:
     def all_assignments(ds, ra):
         return sorted(set(ds['assignment'].dropna()) | set(ra.keys()))
 
-    # Group assignments by level (A1, A2, B1, B2)
     def group_assignments_by_level(all_assigns):
         grouped = {'A1': [], 'A2': [], 'B1': [], 'B2': []}
         for a in all_assigns:
@@ -1712,6 +1713,10 @@ with tabs[9]:
 
     all_assigns = all_assignments(df_scores, REF_ANSWERS)
     assigns_by_level = group_assignments_by_level(all_assigns)
+
+    # DEBUG: Show assignment structure!
+    st.write("Levels available in assigns_by_level:", list(assigns_by_level.keys()))
+    st.write("Assignments for each level:", assigns_by_level)
 
     # --- Marking Mode Switch ---
     mode = st.radio("Marking Mode", ["Classic", "Batch"], horizontal=True)
@@ -1751,9 +1756,13 @@ with tabs[9]:
         st.markdown("---")
         st.subheader("Classic: Mark Single Assignment")
         opts = assigns_by_level.get(level, [])
+        if not opts:
+            st.warning("No assignments found for this level, showing all assignments.")
+            opts = all_assigns
         af = st.text_input("Filter assignments")
         if af:
             opts = [a for a in opts if af.lower() in a.lower()]
+        st.write("DEBUG: Assignment options for selectbox:", opts)
         sel_a = st.selectbox("Assignment", opts)
         # Normalized match for previous
         def norm_match(row):
@@ -1798,6 +1807,9 @@ with tabs[9]:
         st.markdown("---")
         st.subheader("Batch: Mark Assignments")
         opts = assigns_by_level.get(level, [])
+        if not opts:
+            st.warning("No assignments found for this level, showing all assignments.")
+            opts = all_assigns
         stu_scores = df_scores[df_scores['studentcode'] == code]
         with st.form(f"batch_marking_form_{code}"):
             batch = {}
@@ -1833,8 +1845,9 @@ with tabs[9]:
     # --- Score History and PDF Report ---
     st.markdown("### Score History & PDF Report")
     opts = assigns_by_level.get(level, [])
+    if not opts:
+        opts = all_assigns
     normed_opts = set([normalize_assignment_for_match(a) for a in opts])
-    # Show history with normalized assignment matching
     def match_history(row):
         return (row['studentcode'] == code) and (normalize_assignment_for_match(row['assignment']) in normed_opts)
     history = df_scores[df_scores.apply(match_history, axis=1)].sort_values('date', ascending=False)
