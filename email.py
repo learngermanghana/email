@@ -1651,14 +1651,14 @@ with tabs[8]:
 
 # ============== Assignment Marking & Scores Tab ==============
 
-import difflib
-
 with tabs[9]:
     st.title("Assignment Marking & Scores (Email, Reference, PDF)")
 
     # --- Helper: Fuzzy, accent-insensitive assignment match ---
+    import unicodedata, re, difflib
+
     def normalize_assignment_for_match(s):
-        import unicodedata, re
+        # Remove accents (umlauts -> o/u/a), lower, strip all non-alphanumeric
         if not s:
             return ""
         s = str(s)
@@ -1672,7 +1672,7 @@ with tabs[9]:
         candidates = list(REF_ANSWERS.keys())
         norm_a = normalize_assignment_for_match(assignment)
         norm_keys = [normalize_assignment_for_match(k) for k in candidates]
-        matches = difflib.get_close_matches(norm_a, norm_keys, n=1, cutoff=0.7)
+        matches = difflib.get_close_matches(norm_a, norm_keys, n=1, cutoff=0.6)
         if matches:
             idx = norm_keys.index(matches[0])
             return candidates[idx]
@@ -1683,7 +1683,8 @@ with tabs[9]:
         df_students = pd.read_csv(
             "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
         )
-        df_students = normalize_cols(df_students)
+        # Normalize columns
+        df_students.columns = [str(c).strip().replace(" ", "_").lower() for c in df_students.columns]
     except Exception:
         st.error("Could not load student list.")
         df_students = pd.DataFrame(columns=['name', 'studentcode', 'email', 'level'])
@@ -1693,7 +1694,14 @@ with tabs[9]:
         df_scores = pd.read_csv(
             "https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/export?format=csv"
         )
-        df_scores = normalize_cols(df_scores)
+        st.write("DEBUG: df_scores columns BEFORE normalization:", df_scores.columns.tolist())
+        # Normalize columns
+        df_scores.columns = [str(c).strip().replace(" ", "_").lower() for c in df_scores.columns]
+        st.write("DEBUG: df_scores columns AFTER normalization:", df_scores.columns.tolist())
+        st.write("DEBUG: First few rows of df_scores:", df_scores.head())
+        # Optional: Fix for weird capitalization if still present
+        if 'assignment' not in df_scores.columns and 'Assignment' in df_scores.columns:
+            df_scores.rename(columns={'Assignment':'assignment'}, inplace=True)
     except Exception:
         st.error("Could not load score history.")
         df_scores = pd.DataFrame(columns=['studentcode', 'name', 'assignment', 'score', 'comments', 'date', 'level'])
@@ -1701,8 +1709,12 @@ with tabs[9]:
     # --- All Assignments & Categorization ---
     @st.cache_data
     def all_assignments(ds, ra):
+        if 'assignment' not in ds.columns:
+            st.error("No 'assignment' column in scores sheet. Check your CSV or normalization!")
+            return list(ra.keys())
         return sorted(set(ds['assignment'].dropna()) | set(ra.keys()))
 
+    # Group assignments by level (A1, A2, B1, B2)
     def group_assignments_by_level(all_assigns):
         grouped = {'A1': [], 'A2': [], 'B1': [], 'B2': []}
         for a in all_assigns:
@@ -1713,10 +1725,6 @@ with tabs[9]:
 
     all_assigns = all_assignments(df_scores, REF_ANSWERS)
     assigns_by_level = group_assignments_by_level(all_assigns)
-
-    # DEBUG: Show assignment structure!
-    st.write("Levels available in assigns_by_level:", list(assigns_by_level.keys()))
-    st.write("Assignments for each level:", assigns_by_level)
 
     # --- Marking Mode Switch ---
     mode = st.radio("Marking Mode", ["Classic", "Batch"], horizontal=True)
@@ -1756,13 +1764,9 @@ with tabs[9]:
         st.markdown("---")
         st.subheader("Classic: Mark Single Assignment")
         opts = assigns_by_level.get(level, [])
-        if not opts:
-            st.warning("No assignments found for this level, showing all assignments.")
-            opts = all_assigns
         af = st.text_input("Filter assignments")
         if af:
             opts = [a for a in opts if af.lower() in a.lower()]
-        st.write("DEBUG: Assignment options for selectbox:", opts)
         sel_a = st.selectbox("Assignment", opts)
         # Normalized match for previous
         def norm_match(row):
@@ -1807,9 +1811,6 @@ with tabs[9]:
         st.markdown("---")
         st.subheader("Batch: Mark Assignments")
         opts = assigns_by_level.get(level, [])
-        if not opts:
-            st.warning("No assignments found for this level, showing all assignments.")
-            opts = all_assigns
         stu_scores = df_scores[df_scores['studentcode'] == code]
         with st.form(f"batch_marking_form_{code}"):
             batch = {}
@@ -1845,9 +1846,8 @@ with tabs[9]:
     # --- Score History and PDF Report ---
     st.markdown("### Score History & PDF Report")
     opts = assigns_by_level.get(level, [])
-    if not opts:
-        opts = all_assigns
     normed_opts = set([normalize_assignment_for_match(a) for a in opts])
+    # Show history with normalized assignment matching
     def match_history(row):
         return (row['studentcode'] == code) and (normalize_assignment_for_match(row['assignment']) in normed_opts)
     history = df_scores[df_scores.apply(match_history, axis=1)].sort_values('date', ascending=False)
@@ -1875,4 +1875,5 @@ with tabs[9]:
             st.error(f"❌ Email failed to send: {e}")
 
 # ============== END OF MARKING TAB ==============
+
 
