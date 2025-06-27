@@ -1140,14 +1140,12 @@ with tabs[9]:
         st.error("Could not load student list.")
         df_students = pd.DataFrame(columns=['name','studentcode','email','level'])
 
-    # Load and normalize scores
+    # Load scores from local SQLite to ensure persistence
     try:
-        df_scores = pd.read_csv(
-            'https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/export?format=csv'
-        )
+        df_scores = load_scores_from_sqlite()
         df_scores = normalize_cols(df_scores)
     except Exception:
-        st.error("Could not load score history.")
+        st.error("Could not load score history from local database.")
         df_scores = pd.DataFrame(columns=['studentcode','name','assignment','score','comments','date','level'])
 
     # Reference answers and assignment totals
@@ -1156,7 +1154,6 @@ with tabs[9]:
 
     @st.cache_data
     def all_assignments(df_scores, ref_answers):
-        # Generate sorted list of all distinct assignment names
         return sorted(set(df_scores['assignment'].dropna()) | set(ref_answers.keys()))
 
     all_assigns = all_assignments(df_scores, ref_answers)
@@ -1203,16 +1200,12 @@ with tabs[9]:
                 now = datetime.now().strftime("%Y-%m-%d")
                 entry = dict(studentcode=code,name=student['name'],assignment=sel_a,
                              score=score,comments=comments,date=now,level=level)
+                # Update local df_scores and database
                 df_scores = df_scores[~((df_scores['studentcode']==code)&(df_scores['assignment']==sel_a))]
                 df_scores = pd.concat([df_scores,pd.DataFrame([entry])],ignore_index=True)
                 sync_scores_to_sqlite(df_scores)
-                df_scores.to_csv("scores.csv",index=False)
-                st.session_state['show_score_download']=True
-                st.success("Score saved locally.")
-        if st.session_state.get('show_score_download'):
-            st.download_button('⬇️ Download Updated Scores CSV',
-                               data=df_scores.to_csv(index=False).encode(),
-                               file_name='scores.csv',mime='text/csv')
+                st.success("Score saved permanently.")
+                st.experimental_rerun()
     else:
         # Batch mode
         st.markdown("---")
@@ -1232,13 +1225,8 @@ with tabs[9]:
                 df_scores = df_scores[~((df_scores['studentcode']==code)&df_scores['assignment'].isin(batch))]
                 df_scores=pd.concat([df_scores,pd.DataFrame(rows)],ignore_index=True)
                 sync_scores_to_sqlite(df_scores)
-                df_scores.to_csv("scores.csv",index=False)
-                st.session_state['show_score_download']=True
-                st.success("Batch scores saved.")
-        if st.session_state.get('show_score_download'):
-            st.download_button('⬇️ Download Updated Scores CSV',
-                               data=df_scores.to_csv(index=False).encode(),
-                               file_name='scores.csv',mime='text/csv')
+                st.success("All scores saved permanently.")
+                st.experimental_rerun()
 
     # History & PDF
     st.markdown("### Score History & PDF Report")
@@ -1251,12 +1239,12 @@ with tabs[9]:
     else:
         st.info("No records yet.")
 
-    pdf_bytes=build_simple_pdf(student,history,ref_answers,total)
-    st.download_button("Download PDF Report",pdf_bytes,f"{code}_report.pdf","application/pdf")
+    # Download button placed outside any form to avoid Streamlit errors
+    st.download_button("Download PDF Report", build_simple_pdf(student, history, ref_answers, total),
+                       f"{code}_report.pdf", "application/pdf")
     if student.get('email'):
         if st.button('Email PDF'):
-            send_email_with_pdf(student['email'],student['name'],pdf_bytes,
+            send_email_with_pdf(student['email'],student['name'],
+                                build_simple_pdf(student, history, ref_answers, total),
                                 st.secrets['general']['SENDGRID_API_KEY'],
                                 st.secrets['general']['SENDER_EMAIL'])
-#end
-
