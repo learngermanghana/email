@@ -1129,323 +1129,7 @@ with tabs[9]:
     email_col       = get_safe_col(df_students, ["email"], "Email")
 
 #Reference Answers   
-                
-    ref_answers = {
-    # --- A1 Section ---
-    "A1 0.1": [
-        "1. C) Guten Morgen",
-        "2. D) Guten Tag",
-        "3. B) Guten Abend",
-        "4. B) Gute Nacht",
-        "5. C) Guten Morgen",
-        "6. C) Wie geht es Ihnen",
-        "7. B) Auf Wiedersehen",
-        "8. C) Tschuss",
-        "9. C) Guten Abend",
-        "10. D) Guten Nacht"
-    ],
-    "A1 0.2": [
-        "1. C) 26",
-        "2. A) A, O, U, B",
-        "3. A) Eszett",
-        "4. A) K",
-        "5. A) A-Umlaut",
-        "6. A) A, O, U, B",
-        "7. B 4",
-        "",
-        "Wasser", "Kaffee", "Blume", "Schule", "Tisch"
-    ],
-    "A1 1.1": [
-        "1. C",
-        "2. C",
-        "3. A",
-        "4. B"
-    ],
-    "A1 1.2": [
-        "1. Ich heiße Anna",
-        "2. Du heißt Max",
-        "3. Er heißt Peter",
-        "4. Wir kommen aus Italien",
-        "",
-        "5. Ihr kommt aus Brasilien",
-        "6. Sie kommt/k kommen aus Russland",
-        "7. Ich wohne in Berlin",
-        "",
-        "8. Du wohnst in Madrid",
-        "9. Sie wohnt in Wien",
-        "",
-        "1. A) Anna",
-        "2. C) Aus Italien",
-        "3. D) In Berlin",
-        "4. B) Tom",
-        "5. A) In Berlin"
-    ],
-    "A1 2": [
-        "1. A) sieben",
-        "2. B) Drei",
-        "3. B) Sechs",
-        "4. B) Neun",
-        "5. B) Sieben",
-        "6. C) Fünf",
-        "",
-        "7. B) zweihundertzweiundzwanzig",
-        "8. A) fünfhundertneun",
-        "9. A) zweitausendvierzig",
-        "10. A) fünftausendfünfhundertneun",
-        "",
-        "1. 16 – sechzehn",
-        "2. 98 – achtundneunzig",
-        "3. 555 – fünfhundertfünfundfünfzig",
-        "",
-        "4. 1020 – tausendzwanzig",
-        "5. 8553 – achttausendfünfhundertdreiundfünfzig"
-    ],
-    "A1 4": [
-        "1. C) Neun",
-        "2. B) Polnisch",
-        "3. D) Niederländisch",
-        "4. A) Deutsch",
-        "5. C) Paris",
-        "6. B) Amsterdam",
-        "7. C) In der Schweiz",
-        "",
-        "1. C) In Italien und Frankreich",
-        "2. C) Rom",
-        "3. B) Das Essen",
-        "4. B) Paris",
-        "5. A) Nach Spanien"
-    ],
-    "A1 5": [
-        # Part 1 – Vocabulary Review
-        "Der Tisch – the table",
-        "Die Lampe – the lamp",
-        "Das Buch – the book",
-        "Der Stuhl – the chair",
-        "Die Katze – the cat",
-        "Das Auto – the car",
-        "Der Hund – the dog",
-        "Die Blume – the flower",
-        "Das Fenster – the window",
-        "Der Computer – the computer",
-        "",
-        # Part 2 – Nominative Case
-        "1. Der Tisch ist groß",
-        "2. Die Lampe ist neu",
-        "3. Das Buch ist interessant",
-        "4. Der Stuhl ist bequem",
-        "5. Die Katze ist süß",
-        "6. Das Auto ist schnell",
-        "7. Der Hund ist freundlich",
-        "8. Die Blume ist schön",
-        "9. Das Fenster ist offen",
-        "10. Der Computer ist teuer",
-        "",
-        # Part 3 – Accusative Case
-        "1. Ich sehe den Tisch",
-        "2. Sie kauft die Lampe",
-        "3. Er liest das Buch",
-        "4. Wir brauchen den Stuhl",
-        "5. Du fütterst die Katze",
-        "6. Ich fahre das Auto",
-        "7. Sie streichelt den Hund",
-        "8. Er pflückt die Blume",
-        "9. Wir putzen das Fenster",
-        "10. Sie benutzen den Computer"
-    ],
-    "A1 6": [
-        "Das Wohnzimmer – the living room",
-        "Die Küche – the kitchen",
-        "Das Schlafzimmer – the bedroom",
-        "Das Badezimmer – the bathroom",
-        "Der Balkon – the balcony",
-        "",
-        "Der Flur – the hallway",
-        "Das Bett – the bed",
-        "Der Tisch – the table",
-        "Der Stuhl – the chair",
-        "Der Schrank – the wardrobe",
-        "",
-        "1. B) Vier",
-        "2. A) Ein Sofa und ein Fernseher",
-        "3. B) Einen Herd, einen Kühlschrank und einen Tisch mit vier Stühlen",
-        "4. C) Ein großes Bett",
-        "5. D) Eine Dusche, eine Badewanne und ein Waschbecken",
-        "",
-        "6. D) Klein und schön",
-        "7. C) Blumen und einen kleinen Tisch mit zwei Stühlen",
-        "",
-        "1. B", "2. B", "3. B", "4. C", "5. D", "6. B", "7. C"
-    ],
-    "A1 7": [
-        "1. B) Um sieben Uhr",
-        "2. B) Um acht Uhr",
-        "3. B) Um sechs Uhr",
-        "4. B) Um zehn Uhr",
-        "5. B) Um neun Uhr",
-        "",
-        "6. C) Nachmittags",
-        "7. A) Um sieben Uhr",
-        "8. A) Montag",
-        "9. B) Am Dienstag und Donnerstag",
-        "10. B) Er ruht sich aus",
-        "",
-        "1. B) Um neun Uhr",
-        "2. B) Er geht in die Bibliothek",
-        "3. B) Bis zwei Uhr nachmittags",
-        "4. B) Um drei Uhr nachmittags",
-        "5. A) ",
-        "",
-        "6. B) Um neun Uhr",
-        "7. B) Er geht in die Bibliothek",
-        "8. B) Bis zwei Uhr nachmittags",
-        "9. B) Um drei Uhr nachmittags",
-        "10. B) Um sieben Uhr"
-    ],
-    "A1 8": [
-        "1. B) Zwei Uhr nachmittags",
-        "2. B) 29 Tage",
-        "3. B) April",
-        "4. C) 03.02.2024",
-        "5. C) Mittwoch",
-        "",
-        "1. Falsch", "2. Richtig", "3. Richtig", "4. Falsch", "5. Richtig",
-        "",
-        "1. B) Um Mitternacht", "2. B) Vier Uhr nachmittags", "3. C) 28 Tage", "4. B) Tag. Monat. Jahr", "5. D) Montag"
-    ],
-    "A1 9": [
-        "1. B) Apfel und Karotten", "2. C) Karotten", "3. A) Weil er Vegetarier ist", "4. C) Käse", "5. B) Fleisch",
-        "", "6. B) Kekse", "7. A) Käse", "8. C) Kuchen", "9. C) Schokolade", "10. B) Der Bruder des Autors",
-        "", "1. A) Apfel, Bananen und Karotten", "2. A) Müsli mit Joghurt", "3. D) Karotten", "4. A) Käse", "5. C) Schokoladenkuchen"
-    ],
-    "A1 10": [
-        "1. Falsch", "2. Wahr", "3. Falsch", "4. Wahr", "5. Wahr", "6. Falsch", "Wahr", "7. Falsch", "8. Falsch", "9. Falsch",
-        "1. B) Einmal pro Woche", "2. C) Apfel und Bananen", "3. A) Ein halbes Kilo", "4. B) 10 Euro", "5. B) Einen schönen Tag"
-    ],
 
-    # --- A2 Section ---
-    "A2 1.1": [
-        "1. C) In einer Schule",
-        "2. B) Weil sie gerne mit Kindern arbeitet",
-        "3. A) In einem Buro",
-        "4. B) Tennis",
-        "5. B) Es war sonnig und warm",
-        "6. B) Italien und Spanien",
-        "7. C) Weil die Baume so schon bunt sind",
-        "",
-        "1. B) Ins Kino gehen",
-        "2. A) Weil sie spannende Geschichten liebt",
-        "3. A) Tennis",
-        "4. B) Es war sonnig und warm",
-        "5. C) Einen Spaziergang Machen"
-    ],
-    "A2 1.2": [
-        "1. B) Ein Jahr",
-        "2. B) Er ist immer gut gelaunt und organisiert",
-        "3. C) Einen Anzug und eine Brille",
-        "4. B) Er geht geduldig auf ihre Anliegen ein",
-        "5. B) Weil er seine Mitarbeiter regelmaBig lobt",
-        "6. A) Wenn eine Aufgabe nicht rechtzeitig erledigt wird",
-        "7. B) Dass er fair ist und die Leistungen der Mitarbeiter wertschatzt",
-        "",
-        "1. B) Weil er",
-        "2. C) Sprachkurse",
-        "3. A) Jeden tag"
-    ],
-    "A2 1.3": [
-        "1. B) Anna ist 25 Jahre alt",
-        "2. B) In ihrer Freizeit liest Anna Bucher und geht spazieren",
-        "3. C) Anna arbeitet in einem Krankenhaus",
-        "4. C) Anna hat einen Hund",
-        "5. B) Max unterrichtet Mathematik",
-        "6. A) Max spielt oft FuBball mit seinen Freunden",
-        "7. B) Am Wochenende machen Anna und Max Ausfluge oder besuchen Museen",
-        "",
-        "1. B) Julia ist 26 Jahre alt",
-        "2. C) Julia arbeitet als Architektin",
-        "3. B) Tobias lebt in Frankfurt",
-        "4. A) Tobias mochte ein eigenes Restaurant eroffnen",
-        "5. B) Julia und Tobias kochen am Wochenende oft mit Sophie"
-    ],
-    "A2 2.4": [
-        "1. B) faul sein",
-        "2. d) Hockey spielen",
-        "3. a) schwimmen gehen",
-        "4. d) zum See fahren und dort im Zelt übernachten",
-        "5. b) eine Route mit dem Zug durch das ganze Land",
-        "",
-        "1. B) Um 10 Uhr",
-        "2. B) Eine Rucksack",
-        "3. B) Ein Piknik",
-        "4. C) in eienem restaurant",
-        "5. A) Spielen und Spazieren gehen"
-    ],
-    "A2 3.6": [
-        "1. b) Weil ich studiere",
-        "2. b) Wenn es nicht regnet, stürmt oder schneit → Formuliert im Text als:",
-        "3. d) Es ist billig",
-        "4. d) Haustiere",
-        "5. c) Im Zoo",
-        "",
-        "1. A",
-        "2. A",
-        "3. B",
-        "4. B",
-        "5. B"
-    ],
-    "A2 3.7": [
-        "1. b) In Zeitungen und im Internet",
-        "2. c) Eine Person, die bei der Wohnungssuche hilft",
-        "3. c) Kaltmiete und Nebenkosten",
-        "4. b) Ein Betrag, den man beim Auszug zurückbekommt",
-        "5. c) Ein Formular, das Schäden in der Wohnung zeigt",
-        "6. c) Von 22–7 Uhr und 13–15 Uhr",
-        "7. c) Zum Wertstoffcontainer bringen"
-    ],
-    "A2 3.8": [
-        "1. B) Brot, Brotchen, Aufschnitt, Kase und Marmelade",
-        "2. B) Ein Kaltes Abendessen",
-        "3. A) Fischgerichte",
-        "4. B) Oktoberfest",
-        "5. B) Gerichte aus aller Welt",
-        "6. C) Sauerkraut und Bratwurst",
-        "7. A) Eine zentrale Rolle",
-        "",
-        "1. B) Samstag",
-        "2. B) Obst und Gemuse",
-        "3. B) Mozzarella",
-        "4. B) Sie gehen in ein Café",
-        "5. A) Gemuselasagne"
-    ],
-    "A2 4.9": [
-        "1. B) Italien",
-        "2. A) Eine Woche",
-        "3. C) Kolosseum",
-        "4. B) Pasta Carbonara und Tiramisu",
-        "5. B) Amalfikuste",
-        "6. B) Am strand verbracht und geschwommen",
-        "7. C) Wegen des perfekten Urlaubs",
-        "",
-        "1. B) Griechenland",
-        "2. A) Eine woche",
-        "3. B) Der strand von Elafonissi",
-        "4. B) Eine Bootstour",
-        "5. A) Nach Kreta zu reisen"
-    ],
-    "A2 4.10": [
-        "1. C) Barcelona",
-        "2. B) Sagrada Familia und Park Guell",
-        "3. C) Tapas",
-        "4. B) Bunol",
-        "5. C) Tomaten werfen",
-        "6. B) Wiel er die spanische kultur erleben konnte",
-        "7. D) Wieder nach Spanien reisen zu Konnen",
-        "",
-        "1. C) Munchen",
-        "2. B) Zwei Wochen",
-        "3. B) Brezeln. Bratwurst und Schweinebraten",
-        "4. B) Lederhosen und Dirndl",
-        "5. B) Fahrgeschafte und Spiele"
-    ]
     ref_answers = {
     # --- A1 Section ---
     "A1 0.1": [
@@ -1764,8 +1448,565 @@ with tabs[9]:
     ]
     # (continue with A2 4.11 and upwards...)
 }
+    ref_answers = {
+    # --- A1 Section ---
+    "A1 0.1": [
+        "1. C) Guten Morgen",
+        "2. D) Guten Tag",
+        "3. B) Guten Abend",
+        "4. B) Gute Nacht",
+        "5. C) Guten Morgen",
+        "6. C) Wie geht es Ihnen",
+        "7. B) Auf Wiedersehen",
+        "8. C) Tschuss",
+        "9. C) Guten Abend",
+        "10. D) Guten Nacht"
+    ],
+    "A1 0.2": [
+        "1. C) 26",
+        "2. A) A, O, U, B",
+        "3. A) Eszett",
+        "4. A) K",
+        "5. A) A-Umlaut",
+        "6. A) A, O, U, B",
+        "7. B 4",
+        "",
+        "Wasser", "Kaffee", "Blume", "Schule", "Tisch"
+    ],
+    "A1 1.1": [
+        "1. C",
+        "2. C",
+        "3. A",
+        "4. B"
+    ],
+    "A1 1.2": [
+        "1. Ich heiße Anna",
+        "2. Du heißt Max",
+        "3. Er heißt Peter",
+        "4. Wir kommen aus Italien",
+        "",
+        "5. Ihr kommt aus Brasilien",
+        "6. Sie kommt/k kommen aus Russland",
+        "7. Ich wohne in Berlin",
+        "",
+        "8. Du wohnst in Madrid",
+        "9. Sie wohnt in Wien",
+        "",
+        "1. A) Anna",
+        "2. C) Aus Italien",
+        "3. D) In Berlin",
+        "4. B) Tom",
+        "5. A) In Berlin"
+    ],
+    "A1 2": [
+        "1. A) sieben",
+        "2. B) Drei",
+        "3. B) Sechs",
+        "4. B) Neun",
+        "5. B) Sieben",
+        "6. C) Fünf",
+        "",
+        "7. B) zweihundertzweiundzwanzig",
+        "8. A) fünfhundertneun",
+        "9. A) zweitausendvierzig",
+        "10. A) fünftausendfünfhundertneun",
+        "",
+        "1. 16 – sechzehn",
+        "2. 98 – achtundneunzig",
+        "3. 555 – fünfhundertfünfundfünfzig",
+        "",
+        "4. 1020 – tausendzwanzig",
+        "5. 8553 – achttausendfünfhundertdreiundfünfzig"
+    ],
+    "A1 4": [
+        "1. C) Neun",
+        "2. B) Polnisch",
+        "3. D) Niederländisch",
+        "4. A) Deutsch",
+        "5. C) Paris",
+        "6. B) Amsterdam",
+        "7. C) In der Schweiz",
+        "",
+        "1. C) In Italien und Frankreich",
+        "2. C) Rom",
+        "3. B) Das Essen",
+        "4. B) Paris",
+        "5. A) Nach Spanien"
+    ],
+    "A1 5": [
+        # Part 1 – Vocabulary Review
+        "Der Tisch – the table",
+        "Die Lampe – the lamp",
+        "Das Buch – the book",
+        "Der Stuhl – the chair",
+        "Die Katze – the cat",
+        "Das Auto – the car",
+        "Der Hund – the dog",
+        "Die Blume – the flower",
+        "Das Fenster – the window",
+        "Der Computer – the computer",
+        "",
+        # Part 2 – Nominative Case
+        "1. Der Tisch ist groß",
+        "2. Die Lampe ist neu",
+        "3. Das Buch ist interessant",
+        "4. Der Stuhl ist bequem",
+        "5. Die Katze ist süß",
+        "6. Das Auto ist schnell",
+        "7. Der Hund ist freundlich",
+        "8. Die Blume ist schön",
+        "9. Das Fenster ist offen",
+        "10. Der Computer ist teuer",
+        "",
+        # Part 3 – Accusative Case
+        "1. Ich sehe den Tisch",
+        "2. Sie kauft die Lampe",
+        "3. Er liest das Buch",
+        "4. Wir brauchen den Stuhl",
+        "5. Du fütterst die Katze",
+        "6. Ich fahre das Auto",
+        "7. Sie streichelt den Hund",
+        "8. Er pflückt die Blume",
+        "9. Wir putzen das Fenster",
+        "10. Sie benutzen den Computer"
+    ],
+    "A1 6": [
+        "Das Wohnzimmer – the living room",
+        "Die Küche – the kitchen",
+        "Das Schlafzimmer – the bedroom",
+        "Das Badezimmer – the bathroom",
+        "Der Balkon – the balcony",
+        "",
+        "Der Flur – the hallway",
+        "Das Bett – the bed",
+        "Der Tisch – the table",
+        "Der Stuhl – the chair",
+        "Der Schrank – the wardrobe",
+        "",
+        "1. B) Vier",
+        "2. A) Ein Sofa und ein Fernseher",
+        "3. B) Einen Herd, einen Kühlschrank und einen Tisch mit vier Stühlen",
+        "4. C) Ein großes Bett",
+        "5. D) Eine Dusche, eine Badewanne und ein Waschbecken",
+        "",
+        "6. D) Klein und schön",
+        "7. C) Blumen und einen kleinen Tisch mit zwei Stühlen",
+        "",
+        "1. B", "2. B", "3. B", "4. C", "5. D", "6. B", "7. C"
+    ],
+    "A1 7": [
+        "1. B) Um sieben Uhr",
+        "2. B) Um acht Uhr",
+        "3. B) Um sechs Uhr",
+        "4. B) Um zehn Uhr",
+        "5. B) Um neun Uhr",
+        "",
+        "6. C) Nachmittags",
+        "7. A) Um sieben Uhr",
+        "8. A) Montag",
+        "9. B) Am Dienstag und Donnerstag",
+        "10. B) Er ruht sich aus",
+        "",
+        "1. B) Um neun Uhr",
+        "2. B) Er geht in die Bibliothek",
+        "3. B) Bis zwei Uhr nachmittags",
+        "4. B) Um drei Uhr nachmittags",
+        "5. A) ",
+        "",
+        "6. B) Um neun Uhr",
+        "7. B) Er geht in die Bibliothek",
+        "8. B) Bis zwei Uhr nachmittags",
+        "9. B) Um drei Uhr nachmittags",
+        "10. B) Um sieben Uhr"
+    ],
+    "A1 8": [
+        "1. B) Zwei Uhr nachmittags",
+        "2. B) 29 Tage",
+        "3. B) April",
+        "4. C) 03.02.2024",
+        "5. C) Mittwoch",
+        "",
+        "1. Falsch", "2. Richtig", "3. Richtig", "4. Falsch", "5. Richtig",
+        "",
+        "1. B) Um Mitternacht", "2. B) Vier Uhr nachmittags", "3. C) 28 Tage", "4. B) Tag. Monat. Jahr", "5. D) Montag"
+    ],
+    "A1 9": [
+        "1. B) Apfel und Karotten", "2. C) Karotten", "3. A) Weil er Vegetarier ist", "4. C) Käse", "5. B) Fleisch",
+        "", "6. B) Kekse", "7. A) Käse", "8. C) Kuchen", "9. C) Schokolade", "10. B) Der Bruder des Autors",
+        "", "1. A) Apfel, Bananen und Karotten", "2. A) Müsli mit Joghurt", "3. D) Karotten", "4. A) Käse", "5. C) Schokoladenkuchen"
+    ],
+    "A1 10": [
+        "1. Falsch", "2. Wahr", "3. Falsch", "4. Wahr", "5. Wahr", "6. Falsch", "Wahr", "7. Falsch", "8. Falsch", "9. Falsch",
+        "1. B) Einmal pro Woche", "2. C) Apfel und Bananen", "3. A) Ein halbes Kilo", "4. B) 10 Euro", "5. B) Einen schönen Tag"
+    ],
 
-
+    # --- A2 Section ---
+    "A2 1.1": [
+        "1. C) In einer Schule",
+        "2. B) Weil sie gerne mit Kindern arbeitet",
+        "3. A) In einem Buro",
+        "4. B) Tennis",
+        "5. B) Es war sonnig und warm",
+        "6. B) Italien und Spanien",
+        "7. C) Weil die Baume so schon bunt sind",
+        "",
+        "1. B) Ins Kino gehen",
+        "2. A) Weil sie spannende Geschichten liebt",
+        "3. A) Tennis",
+        "4. B) Es war sonnig und warm",
+        "5. C) Einen Spaziergang Machen"
+    ],
+    "A2 1.2": [
+        "1. B) Ein Jahr",
+        "2. B) Er ist immer gut gelaunt und organisiert",
+        "3. C) Einen Anzug und eine Brille",
+        "4. B) Er geht geduldig auf ihre Anliegen ein",
+        "5. B) Weil er seine Mitarbeiter regelmaBig lobt",
+        "6. A) Wenn eine Aufgabe nicht rechtzeitig erledigt wird",
+        "7. B) Dass er fair ist und die Leistungen der Mitarbeiter wertschatzt",
+        "",
+        "1. B) Weil er",
+        "2. C) Sprachkurse",
+        "3. A) Jeden tag"
+    ],
+    "A2 1.3": [
+        "1. B) Anna ist 25 Jahre alt",
+        "2. B) In ihrer Freizeit liest Anna Bucher und geht spazieren",
+        "3. C) Anna arbeitet in einem Krankenhaus",
+        "4. C) Anna hat einen Hund",
+        "5. B) Max unterrichtet Mathematik",
+        "6. A) Max spielt oft FuBball mit seinen Freunden",
+        "7. B) Am Wochenende machen Anna und Max Ausfluge oder besuchen Museen",
+        "",
+        "1. B) Julia ist 26 Jahre alt",
+        "2. C) Julia arbeitet als Architektin",
+        "3. B) Tobias lebt in Frankfurt",
+        "4. A) Tobias mochte ein eigenes Restaurant eroffnen",
+        "5. B) Julia und Tobias kochen am Wochenende oft mit Sophie"
+    ],
+    "A2 2.4": [
+        "1. B) faul sein",
+        "2. d) Hockey spielen",
+        "3. a) schwimmen gehen",
+        "4. d) zum See fahren und dort im Zelt übernachten",
+        "5. b) eine Route mit dem Zug durch das ganze Land",
+        "",
+        "1. B) Um 10 Uhr",
+        "2. B) Eine Rucksack",
+        "3. B) Ein Piknik",
+        "4. C) in eienem restaurant",
+        "5. A) Spielen und Spazieren gehen"
+    ],
+    "A2 3.6": [
+        "1. b) Weil ich studiere",
+        "2. b) Wenn es nicht regnet, stürmt oder schneit → Formuliert im Text als:",
+        "3. d) Es ist billig",
+        "4. d) Haustiere",
+        "5. c) Im Zoo",
+        "",
+        "1. A",
+        "2. A",
+        "3. B",
+        "4. B",
+        "5. B"
+    ],
+    "A2 3.7": [
+        "1. b) In Zeitungen und im Internet",
+        "2. c) Eine Person, die bei der Wohnungssuche hilft",
+        "3. c) Kaltmiete und Nebenkosten",
+        "4. b) Ein Betrag, den man beim Auszug zurückbekommt",
+        "5. c) Ein Formular, das Schäden in der Wohnung zeigt",
+        "6. c) Von 22–7 Uhr und 13–15 Uhr",
+        "7. c) Zum Wertstoffcontainer bringen"
+    ],
+    "A2 3.8": [
+        "1. B) Brot, Brotchen, Aufschnitt, Kase und Marmelade",
+        "2. B) Ein Kaltes Abendessen",
+        "3. A) Fischgerichte",
+        "4. B) Oktoberfest",
+        "5. B) Gerichte aus aller Welt",
+        "6. C) Sauerkraut und Bratwurst",
+        "7. A) Eine zentrale Rolle",
+        "",
+        "1. B) Samstag",
+        "2. B) Obst und Gemuse",
+        "3. B) Mozzarella",
+        "4. B) Sie gehen in ein Café",
+        "5. A) Gemuselasagne"
+    ],
+    "A2 4.9": [
+        "1. B) Italien",
+        "2. A) Eine Woche",
+        "3. C) Kolosseum",
+        "4. B) Pasta Carbonara und Tiramisu",
+        "5. B) Amalfikuste",
+        "6. B) Am strand verbracht und geschwommen",
+        "7. C) Wegen des perfekten Urlaubs",
+        "",
+        "1. B) Griechenland",
+        "2. A) Eine woche",
+        "3. B) Der strand von Elafonissi",
+        "4. B) Eine Bootstour",
+        "5. A) Nach Kreta zu reisen"
+    ],
+    "A2 4.10": [
+        "1. C) Barcelona",
+        "2. B) Sagrada Familia und Park Guell",
+        "3. C) Tapas",
+        "4. B) Bunol",
+        "5. C) Tomaten werfen",
+        "6. B) Wiel er die spanische kultur erleben konnte",
+        "7. D) Wieder nach Spanien reisen zu Konnen",
+        "",
+        "1. C) Munchen",
+        "2. B) Zwei Wochen",
+        "3. B) Brezeln. Bratwurst und Schweinebraten",
+        "4. B) Lederhosen und Dirndl",
+        "5. B) Fahrgeschafte und Spiele"
+    ]
+    # (continue with A2 4.11 and upwards...)
+}
+    ref_answers.update({
+    "A2 4.11": [
+        # Unterwegs: Verkehrsmittel vergleichen
+        "1. b) In Italien",
+        "2. b) Weil sie in der Stadt fahren wird",
+        "3. a) Eine gute Versicherung",
+        "4. b) Führerschein und Personalausweis",
+        "5. b) Der Angestellte der Autovermietung",
+        "6. a) Viele Städte zu besuchen",
+        "7. b) Sehr zufrieden",
+        "",
+        "1. B) in die Birge",
+        "2. B) Ein mittel..",
+        "3. B) 50 Euro",
+        "4. C) fuhrerschein und kreditkarte",
+        "5. B) Das Auto auf mogliche.."
+    ],
+    "A2 5.12": [
+        # Ein Tag im Leben (Übung)
+        "1. C) Eine Behörde prüft, ob das Dokument echt ist",
+        "2. b) Auf der Internetseite „Anerkennung in Deutschland",
+        "3. b) Die Zeitung",
+        "4. c) Berufsinformationszentrum",
+        "5. b) Ein Praktikum",
+        "6. c) Ein Kochrezept",
+        "7. c) Menschen unter 27 Jahren",
+        "",
+        "1. B) um 6 UhrC Beginnt die Visite …",
+        "2. B) um 9 Uhr",
+        "3. B) fuhrt wichtige….",
+        "4. C) Vor 18 Uhr",
+        "5. C) Vor 18 Uhr"
+    ],
+    "A2 5.13": [
+        # Ein Vorstellungsgesprach (Exercise)
+        "1. c) Ein Ort für kleine Kinder bis 3 Jahre",
+        "2. c) Ab 3 Jahren",
+        "3. d) Sie spielen, singen und basteln",
+        "4. d) Sie spielen, singen und basteln",
+        "5. c) Mittagessen",
+        "6. a) Reiche Familien",
+        "7. b) Es bekommt Hilfe beim Deutschlernen",
+        "",
+        "1. B) Um Interesse zu zeigen",
+        "2. B) Punktlich sein",
+        "3. C) Um Interesse zu zeigen",
+        "4. A) Eine Dankes- Email",
+        "5. B) Klar und deutlich sprechen"
+    ],
+    "A2 5.14": [
+        # Beruf und Karriere (Exercise)
+        "1. B) Die Kollegen und die Arbeit",
+        "2. C) Mit „Sie“",
+        "3. C) Eine Arbeitnehmervertretung",
+        "4. C) Arbeitskleidung, Pausen und feste Arbeitszeiten",
+        "5. C) Man kann Arbeitsbeginn und -ende flexibel wählen",
+        "6. C) 38–40 Stunden",
+        "7. B) Den Urlaub eintragen und genehmigen lassen",
+        "8. D) Weiter das Gehalt oder den Lohn",
+        "9. C) Sofort den Arbeitgeber informieren und zum Arzt gehen",
+        "10. C) Auf der Baustelle oder am Flughafen",
+        "11. C) Die Kündigung schriftlich und mit Frist einreichen",
+        "12. C) In der Volkshochschule"
+    ],
+    "A2 6.15": [
+        # Mein Lieblingssport
+        "1. A) Yoda und Zumba",
+        "2. B)  FuBball, Handball und Volleyball",
+        "3. C) Die Spenden an lokale Wohltatigkeitsorganisationen",
+        "4. B) Im Stadtpark",
+        "5. B) Fitnessprogramme",
+        "6. B) Die Enroffnung eines neuen Kletterparks",
+        "7. B) Eine wichtige Rolle zur Forderung der Lebensqualitat",
+        "",
+        "1. B) Pilates – und Aerobic–Kurse",
+        "2. A) Kostenlose Yoga–Kurse",
+        "3. A) Wassergymnastik und Aqua–Zumba",
+        "4. C) Fur Anfanger und Fortgeschrittene",
+        "5. B) Volleyball und Basketball"
+    ],
+    "A2 6.16": [
+        # Wohlbefinden und Entspannung
+        "1. C) Anzeige",
+        "2. B) Anzeige",
+        "3. E) Anzeige",
+        "4. F) Anzeige",
+        "5. A) Anzeige",
+        "",
+        "1. B) Mehr obst und Gemuse essen",
+        "2. C) 30 Minuten",
+        "3. A) Der Besuch eines Fitnessstudios",
+        "4. B) Um Krankheiten fruhzeitig Zu erkennen",
+        "5. A) Yoga und Pilates"
+    ],
+    "A2 6.17": [
+        # In die Apotheke gehen
+        "1. B) Weil sie sich krank fuhlte",
+        "2. B) Hustensaft",
+        "3. C) Hilfsbereit",
+        "4. B) Broschuren mit Tipps",
+        "5. C) Besser",
+        "6. B) Nach einigen Stunden",
+        "7. A) Sie kann sich auf den Rat der Apotheker verlassen",
+        "",
+        "1. B) Wegen Kopfschmerzen",
+        "2. C) Ibuprofen",
+        "3. B) Trockene Haut",
+        "4. B) Sie war erleichtert",
+        "5. B) Proben von Produkten"
+    ],
+    "A2 7.18": [
+        # Die Bank Anrufen
+        "1. Sparkasse",
+        "2. ING-BDiBa",
+        "3. Sparkasse",
+        "4. Volksbank",
+        "5. Commerzbank",
+        "",
+        "1. B) Reisepass, Meldebescheinigung, Einkommensnachweis",
+        "2. B) Eine Stunde",
+        "3. B) Drei",
+        "4. A) Basiskonto",
+        "5. D) Die Formulare vor dem Termin online ausfullen"
+    ],
+    "A2 7.19": [
+        # Einkaufen ? Wo und wie? (Exercise)
+        "1. B) Die Zunahme von Online-Shopping und Werbung",
+        "2. B) Wegen der standigen verfugbarkeit und einfachen Bestellung",
+        "3. B) Nachhaltiger Konsum",
+        "4. B) Weniger Plastik verwenden und lokale Produkte Kaufen",
+        "5. B) Umweltverschmutzung und schlechte Arbeitsbedingungen",
+        "6. A) Sich gut informieren",
+        "7. B) Als komplexes Thema mit positiven und negativen Auswirkungen",
+        "",
+        "1. B) Bequeme Moglichkeit Produckte nach Hause zu bestellen",
+        "2. B) Hohe Anzahl von Rucksendungen und Umweltbelastung",
+        "3. A) Auf vertrauenswurdige Websites und Schutz personlicher Daten",
+        "4. A) Aus nachhaltigen Quellen und fairen Bedingungen",
+        "5. B) Es hat den Konsum revolutioniert und neue Moglichkeiten geschaffen"
+    ],
+    "A2 7.20": [
+        # Typische Reklamationssituationen üben
+        "1. C) Man soltte seine Qualifikationen und Erfahrungen erwahnen, weil sie die Eignung fur die stelle zeigen",
+        "2. A) Man sollte die Firma recherchieren, um gut informiert zu sein",
+        "B) Man sollte den Arbeitsweg uben, um punktlich zu sein",
+        "3. A) Die Bezahlung, weil man finanziell abgesichert sein mochte",
+        "B) Die Arbeitszeiten, weil man eine gute work-Life-Balance haben mochte",
+        "4. A) Frauen Haben oft geringere Aufstiegschancen. Eine Losung ware eine Frauenquote",
+        "B) Frauen verdienen haufig weniger als Manner. Transparente Gehaltsstrukturen Konnten helfen.",
+        "C) Frauen mussen oft Beruf und Familie vereinbaren. Flexible Arbeitszeiten konnten eine losung sein.",
+        "5. A) Es gab weinger technische Gerate im Haushalt",
+        "B) Die Menschen waren weniger mobil und reisten seltener.",
+        "D) Die Arbeitszeiten waren langer und harter",
+        "",
+        "1. B) Die Berufliche",
+        "2. B) Man Informiert sich",
+        "3. A) Die Bezahlung",
+        "4. A) Man sammelt",
+        "5. A) Geringere",
+        "6. A) Flexible arbeitzeiten",
+        "7. A) Es gab weniger",
+        "8. B) Sie arbeiteten mehr und hatten weniger Freizeit"
+    ],
+    "A2 8.21": [
+        # Ein Wochenende planen
+        "1. C) sollen Platze reservieren",
+        "2. C) nur ein Restaurant haben",
+        "3. C) machte er eine lange Reise",
+        "4. A) eine Fernsehsendung",
+        "5. A) den Berufsweg eines Kochs"
+    ],
+    "A2 8.22": [
+        # Die Woche Plannung
+        "1. C) im Moment vieles neu für sie ist.",
+        "2. B) für neue Studenten eine Stadtführung gemacht.",
+        "3. C) kocht jeder einmal für die anderen.",
+        "4. B) Deutsch zu sprechen.",
+        "5. C) übernachtet Sonja in Marios Zimmer."
+    ],
+    "A2 9.23": [
+        # Wie kommst du zur Schule / zur Arbeit?
+        "1. C) an die Nordsee",
+        "2. B) auf einer Insel",
+        "3. A) aus der Schweiz",
+        "4. A) mit der U-Bahn",
+        "5. D) die Berge und die Natur"
+    ],
+    "A2 9.24": [
+        # Einen Urlaub planen
+        "1. Anzeige: f",
+        "2. Anzeige: c",
+        "3. Anzeige: X",
+        "4. Anzeige: b",
+        "5. Anzeige: a"
+    ],
+    "A2 9.25": [
+        # Tagesablauf (Exercise)
+        "1. a) kurz vor 7 Uhr",
+        "2. d) Müsli oder Toast mit Marmelade",
+        "3. b) Hausaufgaben",
+        "4. a) am Nachmittag",
+        "5. b) Freunde treffen",
+        "6. c) die Schweiz",
+        "7. d) mit dem Zug",
+        "8. a) an einem kleinen Bahnhof",
+        "9. d) einen Zimmerschlüssel",
+        "10. b) das Zimmer ist zu klein"
+    ]
+})
+    ref_answers.update({
+    "A2 10.26": [
+        # Gefühle in verschiedenen Situationen beschr
+        "1. b) Er beantwortet Fragen und kontrolliert die Gesundheit des Kindes.",
+        "2. c) 14 Wochen",
+        "3. c) 14 Monate",
+        "4. a) Man muss einen festen Arbeitsvertrag haben.",
+        "5. a) Impfungen und Vorsorgeuntersuchungen",
+        "6. c) Ab 3 Jahren",
+        "7. b) An speziellen Freizeitangeboten in der Stadt teilnehmen"
+    ],
+    "A2 10.27": [
+        # Digitale Kommunikation
+        "1. b) Sie sind oft sehr teuer oder funktionieren nicht.",
+        "2. c) Ein deutsches Bankkonto und einen Ausweis.",
+        "3. C) I bis 2 Jahre",
+        "4. c) Drei Monate vor Vertragsende",
+        "5. c) In Supermärkten, Tankstellen oder Kiosken",
+        "6. b) Name, Adresse, Geburtsdatum und ein Ausweisdokument",
+        "7. d) Mit öffentlichem WLAN"
+    ],
+    "A2 10.28": [
+        # Über die Zukunft sprechen
+        "1. c) Einen gültigen Reisepass",
+        "2. b) Bei der Deutschen Botschaft im Heimatland",
+        "3. c) Einen Aufenthaltstitel",
+        "4. b) Ein Kurs für Deutsch und Leben in Deutschland",
+        "5. c) Man muss sie übersetzen und anerkennen lassen",
+        "6. c) Die Arbeitsagentur",
+        "7. c) Kranken-, Renten- und Pflegeversicherung"
+    ]
+})
 
 
     st.write("Assignments in scores:", df_scores[assign_col].unique())
