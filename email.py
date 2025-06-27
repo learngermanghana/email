@@ -118,10 +118,6 @@ def send_email_with_pdf(student_email, student_name, pdf_bytes, sendgrid_api_key
     response = sg.send(message)
     return response.status_code  # Add this line!
 
-# External utilities (assumed available)
-from utils import normalize_cols, load_ref_answers, sync_scores_to_sqlite
-from email_utils import send_email_with_pdf
-
 # ==== PDF Builder ====
 def build_simple_pdf(student, history_df, ref_answers, total):
     pdf = FPDF(format='A4')
