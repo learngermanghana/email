@@ -1139,6 +1139,10 @@ with tabs[8]:
                        data=pdf.output(dest='S').encode('latin-1'),
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
+
+# --- Mode switch: choose between single or batch marking ---
+mode = st.radio("Marking Mode", ["Classic", "Batch"], horizontal=True)
+
 # --- Classic mode: single assignment ---
 if mode == "Classic":
     st.markdown("---")
