@@ -1258,8 +1258,9 @@ with tabs[9]:
         mime="text/csv"
     )
 
-    # 6. PDF & EMAIL
-    st.markdown("### 📄 PDF/Email Student Full Report")
+    # 6. PDF & EMAIL (with Reference Answers in PDF)
+    st.markdown("### 📄 PDF/Email Student Full Report (with Reference Answers)")
+
     from fpdf import FPDF
     import base64
     from sendgrid import SendGridAPIClient
@@ -1275,12 +1276,24 @@ with tabs[9]:
         pdf.cell(0, 8, f"{r[assign_col]}: {r[score_col]}/100", ln=True)
         pdf.set_font("Arial", "", 11)
         pdf.multi_cell(0, 8, f"Comments: {r[comments_col]}")
+        # ---- Add Reference Answers section ----
+        ref_ans = ref_answers.get(r[assign_col])
+        pdf.ln(1)
+        pdf.set_font("Arial", "I", 10)
+        if ref_ans:
+            pdf.multi_cell(0, 8, "Reference Answers:")
+            pdf.set_font("Arial", "", 10)
+            for ans in ref_ans:
+                pdf.multi_cell(0, 7, ans)
+        else:
+            pdf.multi_cell(0, 7, "Reference Answers: N/A")
         pdf.ln(3)
+
     pdf_bytes = pdf.output(dest="S").encode("latin-1", "replace")
     st.download_button(
-        "📄 Download Student Report PDF",
+        "📄 Download Student Report PDF (with Reference Answers)",
         data=pdf_bytes,
-        file_name=f"{stu_row[name_col].replace(' ', '_')}_report.pdf",
+        file_name=f"{stu_row[name_col].replace(' ', '_')}_report_with_ref.pdf",
         mime="application/pdf"
     )
 
@@ -1299,7 +1312,7 @@ with tabs[9]:
                 subject=f"Your Assignment Results from Learn Language Education Academy",
                 html_content=f"""
                 <p>Hello {stu_row[name_col]},<br><br>
-                Please find attached your latest assignment scores.<br><br>
+                Please find attached your latest assignment scores <b>with official reference answers</b>.<br><br>
                 Best regards,<br>Learn Language Education Academy
                 </p>
                 """
@@ -1307,7 +1320,7 @@ with tabs[9]:
             encoded = base64.b64encode(pdf_bytes).decode()
             attached = Attachment(
                 FileContent(encoded),
-                FileName(f"{stu_row[name_col].replace(' ', '_')}_report.pdf"),
+                FileName(f"{stu_row[name_col].replace(' ', '_')}_report_with_ref.pdf"),
                 FileType('application/pdf'),
                 Disposition('attachment')
             )
@@ -1319,4 +1332,5 @@ with tabs[9]:
     elif not student_email:
         st.info("No email found for this student.")
 
-# --- End of Full Patched Tab 9 ---
+  # --- End of Full Patched Tab 9 ---
+
