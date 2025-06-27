@@ -8,6 +8,8 @@ import traceback
 import unicodedata
 import urllib.parse
 from datetime import date, datetime, timedelta
+from collections import Counter
+
 
 # === Third-Party Imports ===
 import pandas as pd
@@ -164,6 +166,14 @@ def normalize_text(text):
         c for c in unicodedata.normalize('NFKD', str(text))
         if not unicodedata.combining(c)
     ).lower()
+
+def normalize_key(k):
+    return re.sub(r'[^A-Za-z0-9]+', '', k).lower()
+
+all_keys = list(A1_REF_ANSWERS.keys()) + list(A2_REF_ANSWERS.keys())
+normed = [normalize_key(k) for k in all_keys]
+dupes = [item for item, count in Counter(normed).items() if count > 1]
+print([k for k in all_keys if normalize_key(k) in dupes])
 
 # ==== Reference Answers: A1 ====
 A1_REF_ANSWERS = {
