@@ -25,12 +25,31 @@ st.set_page_config(
     layout="wide"
 )
 
+
 school_sendgrid_key = st.secrets.get("general", {}).get("SENDGRID_API_KEY")
 school_sender_email = st.secrets.get("general", {}).get("SENDER_EMAIL", SCHOOL_EMAIL)
 
+admin.postgrest.rpc("sql", {
+  "query": """
+    ALTER TABLE public.scores
+      DROP CONSTRAINT IF EXISTS scores_student_code_assignment_unique;
+    ALTER TABLE public.scores
+      ADD CONSTRAINT scores_student_code_assignment_unique
+        UNIQUE (student_code, assignment);
+    -- etc...
+  """
+}).execute()
+
+
 SUPABASE_URL = "https://uzwgfvxrtagmmoaebxye.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6d2dmdnhydGFnbW1vYWVieHllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTEwNDY4OTEsImV4cCI6MjA2NjYyMjg5MX0.g6gSYYxuMICK2zcaru8wULPjpAMbSo0oC4VfOTz4a2U"
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+SUPABASE_SERVICE_KEY = st.secrets["general"]["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6d2dmdnhydGFnbW1vYWVieHllIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MTA0Njg5MSwiZXhwIjoyMDY2NjIyODkxfQ.bg3NrXd-odkVEX883w5bg6LU8zj5ewFioCp1scuIzb4"]
+
+# read‐only / public operations
+anon_supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+# elevated operations (RLS bypass, inserts, upserts, DDL, etc.)
+service_supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 # ==== 3. HELPER FUNCTIONS (no changes needed here, just keep them above your data loads) ====
 def safe_read_csv(local_path, backup_url=None):
