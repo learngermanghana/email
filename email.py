@@ -1227,7 +1227,7 @@ with tabs[9]:
     pdf_bytes = build_simple_pdf(student, history, ref_answers, total)
     st.download_button("Download PDF Report", pdf_bytes,
                        f"{student['studentcode']}_report.pdf", "application/pdf")
-#starthere
+
     if student.get('email'):
         if st.button(f"Email PDF to {student['email']}"):
             try:
@@ -1237,10 +1237,13 @@ with tabs[9]:
                     pdf_bytes,
                     st.secrets['general']['SENDGRID_API_KEY'],
                     st.secrets['general']['SENDER_EMAIL']
-            )
-            st.success("✅ Email sent successfully!")
-        except Exception as e:
-            st.error(f"❌ Email failed to send: {e}")
+                )
+                st.success("✅ Email sent successfully!")
+            except Exception as e:
+                st.error(f"❌ Email failed to send: {e}")
+#end
+
+        
 #end
 
 
