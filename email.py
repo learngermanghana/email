@@ -7,6 +7,7 @@ import urllib.parse
 from datetime import date, datetime, timedelta
 import os
 import traceback
+import unicodedata
 
 
 
@@ -178,6 +179,12 @@ def sync_google_sheet_to_sqlite(df):
     conn = sqlite3.connect("students_backup.db")
     df.to_sql("students", conn, if_exists="replace", index=False)
     conn.close()
+
+def normalize_text(text):
+    return ''.join(
+        c for c in unicodedata.normalize('NFKD', str(text))
+        if not unicodedata.combining(c)
+    ).lower()
 
 # =========== TABS ===========
 tabs = st.tabs([
@@ -1157,6 +1164,11 @@ with tabs[9]:
     # Reference answers and assignment totals
     LEVEL_TOTALS = {'A1': 18, 'A2': 28, 'B1': 26, 'B2': 30}
     ref_answers = load_ref_answers()
+
+    # --- DEBUG OUTPUT FOR ASSIGNMENT MISMATCH ---
+    st.write("🔑 Ref Answer Keys:", list(ref_answers.keys()))
+    st.write("📝 Assignment Names in Scores:", df_scores['assignment'].unique())
+    # --------------------------------------------
 
     @st.cache_data
     def all_assignments(df, ref_answers):
