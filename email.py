@@ -1602,7 +1602,6 @@ with tabs[8]:
                        mime="application/pdf")
     
 
-# ===== Main Marking Tab =====
 with tabs[9]:
     st.title("Assignment Marking & Scores (Email, Reference, PDF)")
 
@@ -1630,7 +1629,6 @@ with tabs[9]:
     @st.cache_data
     def all_assignments(ds, ra):
         return sorted(set(ds['assignment'].dropna()) | set(ra.keys()))
-
     all_assigns = all_assignments(df_scores, REF_ANSWERS)
 
     # --- Marking Mode Switch ---
@@ -1668,13 +1666,18 @@ with tabs[9]:
         dc = prev['comments'].iloc[0] if not prev.empty else ''
         if sel_a in REF_ANSWERS:
             st.subheader("Reference Answers")
+            # (3) Truncate reference text to maxlen=100 for preview
             for ans in REF_ANSWERS[sel_a]:
-                st.write(f"- {ans}")
+                maxlen = 100
+                st.write(f"- {ans[:maxlen]}{'...' if len(ans) > maxlen else ''}")
 
-        with st.form("mark_single_assignment"):
+        # (2) Unique form key
+        with st.form(f"mark_single_assignment_{code}_{sel_a}"):
             score = st.number_input("Score", 0, 100, ds)
             comments = st.text_area("Comments", dc)
             submitted = st.form_submit_button("Save Score")
+
+        # (5) Download button OUTSIDE form
         if submitted:
             now = datetime.now().strftime("%Y-%m-%d")
             row = dict(studentcode=code, name=student['name'], assignment=sel_a,
@@ -1684,6 +1687,7 @@ with tabs[9]:
             )]
             df_scores = pd.concat([df_scores, pd.DataFrame([row])], ignore_index=True)
             st.success("Score saved (local only). Download and upload to Google Sheets to make permanent.")
+
             st.download_button(
                 '⬇️ Download Updated Scores CSV (Upload to Google Sheets!)',
                 data=df_scores.to_csv(index=False).encode(),
@@ -1691,18 +1695,21 @@ with tabs[9]:
                 mime='text/csv'
             )
             st.stop()
+
     # --- Batch Mode: Mark All Assignments ---
     else:
         st.markdown("---")
         st.subheader("Batch: Mark Assignments")
         stu_scores = df_scores[df_scores['studentcode']==code]
-        with st.form("batch_marking_form"):
+        # (2) Unique batch form key
+        with st.form(f"batch_marking_form_{code}"):
             batch = {}
             for a in [x for x in all_assigns if x.startswith(level)]:
                 pr = stu_scores[stu_scores['assignment'] == a]
                 val = int(pr['score'].iloc[0]) if not pr.empty else 0
                 batch[a] = st.number_input(a, 0, 100, val)
             batch_submitted = st.form_submit_button("Save All")
+        # (5) Download button OUTSIDE form
         if batch_submitted:
             now = datetime.now().strftime("%Y-%m-%d")
             new = [dict(studentcode=code, name=student['name'], assignment=a,
@@ -1713,6 +1720,7 @@ with tabs[9]:
             )]
             df_scores = pd.concat([df_scores, pd.DataFrame(new)], ignore_index=True)
             st.success("All scores saved (local only). Download and upload to Google Sheets to make permanent.")
+
             st.download_button(
                 '⬇️ Download Updated Scores CSV (Upload to Google Sheets!)',
                 data=df_scores.to_csv(index=False).encode(),
@@ -1727,7 +1735,10 @@ with tabs[9]:
     st.write(f"Completed: {history['assignment'].nunique()} / {total}")
     if not history.empty:
         dfh = history[['assignment', 'score', 'comments', 'date']].copy()
-        dfh['reference'] = dfh['assignment'].apply(lambda x: "; ".join(REF_ANSWERS.get(x, [])))
+        # (1) Use apply, never iterrows, for reference answers; (3) Truncate for preview
+        def ref_preview(x):
+            return "; ".join(ans[:100]+'...' if len(ans) > 100 else ans for ans in REF_ANSWERS.get(x, []))
+        dfh['reference'] = dfh['assignment'].apply(ref_preview)
         st.dataframe(dfh)
     else:
         st.info("No records yet.")
@@ -1743,5 +1754,6 @@ with tabs[9]:
             st.success("✅ Email sent successfully!")
         except Exception as e:
             st.error(f"❌ Email failed to send: {e}")
+
 
 
