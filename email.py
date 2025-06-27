@@ -666,6 +666,12 @@ REF_ANSWERS = {**A1_REF_ANSWERS, **A2_REF_ANSWERS}
 # 3. Example: Get a list of all assignment keys
 all_keys = list(A1_REF_ANSWERS.keys()) + list(A2_REF_ANSWERS.keys())
 
+A1_REF_ANSWERS = { ... }
+A2_REF_ANSWERS = { ... }
+REF_ANSWERS = {**A1_REF_ANSWERS, **A2_REF_ANSWERS}
+LEVEL_TOTALS = {'A1': 18, 'A2': 28, 'B1': 26, 'B2': 30}
+
+
 # ====== PAGE CONFIG ======
 st.set_page_config(
     page_title="Learn Language Education Academy Dashboard",
