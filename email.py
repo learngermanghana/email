@@ -116,7 +116,6 @@ def send_email_with_pdf(student_email, student_name, pdf_bytes, sendgrid_api_key
     sg = SendGridAPIClient(sendgrid_api_key)
     sg.send(message)
 
-# ===== PDF Builder =====
 def build_simple_pdf(student, history_df, ref_answers, total):
     pdf = FPDF(format='A4')
     pdf.add_page()
@@ -145,7 +144,8 @@ def build_simple_pdf(student, history_df, ref_answers, total):
         pdf.cell(col_widths[1], 6, score, border=1)
         pdf.cell(col_widths[2], 6, date_str, border=1)
         pdf.multi_cell(col_widths[3], 6, reference, border=1)
-    return pdf.output(dest='S')
+    return pdf.output(dest='S').encode('latin-1')
+
 
 def sync_google_sheet_to_sqlite(df):
     conn = sqlite3.connect("students_backup.db")
