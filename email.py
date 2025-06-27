@@ -1142,22 +1142,22 @@ with tabs[8]:
 with tabs[9]:
     st.title("📝 Assignment Marking & Scores (with Email)")
 
-    # 0. point load‐URL at the top of this tab
+    # 0. Load‐URL at the top of this tab
     students_csv_url = (
       "https://docs.google.com/spreadsheets/d/"
       "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U"
       "/export?format=csv"
     )
 
+    # 1. Load students from Google Sheet
     @st.cache_data(show_spinner=False)
     def load_students():
         df = pd.read_csv(students_csv_url)
         return normalize_columns(df)
 
     df_students = load_students()
-    …
 
-    # 2. Supabase helpers — **reads** use anon_supabase, **writes/deletes** use service_supabase
+    # 2. Supabase helpers — reads via anon_supabase, writes/deletes via service_supabase
     def fetch_scores_supabase():
         resp = anon_supabase.table("scores").select("*").execute()
         return normalize_columns(pd.DataFrame(resp.data))
@@ -1183,14 +1183,14 @@ with tabs[9]:
             .eq("assignment", assignment) \
             .execute()
 
-    # 3. Now fetch once:
+    # 3. Fetch all scores once
     df_scores = fetch_scores_supabase()
 
-    # --- Show columns for debugging (optional) ---
+    # --- (optional) Debug columns ---
     st.write("df_students columns:", df_students.columns.tolist())
-    st.write("df_scores columns:", df_scores.columns.tolist())
+    st.write("df_scores columns:",   df_scores.columns.tolist())
 
-    # === Column lookups ===
+    # 4. Column lookups
     def col_lookup(df, key):
         key = key.strip().lower().replace(" ", "_")
         for col in df.columns:
@@ -1204,23 +1204,22 @@ with tabs[9]:
                 return col_lookup(df, key)
             except KeyError:
                 continue
-        st.error(f"{label} not found! Tried: {keys}. Found columns: {df.columns.tolist()}")
+        st.error(f"{label} not found! Tried: {keys}. Found: {df.columns.tolist()}")
         st.stop()
 
-    name_col        = get_safe_col(df_students, ["name", "fullname"], "Name column")
-    code_col        = get_safe_col(df_students, ["studentcode", "code"], "Student Code")
+    name_col        = get_safe_col(df_students, ["name", "fullname"],         "Name column")
+    code_col        = get_safe_col(df_students, ["studentcode", "code"],      "Student Code")
     level_col       = get_safe_col(df_students, ["level", "class", "course"], "Level")
-    assign_col      = get_safe_col(df_scores, ["assignment", "title"], "Assignment")
-    studentcode_col = get_safe_col(df_scores, ["student_code", "studentcode", "code"], "StudentCode in scores")
-    comments_col    = get_safe_col(df_scores, ["comments", "feedback"], "Comments")
-    score_col       = get_safe_col(df_scores, ["score", "marks"], "Score")
-    date_col        = get_safe_col(df_scores, ["date"], "Date")
-    email_col       = get_safe_col(df_students, ["email"], "Email")
+    assign_col      = get_safe_col(df_scores,   ["assignment", "title"],      "Assignment")
+    studentcode_col = get_safe_col(df_scores,   ["student_code","studentcode","code"], "StudentCode in scores")
+    comments_col    = get_safe_col(df_scores,   ["comments", "feedback"],      "Comments")
+    score_col       = get_safe_col(df_scores,   ["score","marks"],             "Score")
+    date_col        = get_safe_col(df_scores,   ["date"],                      "Date")
+    email_col       = get_safe_col(df_students, ["email"],                     "Email")
 
-    # Load all assignments (supplied by you)
-    all_assignments = sorted(list(ref_answers.keys()))
-    all_levels = sorted(df_students[level_col].dropna().unique())
-
+    # 5. Build assignment & level lists
+    all_assignments = sorted(ref_answers.keys())
+    all_levels      = sorted(df_students[level_col].dropna().unique())
     # === 3. Marking Modes ===
     mode = st.radio(
         "Select marking mode:",
