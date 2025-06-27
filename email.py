@@ -99,7 +99,7 @@ CREATE TABLE IF NOT EXISTS scores (
 )""")
 conn.commit()
 
-# ==== 6. SUPABASE DB HELPERS ====
+# === 2. Load all scores from Supabase ===
 def fetch_scores_supabase():
     resp = anon_supabase.table("scores").select("*").execute()
     return normalize_columns(pd.DataFrame(resp.data))
@@ -115,7 +115,7 @@ def save_score_supabase(student_code, name, assignment, score, comments, date, l
         "level": level
     }
     service_supabase.table("scores") \
-        .upsert(data, on_conflict=["student_code","assignment"]) \
+        .upsert(data, on_conflict=["student_code", "assignment"]) \
         .execute()
 
 def delete_score_supabase(student_code, assignment):
@@ -124,6 +124,7 @@ def delete_score_supabase(student_code, assignment):
         .eq("student_code", student_code) \
         .eq("assignment", assignment) \
         .execute()
+
 # ==== 7. REFERENCE ANSWERS ====
 ref_answers = {
     "A1 0.1": [
