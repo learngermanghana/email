@@ -20,25 +20,20 @@ SCHOOL_WEBSITE = "www.learngermanghana.com"
 SCHOOL_PHONE   = "233205706589"
 SCHOOL_ADDRESS = "Awoshie, Accra, Ghana"
 
-# Streamlit Page Config
 st.set_page_config(
     page_title="Learn Language Education Academy Dashboard",
     layout="wide"
 )
 
-# === Email API from secrets ===
 school_sendgrid_key = st.secrets.get("general", {}).get("SENDGRID_API_KEY")
 school_sender_email = st.secrets.get("general", {}).get("SENDER_EMAIL", SCHOOL_EMAIL)
 
-# ==== SUPABASE CONFIG ====
 SUPABASE_URL = "https://uzwgfvxrtagmmoaebxye.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6d2dmdnhydGFnbW1vYWVieHllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTEwNDY4OTEsImV4cCI6MjA2NjYyMjg5MX0.g6gSYYxuMICK2zcaru8wULPjpAMbSo0oC4VfOTz4a2U"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz..."
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ==== 3. HELPER FUNCTIONS (KEEP ALL THESE ABOVE DATA LOADING) ====
-
+# ==== 3. HELPER FUNCTIONS (no changes needed here, just keep them above your data loads) ====
 def safe_read_csv(local_path, backup_url=None):
-    """Try to read local file, then optional backup url."""
     if os.path.exists(local_path):
         return pd.read_csv(local_path)
     if backup_url:
@@ -50,7 +45,6 @@ def safe_read_csv(local_path, backup_url=None):
     st.stop()
 
 def normalize_columns(df):
-    """Make all DataFrame columns lowercase, replace spaces/dashes/slashes/parentheses with underscores."""
     df.columns = [
         str(c).strip().lower().replace(" ", "_").replace("-", "_").replace("/", "_").replace("(", "").replace(")", "")
         for c in df.columns
@@ -58,18 +52,16 @@ def normalize_columns(df):
     return df
 
 def col_lookup(df, name):
-    """Lookup column in df, ignoring underscores and case."""
     key = name.strip().lower().replace("_", "")
     for c in df.columns:
         if c.replace("_", "").lower() == key:
             return c
-    return name  # fallback, but will raise error if not present
+    return name
 
 def getcol(df, name):
     return col_lookup(df, name)
 
 def clean_phone(phone):
-    """Format Ghana numbers for WhatsApp."""
     phone = str(phone).replace(" ", "").replace("+", "").replace("-", "")
     if phone.startswith("0"):
         phone = "233" + phone[1:]
@@ -79,19 +71,15 @@ def safe_pdf(text):
     return str(text).encode('latin-1', 'replace').decode('latin-1')
 
 def safe_text(s):
-    """Ensure text can be written to PDF without Unicode errors."""
     if isinstance(s, str):
         return s.encode("latin-1", "replace").decode("latin-1")
     return str(s)
 
 # ==== 4. SESSION STATE INITIALIZATION ====
-# (Ensures notification/email state is not lost on reruns)
 st.session_state.setdefault("emailed_expiries", set())
 st.session_state.setdefault("dismissed_notifs", set())
 
 # ==== 5. DATABASE SETUP ====
-
-# --- Optionally keep SQLite for local backup, but you can remove if using only Supabase ---
 conn = sqlite3.connect('scores.db', check_same_thread=False)
 c = conn.cursor()
 c.execute('''
@@ -133,15 +121,12 @@ def delete_score_from_db(row_id):
     conn.commit()
 
 # ==== 6. SUPABASE DB HELPERS ====
-
 def fetch_scores_supabase():
-    """Read all scores from Supabase 'scores' table."""
     res = supabase.table("scores").select("*").execute()
     df = pd.DataFrame(res.data)
     return df
 
 def save_score_supabase(student_code, name, assignment, score, comments, date, level):
-    """Insert or update one score in Supabase."""
     data = {
         "student_code": student_code,
         "name": name,
@@ -154,10 +139,23 @@ def save_score_supabase(student_code, name, assignment, score, comments, date, l
     supabase.table("scores").upsert(data, on_conflict=["student_code", "assignment"]).execute()
 
 def delete_score_supabase(student_code, assignment):
-    """Delete a score from Supabase."""
     supabase.table("scores").delete().eq("student_code", student_code).eq("assignment", assignment).execute()
 
-# ==== 7. DATA LOAD (after all helpers!) ====
+# ==== 7. Reference Answers (MUST be here BEFORE all_assignments!) ====
+ref_answers = {
+    "A1 0.1": [
+        "1. C) Guten Morgen",
+        "2. D) Guten Tag",
+        # ...etc...
+    ],
+    # ... (rest of your dictionary) ...
+    "A2 10.28": [
+        "1. c) Einen gültigen Reisepass",
+        # ... etc ...
+    ]
+}
+
+# ==== 8. DATA LOAD (students, after ref_answers so you can use keys below) ====
 student_file = "students.csv"
 github_csv = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
 df_students = safe_read_csv(student_file, github_csv)
@@ -168,33 +166,16 @@ code_col = getcol(df_students, 'studentcode')
 level_col = getcol(df_students, 'level')
 email_col = getcol(df_students, 'email')
 
-# --- All Assignments (from your reference answers, define ref_answers earlier or import from file) ---
-# ref_answers = {...}  # make sure this exists in your code!
+# ==== 9. Assignments & Levels (NO NameError!) ====
+# (You must have df_scores and assign_col defined before this section if you want to use their assignments.)
+# If you haven't loaded df_scores yet, just do:
+assign_col = "assignment"
+# For initial assignment listing, you can use only ref_answers:
 all_assignments = sorted(list(ref_answers.keys()))
-
-# ==== Ready for the rest of your main code / tabs ====
-
-# ==== 8. Reference Answers (no indent, just after your configs and before you use all_assignments) ====
-
-# 1. Reference answers dictionary first:
-ref_answers = {
-    "A1 0.1": [
-        "1. C) Guten Morgen",
-        "2. D) Guten Tag",
-        # ... etc ...
-    ],
-    # ... (rest of your dictionary) ...
-    "A2 10.28": [
-        "1. c) Einen gültigen Reisepass",
-        # ... etc ...
-    ]
-}
-
-# 2. Now you can use it!
-st.write("Reference answer keys:", list(ref_answers.keys()))
-
-all_assignments = sorted(list({*df_scores[assign_col].dropna().unique(), *ref_answers.keys()}))
 all_levels = sorted(df_students[level_col].dropna().unique())
+
+# ==== (Ready for the rest of your app - including tab layouts, etc) ====
+
 
 # 3. Tabs setup
 tabs = st.tabs([
