@@ -2,8 +2,8 @@ streamlit>=1.14.0
 pandas>=1.5.0
 fpdf>=1.7.2
 sendgrid>=6.9.1
-openai>=1.0.0
 numpy>=1.24.0
 gspread>=5.11.0
 google-auth>=2.22.0
-fpdf
+
+supabase
