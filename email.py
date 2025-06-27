@@ -424,10 +424,9 @@ with tabs[0]:
 with tabs[1]:
     st.title("👩‍🎓 All Students (Edit, Update, Delete, Receipt)")
 
-    # 1. Load students CSV (local, fallback to GitHub backup)
-    student_file = "students.csv"
-    github_csv   = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
-    df_main      = safe_read_csv(student_file, github_csv)
+    # 1. Load students directly from Google Sheet (live)
+    google_csv_url = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
+    df_main = pd.read_csv(google_csv_url)
     df_main = normalize_columns(df_main)
 
     # 2. Build lookup helper for flexible column access
@@ -557,7 +556,6 @@ with tabs[1]:
             file_name='students_backup.csv',
             mime='text/csv'
         )
-# --- End of Stage 4 ---
 
 # ==== 9. TAB 2: ADD STUDENT MANUALLY ====
 with tabs[2]:
