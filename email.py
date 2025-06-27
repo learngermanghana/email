@@ -1602,18 +1602,21 @@ with tabs[8]:
                        mime="application/pdf")
     
 
+# ===== Main Marking Tab =====
 with tabs[9]:
     st.title("Assignment Marking & Scores (Email, Reference, PDF)")
 
-    # Load students
+    # --- Load students from Google Sheets ---
     try:
-        df_students = pd.read_csv('students.csv')
+        df_students = pd.read_csv(
+            "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
+        )
         df_students = normalize_cols(df_students)
     except Exception:
         st.error("Could not load student list.")
         df_students = pd.DataFrame(columns=['name', 'studentcode', 'email', 'level'])
 
-    # Load scores from Google Sheets (use export?format=csv)
+    # --- Load scores from Google Sheets ---
     try:
         df_scores = pd.read_csv(
             "https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/export?format=csv"
@@ -1621,19 +1624,19 @@ with tabs[9]:
         df_scores = normalize_cols(df_scores)
     except Exception:
         st.error("Could not load score history.")
-        df_scores = pd.DataFrame(columns=['studentcode', 'name', 'assignment', 'score', 'comments', 'date', 'level'])
+        df_scores = pd.DataFrame(columns=['studentcode','name','assignment','score','comments','date','level'])
 
-    # Use local reference answers dict
-    ref_answers = REF_ANSWERS
-
+    # --- All Assignments ---
     @st.cache_data
     def all_assignments(ds, ra):
         return sorted(set(ds['assignment'].dropna()) | set(ra.keys()))
 
-    all_assigns = all_assignments(df_scores, ref_answers)
+    all_assigns = all_assignments(df_scores, REF_ANSWERS)
+
+    # --- Marking Mode Switch ---
     mode = st.radio("Marking Mode", ["Classic", "Batch"], horizontal=True)
 
-    # Student selection
+    # --- Student Search & Selection ---
     st.subheader("Find Student")
     search = st.text_input("Search name or code")
     students = df_students.copy()
@@ -1649,11 +1652,11 @@ with tabs[9]:
 
     sel = st.selectbox("Select Student", students['name'] + " (" + students['studentcode'] + ")")
     code = sel.split('(')[-1].strip(')')
-    student = students[students['studentcode'] == code].iloc[0]
-    level = student['level'].upper()
+    student = students[students['studentcode']==code].iloc[0]
+    level = student.get('level', '').upper()
     total = LEVEL_TOTALS.get(level, 0)
 
-    # --- Classic mode: Single Assignment ---
+    # --- Classic Mode: Single Assignment ---
     if mode == "Classic":
         st.markdown("---")
         st.subheader("Classic: Mark Single Assignment")
@@ -1661,85 +1664,82 @@ with tabs[9]:
         opts = [a for a in all_assigns if af.lower() in a.lower()]
         sel_a = st.selectbox("Assignment", opts)
         prev = df_scores[(df_scores['studentcode'] == code) & (df_scores['assignment'] == sel_a)]
-        ds = int(prev['score'].iloc[0]) if not prev.empty and not pd.isna(prev['score'].iloc[0]) else 0
+        ds = int(prev['score'].iloc[0]) if not prev.empty else 0
         dc = prev['comments'].iloc[0] if not prev.empty else ''
-        if sel_a in ref_answers:
+        if sel_a in REF_ANSWERS:
             st.subheader("Reference Answers")
-            for ans in ref_answers[sel_a]:
+            for ans in REF_ANSWERS[sel_a]:
                 st.write(f"- {ans}")
 
-        # Form for marking
-        with st.form('mark_single_assignment'):
+        with st.form("mark_single_assignment"):
             score = st.number_input("Score", 0, 100, ds)
             comments = st.text_area("Comments", dc)
-            submit = st.form_submit_button("Save Score")
-        
-        if submit:
+            submitted = st.form_submit_button("Save Score")
+        if submitted:
             now = datetime.now().strftime("%Y-%m-%d")
-            entry = {'studentcode': code, 'name': student['name'], 'assignment': sel_a,
-                     'score': score, 'comments': comments, 'date': now, 'level': level}
-            df_scores = df_scores[~((df_scores['studentcode'] == code) & (df_scores['assignment'] == sel_a))]
-            df_scores = pd.concat([df_scores, pd.DataFrame([entry])], ignore_index=True)
-            # Save for local download (and remind to upload back to Google Sheets!)
-            df_scores.to_csv("scores.csv", index=False)
-            st.success("Score saved. Download the new CSV and upload to Google Sheets to make permanent.")
-            st.session_state['updated_scores'] = df_scores.copy()
-
-    # --- Batch mode: Mark All Assignments ---
+            row = dict(studentcode=code, name=student['name'], assignment=sel_a,
+                       score=score, comments=comments, date=now, level=student.get('level',''))
+            df_scores = df_scores[~(
+                (df_scores['studentcode'] == code) & (df_scores['assignment'] == sel_a)
+            )]
+            df_scores = pd.concat([df_scores, pd.DataFrame([row])], ignore_index=True)
+            st.success("Score saved (local only). Download and upload to Google Sheets to make permanent.")
+            st.download_button(
+                '⬇️ Download Updated Scores CSV (Upload to Google Sheets!)',
+                data=df_scores.to_csv(index=False).encode(),
+                file_name='scores.csv',
+                mime='text/csv'
+            )
+            st.stop()
+    # --- Batch Mode: Mark All Assignments ---
     else:
         st.markdown("---")
         st.subheader("Batch: Mark Assignments")
-        stu_scores = df_scores[df_scores['studentcode'] == code]
-        with st.form('batch_marking_form'):
+        stu_scores = df_scores[df_scores['studentcode']==code]
+        with st.form("batch_marking_form"):
             batch = {}
             for a in [x for x in all_assigns if x.startswith(level)]:
                 pr = stu_scores[stu_scores['assignment'] == a]
-                val = int(pr['score'].iloc[0]) if not pr.empty and not pd.isna(pr['score'].iloc[0]) else 0
+                val = int(pr['score'].iloc[0]) if not pr.empty else 0
                 batch[a] = st.number_input(a, 0, 100, val)
-            batch_submit = st.form_submit_button("Save All")
-        
-        if batch_submit:
+            batch_submitted = st.form_submit_button("Save All")
+        if batch_submitted:
             now = datetime.now().strftime("%Y-%m-%d")
-            rows = [{'studentcode': code, 'name': student['name'], 'assignment': a,
-                     'score': v, 'comments': '', 'date': now, 'level': level}
-                    for a, v in batch.items()]
-            df_scores = df_scores[~((df_scores['studentcode'] == code) & df_scores['assignment'].isin(batch))]
-            df_scores = pd.concat([df_scores, pd.DataFrame(rows)], ignore_index=True)
-            df_scores.to_csv("scores.csv", index=False)
-            st.success("All scores saved. Download CSV and upload to Google Sheets to make permanent.")
-            st.session_state['updated_scores'] = df_scores.copy()
+            new = [dict(studentcode=code, name=student['name'], assignment=a,
+                        score=v, comments='', date=now, level=student.get('level',''))
+                   for a, v in batch.items()]
+            df_scores = df_scores[~(
+                (df_scores['studentcode'] == code) & df_scores['assignment'].isin(batch)
+            )]
+            df_scores = pd.concat([df_scores, pd.DataFrame(new)], ignore_index=True)
+            st.success("All scores saved (local only). Download and upload to Google Sheets to make permanent.")
+            st.download_button(
+                '⬇️ Download Updated Scores CSV (Upload to Google Sheets!)',
+                data=df_scores.to_csv(index=False).encode(),
+                file_name='scores.csv',
+                mime='text/csv'
+            )
+            st.stop()
 
-    # --- Score History & PDF ---
+    # --- Score History and PDF Report ---
     st.markdown("### Score History & PDF Report")
     history = df_scores[df_scores['studentcode'] == code].sort_values('date', ascending=False)
     st.write(f"Completed: {history['assignment'].nunique()} / {total}")
     if not history.empty:
         dfh = history[['assignment', 'score', 'comments', 'date']].copy()
-        dfh['reference'] = dfh['assignment'].apply(lambda x: "; ".join(ref_answers.get(x, [])))
+        dfh['reference'] = dfh['assignment'].apply(lambda x: "; ".join(REF_ANSWERS.get(x, [])))
         st.dataframe(dfh)
     else:
         st.info("No records yet.")
 
-    # --- Download Buttons (OUTSIDE FORMS!) ---
-    if 'updated_scores' in st.session_state:
-        st.download_button(
-            "⬇️ Download Updated Scores CSV (Upload to Google Sheets!)",
-            data=st.session_state['updated_scores'].to_csv(index=False).encode(),
-            file_name='scores.csv',
-            mime='text/csv'
-        )
-
-    # --- PDF & Email Buttons ---
-    pdf_bytes = build_simple_pdf(student, history, ref_answers, total)
-    st.download_button("Download PDF Report", pdf_bytes,
-                       f"{code}_report.pdf", "application/pdf")
+    # --- PDF Download and Email ---
+    pdf_bytes = build_simple_pdf(student, history, REF_ANSWERS, total)
+    st.download_button("Download PDF Report", pdf_bytes, f"{code}_report.pdf", "application/pdf")
     if student.get('email') and st.button('Email PDF'):
         try:
-            send_email_with_pdf(
-                student['email'], student['name'], pdf_bytes,
-                st.secrets['general']['SENDGRID_API_KEY'],
-                st.secrets['general']['SENDER_EMAIL']
-            )
+            send_email_with_pdf(student['email'], student['name'], pdf_bytes,
+                                st.secrets['general']['SENDGRID_API_KEY'],
+                                st.secrets['general']['SENDER_EMAIL'])
             st.success("✅ Email sent successfully!")
         except Exception as e:
             st.error(f"❌ Email failed to send: {e}")
