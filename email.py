@@ -1127,53 +1127,7 @@ with tabs[8]:
                        data=pdf.output(dest='S').encode('latin-1'),
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
-
-import os
-import pandas as pd
-import streamlit as st
-from datetime import datetime
-from fpdf import FPDF
-
-# External utilities (assumed available)
-from utils import normalize_cols, load_ref_answers, sync_scores_to_sqlite
-from email_utils import send_email_with_pdf
-
-# ==== PDF Builder ====
-def build_simple_pdf(student, history_df, ref_answers, total):
-    pdf = FPDF(format='A4')
-    pdf.add_page()
-    pdf.set_font('Arial', size=12)
-    pdf.cell(0, 10, 'Learn Language Education Academy', ln=True, align='C')
-    pdf.ln(4)
-    pdf.cell(0, 8, f"Student: {student['name']} ({student['studentcode']})", ln=True)
-    pdf.cell(0, 8, f"Level: {student['level']}", ln=True)
-    pdf.cell(0, 8, f"Date: {datetime.now():%Y-%m-%d}", ln=True)
-    pdf.ln(4)
-    pdf.cell(0, 8, f"Assignments completed: {history_df['assignment'].nunique()} / {total}", ln=True)
-    pdf.ln(4)
-
-    col_widths = [60, 20, 30, 80]
-    headers = ['Assignment', 'Score', 'Date', 'Reference']
-    for w, h in zip(col_widths, headers): pdf.cell(w, 8, h, border=1)
-    pdf.ln()
-
-    assignments = history_df['assignment'].tolist()
-    scores = history_df['score'].astype(str).tolist()
-    dates = history_df['date'].tolist()
-    references = ["; ".join(ref_answers.get(a, [])) for a in assignments]
-
-    avg_char_width = pdf.get_string_width('W') or 1
-    max_ref_chars = int(col_widths[3] / avg_char_width)
-    row_height = 6
-
-    for assignment, score, date_str, reference in zip(assignments, scores, dates, references):
-        pdf.cell(col_widths[0], row_height, assignment[:40], border=1)
-        pdf.cell(col_widths[1], row_height, score, border=1)
-        pdf.cell(col_widths[2], row_height, date_str, border=1)
-        ref_text = reference[:max_ref_chars-3] + '...' if len(reference) > max_ref_chars else reference
-        pdf.cell(col_widths[3], row_height, ref_text, border=1)
-        pdf.ln()
-    return pdf.output(dest='S')
+    
 
 # ==== Marking Tab ====
 if 'rerun_needed' not in st.session_state:
