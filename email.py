@@ -1122,7 +1122,7 @@ with tabs[9]:
     code_col        = get_safe_col(df_students, ["studentcode", "code"], "Student Code")
     level_col       = get_safe_col(df_students, ["level", "class", "course"], "Level")
     assign_col      = get_safe_col(df_scores, ["assignment", "title"], "Assignment")
-    studentcode_col = get_safe_col(df_scores, ["studentcode", "code"], "StudentCode in scores")
+    studentcode_col = get_safe_col(df_scores, ["student_code", "studentcode", "code"], "StudentCode in scores")
     comments_col    = get_safe_col(df_scores, ["comments", "feedback"], "Comments")
     score_col       = get_safe_col(df_scores, ["score", "marks"], "Score")
     date_col        = get_safe_col(df_scores, ["date"], "Date")
