@@ -105,6 +105,7 @@ def clean_phone(phone):
 
 def safe_read_csv(local_path, backup_url=None):
     """Try to read local file, then optional backup url."""
+    import pandas as pd, os
     if os.path.exists(local_path):
         return pd.read_csv(local_path)
     if backup_url:
@@ -130,6 +131,7 @@ def col_lookup(df, name):
         if c.replace("_", "").lower() == key:
             return c
     return name  # fallback, but will raise error if not present
+
 
 
 # For PDF-safe text
