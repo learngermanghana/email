@@ -1655,17 +1655,16 @@ with tabs[9]:
     st.title("Assignment Marking & Scores (Email, Reference, PDF)")
 
     # --- Helper: Fuzzy, accent-insensitive assignment match ---
-    import unicodedata, re, difflib
+    import difflib
 
     def normalize_assignment_for_match(s):
-        # Remove accents (umlauts -> o/u/a), lower, strip all non-alphanumeric
-        if not s:
-            return ""
+        import unicodedata, re
+        if not s: return ""
         s = str(s)
         s = unicodedata.normalize('NFKD', s).encode('ascii', 'ignore').decode('ascii')
         s = s.lower()
         s = re.sub(r'[^a-z0-9]', '', s)
-        s = s.replace('exercise','')
+        s = s.replace('exercise', '')
         return s
 
     def best_ref_key(assignment):
@@ -1678,13 +1677,29 @@ with tabs[9]:
             return candidates[idx]
         return None
 
+    # --- Column compatibility patch ---
+    def fix_cols(df):
+        # Rename columns for maximum compatibility
+        replace = {}
+        for c in df.columns:
+            cl = c.strip().lower()
+            if cl == "student_code":
+                replace[c] = "studentcode"
+            if cl == "student_code":
+                replace[c] = "studentcode"
+            if cl == "student code":
+                replace[c] = "studentcode"
+            # Add more if you find more inconsistencies
+        return df.rename(columns=replace)
+
     # --- Load students from Google Sheets ---
     try:
         df_students = pd.read_csv(
             "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
         )
-        # Normalize columns
-        df_students.columns = [str(c).strip().replace(" ", "_").lower() for c in df_students.columns]
+        df_students.columns = [c.strip().lower().replace(" ", "") for c in df_students.columns]
+        df_students = fix_cols(df_students)
+        st.write("DEBUG: Columns after fix_cols() for students:", df_students.columns.tolist())
     except Exception:
         st.error("Could not load student list.")
         df_students = pd.DataFrame(columns=['name', 'studentcode', 'email', 'level'])
@@ -1694,25 +1709,28 @@ with tabs[9]:
         df_scores = pd.read_csv(
             "https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/export?format=csv"
         )
-        st.write("DEBUG: df_scores columns BEFORE normalization:", df_scores.columns.tolist())
-        # Normalize columns
-        df_scores.columns = [str(c).strip().replace(" ", "_").lower() for c in df_scores.columns]
-        st.write("DEBUG: df_scores columns AFTER normalization:", df_scores.columns.tolist())
-        st.write("DEBUG: First few rows of df_scores:", df_scores.head())
-        # Optional: Fix for weird capitalization if still present
-        if 'assignment' not in df_scores.columns and 'Assignment' in df_scores.columns:
-            df_scores.rename(columns={'Assignment':'assignment'}, inplace=True)
+        df_scores.columns = [c.strip().lower().replace(" ", "") for c in df_scores.columns]
+        df_scores = fix_cols(df_scores)
+        st.write("DEBUG: Columns after fix_cols() for scores:", df_scores.columns.tolist())
     except Exception:
         st.error("Could not load score history.")
         df_scores = pd.DataFrame(columns=['studentcode', 'name', 'assignment', 'score', 'comments', 'date', 'level'])
 
+    # --- Print preview of data for debugging ---
+    st.write("DEBUG: First few rows of df_scores:")
+    st.write(df_scores.head())
+
     # --- All Assignments & Categorization ---
     @st.cache_data
     def all_assignments(ds, ra):
-        if 'assignment' not in ds.columns:
-            st.error("No 'assignment' column in scores sheet. Check your CSV or normalization!")
-            return list(ra.keys())
-        return sorted(set(ds['assignment'].dropna()) | set(ra.keys()))
+        assign_col = None
+        for col in ds.columns:
+            if col.lower() == "assignment":
+                assign_col = col
+                break
+        if assign_col is None:
+            return sorted(list(ra.keys()))
+        return sorted(set(ds[assign_col].dropna()) | set(ra.keys()))
 
     # Group assignments by level (A1, A2, B1, B2)
     def group_assignments_by_level(all_assigns):
@@ -1729,7 +1747,7 @@ with tabs[9]:
     # --- Marking Mode Switch ---
     mode = st.radio("Marking Mode", ["Classic", "Batch"], horizontal=True)
 
-    # --- Student Search & Selection (DEFENSIVE, strips spaces and blanks) ---
+    # --- Student Search & Selection ---
     st.subheader("Find Student")
     search = st.text_input("Search name or code")
     students = df_students.copy()
@@ -1770,7 +1788,10 @@ with tabs[9]:
         sel_a = st.selectbox("Assignment", opts)
         # Normalized match for previous
         def norm_match(row):
-            return (row['studentcode'] == code) and (normalize_assignment_for_match(row['assignment']) == normalize_assignment_for_match(sel_a))
+            return (
+                (row.get('studentcode','') == code) and
+                (normalize_assignment_for_match(row.get('assignment','')) == normalize_assignment_for_match(sel_a))
+            )
         prev = df_scores[df_scores.apply(norm_match, axis=1)]
         ds = int(prev['score'].iloc[0]) if not prev.empty else 0
         dc = prev['comments'].iloc[0] if not prev.empty else ''
@@ -1792,7 +1813,6 @@ with tabs[9]:
             now = datetime.now().strftime("%Y-%m-%d")
             row = dict(studentcode=code, name=student['name'], assignment=sel_a,
                        score=score, comments=comments, date=now, level=student.get('level',''))
-            # Remove any previous matching assignment (normalized)
             mask = ~df_scores.apply(norm_match, axis=1)
             df_scores = df_scores[mask]
             df_scores = pd.concat([df_scores, pd.DataFrame([row])], ignore_index=True)
@@ -1811,13 +1831,12 @@ with tabs[9]:
         st.markdown("---")
         st.subheader("Batch: Mark Assignments")
         opts = assigns_by_level.get(level, [])
-        stu_scores = df_scores[df_scores['studentcode'] == code]
         with st.form(f"batch_marking_form_{code}"):
             batch = {}
             for a in opts:
                 # Match using normalization
                 def norm_batch(row):
-                    return (row['studentcode'] == code) and (normalize_assignment_for_match(row['assignment']) == normalize_assignment_for_match(a))
+                    return (row.get('studentcode','') == code) and (normalize_assignment_for_match(row.get('assignment','')) == normalize_assignment_for_match(a))
                 pr = df_scores[df_scores.apply(norm_batch, axis=1)]
                 val = int(pr['score'].iloc[0]) if not pr.empty else 0
                 batch[a] = st.number_input(a, 0, 100, val)
@@ -1827,10 +1846,9 @@ with tabs[9]:
             new = [dict(studentcode=code, name=student['name'], assignment=a,
                         score=v, comments='', date=now, level=student.get('level',''))
                    for a, v in batch.items()]
-            # Remove old assignments by normalized assignment name
             def not_in_batch(row):
                 normed_batch = [normalize_assignment_for_match(a) for a in batch]
-                return not ((row['studentcode'] == code) and (normalize_assignment_for_match(row['assignment']) in normed_batch))
+                return not ((row.get('studentcode','') == code) and (normalize_assignment_for_match(row.get('assignment','')) in normed_batch))
             df_scores = df_scores[df_scores.apply(not_in_batch, axis=1)]
             df_scores = pd.concat([df_scores, pd.DataFrame(new)], ignore_index=True)
             st.success("All scores saved (local only). Download and upload to Google Sheets to make permanent.")
@@ -1847,9 +1865,8 @@ with tabs[9]:
     st.markdown("### Score History & PDF Report")
     opts = assigns_by_level.get(level, [])
     normed_opts = set([normalize_assignment_for_match(a) for a in opts])
-    # Show history with normalized assignment matching
     def match_history(row):
-        return (row['studentcode'] == code) and (normalize_assignment_for_match(row['assignment']) in normed_opts)
+        return (row.get('studentcode','') == code) and (normalize_assignment_for_match(row.get('assignment','')) in normed_opts)
     history = df_scores[df_scores.apply(match_history, axis=1)].sort_values('date', ascending=False)
     st.write(f"Completed: {history['assignment'].nunique()} / {total}")
     if not history.empty:
