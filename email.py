@@ -1336,7 +1336,9 @@ with tabs[9]:
         "A2 1.3 Hören": ["1. B) Julia ist 26 Jahre alt","2. C) Julia arbeitet als Architektin","3. B) Tobias lebt in Frankfurt","4. A) Tobias möchte ein eigenes Restaurant eröffnen","5. B) Julia und Tobias kochen am Wochenende oft mit Sophie"]
     }
 
-
+    st.write("Assignments in scores:", df_scores[assign_col].unique())
+    st.write("Reference answer keys:", list(ref_answers.keys()))
+    
     all_assignments = sorted(list({*df_scores[assign_col].dropna().unique(), *ref_answers.keys()}))
     all_levels = sorted(df_students[level_col].dropna().unique())
 
