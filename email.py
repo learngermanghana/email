@@ -4,6 +4,7 @@ import json
 import base64
 import urllib.parse
 from datetime import date, datetime, timedelta
+
 import pandas as pd
 import numpy as np
 import streamlit as st
@@ -20,37 +21,22 @@ SCHOOL_WEBSITE = "www.learngermanghana.com"
 SCHOOL_PHONE   = "233205706589"
 SCHOOL_ADDRESS = "Awoshie, Accra, Ghana"
 
-st.set_page_config(
-    page_title="Learn Language Education Academy Dashboard",
-    layout="wide"
-)
+st.set_page_config(page_title="Dashboard", layout="wide")
 
+school_sendgrid_key = st.secrets["general"]["SENDGRID_API_KEY"]
+school_sender_email = st.secrets["general"]["SENDER_EMAIL"]
 
-school_sendgrid_key = st.secrets.get("general", {}).get("SENDGRID_API_KEY")
-school_sender_email = st.secrets.get("general", {}).get("SENDER_EMAIL", SCHOOL_EMAIL)
+# ==== 3. SUPABASE CLIENTS ====
+SUPABASE_URL               = st.secrets["general"]["SUPABASE_URL"]
+SUPABASE_ANON_KEY          = st.secrets["general"]["SUPABASE_ANON_KEY"]
+SUPABASE_SERVICE_ROLE_KEY  = st.secrets["general"]["SUPABASE_SERVICE_ROLE_KEY"]
 
-SUPABASE_URL              = st.secrets["general"]["SUPABASE_URL"]
-SUPABASE_ANON_KEY         = st.secrets["general"]["SUPABASE_ANON_KEY"]
-SUPABASE_SERVICE_ROLE_KEY = st.secrets["general"]["SUPABASE_SERVICE_ROLE_KEY"]
-
+# read-only (enforced by RLS)
 anon_supabase    = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+# elevated (bypasses RLS entirely)
 service_supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-
-service_supabase.postgrest.rpc("sql", {
-  "query": """
-    -- drop any old constraint
-    ALTER TABLE public.scores
-      DROP CONSTRAINT IF EXISTS scores_student_code_assignment_unique;
-    -- add the UNIQUE constraint you need
-    ALTER TABLE public.scores
-      ADD CONSTRAINT scores_student_code_assignment_unique
-      UNIQUE (student_code, assignment);
-  """
-}).execute()
-
-
-# ==== 3. HELPER FUNCTIONS (no changes needed here, just keep them above your data loads) ====
+# ==== 4. HELPERS & STATE ====
 def safe_read_csv(local_path, backup_url=None):
     if os.path.exists(local_path):
         return pd.read_csv(local_path)
@@ -64,85 +50,53 @@ def safe_read_csv(local_path, backup_url=None):
 
 def normalize_columns(df):
     df.columns = [
-        str(c).strip().lower().replace(" ", "_").replace("-", "_").replace("/", "_").replace("(", "").replace(")", "")
+        str(c).strip().lower()
+             .replace(" ", "_")
+             .replace("-", "_")
+             .replace("/", "_")
+             .replace("(", "")
+             .replace(")", "")
         for c in df.columns
     ]
     return df
 
-def col_lookup(df, name):
-    key = name.strip().lower().replace("_", "")
+def col_lookup(df, key):
+    k = key.strip().lower().replace("_","")
     for c in df.columns:
-        if c.replace("_", "").lower() == key:
+        if c.replace("_","").lower() == k:
             return c
-    return name
+    raise KeyError(f"{key} not found in {df.columns}")
 
 def getcol(df, name):
     return col_lookup(df, name)
 
-def clean_phone(phone):
-    phone = str(phone).replace(" ", "").replace("+", "").replace("-", "")
-    if phone.startswith("0"):
-        phone = "233" + phone[1:]
-    return ''.join(filter(str.isdigit, phone))
-
-def safe_pdf(text):
-    return str(text).encode('latin-1', 'replace').decode('latin-1')
-
 def safe_text(s):
-    if isinstance(s, str):
-        return s.encode("latin-1", "replace").decode("latin-1")
-    return str(s)
+    return str(s).encode("latin-1","replace").decode("latin-1")
 
-# ==== 4. SESSION STATE INITIALIZATION ====
+# keep session state across reruns
 st.session_state.setdefault("emailed_expiries", set())
 st.session_state.setdefault("dismissed_notifs", set())
 
-# ==== 5. DATABASE SETUP ====
-conn = sqlite3.connect('scores.db', check_same_thread=False)
+# ==== 5. OPTIONAL LOCAL DB (SQLite) ====
+conn = sqlite3.connect("scores.db", check_same_thread=False)
 c = conn.cursor()
-c.execute('''
-    CREATE TABLE IF NOT EXISTS scores (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        student_code TEXT,
-        name TEXT,
-        assignment TEXT,
-        score REAL,
-        comments TEXT,
-        date TEXT,
-        level TEXT
-    )
-''')
+c.execute("""
+CREATE TABLE IF NOT EXISTS scores (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_code TEXT,
+  name TEXT,
+  assignment TEXT,
+  score REAL,
+  comments TEXT,
+  date TEXT,
+  level TEXT
+)""")
 conn.commit()
-
-def fetch_scores_from_db():
-    return pd.read_sql_query("SELECT * FROM scores", conn)
-
-def save_score_to_db(student_code, name, assignment, score, comments, date, level):
-    c.execute('''
-        SELECT id FROM scores WHERE student_code=? AND assignment=?
-    ''', (student_code, assignment))
-    result = c.fetchone()
-    if result:
-        c.execute('''
-            UPDATE scores SET score=?, comments=?, name=?, date=?, level=?
-            WHERE id=?
-        ''', (score, comments, name, date, level, result[0]))
-    else:
-        c.execute('''
-            INSERT INTO scores (student_code, name, assignment, score, comments, date, level)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (student_code, name, assignment, score, comments, date, level))
-    conn.commit()
-
-def delete_score_from_db(row_id):
-    c.execute('DELETE FROM scores WHERE id=?', (row_id,))
-    conn.commit()
 
 # ==== 6. SUPABASE DB HELPERS ====
 def fetch_scores_supabase():
-    res = supabase.table("scores").select("*").execute()
-    df = pd.DataFrame(res.data)
-    return df
+    resp = anon_supabase.table("scores").select("*").execute()
+    return normalize_columns(pd.DataFrame(resp.data))
 
 def save_score_supabase(student_code, name, assignment, score, comments, date, level):
     data = {
@@ -154,45 +108,23 @@ def save_score_supabase(student_code, name, assignment, score, comments, date, l
         "date": date,
         "level": level
     }
-    supabase.table("scores").upsert(data, on_conflict=["student_code", "assignment"]).execute()
+    service_supabase.table("scores") \
+        .upsert(data, on_conflict=["student_code","assignment"]) \
+        .execute()
 
 def delete_score_supabase(student_code, assignment):
-    supabase.table("scores").delete().eq("student_code", student_code).eq("assignment", assignment).execute()
+    service_supabase.table("scores") \
+        .delete() \
+        .eq("student_code", student_code) \
+        .eq("assignment", assignment) \
+        .execute()
 
-# ==== 7. Reference Answers (MUST be here BEFORE all_assignments!) ====
+# ==== 7. REFERENCE ANSWERS ====
 ref_answers = {
-    "A1 0.1": [
-        "1. C) Guten Morgen",
-        "2. D) Guten Tag",
-        # ...etc...
-    ],
-    # ... (rest of your dictionary) ...
-    "A2 10.28": [
-        "1. c) Einen gültigen Reisepass",
-        # ... etc ...
-    ]
+    "A1 0.1": ["1. C) Guten Morgen", "2. D) Guten Tag", /* … */],
+    # … your full dictionary …
+    "A2 10.28": ["1. c) Einen gültigen Reisepass", /* … */]
 }
-
-# ==== 8. DATA LOAD (students, after ref_answers so you can use keys below) ====
-student_file = "students.csv"
-github_csv = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
-df_students = safe_read_csv(student_file, github_csv)
-df_students = normalize_columns(df_students)
-
-name_col = getcol(df_students, 'name')
-code_col = getcol(df_students, 'studentcode')
-level_col = getcol(df_students, 'level')
-email_col = getcol(df_students, 'email')
-
-# ==== 9. Assignments & Levels (NO NameError!) ====
-# (You must have df_scores and assign_col defined before this section if you want to use their assignments.)
-# If you haven't loaded df_scores yet, just do:
-assign_col = "assignment"
-# For initial assignment listing, you can use only ref_answers:
-all_assignments = sorted(list(ref_answers.keys()))
-all_levels = sorted(df_students[level_col].dropna().unique())
-
-# ==== (Ready for the rest of your app - including tab layouts, etc) ====
 
 
 # 3. Tabs setup
