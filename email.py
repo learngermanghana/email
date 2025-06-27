@@ -117,7 +117,6 @@ def send_email_with_pdf(student_email, student_name, pdf_bytes, sendgrid_api_key
     response = sg.send(message)
     return response.status_code  # Add this line!
 
-
 def build_simple_pdf(student, history_df, ref_answers, total):
     from fpdf import FPDF
     pdf = FPDF(format='A4')
@@ -146,34 +145,33 @@ def build_simple_pdf(student, history_df, ref_answers, total):
         date_str = safe_pdf(str(row['date']))
         reference_raw = '; '.join(ref_answers.get(row['assignment'], []))
         reference = safe_pdf(reference_raw)
-        
-        # --- Calculate required height for this row
-        # Find the cell that needs the most vertical space (number of lines)
-        line_height = 6
-        ref_lines = pdf.multi_cell(col_widths[3], line_height, reference, border=0, align='L', split_only=True)
-        num_lines = max(len(ref_lines), 1)
-        row_height = num_lines * line_height
 
-        # Save x and y
+        # Calculate number of lines for the reference column
+        ref_lines = pdf.get_string_width(reference) / (col_widths[3] - 2)
+        ref_lines = int(ref_lines) + 1
+        line_height = 6
+        row_height = max(line_height, ref_lines * line_height)
+
+        y_before = pdf.get_y()
         x_left = pdf.get_x()
-        y_top = pdf.get_y()
 
         # Assignment
-        pdf.multi_cell(col_widths[0], row_height, assignment, border=1, align='L', ln=3, max_line_height=line_height)
-        pdf.set_xy(x_left + col_widths[0], y_top)
+        pdf.multi_cell(col_widths[0], row_height, assignment, border=1, align='L')
+        pdf.set_xy(x_left + col_widths[0], y_before)
         # Score
-        pdf.multi_cell(col_widths[1], row_height, score, border=1, align='L', ln=3, max_line_height=line_height)
-        pdf.set_xy(x_left + col_widths[0] + col_widths[1], y_top)
+        pdf.cell(col_widths[1], row_height, score, border=1)
         # Date
-        pdf.multi_cell(col_widths[2], row_height, date_str, border=1, align='L', ln=3, max_line_height=line_height)
-        pdf.set_xy(x_left + col_widths[0] + col_widths[1] + col_widths[2], y_top)
-        # Reference (multi-line, uses full height)
+        pdf.cell(col_widths[2], row_height, date_str, border=1)
+        # Reference (multi-cell, moves cursor automatically)
+        pdf.set_xy(x_left + col_widths[0] + col_widths[1] + col_widths[2], y_before)
         pdf.multi_cell(col_widths[3], line_height, reference, border=1, align='L')
-        # Move to next line for the next row
-        pdf.ln(0)
+        # After reference, move to the next line (handled by multi_cell)
+
+        # Set y to the max height used
+        y_after = pdf.get_y()
+        pdf.set_y(max(y_after, y_before + row_height))
 
     return pdf.output(dest='S').encode('latin-1')
-
 
 
 def sync_google_sheet_to_sqlite(df):
