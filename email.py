@@ -138,14 +138,17 @@ def build_simple_pdf(student, history_df, ref_answers, total):
     pdf.ln()
 
     for _, row in history_df.iterrows():
-        assignment = safe_pdf(row['assignment'])
+        assignment = safe_pdf(str(row['assignment']))
         score = safe_pdf(str(row['score']))
         date_str = safe_pdf(str(row['date']))
-        reference = safe_pdf('; '.join(ref_answers.get(row['assignment'], [])))
+        # Get the reference answers as a single string (first 180 chars)
+        reference_raw = '; '.join(ref_answers.get(row['assignment'], []))
+        reference = safe_pdf(reference_raw[:180])  # show first 180 chars
         pdf.cell(col_widths[0], 6, assignment[:40], border=1)
         pdf.cell(col_widths[1], 6, score, border=1)
         pdf.cell(col_widths[2], 6, date_str, border=1)
-        pdf.multi_cell(col_widths[3], 6, reference, border=1)
+        pdf.cell(col_widths[3], 6, reference, border=1)
+        pdf.ln()
     return pdf.output(dest='S').encode('latin-1')
 
 
