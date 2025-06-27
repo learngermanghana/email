@@ -166,15 +166,13 @@ def normalize_text(text):
 def normalize_key(k):
     return re.sub(r'[^A-Za-z0-9]+', '', k).lower()
 
-# 1. Define reference answers
-A1_REF_ANSWERS = {...}   # <-- Make sure this is here
-A2_REF_ANSWERS = {...}   # <-- And this
+A1_REF_ANSWERS = {...}
+A2_REF_ANSWERS = {...}
 
-# 2. Combine
 REF_ANSWERS = {**A1_REF_ANSWERS, **A2_REF_ANSWERS}
 
-# 3. Any other code that needs these
 all_keys = list(A1_REF_ANSWERS.keys()) + list(A2_REF_ANSWERS.keys()
+
                                               
 # ==== Reference Answers: A1 ====
 A1_REF_ANSWERS = {
