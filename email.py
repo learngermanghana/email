@@ -99,35 +99,6 @@ CREATE TABLE IF NOT EXISTS scores (
 )""")
 conn.commit()
 
-# ==== 6. SUPABASE DB HELPERS ====
-def fetch_scores_supabase():
-    # reads (anyone/anon)
-    resp = anon_supabase.table("scores").select("*").execute()
-    return pd.DataFrame(resp.data)
-
-def save_score_supabase(student_code, name, assignment, score, comments, date, level):
-    data = {
-        "student_code": student_code,
-        "name":         name,
-        "assignment":   assignment,
-        "score":        score,
-        "comments":     comments,
-        "date":         date,
-        "level":        level,
-    }
-    # writes (bypass RLS)
-    service_supabase.table("scores") \
-        .upsert(data, on_conflict=["student_code","assignment"]) \
-        .execute()
-
-def delete_score_supabase(student_code, assignment):
-    # deletes (bypass RLS)
-    service_supabase.table("scores") \
-        .delete() \
-        .eq("student_code", student_code) \
-        .eq("assignment", assignment) \
-        .execute()
-
 
 # ==== 7. REFERENCE ANSWERS ====
 ref_answers = {
@@ -1142,14 +1113,14 @@ with tabs[8]:
 with tabs[9]:
     st.title("📝 Assignment Marking & Scores (with Email)")
 
-    # 0. Load‐URL at the top of this tab
+    # 0. your students CSV URL
     students_csv_url = (
       "https://docs.google.com/spreadsheets/d/"
       "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U"
       "/export?format=csv"
     )
 
-    # 1. Load students from Google Sheet
+    # 1. load students
     @st.cache_data(show_spinner=False)
     def load_students():
         df = pd.read_csv(students_csv_url)
@@ -1157,7 +1128,7 @@ with tabs[9]:
 
     df_students = load_students()
 
-    # 2. Supabase helpers — reads via anon_supabase, writes/deletes via service_supabase
+    # 2. Supabase helpers — **reads** use anon_supabase, **writes** use service_supabase
     def fetch_scores_supabase():
         resp = anon_supabase.table("scores").select("*").execute()
         return normalize_columns(pd.DataFrame(resp.data))
@@ -1172,6 +1143,7 @@ with tabs[9]:
             "date":         date,
             "level":        level,
         }
+        # ⚠️ use the service key here so RLS is bypassed
         service_supabase.table("scores") \
             .upsert(data, on_conflict=["student_code","assignment"]) \
             .execute()
@@ -1183,7 +1155,7 @@ with tabs[9]:
             .eq("assignment", assignment) \
             .execute()
 
-    # 3. Fetch all scores once
+    # 3. now pull everything
     df_scores = fetch_scores_supabase()
 
     # --- (optional) Debug columns ---
