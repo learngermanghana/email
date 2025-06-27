@@ -29,7 +29,7 @@ school_sendgrid_key = st.secrets.get("general", {}).get("SENDGRID_API_KEY")
 school_sender_email = st.secrets.get("general", {}).get("SENDER_EMAIL", SCHOOL_EMAIL)
 
 SUPABASE_URL = "https://uzwgfvxrtagmmoaebxye.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz..."
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6d2dmdnhydGFnbW1vYWVieHllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTEwNDY4OTEsImV4cCI6MjA2NjYyMjg5MX0.g6gSYYxuMICK2zcaru8wULPjpAMbSo0oC4VfOTz4a2U"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ==== 3. HELPER FUNCTIONS (no changes needed here, just keep them above your data loads) ====
