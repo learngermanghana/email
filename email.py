@@ -4,6 +4,8 @@ import re
 import sqlite3
 import base64
 from datetime import date, datetime, timedelta
+import os
+
 
 
 import pandas as pd
