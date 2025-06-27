@@ -276,7 +276,7 @@ ref_answers = {
 
 
 
-    st.write("Assignments in scores:", df_scores[assign_col].unique())
+    st.write("Assignments in scores:", df_scores[assign_col].unique()
     st.write("Reference answer keys:", list(ref_answers.keys()))
     
     all_assignments = sorted(list({*df_scores[assign_col].dropna().unique(), *ref_answers.keys()}))
