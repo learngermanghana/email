@@ -1601,6 +1601,7 @@ with tabs[8]:
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
     
+
 with tabs[9]:
     st.title("Assignment Marking & Scores (Email, Reference, PDF)")
 
@@ -1633,36 +1634,42 @@ with tabs[9]:
     # --- Marking Mode Switch ---
     mode = st.radio("Marking Mode", ["Classic", "Batch"], horizontal=True)
 
-    # --- Student Search & Selection (DEFENSIVE) ---
+    # --- Student Search & Selection (DEFENSIVE, strips spaces and blanks) ---
     st.subheader("Find Student")
     search = st.text_input("Search name or code")
+
+    # Strip whitespace and drop rows with empty name or studentcode
     students = df_students.copy()
+    students['name'] = students['name'].astype(str).str.strip()
+    students['studentcode'] = students['studentcode'].astype(str).str.strip()
+    students = students.dropna(subset=['name', 'studentcode'])
+    students = students[(students['name'] != "") & (students['studentcode'] != "")]
 
-    # Only use non-empty name and studentcode rows
-    valid_students = students.dropna(subset=['name', 'studentcode'])
-    valid_students = valid_students[valid_students['name'].astype(str).str.strip() != ""]
-    valid_students = valid_students[valid_students['studentcode'].astype(str).str.strip() != ""]
-
+    # Apply search filter if needed
     if search:
+        s = search.strip().lower()
         mask = (
-            valid_students['name'].astype(str).str.lower().str.contains(search.lower(), na=False) |
-            valid_students['studentcode'].astype(str).str.lower().str.contains(search.lower(), na=False)
+            students['name'].str.lower().str.contains(s, na=False) |
+            students['studentcode'].str.lower().str.contains(s, na=False)
         )
-        valid_students = valid_students[mask]
+        students = students[mask]
 
-    if valid_students.empty:
-        st.info("No students found.")
+    # Defensive: if empty, show available names for debugging
+    if students.empty:
+        st.warning("No students found. Try different search, or check for extra spaces in the sheet.")
+        st.write("Current available students:", df_students[['name','studentcode']])
         st.stop()
 
-    # Build selectbox options (name and code, both guaranteed present)
-    student_options = valid_students['name'].astype(str) + " (" + valid_students['studentcode'].astype(str) + ")"
+    # Build selectbox options
+    student_options = students['name'] + " (" + students['studentcode'] + ")"
     sel = st.selectbox("Select Student", student_options)
-
-    # Defensive: Ensure selection is valid
-    if not sel or '(' not in sel:
-        st.warning("Invalid student selection.")
-        st.stop()
-
+    # Robust extraction, handles spaces
+    code = sel.rsplit("(", 1)[-1].rstrip(")")
+    code = code.strip()
+    student = students[students['studentcode'] == code].iloc[0]
+    level = student.get('level', '').upper()
+    total = LEVEL_TOTALS.get(level, 0)
+    
     code = sel.split('(')[-1].strip(')')
     student = valid_students[valid_students['studentcode'] == code].iloc[0]
     level = student.get('level', '').upper() if 'level' in student else ""
