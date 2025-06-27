@@ -3,6 +3,7 @@ import requests
 import re
 import sqlite3
 import base64
+import urllib.parse 
 from datetime import date, datetime, timedelta
 import os
 
