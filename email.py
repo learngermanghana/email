@@ -1649,248 +1649,366 @@ with tabs[8]:
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
 
-# ============== Assignment Marking & Scores Tab ==============
-
 with tabs[9]:
-    st.title("Assignment Marking & Scores (Email, Reference, PDF)")
+    st.title("📝 Assignment Marking & Scores")
 
-    # --- Helper: Fuzzy, accent-insensitive assignment match ---
-    import difflib
-
-    def normalize_assignment_for_match(s):
-        import unicodedata, re
-        if not s: return ""
-        s = str(s)
-        s = unicodedata.normalize('NFKD', s).encode('ascii', 'ignore').decode('ascii')
-        s = s.lower()
-        s = re.sub(r'[^a-z0-9]', '', s)
-        s = s.replace('exercise', '')
-        return s
-
-    def best_ref_key(assignment):
-        candidates = list(REF_ANSWERS.keys())
-        norm_a = normalize_assignment_for_match(assignment)
-        norm_keys = [normalize_assignment_for_match(k) for k in candidates]
-        matches = difflib.get_close_matches(norm_a, norm_keys, n=1, cutoff=0.6)
-        if matches:
-            idx = norm_keys.index(matches[0])
-            return candidates[idx]
-        return None
-
-    # --- Column compatibility patch ---
-    def fix_cols(df):
-        # Rename columns for maximum compatibility
-        replace = {}
-        for c in df.columns:
-            cl = c.strip().lower()
-            if cl == "student_code":
-                replace[c] = "studentcode"
-            if cl == "student_code":
-                replace[c] = "studentcode"
-            if cl == "student code":
-                replace[c] = "studentcode"
-            # Add more if you find more inconsistencies
-        return df.rename(columns=replace)
-
-    # --- Load students from Google Sheets ---
-    try:
-        df_students = pd.read_csv(
-            "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
+    import sqlite3
+    # === Initialize SQLite for Scores ===
+    conn_scores = sqlite3.connect('scores.db')
+    cursor_scores = conn_scores.cursor()
+    cursor_scores.execute('''
+        CREATE TABLE IF NOT EXISTS scores (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            StudentCode TEXT,
+            Name TEXT,
+            Assignment TEXT,
+            Score REAL,
+            Comments TEXT,
+            Date TEXT
         )
-        df_students.columns = [c.strip().lower().replace(" ", "") for c in df_students.columns]
-        df_students = fix_cols(df_students)
-        st.write("DEBUG: Columns after fix_cols() for students:", df_students.columns.tolist())
-    except Exception:
-        st.error("Could not load student list.")
-        df_students = pd.DataFrame(columns=['name', 'studentcode', 'email', 'level'])
+    ''')
+    conn_scores.commit()
 
-    # --- Load scores from Google Sheets ---
-    try:
-        df_scores = pd.read_csv(
-            "https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/export?format=csv"
-        )
-        df_scores.columns = [c.strip().lower().replace(" ", "") for c in df_scores.columns]
-        df_scores = fix_cols(df_scores)
-        st.write("DEBUG: Columns after fix_cols() for scores:", df_scores.columns.tolist())
-    except Exception:
-        st.error("Could not load score history.")
-        df_scores = pd.DataFrame(columns=['studentcode', 'name', 'assignment', 'score', 'comments', 'date', 'level'])
+    # --- Load student database ---
+    github_csv_url = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
+    student_file = "students.csv"
+    if os.path.exists(student_file):
+        df_students = pd.read_csv(student_file)
+    else:
+        try:
+            df_students = pd.read_csv(github_csv_url)
+        except Exception:
+            st.warning("Could not find student data. Please upload students.csv in 📝 Pending tab.")
+            st.stop()
+    df_students.columns = [c.lower().strip().replace(" ", "_") for c in df_students.columns]
 
-    # --- Print preview of data for debugging ---
-    st.write("DEBUG: First few rows of df_scores:")
-    st.write(df_scores.head())
-
-    # --- All Assignments & Categorization ---
-    @st.cache_data
-    def all_assignments(ds, ra):
-        assign_col = None
-        for col in ds.columns:
-            if col.lower() == "assignment":
-                assign_col = col
-                break
-        if assign_col is None:
-            return sorted(list(ra.keys()))
-        return sorted(set(ds[assign_col].dropna()) | set(ra.keys()))
-
-    # Group assignments by level (A1, A2, B1, B2)
-    def group_assignments_by_level(all_assigns):
-        grouped = {'A1': [], 'A2': [], 'B1': [], 'B2': []}
-        for a in all_assigns:
-            lvl = a[:2].upper()
-            if lvl in grouped:
-                grouped[lvl].append(a)
-        return grouped
-
-    all_assigns = all_assignments(df_scores, REF_ANSWERS)
-    assigns_by_level = group_assignments_by_level(all_assigns)
-
-    # --- Marking Mode Switch ---
-    mode = st.radio("Marking Mode", ["Classic", "Batch"], horizontal=True)
-
-    # --- Student Search & Selection ---
-    st.subheader("Find Student")
-    search = st.text_input("Search name or code")
-    students = df_students.copy()
-    students['name'] = students['name'].astype(str).str.strip()
-    students['studentcode'] = students['studentcode'].astype(str).str.strip()
-    students = students.dropna(subset=['name', 'studentcode'])
-    students = students[(students['name'] != "") & (students['studentcode'] != "")]
-
-    if search:
-        s = search.strip().lower()
-        mask = (
-            students['name'].str.lower().str.contains(s, na=False) |
-            students['studentcode'].str.lower().str.contains(s, na=False)
-        )
-        students = students[mask]
-
-    if students.empty:
-        st.warning("No students found. Try different search, or check for extra spaces in the sheet.")
-        st.write("Current available students:", df_students[['name', 'studentcode']])
+    # --- Filter/Search Students ---
+    st.subheader("🔍 Filter/Search Students")
+    search_term = st.text_input("Search by name or code", key="search_term")
+    levels = ["All"] + sorted(df_students['level'].dropna().unique().tolist())
+    selected_level = st.selectbox("Filter by Level", levels, key="selected_level")
+    view_df = df_students.copy()
+    if search_term:
+        view_df = view_df[
+            view_df['name'].str.contains(search_term, case=False, na=False) |
+            view_df['studentcode'].astype(str).str.contains(search_term, case=False, na=False)
+        ]
+    if selected_level != "All":
+        view_df = view_df[view_df['level'] == selected_level]
+    if view_df.empty:
+        st.info("No students match your filter.")
         st.stop()
 
-    student_options = students['name'] + " (" + students['studentcode'] + ")"
-    sel = st.selectbox("Select Student", student_options)
-    code = sel.rsplit("(", 1)[-1].rstrip(")")
-    code = code.strip()
-    student = students[students['studentcode'] == code].iloc[0]
-    level = student.get('level', '').upper()
-    total = LEVEL_TOTALS.get(level, 0)
+    # --- Select Student ---
+    student_list = view_df['name'] + " (" + view_df['studentcode'] + ")"
+    chosen = st.selectbox("Select a student", student_list, key="chosen_student")
+    code = chosen.split("(")[-1].replace(")", "").strip().lower()
+    student_row = view_df[view_df['studentcode'].str.lower() == code].iloc[0]
 
-    # --- Classic Mode: Single Assignment ---
-    if mode == "Classic":
-        st.markdown("---")
-        st.subheader("Classic: Mark Single Assignment")
-        opts = assigns_by_level.get(level, [])
-        af = st.text_input("Filter assignments")
-        if af:
-            opts = [a for a in opts if af.lower() in a.lower()]
-        sel_a = st.selectbox("Assignment", opts)
-        # Normalized match for previous
-        def norm_match(row):
-            return (
-                (row.get('studentcode','') == code) and
-                (normalize_assignment_for_match(row.get('assignment','')) == normalize_assignment_for_match(sel_a))
-            )
-        prev = df_scores[df_scores.apply(norm_match, axis=1)]
-        ds = int(prev['score'].iloc[0]) if not prev.empty else 0
-        dc = prev['comments'].iloc[0] if not prev.empty else ''
-        matched_key = best_ref_key(sel_a)
-        if matched_key:
-            st.subheader(f"Reference Answers ({matched_key})")
-            for ans in REF_ANSWERS[matched_key]:
-                maxlen = 100
-                st.write(f"- {ans[:maxlen]}{'...' if len(ans) > maxlen else ''}")
-        else:
-            st.info("No reference answers found for this assignment.")
+                # --- Reference Answers ---
+    ref_answers = {
+        "Lesen und Hören 0.1": [
+            "1. C) Guten Morgen", "2. D) Guten Tag", "3. B) Guten Abend", "4. B) Gute Nacht", "5. C) Guten Morgen", "6. C) Wie geht es Ihnen", "7. B) Auf Wiedersehen",
+            "8. C) Tschuss", "9. C) Guten Abend", "10. D) Guten Nacht",
+        ],
+        "Lesen und Hören 0.2": [
+            "1. C) 26", "2. A) A, O, U, B", "3. A) Eszett", "4. A) K", "5. A) A-Umlaut", "6. A) A, O, U, B", "7. B 4",
+            "",  # blank line for spacing
+            "Wasser", "Kaffee", "Blume", "Schule", "Tisch"
+        ],
+        "Lesen und Hören 1.1": ["1. C", "2. C", "3. A", "4. B"],
+        "Lesen und Hören 1.2": [
+            "1. Ich heiße Anna", "2. Du heißt Max", "3. Er heißt Peter", "4. Wir kommen aus Italien",
+            "",  # blank line for spacing
+            "5. Ihr kommt aus Brasilien", "6. Sie kommt/k kommen aus Russland", "7. Ich wohne in Berlin",
+            "",  # blank line for spacing
+            "8. Du wohnst in Madrid", "9. Sie wohnt in Wien",
+            "",  # blank line for spacing
+            "1. A) Anna", "2. C) Aus Italien", "3. D) In Berlin", "4. B) Tom", "5. A) In Berlin"
+        ],
+        "Lesen und Hören 2": [
+            "1. A) sieben", "2. B) Drei", "3. B) Sechs", "4. B) Neun", "5. B) Sieben", "6. C) Fünf",
+            "",  # blank line for spacing
+            "7. B) zweihundertzweiundzwanzig", "8. A) fünfhundertneun", "9. A) zweitausendvierzig", "10. A) fünftausendfünfhundertneun",
+            "",  # blank line for spacing
+            "1. 16 – sechzehn", "2. 98 – achtundneunzig", "3. 555 – fünfhundertfünfundfünfzig",
+            "",  # blank line for spacing
+            "4. 1020 – tausendzwanzig", "5. 8553 – achttausendfünfhundertdreiundfünfzig"
+        ],
+        "Lesen und Hören 4": [
+            "1. C) Neun", "2. B) Polnisch", "3. D) Niederländisch", "4. A) Deutsch", "5. C) Paris", "6. B) Amsterdam", "7. C) In der Schweiz"
+             "",  # blank line for spacing
+            "1. C) In Italien und Frankreich", "2. C) Rom", "3. B) Das Essen", "4. B) Paris", "5. A) Nach Spanien"
+        ],
+        "Lesen und Hören 5": [
+            # Part 1 – Vocabulary Review
+            "Der Tisch – the table",
+            "Die Lampe – the lamp",
+            "Das Buch – the book",
+            "Der Stuhl – the chair",
+            "Die Katze – the cat",
+            "Das Auto – the car",
+            "Der Hund – the dog",
+            "Die Blume – the flower",
+            "Das Fenster – the window",
+            "Der Computer – the computer",
+            "",  # blank line for spacing
+            # Part 2 – Nominative Case
+            "1. Der Tisch ist groß",
+            "2. Die Lampe ist neu",
+            "3. Das Buch ist interessant",
+            "4. Der Stuhl ist bequem",
+            "5. Die Katze ist süß",
+            "6. Das Auto ist schnell",
+            "7. Der Hund ist freundlich",
+            "8. Die Blume ist schön",
+            "9. Das Fenster ist offen",
+            "10. Der Computer ist teuer",
+            "",  # blank line for spacing
+            # Part 3 – Accusative Case
+            "1. Ich sehe den Tisch",
+            "2. Sie kauft die Lampe",
+            "3. Er liest das Buch",
+            "4. Wir brauchen den Stuhl",
+            "5. Du fütterst die Katze",
+            "6. Ich fahre das Auto",
+            "7. Sie streichelt den Hund",
+            "8. Er pflückt die Blume",
+            "9. Wir putzen das Fenster",
+            "10. Sie benutzen den Computer"
+        ],
+        "Lesen und Hören 6": [
+            "Das Wohnzimmer – the living room", "Die Küche – the kitchen", "Das Schlafzimmer – the bedroom", "Das Badezimmer – the bathroom", "Der Balkon – the balcony",
+            "",  # blank line for spacing
+            "Der Flur – the hallway", "Das Bett – the bed", "Der Tisch – the table", "Der Stuhl – the chair", "Der Schrank – the wardrobe"
+            "",  # blank line for spacing
+            "1. B) Vier", "2. A) Ein Sofa und ein Fernseher", "3. B) Einen Herd, einen Kühlschrank und einen Tisch mit vier Stühlen", "4. C) Ein großes Bett", "5. D) Eine Dusche, eine Badewanne und ein Waschbecken",
+            "",  # blank line for spacing
+            "6. D) Klein und schön", "7. C) Blumen und einen kleinen Tisch mit zwei Stühlen"
+            "",  # blank line for spacing
+            ["1. B", "2. B", "3. B", "4. C", "5. D", "6. B", "7. C"],
+        ],
+        "Lesen und Hören 7": [
+            "1. B) Um sieben Uhr", "2. B) Um acht Uhr", "3. B) Um sechs Uhr", "4. B) Um zehn Uhr", "5. B) Um neun Uhr",
+            "",  # blank line for spacing
+            "6. C) Nachmittags", "7. A) Um sieben Uhr", "8. A) Montag", "9. B) Am Dienstag und Donnerstag", "10. B) Er ruht sich aus"
+            "",  # blank line for spacing       
+            "1. B) Um neun Uhr", "2. B) Er geht in die Bibliothek", "3. B) Bis zwei Uhr nachmittags", "4. B) Um drei Uhr nachmittags", "5. A) ",
+            "",  # blank line for spacing       
+            "6. B) Um neun Uhr", "7. B) Er geht in die Bibliothek", "8. B) Bis zwei Uhr nachmittags", "9. B) Um drei Uhr nachmittags", "10. B) Um sieben Uhr"
+        ],
+        "Lesen und Hören 8": [
+            "1. B) Zwei Uhr nachmittags", "2. B) 29 Tage", "3. B) April", "4. C) 03.02.2024", "5. C) Mittwoch"
+            "",  # blank line for spacing
+           "1. Falsch", "2. Richtig", "3. Richtig", "4. Falsch", "5. Richtig",
+            "",  # blank line for spacing
+            "1. B) Um Mitternacht", "2. B) Vier Uhr nachmittags", "3. C) 28 Tage", "4. B) Tag. Monat. Jahr", "5. D) Montag"
+        ],
+        "Lesen und Hören 9": [
+            "1. B) Apfel und Karotten", "2. C) Karotten", "3. A) Weil er Vegetarier ist", "4. C) Käse", "5. B) Fleisch",
+            "",  # blank line for spacing
+            "6. B) Kekse", "7. A) Käse", "8. C) Kuchen", "9. C) Schokolade", "10. B) Der Bruder des Autors"
+            "",  # blank line for spacing
+            "1. A) Apfel, Bananen und Karotten", "2. A) Müsli mit Joghurt", "3. D) Karotten", "4. A) Käse", "5. C) Schokoladenkuchen"
+        ],
+        "Lesen und Hören 10 ": [ 
+            "1. Falsch", "2. Wahr", "3. Falsch", "4. Wahr", "5. Wahr", "6. Falsch", "Wahr", "7. Falsch", "8. Falsch", "9. Falsch",
+        
+            "1. B) Einmal pro Woche", "2. C) Apfel und Bananen", "3. A) Ein halbes Kilo", "4. B) 10 Euro", "5. B) Einen schönen Tag"
+        ],
+        "Lesen und Hören 11": [
+            # Teil 1
+            "1. B) Entschuldigung, wo ist der Bahnhof?",
+            "2. B) Links abbiegen",
+            "3. B) Auf der rechten Seite, direkt neben dem großen Supermarkt",
+            "4. B) Wie komme ich zur nächsten Apotheke?",
+            "5. C) Gute Reise und einen schönen Tag noch",
+            "",  # blank line between parts
+            # Teil 2
+            "1. C) Wie komme ich zur nächsten Apotheke?",
+            "2. C) Rechts abbiegen",
+            "3. B) Auf der linken Seite, direkt neben der Bäckerei",
+            "4. A) Gehen Sie geradeaus bis zur Kreuzung, dann links",
+            "5. C) Einen schönen Tag noch",
+            "",  # blank line between parts
+            # Teil 3
+            "Fragen nach dem Weg: Entschuldigung, wie komme ich zum Bahnhof",
+            "Die Straße überqueren: Überqueren Sie die Straße",
+            "Geradeaus gehen: Gehen Sie geradeaus",
+            "Links abbiegen: Biegen Sie links ab",
+            "Rechts abbiegen: Biegen Sie rechts ab",
+            "On the left side: Das Kino ist auf der linken Seite"
+        ],
+        "Lesen und Hören 12.1": [
+            # Teil 1
+            "1. B) Ärztin",
+            "2. A) Weil sie keine Zeit hat",
+            "3. B) Um 8 Uhr",
+            "4. C) Viele verschiedene Fächer",
+            "5. C) Einen Sprachkurs besuchen",
+            "",  # blank line
+            # Teil 2
+            "1. B) Falsch",
+            "2. B) Falsch",
+            "3. B) Falsch",
+            "4. B) Falsch",
+            "5. B) Falsch",
+            "",  # blank line
+            # Teil 3
+            "A) Richtig",
+            "A) Richtig",
+            "A) Richtig",
+            "A) Richtig",
+            "A) Richtig"
+        ],
+        "Lesen und Hören 12.2": [
+            # Teil 1
+            "In Berlin",
+            "Mit seiner Frau und seinen drei Kindern",
+            "Mit seinem Auto",
+            "Um 7:30 Uhr",
+            "Barzahlung (cash)",
+            "",  # blank line between parts
+            # Teil 2
+            "1. B) Um 9:00 Uhr",
+            "2. B) Um 12:00 Uhr",
+            "3. B) Um 18:00 Uhr",
+            "4. B) Um 21:00 Uhr",
+            "5. D) Alles Genannte",
+            "",  # blank line between parts
+            # Teil 3
+            "1. B) Um 9 Uhr",
+            "2. B) Um 12 Uhr",
+            "3. A) ein Computer und ein Drucker",
+            "4. C) in einer Bar",
+            "5. C) bar"
+        ],
+                "Lesen und Hören 13": [
+            # Teil 1
+            "A", "B", "A", "A", "B", "B",
+            "",  # blank line between parts
+            # Teil 2
+            "A", "B", "B",
+            "",  # blank line between parts
+            # Teil 3
+            "B", "B", "B"
+        ],
+      
+        "Lesen und Hören 14.1": [
+            # Teil 1
+            "Anzeige A", "Anzeige B", "Anzeige B", "Anzeige A", "Anzeige A",
+            "",  # blank line between parts
+            # Teil 2
+            "C) Guten Tag, Herr Doktor", "B) Halsschmerzen und Fieber", "C) Seit gestern", "C) Kopfschmerzen und Müdigkeit", "A) Ich verschreibe Ihnen Medikamente",
+            "",  # blank line between parts
+            # Body Parts
+            "Kopf – Head", "Arm – Arm", "Bein – Leg", "Auge – Eye", "Nase – Nose", "Ohr – Ear", "Mund – Mouth", "Hand – Hand", "Fuß – Foot", "Bauch – Stomach"
+         ],
+        "A2 1.1 Lesen": ["1. C) In einer Schule","2. B) Weil sie gerne mit Kindern arbeitet","3. A) In einem Büro","4. B) Tennis","5. B) Es war sonnig und warm","6. B) Italien und Spanien","7. C) Weil die Bäume so schön bunt sind"],
+        "A2 1.1 Hören": ["1. B) Ins Kino gehen","2. A) Weil sie spannende Geschichten liebt","3. A) Tennis","4. B) Es war sonnig und warm","5. C) Einen Spaziergang machen"],
+        "A2 1.2 Lesen": ["1. B) Ein Jahr","2. B) Er ist immer gut gelaunt und organisiert","3. C) Einen Anzug und eine Brille","4. B) Er geht geduldig auf ihre Anliegen ein","5. B) Weil er seine Mitarbeiter regelmäßig lobt","6. A) Wenn eine Aufgabe nicht rechtzeitig erledigt wird","7. B) Dass er fair ist und die Leistungen der Mitarbeiter wertschätzt"],
+        "A2 1.2 Hören": ["1. B) Weil er","2. C) Sprachkurse","3. A) Jeden Tag"],
+        "A2 1.3 Lesen": ["1. B) Anna ist 25 Jahre alt","2. B) In ihrer Freizeit liest Anna Bücher und geht spazieren","3. C) Anna arbeitet in einem Krankenhaus","4. C) Anna hat einen Hund","5. B) Max unterrichtet Mathematik","6. A) Max spielt oft Fußball mit seinen Freunden","7. B) Am Wochenende machen Anna und Max Ausflüge oder besuchen Museen"],
+        "A2 1.3 Hören": ["1. B) Julia ist 26 Jahre alt","2. C) Julia arbeitet als Architektin","3. B) Tobias lebt in Frankfurt","4. A) Tobias möchte ein eigenes Restaurant eröffnen","5. B) Julia und Tobias kochen am Wochenende oft mit Sophie"]
+    }
 
-        with st.form(f"mark_single_assignment_{code}_{sel_a}"):
-            score = st.number_input("Score", 0, 100, ds)
-            comments = st.text_area("Comments", dc)
-            submitted = st.form_submit_button("Save Score")
+    # --- Load Scores from Google Sheet CSV ---
+    scores_sheet_url = (
+        "https://docs.google.com/spreadsheets/d/"
+        "1l66qurVjKkgM3YCYGN3GURT-Q86DEeHql8BL_Z6YfCY/export?format=csv"
+    )
+    try:
+        remote_df = pd.read_csv(scores_sheet_url)
+    except Exception:
+        st.warning("Could not load scores from Google Sheet. Using local database only.")
+        remote_df = pd.DataFrame(columns=["StudentCode", "Name", "Assignment", "Score", "Comments", "Date"])
 
-        if submitted:
-            now = datetime.now().strftime("%Y-%m-%d")
-            row = dict(studentcode=code, name=student['name'], assignment=sel_a,
-                       score=score, comments=comments, date=now, level=student.get('level',''))
-            mask = ~df_scores.apply(norm_match, axis=1)
-            df_scores = df_scores[mask]
-            df_scores = pd.concat([df_scores, pd.DataFrame([row])], ignore_index=True)
-            st.success("Score saved (local only). Download and upload to Google Sheets to make permanent.")
+    # --- Load Scores from SQLite ---
+    rows = cursor_scores.execute(
+        "SELECT StudentCode, Name, Assignment, Score, Comments, Date FROM scores"
+    ).fetchall()
+    local_df = pd.DataFrame(rows, columns=["StudentCode", "Name", "Assignment", "Score", "Comments", "Date"])
 
-            st.download_button(
-                '⬇️ Download Updated Scores CSV (Upload to Google Sheets!)',
-                data=df_scores.to_csv(index=False).encode(),
-                file_name='scores.csv',
-                mime='text/csv'
-            )
-            st.stop()
+        # --- Combine remote and local scores ---
+    scores_df = pd.concat([remote_df, local_df], ignore_index=True)
+    # Normalize and dedupe by date
+    scores_df['Date'] = pd.to_datetime(scores_df['Date'], errors='coerce')
+    scores_df = scores_df.sort_values('Date').drop_duplicates(subset=['StudentCode','Assignment','Date'], keep='last')
+    scores_df['Date'] = scores_df['Date'].dt.strftime('%Y-%m-%d')
+    # --- Assignment Input UI ---
+    st.markdown("---")
+    st.subheader(f"Record Assignment Score for {student_row['name']} ({student_row['studentcode']})")
+    # Filter/search assignment titles
+    assign_filter = st.text_input("🔎 Filter assignment titles", key="assign_filter")
+    assign_options = [k for k in ref_answers.keys() if assign_filter.lower() in k.lower()]
+    assignment = st.selectbox("📋 Select Assignment", [""] + assign_options, key="assignment")
+    if not assignment:
+        assignment = st.text_input("Or enter assignment manually", key="assignment_manual")
+    score = st.number_input("Score", min_value=0, max_value=100, value=0, key="score_input")
+    comments = st.text_area("Comments / Feedback", key="comments_input")
+    if assignment in ref_answers:
+        st.markdown("**Reference Answers:**")
+        st.markdown("<br>".join(ref_answers[assignment]), unsafe_allow_html=True)
 
-    # --- Batch Mode: Mark All Assignments ---
+    # --- Record New Score ---
+    if st.button("💾 Save Score", key="save_score"):
+        now = datetime.now().strftime("%Y-%m-%d")
+        # Save to SQLite
+        cursor_scores.execute(
+            "INSERT INTO scores (StudentCode, Name, Assignment, Score, Comments, Date) VALUES (?,?,?,?,?,?)",
+            (student_row['studentcode'], student_row['name'], assignment, score, comments, now)
+        )
+        conn_scores.commit()
+        st.success("Score saved to database.")
+
+        # --- Download All Scores CSV (from DB) ---
+    if not scores_df.empty:
+        # Merge in student level for export
+        export_df = scores_df.merge(
+            df_students[['studentcode','level']],
+            left_on='StudentCode', right_on='studentcode', how='left'
+        )
+        export_df = export_df[['StudentCode','Name','Assignment','Score','Comments','Date','level']]
+        export_df = export_df.rename(columns={'level':'Level'})
+
+        # Properly indent download button
+        st.download_button(
+            "📁 Download All Scores CSV",
+            data=export_df.to_csv(index=False).encode(),
+            file_name="scores_backup.csv",
+            mime="text/csv"
+        )
+
+    # --- Display Student History & PDF ---
+    hist = scores_df[scores_df['StudentCode'].str.lower() == student_row['studentcode'].lower()]
+    if not hist.empty:
+        st.markdown("### Student Score History")
+        st.dataframe(hist[['Assignment','Score','Comments','Date']])
+        avg = hist['Score'].mean()
+        st.markdown(f"**Average Score:** {avg:.1f}")
+
+        pdf = FPDF()
+        pdf.add_page()
+        def safe(txt): return str(txt).encode('latin-1','replace').decode('latin-1')
+        pdf.set_font("Arial","B",14)
+        pdf.cell(0,10,safe(f"Report for {student_row['name']}"),ln=True)
+        pdf.ln(5)
+        for _, r in hist.iterrows():
+            pdf.set_font("Arial","B",12)
+            pdf.cell(0,8,safe(f"{r['Assignment']}: {r['Score']}/100"),ln=True)
+            pdf.set_font("Arial","",11)
+            pdf.multi_cell(0,8,safe(f"Comments: {r['Comments']}"))
+            if r['Assignment'] in ref_answers:
+                pdf.set_font("Arial","I",11)
+                pdf.multi_cell(0,8,safe("Reference Answers:"))
+                for ans in ref_answers[r['Assignment']]: pdf.multi_cell(0,8,safe(ans))
+            pdf.ln(3)
+        pdf_bytes = pdf.output(dest='S').encode('latin-1','replace')
+        st.download_button(
+            "📄 Download Student Report PDF",
+            data=pdf_bytes,
+            file_name=f"{student_row['name']}_report.pdf",
+            mime="application/pdf"
+        )
     else:
-        st.markdown("---")
-        st.subheader("Batch: Mark Assignments")
-        opts = assigns_by_level.get(level, [])
-        with st.form(f"batch_marking_form_{code}"):
-            batch = {}
-            for a in opts:
-                # Match using normalization
-                def norm_batch(row):
-                    return (row.get('studentcode','') == code) and (normalize_assignment_for_match(row.get('assignment','')) == normalize_assignment_for_match(a))
-                pr = df_scores[df_scores.apply(norm_batch, axis=1)]
-                val = int(pr['score'].iloc[0]) if not pr.empty else 0
-                batch[a] = st.number_input(a, 0, 100, val)
-            batch_submitted = st.form_submit_button("Save All")
-        if batch_submitted:
-            now = datetime.now().strftime("%Y-%m-%d")
-            new = [dict(studentcode=code, name=student['name'], assignment=a,
-                        score=v, comments='', date=now, level=student.get('level',''))
-                   for a, v in batch.items()]
-            def not_in_batch(row):
-                normed_batch = [normalize_assignment_for_match(a) for a in batch]
-                return not ((row.get('studentcode','') == code) and (normalize_assignment_for_match(row.get('assignment','')) in normed_batch))
-            df_scores = df_scores[df_scores.apply(not_in_batch, axis=1)]
-            df_scores = pd.concat([df_scores, pd.DataFrame(new)], ignore_index=True)
-            st.success("All scores saved (local only). Download and upload to Google Sheets to make permanent.")
-
-            st.download_button(
-                '⬇️ Download Updated Scores CSV (Upload to Google Sheets!)',
-                data=df_scores.to_csv(index=False).encode(),
-                file_name='scores.csv',
-                mime='text/csv'
-            )
-            st.stop()
-
-    # --- Score History and PDF Report ---
-    st.markdown("### Score History & PDF Report")
-    opts = assigns_by_level.get(level, [])
-    normed_opts = set([normalize_assignment_for_match(a) for a in opts])
-    def match_history(row):
-        return (row.get('studentcode','') == code) and (normalize_assignment_for_match(row.get('assignment','')) in normed_opts)
-    history = df_scores[df_scores.apply(match_history, axis=1)].sort_values('date', ascending=False)
-    st.write(f"Completed: {history['assignment'].nunique()} / {total}")
-    if not history.empty:
-        dfh = history[['assignment', 'score', 'comments', 'date']].copy()
-        def ref_preview(x):
-            matched_key = best_ref_key(x)
-            return "; ".join(ans[:100]+'...' if len(ans) > 100 else ans for ans in REF_ANSWERS.get(matched_key, []))
-        dfh['reference'] = dfh['assignment'].apply(ref_preview)
-        st.dataframe(dfh)
-    else:
-        st.info("No records yet.")
-
-    # --- PDF Download and Email ---
-    pdf_bytes = build_simple_pdf(student, history, REF_ANSWERS, total)
-    st.download_button("Download PDF Report", pdf_bytes, f"{code}_report.pdf", "application/pdf")
-    if student.get('email') and st.button('Email PDF'):
-        try:
-            send_email_with_pdf(student['email'], student['name'], pdf_bytes,
-                                st.secrets['general']['SENDGRID_API_KEY'],
-                                st.secrets['general']['SENDER_EMAIL'])
-            st.success("✅ Email sent successfully!")
-        except Exception as e:
-            st.error(f"❌ Email failed to send: {e}")
-
-# ============== END OF MARKING TAB ==============
-
-
+        st.info("No scores found for this student.")
