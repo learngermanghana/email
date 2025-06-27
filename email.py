@@ -1189,7 +1189,7 @@ with tabs[9]:
                 df_scores = pd.concat([df_scores, pd.DataFrame([row])], ignore_index=True)
                 sync_scores_to_sqlite(df_scores)
                 st.success("Score saved.")
-                st.experimental_rerun()
+                st.rerun()
     else:
         # Batch mode: all assignments of level
         st.markdown("---")
