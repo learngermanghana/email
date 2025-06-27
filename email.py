@@ -205,7 +205,7 @@ A1_REF_ANSWERS = {
         "4. B) Tom",
         "5. A) In Berlin"
     ],
-    "Lesen und Horen 2.": [
+    "Lesen und Horen 2": [
         "1. A) sieben",
         "2. B) Drei",
         "3. B) Sechs",
