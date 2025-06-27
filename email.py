@@ -1140,11 +1140,10 @@ with tabs[8]:
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
 
-
-with tabs[9]:
+ with tabs[9]:
     st.title("Assignment Marking & Scores (Email, Reference, PDF)")
 
-    # --- Load and normalize students ---
+    # Load and normalize students
     try:
         df_students = pd.read_csv("students.csv")
         df_students = normalize_cols(df_students)
@@ -1152,7 +1151,7 @@ with tabs[9]:
         st.error("Could not load student list.")
         df_students = pd.DataFrame(columns=['name', 'studentcode', 'email', 'level'])
 
-    # --- Load and normalize scores ---
+    # Load and normalize scores
     try:
         df_scores = pd.read_csv(
             "https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/export?format=csv"
@@ -1162,24 +1161,20 @@ with tabs[9]:
         st.error("Could not load score history.")
         df_scores = pd.DataFrame(columns=['studentcode', 'name', 'assignment', 'score', 'comments', 'date', 'level'])
 
-    # --- Reference answers and assignment totals ---
+    # Reference answers and assignment totals
     LEVEL_TOTALS = {'A1': 18, 'A2': 28, 'B1': 26, 'B2': 30}
     ref_answers = load_ref_answers()
-
-    # --- Assignments list (debug lines can be commented out in prod) ---
-    # st.write("🔑 Ref Answer Keys:", list(ref_answers.keys()))
-    # st.write("📝 Assignment Names in Scores:", df_scores['assignment'].unique())
 
     @st.cache_data
     def all_assignments(df, ref_answers):
         return sorted(set(df['assignment'].dropna()) | set(ref_answers.keys()))
 
-    all_assigns = all_assignments(df_scores, ref_answers)  # MUST BE BEFORE USE
+    all_assigns = all_assignments(df_scores, ref_answers)
 
-    # --- Mode switch ---
+    # Mode switch
     mode = st.radio("Marking Mode", ["Classic", "Batch"], horizontal=True)
 
-    # --- Student search/select ---
+    # Student search/select
     st.subheader("Find Student")
     search = st.text_input("Search name or code")
     filtered = df_students.copy()
@@ -1198,7 +1193,7 @@ with tabs[9]:
     level = student.get('level', '').upper()
     total = LEVEL_TOTALS.get(level, 0)
 
-    # --- Classic mode: single assignment ---
+    # Classic mode: single assignment
     if mode == "Classic":
         st.markdown("---")
         st.subheader("Classic: Mark Single Assignment")
@@ -1212,10 +1207,12 @@ with tabs[9]:
             st.subheader("Reference Answers")
             for ans in ref_answers[sel_a]:
                 st.write(f"- {ans}")
+
         with st.form("mark_form"):
             score = st.number_input("Score", 0, 100, ds)
             comments = st.text_area("Comments", dc)
-            if st.form_submit_button("Save Score"):
+            save_clicked = st.form_submit_button("Save Score")
+            if save_clicked:
                 now = datetime.now().strftime("%Y-%m-%d")
                 row = dict(studentcode=code, name=student['name'], assignment=sel_a,
                            score=score, comments=comments, date=now, level=student['level'])
@@ -1227,16 +1224,22 @@ with tabs[9]:
                 sync_scores_to_sqlite(df_scores)
                 df_scores.to_csv("scores.csv", index=False)   # Save local for download
 
+                st.session_state["show_score_download"] = True
                 st.success("Score saved **locally**. Download and upload 'scores.csv' to Google Sheets to make permanent!")
-                st.download_button(
-                    '⬇️ Download Updated Scores CSV (Upload to Google Sheets!)',
-                    data=df_scores.to_csv(index=False).encode(),
-                    file_name='scores.csv',
-                    mime='text/csv'
-                )
-                st.stop()
+
+        # OUTSIDE the form: show download button if needed
+        if st.session_state.get("show_score_download"):
+            st.download_button(
+                '⬇️ Download Updated Scores CSV (Upload to Google Sheets!)',
+                data=df_scores.to_csv(index=False).encode(),
+                file_name='scores.csv',
+                mime='text/csv'
+            )
+            # Optionally reset flag after download
+            # st.session_state["show_score_download"] = False
+
     else:
-        # --- Batch mode: all assignments of level ---
+        # Batch mode: all assignments of level
         st.markdown("---")
         st.subheader("Batch: Mark Assignments")
         stu_scores = df_scores[df_scores['studentcode'] == code]
@@ -1246,7 +1249,8 @@ with tabs[9]:
                 pr = stu_scores[stu_scores['assignment'] == a]
                 val = int(pr['score'].iloc[0]) if not pr.empty else 0
                 batch[a] = st.number_input(a, 0, 100, val)
-            if st.form_submit_button("Save All"):
+            save_all_clicked = st.form_submit_button("Save All")
+            if save_all_clicked:
                 now = datetime.now().strftime("%Y-%m-%d")
                 new = [dict(studentcode=code, name=student['name'], assignment=a,
                             score=v, comments='', date=now, level=student['level'])
@@ -1257,16 +1261,20 @@ with tabs[9]:
                 df_scores = pd.concat([df_scores, pd.DataFrame(new)], ignore_index=True)
                 sync_scores_to_sqlite(df_scores)
                 df_scores.to_csv("scores.csv", index=False)
-                st.success("All scores saved. Download and upload 'scores.csv' to Google Sheets to make permanent!")
-                st.download_button(
-                    '⬇️ Download Updated Scores CSV (Upload to Google Sheets!)',
-                    data=df_scores.to_csv(index=False).encode(),
-                    file_name='scores.csv',
-                    mime='text/csv'
-                )
-                st.stop()
+                st.session_state["show_score_download"] = True
+                st.success("All scores saved **locally**. Download and upload 'scores.csv' to Google Sheets to make permanent!")
 
-    # --- Score history & PDF download ---
+        # OUTSIDE the form: show download for batch too
+        if st.session_state.get("show_score_download"):
+            st.download_button(
+                '⬇️ Download Updated Scores CSV (Upload to Google Sheets!)',
+                data=df_scores.to_csv(index=False).encode(),
+                file_name='scores.csv',
+                mime='text/csv'
+            )
+            # st.session_state["show_score_download"] = False
+
+    # History and PDF
     st.markdown("### Score History & PDF Report")
     history = df_scores[df_scores['studentcode'] == code].sort_values('date', ascending=False)
     st.write(f"Completed: {history['assignment'].nunique()} / {total}")
@@ -1281,7 +1289,6 @@ with tabs[9]:
     st.download_button("Download PDF Report", pdf_bytes,
                        f"{student['studentcode']}_report.pdf", "application/pdf")
 
-    # --- Email PDF if student has email ---
     if student.get('email'):
         if st.button(f"Email PDF to {student['email']}"):
             try:
@@ -1296,3 +1303,4 @@ with tabs[9]:
             except Exception as e:
                 st.error(f"❌ Email failed to send: {e}")
 #end
+
