@@ -174,9 +174,12 @@ all_assignments = sorted(list(ref_answers.keys()))
 
 # ==== Ready for the rest of your main code / tabs ====
 
+
+
+
    
 
-    ref_answers = {
+ref_answers = {
     # --- A1 Section ---
     "A1 0.1": [
         "1. C) Guten Morgen",
