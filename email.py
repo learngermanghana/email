@@ -111,7 +111,6 @@ def send_email_with_pdf(student_email, student_name, pdf_bytes, sendgrid_api_key
     response = sg.send(message)
     return response.status_code  # Add this line!
 
-# ==== PDF Builder ====
 def build_simple_pdf(student, history_df, ref_answers, total):
     pdf = FPDF(format='A4')
     pdf.add_page()
@@ -122,7 +121,7 @@ def build_simple_pdf(student, history_df, ref_answers, total):
     pdf.cell(0, 8, f"Level: {student['level']}", ln=True)
     pdf.cell(0, 8, f"Date: {datetime.now():%Y-%m-%d}", ln=True)
     pdf.ln(4)
-    pdf.cell(0, 8, f"Assignments completed: {history_df['assignment'].nunique()} / {total}", ln=True)
+    pdf.cell(0, 8, f"Assignments completed: {history_df['assignment'].nunique() if not history_df.empty else 0} / {total}", ln=True)
     pdf.ln(4)
 
     # Table header
@@ -132,29 +131,26 @@ def build_simple_pdf(student, history_df, ref_answers, total):
         pdf.cell(w, 8, h, border=1)
     pdf.ln()
 
-    # Prepare data
-    assignments = history_df['assignment'].tolist()
-    scores = history_df['score'].astype(str).tolist()
-    dates = history_df['date'].tolist()
-    references = ["; ".join(ref_answers.get(a, [])) for a in assignments]
+    if not history_df.empty:
+        # Existing code to fill table
+        assignments = history_df['assignment'].tolist()
+        scores = history_df['score'].astype(str).tolist()
+        dates = history_df['date'].tolist()
+        references = ["; ".join(ref_answers.get(a, [])) for a in assignments]
+        avg_char_width = pdf.get_string_width('W') or 1
+        max_ref_chars = int(col_widths[3] / avg_char_width)
+        row_height = 6
+        for assignment, score, date_str, reference in zip(assignments, scores, dates, references):
+            pdf.cell(col_widths[0], row_height, assignment[:40], border=1)
+            pdf.cell(col_widths[1], row_height, score, border=1)
+            pdf.cell(col_widths[2], row_height, date_str, border=1)
+            ref_text = reference[:max_ref_chars - 3] + '...' if len(reference) > max_ref_chars else reference
+            pdf.cell(col_widths[3], row_height, ref_text, border=1)
+            pdf.ln()
+    else:
+        pdf.cell(sum(col_widths), 8, "No score records found.", border=1, ln=True)
 
-    # Calculate max chars per cell for reference
-    avg_char_width = pdf.get_string_width('W') or 1
-    max_ref_chars = int(col_widths[3] / avg_char_width)
-
-    # Row height
-    row_height = 6
-
-    # Table rows: use fixed-height cells for alignment
-    for assignment, score, date_str, reference in zip(assignments, scores, dates, references):
-        pdf.cell(col_widths[0], row_height, assignment[:40], border=1)
-        pdf.cell(col_widths[1], row_height, score, border=1)
-        pdf.cell(col_widths[2], row_height, date_str, border=1)
-        # Truncate reference to fit in single cell
-        ref_text = reference[:max_ref_chars - 3] + '...' if len(reference) > max_ref_chars else reference
-        pdf.cell(col_widths[3], row_height, ref_text, border=1)
-        pdf.ln()
-    return pdf.output(dest='S')
+    return pdf.output(dest='S').encode("latin-1")
 
 def sync_google_sheet_to_sqlite(df):
     conn = sqlite3.connect("students_backup.db")
@@ -170,11 +166,16 @@ def normalize_text(text):
 def normalize_key(k):
     return re.sub(r'[^A-Za-z0-9]+', '', k).lower()
 
-all_keys = list(A1_REF_ANSWERS.keys()) + list(A2_REF_ANSWERS.keys())
-normed = [normalize_key(k) for k in all_keys]
-dupes = [item for item, count in Counter(normed).items() if count > 1]
-print([k for k in all_keys if normalize_key(k) in dupes])
+# 1. Define reference answers
+A1_REF_ANSWERS = {...}   # <-- Make sure this is here
+A2_REF_ANSWERS = {...}   # <-- And this
 
+# 2. Combine
+REF_ANSWERS = {**A1_REF_ANSWERS, **A2_REF_ANSWERS}
+
+# 3. Any other code that needs these
+all_keys = list(A1_REF_ANSWERS.keys()) + list(A2_REF_ANSWERS.keys()
+                                              
 # ==== Reference Answers: A1 ====
 A1_REF_ANSWERS = {
     "Lesen und Horen 0.2": [
@@ -1769,6 +1770,7 @@ with tabs[9]:
         st.info("No records yet.")
 
     # --- PDF Download and Email ---
+    st.write("DEBUG history:", history)
     pdf_bytes = build_simple_pdf(student, history, REF_ANSWERS, total)
     st.download_button("Download PDF Report", pdf_bytes, f"{code}_report.pdf", "application/pdf")
     if student.get('email') and st.button('Email PDF'):
