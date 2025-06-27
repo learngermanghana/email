@@ -497,6 +497,9 @@ ref_answers = {
     ]
     # (continue with A2 4.11 and upwards...)
 }
+
+# ==== 8. Reference Answers (no indent!) ====
+
     ref_answers = {
     # --- A1 Section ---
     "A1 0.1": [
@@ -1056,6 +1059,7 @@ ref_answers = {
         "7. c) Kranken-, Renten- und Pflegeversicherung"
     ]
 })
+
 
 
     st.write("Assignments in scores:", df_scores[assign_col].unique())
