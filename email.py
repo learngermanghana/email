@@ -1128,11 +1128,60 @@ with tabs[8]:
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
 
+import os
+import pandas as pd
+import streamlit as st
+from datetime import datetime
+from fpdf import FPDF
+
+# External utilities (assumed available)
+from utils import normalize_cols, load_ref_answers, sync_scores_to_sqlite
+from email_utils import send_email_with_pdf
+
+# ==== PDF Builder ====
+def build_simple_pdf(student, history_df, ref_answers, total):
+    pdf = FPDF(format='A4')
+    pdf.add_page()
+    pdf.set_font('Arial', size=12)
+    pdf.cell(0, 10, 'Learn Language Education Academy', ln=True, align='C')
+    pdf.ln(4)
+    pdf.cell(0, 8, f"Student: {student['name']} ({student['studentcode']})", ln=True)
+    pdf.cell(0, 8, f"Level: {student['level']}", ln=True)
+    pdf.cell(0, 8, f"Date: {datetime.now():%Y-%m-%d}", ln=True)
+    pdf.ln(4)
+    pdf.cell(0, 8, f"Assignments completed: {history_df['assignment'].nunique()} / {total}", ln=True)
+    pdf.ln(4)
+
+    col_widths = [60, 20, 30, 80]
+    headers = ['Assignment', 'Score', 'Date', 'Reference']
+    for w, h in zip(col_widths, headers): pdf.cell(w, 8, h, border=1)
+    pdf.ln()
+
+    assignments = history_df['assignment'].tolist()
+    scores = history_df['score'].astype(str).tolist()
+    dates = history_df['date'].tolist()
+    references = ["; ".join(ref_answers.get(a, [])) for a in assignments]
+
+    avg_char_width = pdf.get_string_width('W') or 1
+    max_ref_chars = int(col_widths[3] / avg_char_width)
+    row_height = 6
+
+    for assignment, score, date_str, reference in zip(assignments, scores, dates, references):
+        pdf.cell(col_widths[0], row_height, assignment[:40], border=1)
+        pdf.cell(col_widths[1], row_height, score, border=1)
+        pdf.cell(col_widths[2], row_height, date_str, border=1)
+        ref_text = reference[:max_ref_chars-3] + '...' if len(reference) > max_ref_chars else reference
+        pdf.cell(col_widths[3], row_height, ref_text, border=1)
+        pdf.ln()
+    return pdf.output(dest='S')
+
 # ==== Marking Tab ====
+if 'rerun_needed' not in st.session_state:
+    st.session_state['rerun_needed'] = False
+
 with tabs[9]:
     st.title("Assignment Marking & Scores (Email, Reference, PDF)")
 
-    # Load and normalize students
     try:
         df_students = pd.read_csv('students.csv')
         df_students = normalize_cols(df_students)
@@ -1140,47 +1189,36 @@ with tabs[9]:
         st.error("Could not load student list.")
         df_students = pd.DataFrame(columns=['name','studentcode','email','level'])
 
-    # Load scores from local SQLite to ensure persistence
     try:
         df_scores = load_scores_from_sqlite()
         df_scores = normalize_cols(df_scores)
     except Exception:
-        st.error("Could not load score history from local database.")
+        st.error("Could not load score history.")
         df_scores = pd.DataFrame(columns=['studentcode','name','assignment','score','comments','date','level'])
 
-    # Reference answers and assignment totals
-    LEVEL_TOTALS = {'A1': 18, 'A2': 28, 'B1': 26, 'B2': 30}
+    LEVEL_TOTALS = {'A1':18,'A2':28,'B1':26,'B2':30}
     ref_answers = load_ref_answers()
 
     @st.cache_data
-    def all_assignments(df_scores, ref_answers):
-        return sorted(set(df_scores['assignment'].dropna()) | set(ref_answers.keys()))
-
+    def all_assignments(ds, ra): return sorted(set(ds['assignment'].dropna()) | set(ra.keys()))
     all_assigns = all_assignments(df_scores, ref_answers)
 
-    # Mode switch
     mode = st.radio("Marking Mode", ["Classic","Batch"], horizontal=True)
 
-    # Student search/select
     st.subheader("Find Student")
     search = st.text_input("Search name or code")
     filtered = df_students.copy()
     if search:
-        mask = (
-            filtered['name'].str.lower().str.contains(search.lower(), na=False) |
-            filtered['studentcode'].str.lower().str.contains(search.lower(), na=False)
-        )
-        filtered = filtered[mask]
+        m = filtered['name'].str.lower().str.contains(search.lower(), na=False)
+        n = filtered['studentcode'].str.lower().str.contains(search.lower(), na=False)
+        filtered = filtered[m|n]
     if filtered.empty:
-        st.info("No students found.")
-        st.stop()
+        st.info("No students found."); st.stop()
     sel = st.selectbox("Select Student", filtered['name'] + " (" + filtered['studentcode'] + ")")
     code = sel.split('(')[-1].strip(')')
     student = filtered[filtered['studentcode']==code].iloc[0]
-    level = student.get('level','').upper()
-    total = LEVEL_TOTALS.get(level,0)
+    level = student.get('level','').upper(); total = LEVEL_TOTALS.get(level,0)
 
-    # Classic mode: single assignment
     if mode == "Classic":
         st.markdown("---")
         st.subheader("Classic: Mark Single Assignment")
@@ -1198,16 +1236,14 @@ with tabs[9]:
             comments = st.text_area("Comments",dc)
             if st.form_submit_button("Save Score"):
                 now = datetime.now().strftime("%Y-%m-%d")
-                entry = dict(studentcode=code,name=student['name'],assignment=sel_a,
-                             score=score,comments=comments,date=now,level=level)
-                # Update local df_scores and database
+                entry = {'studentcode':code,'name':student['name'],'assignment':sel_a,
+                         'score':score,'comments':comments,'date':now,'level':level}
                 df_scores = df_scores[~((df_scores['studentcode']==code)&(df_scores['assignment']==sel_a))]
                 df_scores = pd.concat([df_scores,pd.DataFrame([entry])],ignore_index=True)
                 sync_scores_to_sqlite(df_scores)
+                st.session_state['rerun_needed'] = True
                 st.success("Score saved permanently.")
-                st.experimental_rerun()
     else:
-        # Batch mode
         st.markdown("---")
         st.subheader("Batch: Mark Assignments")
         stu_scores = df_scores[df_scores['studentcode']==code]
@@ -1216,35 +1252,39 @@ with tabs[9]:
             for a in [x for x in all_assigns if x.startswith(level)]:
                 pr = stu_scores[stu_scores['assignment']==a]
                 val = int(pr['score'].iloc[0]) if not pr.empty else 0
-                batch[a]=st.number_input(a,0,100,val)
+                batch[a] = st.number_input(a,0,100,val)
             if st.form_submit_button("Save All"):
                 now = datetime.now().strftime("%Y-%m-%d")
-                rows=[dict(studentcode=code,name=student['name'],assignment=a,
-                            score=v,comments='',date=now,level=level)
-                      for a,v in batch.items()]
+                rows = [{'studentcode':code,'name':student['name'],'assignment':a,
+                         'score':v,'comments':'','date':now,'level':level}
+                        for a,v in batch.items()]
                 df_scores = df_scores[~((df_scores['studentcode']==code)&df_scores['assignment'].isin(batch))]
-                df_scores=pd.concat([df_scores,pd.DataFrame(rows)],ignore_index=True)
+                df_scores = pd.concat([df_scores,pd.DataFrame(rows)],ignore_index=True)
                 sync_scores_to_sqlite(df_scores)
+                st.session_state['rerun_needed'] = True
                 st.success("All scores saved permanently.")
-                st.experimental_rerun()
 
-    # History & PDF
+    # After form submission, rerun outside form context
+    if st.session_state['rerun_needed']:
+        st.session_state['rerun_needed'] = False
+        st.experimental_rerun()
+
     st.markdown("### Score History & PDF Report")
-    history= df_scores[df_scores['studentcode']==code].sort_values('date',ascending=False)
+    history = df_scores[df_scores['studentcode']==code].sort_values('date',ascending=False)
     st.write(f"Completed: {history['assignment'].nunique()} / {total}")
     if not history.empty:
-        dfh=history[['assignment','score','comments','date']].copy()
-        dfh['reference']=dfh['assignment'].apply(lambda x: "; ".join(ref_answers.get(x,[])))
+        dfh = history[['assignment','score','comments','date']].copy()
+        dfh['reference'] = dfh['assignment'].apply(lambda x: "; ".join(ref_answers.get(x,[])))
         st.dataframe(dfh)
     else:
         st.info("No records yet.")
 
-    # Download button placed outside any form to avoid Streamlit errors
     st.download_button("Download PDF Report", build_simple_pdf(student, history, ref_answers, total),
-                       f"{code}_report.pdf", "application/pdf")
-    if student.get('email'):
-        if st.button('Email PDF'):
-            send_email_with_pdf(student['email'],student['name'],
-                                build_simple_pdf(student, history, ref_answers, total),
-                                st.secrets['general']['SENDGRID_API_KEY'],
-                                st.secrets['general']['SENDER_EMAIL'])
+                       f"{code}_report.pdf","application/pdf")
+    if student.get('email') and st.button('Email PDF'):
+        send_email_with_pdf(student['email'],student['name'],
+                            build_simple_pdf(student, history, ref_answers, total),
+                            st.secrets['general']['SENDGRID_API_KEY'],
+                            st.secrets['general']['SENDER_EMAIL'])
+#end
+
