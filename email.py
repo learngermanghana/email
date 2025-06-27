@@ -35,77 +35,10 @@ SUPABASE_URL = "https://uzwgfvxrtagmmoaebxye.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6d2dmdnhydGFnbW1vYWVieHllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTEwNDY4OTEsImV4cCI6MjA2NjYyMjg5MX0.g6gSYYxuMICK2zcaru8wULPjpAMbSo0oC4VfOTz4a2U"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-
-# --- 1. Initialize SQLite (at the top of your script is fine, but needed here too) ---
-conn = sqlite3.connect('scores.db', check_same_thread=False)
-c = conn.cursor()
-c.execute('''
-    CREATE TABLE IF NOT EXISTS scores (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        student_code TEXT,
-        name TEXT,
-        assignment TEXT,
-        score REAL,
-        comments TEXT,
-        date TEXT,
-        level TEXT
-    )
-''')
-conn.commit()
-
-# --- 2. Student data (keep your existing safe_read_csv logic) ---
-student_file = "students.csv"
-github_csv = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
-df_students = safe_read_csv(student_file, github_csv)
-df_students = normalize_columns(df_students)
-
-def getcol(df, name):
-    return col_lookup(df, name)
-
-name_col = getcol(df_students, 'name')
-code_col = getcol(df_students, 'studentcode')
-level_col = getcol(df_students, 'level')
-email_col = getcol(df_students, 'email')
-
-# --- 3. Helper Functions for Scores DB ---
-def fetch_scores_from_db():
-    return pd.read_sql_query("SELECT * FROM scores", conn)
-
-def save_score_to_db(student_code, name, assignment, score, comments, date, level):
-    c.execute('''
-        SELECT id FROM scores WHERE student_code=? AND assignment=?
-    ''', (student_code, assignment))
-    result = c.fetchone()
-    if result:
-        c.execute('''
-            UPDATE scores SET score=?, comments=?, name=?, date=?, level=?
-            WHERE id=?
-        ''', (score, comments, name, date, level, result[0]))
-    else:
-        c.execute('''
-            INSERT INTO scores (student_code, name, assignment, score, comments, date, level)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (student_code, name, assignment, score, comments, date, level))
-    conn.commit()
-
-def delete_score_from_db(row_id):
-    c.execute('DELETE FROM scores WHERE id=?', (row_id,))
-    conn.commit()
-
-# --- 4. All Assignments (from your reference answers) ---
-all_assignments = sorted(list(ref_answers.keys()))
-
-# ==== 3. HELPER FUNCTIONS ====
-def clean_phone(phone):
-    """Format Ghana numbers for WhatsApp."""
-    phone = str(phone).replace(" ", "").replace("+", "").replace("-", "")
-    if phone.startswith("0"):
-        phone = "233" + phone[1:]
-    return ''.join(filter(str.isdigit, phone))
+# ==== 3. HELPER FUNCTIONS (KEEP ALL THESE ABOVE DATA LOADING) ====
 
 def safe_read_csv(local_path, backup_url=None):
     """Try to read local file, then optional backup url."""
-    import pandas as pd, os
     if os.path.exists(local_path):
         return pd.read_csv(local_path)
     if backup_url:
@@ -132,9 +65,16 @@ def col_lookup(df, name):
             return c
     return name  # fallback, but will raise error if not present
 
+def getcol(df, name):
+    return col_lookup(df, name)
 
+def clean_phone(phone):
+    """Format Ghana numbers for WhatsApp."""
+    phone = str(phone).replace(" ", "").replace("+", "").replace("-", "")
+    if phone.startswith("0"):
+        phone = "233" + phone[1:]
+    return ''.join(filter(str.isdigit, phone))
 
-# For PDF-safe text
 def safe_pdf(text):
     return str(text).encode('latin-1', 'replace').decode('latin-1')
 
@@ -144,15 +84,56 @@ def safe_text(s):
         return s.encode("latin-1", "replace").decode("latin-1")
     return str(s)
 
-
-# ---- Add more helpers as needed (PDF, Email) in future stages ----
-
 # ==== 4. SESSION STATE INITIALIZATION ====
 # (Ensures notification/email state is not lost on reruns)
 st.session_state.setdefault("emailed_expiries", set())
 st.session_state.setdefault("dismissed_notifs", set())
 
-# === SUPABASE HELPERS ===
+# ==== 5. DATABASE SETUP ====
+
+# --- Optionally keep SQLite for local backup, but you can remove if using only Supabase ---
+conn = sqlite3.connect('scores.db', check_same_thread=False)
+c = conn.cursor()
+c.execute('''
+    CREATE TABLE IF NOT EXISTS scores (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_code TEXT,
+        name TEXT,
+        assignment TEXT,
+        score REAL,
+        comments TEXT,
+        date TEXT,
+        level TEXT
+    )
+''')
+conn.commit()
+
+def fetch_scores_from_db():
+    return pd.read_sql_query("SELECT * FROM scores", conn)
+
+def save_score_to_db(student_code, name, assignment, score, comments, date, level):
+    c.execute('''
+        SELECT id FROM scores WHERE student_code=? AND assignment=?
+    ''', (student_code, assignment))
+    result = c.fetchone()
+    if result:
+        c.execute('''
+            UPDATE scores SET score=?, comments=?, name=?, date=?, level=?
+            WHERE id=?
+        ''', (score, comments, name, date, level, result[0]))
+    else:
+        c.execute('''
+            INSERT INTO scores (student_code, name, assignment, score, comments, date, level)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (student_code, name, assignment, score, comments, date, level))
+    conn.commit()
+
+def delete_score_from_db(row_id):
+    c.execute('DELETE FROM scores WHERE id=?', (row_id,))
+    conn.commit()
+
+# ==== 6. SUPABASE DB HELPERS ====
+
 def fetch_scores_supabase():
     """Read all scores from Supabase 'scores' table."""
     res = supabase.table("scores").select("*").execute()
@@ -176,7 +157,22 @@ def delete_score_supabase(student_code, assignment):
     """Delete a score from Supabase."""
     supabase.table("scores").delete().eq("student_code", student_code).eq("assignment", assignment).execute()
 
+# ==== 7. DATA LOAD (after all helpers!) ====
+student_file = "students.csv"
+github_csv = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
+df_students = safe_read_csv(student_file, github_csv)
+df_students = normalize_columns(df_students)
 
+name_col = getcol(df_students, 'name')
+code_col = getcol(df_students, 'studentcode')
+level_col = getcol(df_students, 'level')
+email_col = getcol(df_students, 'email')
+
+# --- All Assignments (from your reference answers, define ref_answers earlier or import from file) ---
+# ref_answers = {...}  # make sure this exists in your code!
+all_assignments = sorted(list(ref_answers.keys()))
+
+# ==== Ready for the rest of your main code / tabs ====
 
    
 
