@@ -1601,7 +1601,6 @@ with tabs[8]:
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
     
-
 with tabs[9]:
     st.title("Assignment Marking & Scores (Email, Reference, PDF)")
 
@@ -1669,12 +1668,6 @@ with tabs[9]:
     student = students[students['studentcode'] == code].iloc[0]
     level = student.get('level', '').upper()
     total = LEVEL_TOTALS.get(level, 0)
-    
-    code = sel.split('(')[-1].strip(')')
-    student = valid_students[valid_students['studentcode'] == code].iloc[0]
-    level = student.get('level', '').upper() if 'level' in student else ""
-    total = LEVEL_TOTALS.get(level, 0)
-
 
     # --- Classic Mode: Single Assignment ---
     if mode == "Classic":
