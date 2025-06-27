@@ -1601,7 +1601,6 @@ with tabs[8]:
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
     
-
 with tabs[9]:
     st.title("Assignment Marking & Scores (Email, Reference, PDF)")
 
@@ -1623,7 +1622,7 @@ with tabs[9]:
         df_scores = normalize_cols(df_scores)
     except Exception:
         st.error("Could not load score history.")
-        df_scores = pd.DataFrame(columns=['studentcode','name','assignment','score','comments','date','level'])
+        df_scores = pd.DataFrame(columns=['studentcode', 'name', 'assignment', 'score', 'comments', 'date', 'level'])
 
     # --- All Assignments ---
     @st.cache_data
@@ -1634,25 +1633,41 @@ with tabs[9]:
     # --- Marking Mode Switch ---
     mode = st.radio("Marking Mode", ["Classic", "Batch"], horizontal=True)
 
-    # --- Student Search & Selection ---
+    # --- Student Search & Selection (DEFENSIVE) ---
     st.subheader("Find Student")
     search = st.text_input("Search name or code")
     students = df_students.copy()
+
+    # Only use non-empty name and studentcode rows
+    valid_students = students.dropna(subset=['name', 'studentcode'])
+    valid_students = valid_students[valid_students['name'].astype(str).str.strip() != ""]
+    valid_students = valid_students[valid_students['studentcode'].astype(str).str.strip() != ""]
+
     if search:
         mask = (
-            students['name'].str.lower().str.contains(search.lower(), na=False) |
-            students['studentcode'].astype(str).str.lower().str.contains(search.lower(), na=False)
+            valid_students['name'].astype(str).str.lower().str.contains(search.lower(), na=False) |
+            valid_students['studentcode'].astype(str).str.lower().str.contains(search.lower(), na=False)
         )
-        students = students[mask]
-    if students.empty:
+        valid_students = valid_students[mask]
+
+    if valid_students.empty:
         st.info("No students found.")
         st.stop()
 
-    sel = st.selectbox("Select Student", students['name'] + " (" + students['studentcode'] + ")")
+    # Build selectbox options (name and code, both guaranteed present)
+    student_options = valid_students['name'].astype(str) + " (" + valid_students['studentcode'].astype(str) + ")"
+    sel = st.selectbox("Select Student", student_options)
+
+    # Defensive: Ensure selection is valid
+    if not sel or '(' not in sel:
+        st.warning("Invalid student selection.")
+        st.stop()
+
     code = sel.split('(')[-1].strip(')')
-    student = students[students['studentcode']==code].iloc[0]
-    level = student.get('level', '').upper()
+    student = valid_students[valid_students['studentcode'] == code].iloc[0]
+    level = student.get('level', '').upper() if 'level' in student else ""
     total = LEVEL_TOTALS.get(level, 0)
+
 
     # --- Classic Mode: Single Assignment ---
     if mode == "Classic":
