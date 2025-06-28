@@ -1411,7 +1411,6 @@ with tabs[5]:
     email_col = col_lookup(df_students, "email")
     level_col = col_lookup(df_students, "level")
     code_col  = col_lookup(df_students, "student_code") if "student_code" in df_students.columns else "studentcode"
-    start_col = col_lookup(df_students, "contractstart") if "contractstart" in df_students.columns else ""
 
     # --- 1b. Load score sheet (for assignment results) ---
     scores_csv_url = (
@@ -1430,16 +1429,17 @@ with tabs[5]:
         "Template", template_opts, key="tab6_template"
     )
 
-    # --- 3. Defaults per template ---
+    # --- 3. Template body logic ---
     if selected_template == "Welcome":
         subj_def = "Welcome to Learn Language Education Academy!"
-        start_date = st.text_input("Class Start Date (edit here)", value="")
         body_def = (
             "Hello {name},<br><br>"
             "Welcome to Learn Language Education Academy! We have helped many students succeed, and we’re excited to support you as well.<br><br>"
-            "Your <b>{level}</b> class will begin on <b>{start_date}</b>. You can join either in person or online via Zoom (link will be shared before class).<br><br>"
-            "Attached is your course outline, so you can preview how the class will progress.<br><br>"
-            "You will use our Falowen App (https://falowen.streamlit.app/) to track your progress, see assignments, and practice your skills. Log in with your student code or email.<br><br>"
+            "<b>Your contract starts on the date indicated in the attached course schedule.</b> "
+            "Please refer to the schedule for both your class start and end dates.<br><br>"
+            "You can join classes in person or online via Zoom (link will be sent before class).<br><br>"
+            "We've attached your course outline so you can preview how your class will progress.<br><br>"
+            "You can use our Falowen App (<a href='https://falowen.streamlit.app/'>falowen.streamlit.app</a>) to track your progress, see assignments, and practice your skills. Log in with your student code or email.<br><br>"
             "Assignments, course books, and recorded lectures are all available in Google Classroom.<br><br>"
             "We wish you a great start and look forward to seeing your progress!<br><br>"
             "Best regards,<br>"
