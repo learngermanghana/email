@@ -5,5 +5,5 @@ sendgrid>=6.9.1
 numpy>=1.24.0
 gspread>=5.11.0
 google-auth>=2.22.0
+matplotlib
 
-supabase
