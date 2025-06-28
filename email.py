@@ -1761,6 +1761,7 @@ with tabs[7]:
     history_df = history_df[history_df['studentcode'] == student_code].sort_values('date', ascending=False)
     st.markdown("### 📋 Score History")
     st.dataframe(history_df[['assignment','score','comments','date']], use_container_width=True)
+
 def generate_pdf_report(name: str, history: pd.DataFrame, assignment: str = None) -> bytes:
     pdf = FPDF()
     pdf.add_page()
@@ -1790,15 +1791,16 @@ def generate_pdf_report(name: str, history: pd.DataFrame, assignment: str = None
     pdf.ln(6)
     return pdf.output(dest="S").encode("latin-1", "replace")
 
-    # --- Download button using student name + assignment ---
-    pdf_bytes = generate_pdf_report(student_row['name'], history_df, assignment)
-    pdf_filename = f"{student_row['name'].replace(' ', '_')}_{assignment.replace(' ', '_')}_report.pdf"
-    st.download_button(
-        "Download Report PDF",
-        data=pdf_bytes,
-        file_name=pdf_filename,
-        mime="application/pdf"
-    )
+# --- Download button using student name + assignment ---
+pdf_bytes = generate_pdf_report(student_row['name'], history_df, assignment)
+pdf_filename = f"{student_row['name'].replace(' ', '_')}_{assignment.replace(' ', '_')}_report.pdf"
+st.download_button(
+    "Download Report PDF",
+    data=pdf_bytes,
+    file_name=pdf_filename,
+    mime="application/pdf"
+)
 
 #EndofTab
+
 
