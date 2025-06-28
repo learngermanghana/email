@@ -1720,8 +1720,6 @@ with tabs[6]:
                        data=pdf.output(dest='S').encode('latin-1'),
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
-
-
 with tabs[7]:
     st.title("📝 Assignment Marking & Scores")
 
@@ -1741,7 +1739,7 @@ with tabs[7]:
                 return c
         raise KeyError(f"Column '{name}' not found in DataFrame")
 
-    # --- Students ---
+    # --- Load students ---
     @st.cache_data(show_spinner=False)
     def load_students():
         df = pd.read_csv(students_csv_url)
@@ -1751,7 +1749,7 @@ with tabs[7]:
         return df
     df_students = load_students()
 
-    # --- Scores: SHEET ---
+    # --- Load scores from Sheet ---
     @st.cache_data(ttl=0)
     def load_sheet_scores():
         df = pd.read_csv(scores_csv_url)
@@ -1762,7 +1760,7 @@ with tabs[7]:
             df["level"] = None
         return df
 
-    # --- Scores: SQLITE ---
+    # --- Load scores from SQLite ---
     @st.cache_data(ttl=0)
     def fetch_sqlite_scores():
         conn = init_sqlite_connection()
@@ -1773,7 +1771,7 @@ with tabs[7]:
     df_sheet_scores = load_sheet_scores()
     df_sqlite_scores = fetch_sqlite_scores()
 
-    # --- Harmonize both sources ---
+    # --- Harmonize columns in both sources ---
     for df in [df_sheet_scores, df_sqlite_scores]:
         if "studentcode" not in df.columns:
             if "student_code" in df.columns:
@@ -1781,30 +1779,35 @@ with tabs[7]:
         if "level" not in df.columns:
             df["level"] = None
 
-    # --- Combine: Prefer most recent date for each (studentcode, assignment) ---
+    # --- Combine and deduplicate (prefer latest date for each student+assignment) ---
     df_scores = pd.concat([df_sheet_scores, df_sqlite_scores], ignore_index=True)
     df_scores["date"] = pd.to_datetime(df_scores["date"], errors="coerce")
     df_scores = df_scores.sort_values("date").drop_duplicates(["studentcode", "assignment"], keep="last")
     df_scores = df_scores.reset_index(drop=True)
 
-    # --- Merge NAME and LEVEL from students for complete download ---
+    # --- Merge student name and level for every row (for CSV and display) ---
     df_scores_with_name = df_scores.merge(
         df_students[["studentcode", "name", "level"]],
         on="studentcode", how="left"
     )
-    st.dataframe(df_scores_with_name)
+
+    # --- Ensure all required columns exist (robust for download) ---
+    cols = ['studentcode', 'name', 'assignment', 'score', 'comments', 'date', 'level']
+    for c in cols:
+        if c not in df_scores_with_name.columns:
+            df_scores_with_name[c] = ""
 
     # --- Show full score history ---
     st.markdown("#### 📚 All Score History (Sheet + App)")
-    st.dataframe(df_scores_with_name, use_container_width=True)
+    st.dataframe(df_scores_with_name[cols], use_container_width=True)
 
-    # --- Download with name and level ---
-    cols = ['studentcode', 'name', 'assignment', 'score', 'comments', 'date', 'level']
+    # --- Download button for clean CSV with name and level ---
     st.download_button(
         "⬇️ Download All Scores as CSV (with Name & Level)",
         data=df_scores_with_name[cols].to_csv(index=False),
         file_name="all_scores_with_name_level.csv"
     )
+
 
     # --- Student search and select ---
     st.subheader("🔎 Search Student")
