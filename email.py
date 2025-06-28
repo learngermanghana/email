@@ -1704,8 +1704,8 @@ def extract_code(option):
         return None
     return option.rsplit("(",1)[-1].rstrip(")")
 
-# ---- TAB 8: Assignment Marking & Scores ----
-with tabs[8]:
+# ---- TAB 7: Assignment Marking & Scores ----
+with tabs[7]:
     st.title("📝 Assignment Marking & Scores (Classic + Batch, PDF, Email)")
 
     # ---- 1. Student Search ----
