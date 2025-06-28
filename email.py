@@ -10,9 +10,9 @@ from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileT
 import sqlite3
 
 # ==== 2. CONFIG / CONSTANTS ====
-SCHOOL_NAME    = "Learn Language Education Academy"
-school_sendgrid_key = st.secrets.get("general", {}).get("SENDGRID_API_KEY")
-school_sender_email = st.secrets.get("general", {}).get("SENDER_EMAIL") or "Learngermanghana@gmail.com"
+SCHOOL_NAME          = "Learn Language Education Academy"
+school_sendgrid_key  = st.secrets.get("general", {}).get("SENDGRID_API_KEY")
+school_sender_email  = st.secrets.get("general", {}).get("SENDER_EMAIL") or "Learngermanghana@gmail.com"
 
 # ==== 3. REFERENCE ANSWERS ====
 ref_answers = {
@@ -20,8 +20,12 @@ ref_answers = {
 }
 
 # ==== 4. SQLITE DB HELPERS ====
-def init_sqlite_db():
-    conn = sqlite3.connect('students_scores.db')
+@st.cache_resource
+def init_sqlite_connection():
+    """
+    Return a persistent SQLite connection. Tables created once.
+    """
+    conn = sqlite3.connect('students_scores.db', check_same_thread=False)
     cur = conn.cursor()
     cur.execute('''
         CREATE TABLE IF NOT EXISTS students (
@@ -30,8 +34,7 @@ def init_sqlite_db():
             name TEXT,
             email TEXT,
             level TEXT
-        )
-    ''')
+        )''')
     cur.execute('''
         CREATE TABLE IF NOT EXISTS scores (
             id INTEGER PRIMARY KEY,
@@ -40,50 +43,51 @@ def init_sqlite_db():
             score REAL,
             comments TEXT,
             date TEXT
-        )
-    ''')
+        )''')
     conn.commit()
-    return conn, cur
+    return conn
 
-@st.cache_data
+# Cache results with a TTL to allow fresh data if DB changes externally
 def fetch_students_from_sqlite() -> pd.DataFrame:
-    conn, _ = init_sqlite_db()
+    conn = init_sqlite_connection()
     df = pd.read_sql("SELECT studentcode,name,email,level FROM students", conn)
-    conn.close()
     df.columns = [c.lower() for c in df.columns]
     return df
 
-@st.cache_data
+@st.cache_data(ttl=600)
 def fetch_scores_from_sqlite() -> pd.DataFrame:
-    conn, _ = init_sqlite_db()
+    conn = init_sqlite_connection()
     df = pd.read_sql("SELECT studentcode,assignment,score,comments,date FROM scores", conn)
-    conn.close()
     df.columns = [c.lower() for c in df.columns]
     return df
 
 def save_score_to_sqlite(score: dict):
-    conn, cur = init_sqlite_db()
+    conn = init_sqlite_connection()
+    cur = conn.cursor()
     cols = ",".join(score.keys())
     vals = tuple(score.values())
     q = f"INSERT INTO scores ({cols}) VALUES ({','.join(['?']*len(vals))})"
     cur.execute(q, vals)
     conn.commit()
-    conn.close()
 
 # ==== 5. GENERAL HELPERS ====
 def extract_code(selection: str, label: str = "student") -> str:
-    """
-    Safely extract the code in parentheses at the end of a 'Name (code)' string.
-    Falls back with a warning if no match.
-    """
     if not selection:
         st.warning(f"Please select a {label}.")
         st.stop()
     match = re.search(r"\(([^()]+)\)\s*$", selection)
     if not match:
-        st.warning(f"Could not parse {label} code from selection.")
+        st.warning(f"Could not parse {label} code.")
         st.stop()
     return match.group(1)
+
+def choose_student(df: pd.DataFrame, levels: list, key_suffix: str) -> tuple:
+    lvl = st.selectbox("Level", ["All"] + levels, key=f"level_{key_suffix}")
+    filtered = df if lvl == "All" else df[df['level'] == lvl]
+    sel = st.selectbox("Student", filtered['name'] + " (" + filtered['studentcode'] + ")", key=f"student_{key_suffix}")
+    code = extract_code(sel)
+    row = filtered[filtered['studentcode'] == code].iloc[0]
+    return code, row
 
 # ==== 6. PDF & EMAIL HELPERS ====
 def generate_pdf_report(name: str, history: pd.DataFrame) -> bytes:
@@ -92,33 +96,27 @@ def generate_pdf_report(name: str, history: pd.DataFrame) -> bytes:
     pdf.set_font("Arial", "B", 14)
     pdf.cell(0, 10, f"Report for {name}", ln=True)
     pdf.ln(5)
-    for _, row in history.iterrows():
-        pdf.set_font("Arial", "B", 12)
-        pdf.cell(0, 8, f"{row['assignment']}: {row['score']}/100", ln=True)
-        pdf.set_font("Arial", "", 11)
-        pdf.multi_cell(0, 8, f"Comments: {row['comments']}")
+    # Pre-format report lines to improve performance
+    report_lines = [f"{row.assignment}: {row.score}/100 - Comments: {row.comments}" for row in history.itertuples()]
+    pdf.set_font("Arial", "", 11)
+    for line in report_lines:
+        pdf.multi_cell(0, 8, line)
         pdf.ln(3)
     return pdf.output(dest="S").encode("latin-1", "replace")
 
 def send_email_report(pdf_bytes: bytes, to: str, subject: str, html_content: str):
     try:
-        msg = Mail(
-            from_email=school_sender_email,
-            to_emails=to,
-            subject=subject,
-            html_content=html_content
-        )
+        msg = Mail(from_email=school_sender_email, to_emails=to, subject=subject, html_content=html_content)
         attachment = Attachment(
             FileContent(base64.b64encode(pdf_bytes).decode()),
-            FileName(f"{to.replace('@','_')}_report.pdf"),
-            FileType('application/pdf'),
-            Disposition('attachment')
+            FileName(f"{to.replace('@','_')}_report.pdf"), FileType('application/pdf'), Disposition('attachment')
         )
         msg.attachment = attachment
         SendGridAPIClient(school_sendgrid_key).send(msg)
     except Exception as e:
         st.error(f"Email send failed: {e}")
 
+        
 # ==== 8. REFERENCE ANSWERS ====
 #def ref_answers
 ref_answers = {
@@ -1649,73 +1647,65 @@ with tabs[7]:
 
     df_students = fetch_students_from_sqlite()
     df_scores   = fetch_scores_from_sqlite()
-
-    levels = sorted(df_students['level'].unique())
+    levels      = sorted(df_students['level'].unique())
     assignments = sorted(set(df_scores['assignment']).union(ref_answers.keys()))
-
-    mode = st.radio("Mode:", ["Classic", "Batch"], key="mode")
+    mode        = st.radio("Mode:", ["Classic","Batch"], key="mode")
 
     if mode == "Classic":
-        lvl = st.selectbox("Level", ["All"] + levels)
-        students = df_students if lvl == "All" else df_students[df_students['level']==lvl]
-        sel = st.selectbox("Student", students['name'] + " (" + students['studentcode'] + ")")
-        code = extract_code(sel)
-        row = students[students['studentcode']==code].iloc[0]
+        code, student = choose_student(df_students, levels, "classic")
+        hist = df_scores[df_scores['studentcode'] == code]
 
-        filt = st.text_input("Filter Assignment")
+        filt = st.text_input("Filter Assignment", key="filter_classic")
         opts = [a for a in assignments if filt.lower() in a.lower()]
-        asg = st.selectbox("Assignment", opts)
+        assignment = st.selectbox("Assignment", opts, key="assign_classic")
 
-        prev = df_scores[(df_scores['studentcode']==code)&(df_scores['assignment']==asg)]
+        prev    = hist[hist['assignment'] == assignment]
         default = int(prev['score'].iloc[0]) if not prev.empty else 0
-        comments = prev['comments'].iloc[0] if not prev.empty else ""
+        comment = prev['comments'].iloc[0] if not prev.empty else ""
 
-        key_single = f"score_{code}_{hash(asg)}"
-        score = st.number_input("Score", 0, 100, value=default, key=key_single)
-        note  = st.text_area("Comments", value=comments, key=f"note_{code}_{hash(asg)}")
+        with st.form(f"form_classic_{code}"):
+            key_score = f"score_{code}_{hash(assignment)}"
+            score     = st.number_input("Score", 0, 100, value=default, key=key_score)
+            key_note  = f"note_{code}_{hash(assignment)}"
+            note      = st.text_area("Comments", value=comment, key=key_note)
+            submitted = st.form_submit_button("Save Score")
 
-        if asg in ref_answers:
-            st.markdown("**Reference Answers:**")
-            for a in ref_answers[asg]: st.markdown(f"- {a}")
-
-        if st.button("Save Score", key=f"save_single_{code}_{hash(asg)}"):
+        if submitted:
             save_score_to_sqlite({
                 'studentcode': code,
-                'assignment':  asg,
-                'score':       float(score),
-                'comments':    note,
-                'date':        datetime.now().strftime("%Y-%m-%d")
+                'assignment' : assignment,
+                'score'      : float(score),
+                'comments'   : note,
+                'date'       : datetime.now().strftime("%Y-%m-%d")
             })
             st.success("Saved!")
             df_scores = fetch_scores_from_sqlite()
 
-        hist = df_scores[df_scores['studentcode']==code].sort_values('date', ascending=False)
-        st.dataframe(hist[['assignment','score','comments','date']], use_container_width=True)
+        history_df = df_scores[df_scores['studentcode'] == code].sort_values('date', ascending=False)
+        st.dataframe(history_df[['assignment','score','comments','date']], use_container_width=True)
 
     else:
-        lvl = st.selectbox("Level", levels, key="lvl2")
-        students = df_students[df_students['level']==lvl]
-        sel = st.selectbox("Student", students['name'] + " (" + students['studentcode'] + ")")
-        code = extract_code(sel)
-        row = students[students['studentcode']==code].iloc[0]
-
-        st.markdown(f"Enter scores for {row['name']}")
-        prev = df_scores[df_scores['studentcode']==code]
+        code, student = choose_student(df_students, levels, "batch")
+        st.markdown(f"Enter scores for {student['name']}")
+        prev = df_scores[df_scores['studentcode'] == code]
         batch = {}
-        for a in assignments:
-            existing = prev[prev['assignment']==a]
-            val = int(existing['score'].iloc[0]) if not existing.empty else 0
-            sanitized = re.sub(r"\W+", "_", a)
-            key_batch = f"batch_{code}_{sanitized}"
-            batch[a] = st.number_input(a, 0, 100, value=val, key=key_batch)
-        if st.button("Save All", key=f"save_batch_{code}"):
-            for a,v in batch.items():
+        with st.form(f"form_batch_{code}"):
+            for a in assignments:
+                ex     = prev[prev['assignment'] == a]
+                val    = int(ex['score'].iloc[0]) if not ex.empty else 0
+                sanitized = re.sub(r"\W+","_", a)
+                batch_key = f"batch_{code}_{sanitized}"
+                batch[a]  = st.number_input(a, 0, 100, value=val, key=batch_key)
+            submitted = st.form_submit_button("Save All")
+
+        if submitted:
+            for a, v in batch.items():
                 save_score_to_sqlite({
                     'studentcode': code,
-                    'assignment':  a,
-                    'score':       float(v),
-                    'comments':    "",
-                    'date':        datetime.now().strftime("%Y-%m-%d")
+                    'assignment' : a,
+                    'score'      : float(v),
+                    'comments'   : "",
+                    'date'       : datetime.now().strftime("%Y-%m-%d")
                 })
             st.success("Batch saved!")
             df_scores = fetch_scores_from_sqlite()
@@ -1723,15 +1713,12 @@ with tabs[7]:
 
     # REPORT & EMAIL
     st.markdown("---")
-    sel_r = st.selectbox("Report for", df_students['name'] + " (" + df_students['studentcode'] + ")", key="rpt")
-    code_r = extract_code(sel_r)
-    row_r = df_students[df_students['studentcode']==code_r].iloc[0]
-    hist_r = df_scores[df_scores['studentcode']==code_r].sort_values('date', ascending=False)
-
-    pdf_bytes = generate_pdf_report(row_r['name'], hist_r)
-    st.download_button("Download PDF", pdf_bytes, file_name=f"{row_r['name'].replace(' ','_')}_report.pdf")
-    email = row_r['email']['email']
-    if email and st.button("Email PDF", key=f"email_{code_r}"):
-        html = f"<p>Hello {row_r['name']},</p><p>Please find your report attached.</p>"
-        send_email_report(pdf_bytes, email, f"Your Results - {SCHOOL_NAME}", html)
+    code_r, student_r = choose_student(df_students, levels, "report")
+    history_r         = df_scores[df_scores['studentcode'] == code_r].sort_values('date', ascending=False)
+    pdf_bytes         = generate_pdf_report(student_r['name'], history_r)
+    st.download_button("Download PDF", pdf_bytes, file_name=f"{student_r['name'].replace(' ','_')}_report.pdf")
+    if student_r['email'] and st.button("Email PDF", key=f"email_{code_r}"):
+        html = f"<p>Hello {student_r['name']},</p><p>Please find your report attached.</p>"
+        send_email_report(pdf_bytes, student_r['email'], f"Your Results - {SCHOOL_NAME}", html)
         st.success("Email sent!")
+
