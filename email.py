@@ -1700,6 +1700,9 @@ with tabs[7]:
         df.columns = [c.strip().lower().replace(" ", "") for c in df.columns]
         return df
     df_sheet_scores = load_sheet_scores()
+    st.write("Google Sheet Score History:")
+    st.dataframe(df_sheet_scores)
+
 
     @st.cache_data(ttl=0)
     def fetch_sqlite_scores():
