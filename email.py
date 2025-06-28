@@ -111,17 +111,21 @@ def choose_student(df: pd.DataFrame, levels: list, key_suffix: str) -> tuple:
     row = filtered[filtered['studentcode'] == code].iloc[0]
     return code, row
 
-# ==== 6. PDF & EMAIL HELPERS ====
+# Add this helper first!
+def safe_pdf(text):
+    # Remove or replace any character not in latin-1
+    return "".join(c if ord(c) < 256 else "?" for c in str(text))
+
 def generate_pdf_report(name: str, history: pd.DataFrame) -> bytes:
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", "B", 14)
-    pdf.cell(0, 10, f"Report for {name}", ln=True)
+    pdf.cell(0, 10, safe_pdf(f"Report for {name}"), ln=True)
     pdf.ln(5)
     pdf.set_font("Arial", "", 11)
-    for row in history.itertuples():
-        line = f"{row.assignment}: {row.score}/100 − Comments: {row.comments}"
-        pdf.multi_cell(0, 8, line)
+    report_lines = [f"{row.assignment}: {row.score}/100 - Comments: {row.comments}" for row in history.itertuples()]
+    for line in report_lines:
+        pdf.multi_cell(0, 8, safe_pdf(line))
         pdf.ln(3)
     return pdf.output(dest="S").encode("latin-1", "replace")
 
