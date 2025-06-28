@@ -1677,8 +1677,8 @@ with tabs[6]:
 
 
 
-# ==== TAB 9: Assignment Marking & Scores (with Email) ====
-with tabs[9]:
+# ==== TAB 8: Assignment Marking & Scores (with Email) ====
+with tabs[8]:
     st.title("📝 Assignment Marking & Scores (with Email)")
 
     # --- Load students and scores from SQLite ---
