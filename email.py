@@ -823,14 +823,13 @@ ref_answers = {
 # ==== 5. TABS LAYOUT ====
 tabs = st.tabs([
     "📝 Pending",                 # 0
-    "👩‍🎓 All Students",          # 1
+    "👩‍🎓 All Students",            # 1
     "💵 Expenses",                # 2
     "📲 Reminders",               # 3
-    "📄 Contract",                # 4
-    "📧 Send Email",              # 5
-    "📊 Analytics & Export",      # 6
-    "📆 Schedule",                # 7
-    "📝 Marking"                  # 8
+    "📧 Send Email",              # 4
+    "📊 Analytics & Export",      # 5
+    "📆 Schedule",                # 6
+    "📝 Marking"                  # 7
 ])
 
 
@@ -1198,7 +1197,7 @@ with tabs[3]:
         )
 
 # ==== 12. TAB 5: GENERATE CONTRACT & RECEIPT PDF FOR ANY STUDENT ====
-with tabs[5]:
+with tabs[4]:
     st.title("📄 Generate Contract & Receipt PDF for Any Student")
 
     # 1. Google Sheet as main source, fallback to local file if offline
@@ -1353,7 +1352,7 @@ with tabs[5]:
 
 
 # ==== Tab 6: QUICK EMAIL SENDER ====
-with tabs[6]:
+with tabs[5]:
     st.title("📧 Send Email (Quick)")
 
     # 1. Load student list from Google Sheets
@@ -1491,38 +1490,8 @@ with tabs[6]:
             if failures:
                 st.error(f"Failures: {', '.join(failures)}")
 
-# ==== TAB: CLASS SCHEDULE, ZOOM & IN-PERSON INFO ====
-with tabs[8]:  # Adjust tab index if needed
-    st.title("🗓️ Class Schedule – Zoom & In-Person")
-
-    st.markdown("""
-    ### How to Attend Your Classes
-
-    **You may join each lesson online (Zoom) or come to the classroom in person.**
-
-    ---
-
-    #### 🖥️ **Online (Zoom)**
-    - [**Join Zoom Meeting**](https://us06web.zoom.us/j/6886900916?pwd=bEdtR3RLQ2dGTytvYzNrMUV3eFJwUT09)
-    - **Meeting ID:** `688 690 0916`
-    - **Passcode:** `german`
-
-    #### 🏫 **In-Person**
-    - **Location:** Awoshie, Accra, Ghana  
-    - **School:** Learn Language Education Academy
-
-    ---
-
-    ### ⏰ **Regular Class Times**
-    - **Thursdays & Fridays:** 6:00pm – 7:00pm
-    - **Saturdays:** 9:00am – 10:00am
-
-    _Choose your preferred attendance for every lesson. Please be punctual!_
-    """)
-
-
 # ==== 14. TAB 7: COURSE SCHEDULE GENERATOR ====
-with tabs[7]:
+with tabs[6]:
     st.markdown("""
     <div style='background:#e3f2fd;padding:1.2em 1em 0.8em 1em;border-radius:12px;margin-bottom:1em'>
       <h2 style='color:#1565c0;'>📆 <b>Intelligenter Kursplan-Generator (A1, A2, B1)</b></h2>
@@ -1706,7 +1675,7 @@ with tabs[7]:
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
 
-with tabs[8]:
+with tabs[7]:
     st.title("📝 Assignment Marking & Scores (with Email)")
 
     # -- 1. LOAD DATA --
