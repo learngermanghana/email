@@ -1,4 +1,5 @@
 # ==== 1. IMPORTS ====
+import os
 import base64
 import re
 from datetime import datetime, date, timedelta
@@ -9,22 +10,43 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
 import sqlite3
 
+# ==== 1.a. CSV & COLUMN HELPERS ====
+def safe_read_csv(local_path: str, remote_url: str) -> pd.DataFrame:
+    """Try local CSV first, else fall back to remote URL."""
+    if os.path.exists(local_path):
+        return pd.read_csv(local_path)
+    return pd.read_csv(remote_url)
+
+def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Lowercase, strip and de-space all column names."""
+    df.columns = [c.strip().lower().replace(" ", "").replace("_", "") for c in df.columns]
+    return df
+
+def col_lookup(df: pd.DataFrame, name: str) -> str:
+    """Find the actual column name for a logical key."""
+    key = name.lower().replace(" ", "").replace("_", "")
+    for c in df.columns:
+        if c.lower().replace(" ", "").replace("_", "") == key:
+            return c
+    raise KeyError(f"Column '{name}' not found in DataFrame")
+
+def safe_pdf(text: str) -> str:
+    """Ensure strings are PDF-safe (Latin-1)."""
+    return text.encode("latin-1", "replace").decode("latin-1")
+
 # ==== 2. CONFIG / CONSTANTS ====
-SCHOOL_NAME          = "Learn Language Education Academy"
-school_sendgrid_key  = st.secrets.get("general", {}).get("SENDGRID_API_KEY")
-school_sender_email  = st.secrets.get("general", {}).get("SENDER_EMAIL") or "Learngermanghana@gmail.com"
+SCHOOL_NAME         = "Learn Language Education Academy"
+school_sendgrid_key = st.secrets.get("general", {}).get("SENDGRID_API_KEY")
+school_sender_email = st.secrets.get("general", {}).get("SENDER_EMAIL") or "Learngermanghana@gmail.com"
 
 # ==== 3. REFERENCE ANSWERS ====
 ref_answers = {
-    # "Assignment 1": ["Answer A", "Answer B"],
+    # Put your full dictionary of ref_answers here...
 }
 
 # ==== 4. SQLITE DB HELPERS ====
 @st.cache_resource
 def init_sqlite_connection():
-    """
-    Return a persistent SQLite connection. Tables created once.
-    """
     conn = sqlite3.connect('students_scores.db', check_same_thread=False)
     cur = conn.cursor()
     cur.execute('''
@@ -47,7 +69,6 @@ def init_sqlite_connection():
     conn.commit()
     return conn
 
-# Cache results with a TTL to allow fresh data if DB changes externally
 def fetch_students_from_sqlite() -> pd.DataFrame:
     conn = init_sqlite_connection()
     df = pd.read_sql("SELECT studentcode,name,email,level FROM students", conn)
@@ -96,10 +117,9 @@ def generate_pdf_report(name: str, history: pd.DataFrame) -> bytes:
     pdf.set_font("Arial", "B", 14)
     pdf.cell(0, 10, f"Report for {name}", ln=True)
     pdf.ln(5)
-    # Pre-format report lines to improve performance
-    report_lines = [f"{row.assignment}: {row.score}/100 - Comments: {row.comments}" for row in history.itertuples()]
     pdf.set_font("Arial", "", 11)
-    for line in report_lines:
+    for row in history.itertuples():
+        line = f"{row.assignment}: {row.score}/100 − Comments: {row.comments}"
         pdf.multi_cell(0, 8, line)
         pdf.ln(3)
     return pdf.output(dest="S").encode("latin-1", "replace")
@@ -109,7 +129,9 @@ def send_email_report(pdf_bytes: bytes, to: str, subject: str, html_content: str
         msg = Mail(from_email=school_sender_email, to_emails=to, subject=subject, html_content=html_content)
         attachment = Attachment(
             FileContent(base64.b64encode(pdf_bytes).decode()),
-            FileName(f"{to.replace('@','_')}_report.pdf"), FileType('application/pdf'), Disposition('attachment')
+            FileName(f"{to.replace('@','_')}_report.pdf"),
+            FileType('application/pdf'),
+            Disposition('attachment')
         )
         msg.attachment = attachment
         SendGridAPIClient(school_sendgrid_key).send(msg)
