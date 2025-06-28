@@ -1736,21 +1736,18 @@ with tabs[6]:
                        data=pdf.output(dest='S').encode('latin-1'),
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
-
 with tabs[7]:
     st.title("📝 Assignment Marking & Scores")
 
-    # --- 1. Sheet URLs ---
+    # --- URLs ---
     students_csv_url = (
-        "https://docs.google.com/spreadsheets/d/"
-        "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
+        "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
     )
     scores_csv_url = (
-        "https://docs.google.com/spreadsheets/d/"
-        "1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/export?format=csv"
+        "https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/export?format=csv"
     )
 
-    # --- 2. Column lookup helper ---
+    # --- Helpers ---
     def col_lookup(df: pd.DataFrame, name: str) -> str:
         key = name.lower().replace(" ", "").replace("_", "")
         for c in df.columns:
@@ -1758,7 +1755,7 @@ with tabs[7]:
                 return c
         raise KeyError(f"Column '{name}' not found in DataFrame")
 
-    # --- 3. Load students
+    # --- Students ---
     @st.cache_data(show_spinner=False)
     def load_students():
         df = pd.read_csv(students_csv_url)
@@ -1768,7 +1765,7 @@ with tabs[7]:
         return df
     df_students = load_students()
 
-    # --- 4. Load scores (Sheet and SQLite), harmonize columns
+    # --- Scores: SHEET ---
     @st.cache_data(ttl=0)
     def load_sheet_scores():
         df = pd.read_csv(scores_csv_url)
@@ -1779,6 +1776,7 @@ with tabs[7]:
             df["level"] = None
         return df
 
+    # --- Scores: SQLITE ---
     @st.cache_data(ttl=0)
     def fetch_sqlite_scores():
         conn = init_sqlite_connection()
@@ -1789,36 +1787,44 @@ with tabs[7]:
     df_sheet_scores = load_sheet_scores()
     df_sqlite_scores = fetch_sqlite_scores()
 
-    # --- 5. Combine and deduplicate (keep latest date per student + assignment)
+    # --- Harmonize both sources ---
+    for df in [df_sheet_scores, df_sqlite_scores]:
+        if "studentcode" not in df.columns:
+            if "student_code" in df.columns:
+                df["studentcode"] = df["student_code"]
+        if "level" not in df.columns:
+            df["level"] = None
+
+    # --- Combine: Prefer most recent date for each (studentcode, assignment) ---
     df_scores = pd.concat([df_sheet_scores, df_sqlite_scores], ignore_index=True)
-    df_scores['date'] = pd.to_datetime(df_scores['date'], errors='coerce')
-    df_scores = df_scores.sort_values('date').drop_duplicates(['studentcode', 'assignment'], keep='last')
+    df_scores["date"] = pd.to_datetime(df_scores["date"], errors="coerce")
+    df_scores = df_scores.sort_values("date").drop_duplicates(["studentcode", "assignment"], keep="last")
+    df_scores = df_scores.reset_index(drop=True)
 
-    # --- 6. Ensure 'level' is present and filled (Sheet wins if duplicate, else from students) ---
-    if 'level' not in df_scores.columns or df_scores['level'].isnull().all():
+    # --- Merge level from students if still missing ---
+    if df_scores["level"].isnull().any():
         df_scores = df_scores.merge(
-            df_students[['studentcode', 'level']],
-            on='studentcode', how='left', suffixes=('', '_student')
+            df_students[["studentcode", "level"]],
+            on="studentcode", how="left", suffixes=("", "_student")
         )
-        df_scores['level'] = df_scores['level'].combine_first(df_scores.get('level_student'))
-        if 'level_student' in df_scores.columns:
-            df_scores = df_scores.drop(columns=['level_student'])
+        df_scores["level"] = df_scores["level"].combine_first(df_scores.get("level_student"))
+        if "level_student" in df_scores.columns:
+            df_scores = df_scores.drop(columns=["level_student"])
 
-    # --- 7. Show all score history ---
+    # --- Show full score history ---
     st.markdown("#### 📚 All Score History (Sheet + App)")
     st.dataframe(df_scores, use_container_width=True)
 
-    # --- 8. Download button with level ---
     st.download_button(
         "⬇️ Download All Scores as CSV (with Level)",
         data=df_scores.to_csv(index=False),
         file_name="all_scores_with_level.csv"
     )
 
-    # --- 2. Student search and select ---
+    # --- Student search and select ---
     st.subheader("🔎 Search Student")
+    name_col, code_col = col_lookup(df_students, "name"), col_lookup(df_students, "studentcode")
     search_student = st.text_input("Type student name or code...")
-    name_col, code_col = col_lookup(df_students, "name"), col_lookup(df_students, "student_code")
     students_filtered = df_students[
         df_students[name_col].str.contains(search_student, case=False, na=False) |
         df_students[code_col].astype(str).str.contains(search_student, case=False, na=False)
@@ -1835,7 +1841,7 @@ with tabs[7]:
     st.markdown(f"**Selected:** {student_row[name_col]} ({student_code})")
     student_level = student_row['level'] if 'level' in student_row else ""
 
-    # --- 3. Assignment search and select ---
+    # --- Assignment search and select ---
     st.subheader("🔎 Search Assignment")
     search_assign = st.text_input("Type assignment title...", key="search_assign")
     assignments = sorted(set(df_scores['assignment']).union(ref_answers.keys()))
@@ -1845,12 +1851,12 @@ with tabs[7]:
         st.stop()
     assignment = st.selectbox("Select Assignment", filtered, key="assign_select")
 
-    # --- 4. Show Reference Answers (if available) ---
+    # --- Reference Answers (if available) ---
     st.markdown("**Reference Answers:**")
     for ans in ref_answers.get(assignment, []):
         st.write(f"- {ans}")
 
-    # --- 5. Score entry form (pre-fills previous score and comment if exists) ---
+    # --- Score entry form (pre-fills previous score/comment if exists) ---
     prev = df_scores[
         (df_scores['studentcode'] == student_code) &
         (df_scores['assignment'] == assignment)
@@ -1875,7 +1881,7 @@ with tabs[7]:
         st.success("Score saved! Refreshing...")
         st.rerun()
 
-    # --- 6. Show Score History for this student (all sources) ---
+    # --- Show Score History for this student ---
     student_history = df_scores[df_scores['studentcode'] == student_code].sort_values('date', ascending=False)
     st.markdown(f"### 📋 Score History for {student_row[name_col]} (Level: {student_level})")
     st.dataframe(student_history[['assignment','score','comments','date','level']], use_container_width=True)
@@ -1899,5 +1905,7 @@ with tabs[7]:
         file_name=pdf_filename,
         mime="application/pdf"
     )
+    
+#EndofTab7
 
 #EndofTab1
