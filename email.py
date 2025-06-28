@@ -1647,84 +1647,109 @@ with tabs[6]:
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
 
-# ==== 8. ASSIGNMENTS TAB ====
+# ==== 8. TAB 7: ASSIGNMENTS (MARKING & SCORES) ====
 with tabs[7]:
     st.title("📝 Assignment Marking & Scores (with Email)")
 
+    # — Load data from SQLite —
     df_students = fetch_students_from_sqlite()
     df_scores   = fetch_scores_from_sqlite()
+
+    # — Download full student list —
+    csv_students = df_students.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        "📁 Download Students CSV",
+        data=csv_students,
+        file_name="students.csv",
+        mime="text/csv"
+    )
+
+    # — Setup —
     levels      = sorted(df_students['level'].unique())
     assignments = sorted(set(df_scores['assignment']).union(ref_answers.keys()))
-    mode        = st.radio("Mode:", ["Classic","Batch"], key="mode")
+    mode        = st.radio("Mode:", ["Classic", "Batch"], key="mode")
 
+    # — Classic mode: one student, one assignment —
     if mode == "Classic":
         code, student = choose_student(df_students, levels, "classic")
         hist = df_scores[df_scores['studentcode'] == code]
 
-        filt = st.text_input("Filter Assignment", key="filter_classic")
-        opts = [a for a in assignments if filt.lower() in a.lower()]
+        # Filter assignments
+        filt_opts = st.text_input("Filter Assignment", key="filter_classic")
+        opts = [a for a in assignments if filt_opts.lower() in a.lower()]
         assignment = st.selectbox("Assignment", opts, key="assign_classic")
 
+        # Pre-fill if exists
         prev    = hist[hist['assignment'] == assignment]
         default = int(prev['score'].iloc[0]) if not prev.empty else 0
-        comment = prev['comments'].iloc[0] if not prev.empty else ""
+        comment = prev['comments'].iloc[0]     if not prev.empty else ""
 
         with st.form(f"form_classic_{code}"):
-            key_score = f"score_{code}_{hash(assignment)}"
-            score     = st.number_input("Score", 0, 100, value=default, key=key_score)
-            key_note  = f"note_{code}_{hash(assignment)}"
-            note      = st.text_area("Comments", value=comment, key=key_note)
-            submitted = st.form_submit_button("Save Score")
-
-        if submitted:
-            save_score_to_sqlite({
-                'studentcode': code,
-                'assignment' : assignment,
-                'score'      : float(score),
-                'comments'   : note,
-                'date'       : datetime.now().strftime("%Y-%m-%d")
-            })
-            st.success("Saved!")
-            df_scores = fetch_scores_from_sqlite()
-
-        history_df = df_scores[df_scores['studentcode'] == code].sort_values('date', ascending=False)
-        st.dataframe(history_df[['assignment','score','comments','date']], use_container_width=True)
-
-    else:
-        code, student = choose_student(df_students, levels, "batch")
-        st.markdown(f"Enter scores for {student['name']}")
-        prev = df_scores[df_scores['studentcode'] == code]
-        batch = {}
-        with st.form(f"form_batch_{code}"):
-            for a in assignments:
-                ex     = prev[prev['assignment'] == a]
-                val    = int(ex['score'].iloc[0]) if not ex.empty else 0
-                sanitized = re.sub(r"\W+","_", a)
-                batch_key = f"batch_{code}_{sanitized}"
-                batch[a]  = st.number_input(a, 0, 100, value=val, key=batch_key)
-            submitted = st.form_submit_button("Save All")
-
-        if submitted:
-            for a, v in batch.items():
+            score = st.number_input("Score", 0, 100, value=default, key=f"score_{code}_{hash(assignment)}")
+            note  = st.text_area("Comments", value=comment, key=f"note_{code}_{hash(assignment)}")
+            if st.form_submit_button("Save Score"):
                 save_score_to_sqlite({
                     'studentcode': code,
-                    'assignment' : a,
-                    'score'      : float(v),
-                    'comments'   : "",
+                    'assignment' : assignment,
+                    'score'      : float(score),
+                    'comments'   : note,
                     'date'       : datetime.now().strftime("%Y-%m-%d")
                 })
-            st.success("Batch saved!")
-            df_scores = fetch_scores_from_sqlite()
-        st.dataframe(pd.DataFrame(batch.items(), columns=['Assignment','Score']), use_container_width=True)
+                st.success("✅ Saved!")
+                df_scores = fetch_scores_from_sqlite()
 
-    # REPORT & EMAIL
+        # Show history
+        history_df = df_scores[df_scores['studentcode'] == code] \
+                       .sort_values('date', ascending=False)
+        st.dataframe(history_df[['assignment','score','comments','date']], use_container_width=True)
+
+    # — Batch mode: one student, all assignments at once —
+    else:
+        code, student = choose_student(df_students, levels, "batch")
+        st.markdown(f"## Batch Entry for **{student['name']}**")
+        prev = df_scores[df_scores['studentcode'] == code]
+        batch = {}
+
+        with st.form(f"form_batch_{code}"):
+            for a in assignments:
+                ex  = prev[prev['assignment'] == a]
+                val = int(ex['score'].iloc[0]) if not ex.empty else 0
+                key = f"batch_{code}_{re.sub(r'\\W+','_', a)}"
+                batch[a] = st.number_input(a, 0, 100, value=val, key=key)
+            if st.form_submit_button("Save All"):
+                for a, v in batch.items():
+                    save_score_to_sqlite({
+                        'studentcode': code,
+                        'assignment' : a,
+                        'score'      : float(v),
+                        'comments'   : "",
+                        'date'       : datetime.now().strftime("%Y-%m-%d")
+                    })
+                st.success("✅ Batch saved!")
+                df_scores = fetch_scores_from_sqlite()
+
+        st.dataframe(
+            pd.DataFrame(batch.items(), columns=['Assignment','Score']),
+            use_container_width=True
+        )
+
+    # — Report & Email PDF for any student —
     st.markdown("---")
+    st.markdown("## Generate Report & Send by Email")
+
     code_r, student_r = choose_student(df_students, levels, "report")
-    history_r         = df_scores[df_scores['studentcode'] == code_r].sort_values('date', ascending=False)
-    pdf_bytes         = generate_pdf_report(student_r['name'], history_r)
-    st.download_button("Download PDF", pdf_bytes, file_name=f"{student_r['name'].replace(' ','_')}_report.pdf")
-    if student_r['email'] and st.button("Email PDF", key=f"email_{code_r}"):
+    history_r = df_scores[df_scores['studentcode'] == code_r] \
+                  .sort_values('date', ascending=False)
+    pdf_bytes = generate_pdf_report(student_r['name'], history_r)
+
+    st.download_button(
+        "Download Report PDF",
+        pdf_bytes,
+        file_name=f"{student_r['name'].replace(' ','_')}_report.pdf",
+        mime="application/pdf"
+    )
+    if student_r.get('email') and st.button("Email Report", key=f"email_{code_r}"):
         html = f"<p>Hello {student_r['name']},</p><p>Please find your report attached.</p>"
-        send_email_report(pdf_bytes, student_r['email'], f"Your Results - {SCHOOL_NAME}", html)
-        st.success("Email sent!")
+        send_email_report(pdf_bytes, student_r['email'], f"Your Results – {SCHOOL_NAME}", html)
+        st.success("✅ Email sent!")
 
