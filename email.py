@@ -1693,11 +1693,14 @@ with tabs[7]:
         return normalize_columns(df)
     df_students = load_students()
 
-    @st.cache_data(ttl=600)
-    def load_scores():
-        df = pd.read_csv(scores_csv_url)
-        return normalize_columns(df)
-    df_scores = load_scores()
+    @st.cache_data(ttl=0)  # or remove cache for always fresh
+    def fetch_scores_from_sqlite() -> pd.DataFrame:
+        conn = init_sqlite_connection()
+        df = pd.read_sql("SELECT studentcode,assignment,score,comments,date FROM scores", conn)
+        df.columns = [c.lower() for c in df.columns]
+        return df
+
+    df_scores = fetch_scores_from_sqlite()
 
     # --- Search for student ---
     st.subheader("🔎 Search Student")
@@ -1757,7 +1760,7 @@ with tabs[7]:
             'date'       : datetime.now().strftime("%Y-%m-%d")
         })
         st.success("Score saved! Refreshing...")
-        st.experimental_rerun()
+        st.rerun()
 
     # --- Show Score History for Student ---
     history_df = df_scores[df_scores['studentcode'] == student_code].sort_values('date', ascending=False)
