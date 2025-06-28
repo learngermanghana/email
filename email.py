@@ -1521,8 +1521,8 @@ with tabs[8]:  # Adjust tab index if needed
     """)
 
 
-# ==== 14. TAB 8: COURSE SCHEDULE GENERATOR ====
-with tabs[8]:
+# ==== 14. TAB 7: COURSE SCHEDULE GENERATOR ====
+with tabs[7]:
     st.markdown("""
     <div style='background:#e3f2fd;padding:1.2em 1em 0.8em 1em;border-radius:12px;margin-bottom:1em'>
       <h2 style='color:#1565c0;'>📆 <b>Intelligenter Kursplan-Generator (A1, A2, B1)</b></h2>
@@ -1706,7 +1706,7 @@ with tabs[8]:
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
 
-with tabs[9]:
+with tabs[8]:
     st.title("📝 Assignment Marking & Scores (with Email)")
 
     # -- 1. LOAD DATA --
