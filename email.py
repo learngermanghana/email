@@ -1708,12 +1708,31 @@ with tabs[7]:
         return df
     df_sqlite_scores = fetch_sqlite_scores()
 
-    # --- Combine scores: Sheet + App ---
+    # --- 1b. Add LEVEL to scores based on studentcode ---
+    # Use left join to attach level from df_students (by studentcode)
+    def add_level_column(scores_df):
+        # Defensive: make sure all are lower and de-spaced
+        students_df = df_students.copy()
+        students_df['studentcode'] = students_df['studentcode'].astype(str).str.strip()
+        scores_df['studentcode'] = scores_df['studentcode'].astype(str).str.strip()
+        merged = scores_df.merge(
+            students_df[['studentcode', 'level']], on='studentcode', how='left'
+        )
+        # If sheet already has a level column, prefer that, else use merged one
+        if 'level_x' in merged.columns and 'level_y' in merged.columns:
+            merged['level'] = merged['level_x'].combine_first(merged['level_y'])
+        elif 'level' not in merged.columns and 'level_y' in merged.columns:
+            merged['level'] = merged['level_y']
+        return merged.drop(columns=[c for c in merged.columns if c.endswith('_x') or c.endswith('_y')], errors='ignore')
+
+    # --- Combine scores: Sheet + App (with level) ---
+    df_sheet_scores = add_level_column(df_sheet_scores)
+    df_sqlite_scores = add_level_column(df_sqlite_scores)
     df_scores = pd.concat([df_sheet_scores, df_sqlite_scores], ignore_index=True)
     df_scores = df_scores.drop_duplicates(subset=['studentcode', 'assignment', 'date'], keep='last')
 
     # --- Show full history from both sources ---
-    st.markdown("#### 📚 All Score History (Sheet + App)")
+    st.markdown("#### 📚 All Score History (Sheet + App, with Level)")
     st.dataframe(df_scores, use_container_width=True)
     st.download_button("⬇️ Download All Scores as CSV", data=df_scores.to_csv(index=False), file_name="all_scores.csv")
 
@@ -1735,6 +1754,7 @@ with tabs[7]:
     student_code = chosen.split("(")[-1].replace(")", "").strip()
     student_row = students_filtered[students_filtered[code_col] == student_code].iloc[0]
     st.markdown(f"**Selected:** {student_row['name']} ({student_code})")
+    current_level = student_row.get("level", "")
 
     # --- 3. Assignment search and select ---
     st.subheader("🔎 Search Assignment")
@@ -1771,22 +1791,26 @@ with tabs[7]:
             'score'      : float(score),
             'comments'   : comment,
             'date'       : datetime.now().strftime("%Y-%m-%d")
+            # You can also add 'level': current_level, if you want to save it in sqlite table.
         })
         st.success("Score saved! Refreshing...")
         st.rerun()
 
-    # --- 6. Show Score History for this student ---
+    # --- 6. Show Score History for this student (with level) ---
     student_history = df_scores[df_scores['studentcode'] == student_code].sort_values('date', ascending=False)
-    st.markdown("### 📋 Score History for Student")
-    st.dataframe(student_history[['assignment','score','comments','date']], use_container_width=True)
+    st.markdown("### 📋 Score History for Student (with Level)")
+    # Add 'level' to the history table
+    st.dataframe(student_history[['assignment', 'score', 'comments', 'level', 'date']], use_container_width=True)
 
-    # --- 7. Download PDF Report ---
-    def generate_pdf_report(name: str, history: pd.DataFrame, assignment: str = None) -> bytes:
+    # --- 7. Download PDF Report (with Level) ---
+    def generate_pdf_report(name: str, history: pd.DataFrame, assignment: str = None, level: str = "") -> bytes:
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", "B", 15)
         pdf.cell(0, 12, safe_pdf(f"Report for {name}"), ln=True)
-        pdf.ln(6)
+        pdf.set_font("Arial", "", 12)
+        pdf.cell(0, 10, safe_pdf(f"Level: {level}"), ln=True)
+        pdf.ln(4)
         # Reference answers section
         if assignment and assignment in ref_answers and ref_answers[assignment]:
             pdf.set_font("Arial", "B", 12)
@@ -1802,6 +1826,7 @@ with tabs[7]:
         report_lines = [
             f"{row.assignment}: {row.score}/100"
             + (f" - Comments: {row.comments}" if row.comments else "")
+            + (f" - Level: {getattr(row, 'level', '')}" if hasattr(row, 'level') else "")
             for row in history.itertuples()
         ]
         for line in report_lines:
@@ -1810,7 +1835,7 @@ with tabs[7]:
         pdf.ln(6)
         return pdf.output(dest="S").encode("latin-1", "replace")
 
-    pdf_bytes = generate_pdf_report(student_row['name'], student_history, assignment)
+    pdf_bytes = generate_pdf_report(student_row['name'], student_history, assignment, current_level)
     pdf_filename = f"{student_row['name'].replace(' ', '_')}_{assignment.replace(' ', '_')}_report.pdf"
     st.download_button(
         "Download Report PDF",
@@ -1820,3 +1845,4 @@ with tabs[7]:
     )
 
 #EndofTab
+
