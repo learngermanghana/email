@@ -1740,7 +1740,7 @@ with tabs[6]:
 with tabs[7]:
     st.title("📝 Assignment Marking & Scores")
 
-    # --- 1. Load data from Google Sheets ---
+    # --- 1. Sheet URLs ---
     students_csv_url = (
         "https://docs.google.com/spreadsheets/d/"
         "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
@@ -1750,7 +1750,7 @@ with tabs[7]:
         "1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/export?format=csv"
     )
 
-    # --- Column lookup helper ---
+    # --- 2. Column lookup helper ---
     def col_lookup(df: pd.DataFrame, name: str) -> str:
         key = name.lower().replace(" ", "").replace("_", "")
         for c in df.columns:
@@ -1758,19 +1758,26 @@ with tabs[7]:
                 return c
         raise KeyError(f"Column '{name}' not found in DataFrame")
 
+    # --- 3. Load students
     @st.cache_data(show_spinner=False)
     def load_students():
         df = pd.read_csv(students_csv_url)
         df.columns = [c.strip().lower().replace(" ", "").replace("_", "") for c in df.columns]
+        if "student_code" in df.columns:
+            df = df.rename(columns={"student_code": "studentcode"})
         return df
     df_students = load_students()
 
+    # --- 4. Load scores (Sheet and SQLite), harmonize columns
     @st.cache_data(ttl=0)
     def load_sheet_scores():
         df = pd.read_csv(scores_csv_url)
         df.columns = [c.strip().lower().replace(" ", "").replace("_", "") for c in df.columns]
+        if "student_code" in df.columns:
+            df = df.rename(columns={"student_code": "studentcode"})
+        if "level" not in df.columns:
+            df["level"] = None
         return df
-    df_sheet_scores = load_sheet_scores()
 
     @st.cache_data(ttl=0)
     def fetch_sqlite_scores():
@@ -1778,51 +1785,33 @@ with tabs[7]:
         df = pd.read_sql("SELECT studentcode,assignment,score,comments,date,level FROM scores", conn)
         df.columns = [c.lower() for c in df.columns]
         return df
+
+    df_sheet_scores = load_sheet_scores()
     df_sqlite_scores = fetch_sqlite_scores()
 
-    # --- Add level to Google Sheet scores by merging with students ---
-    def add_level_column(scores_df):
-        students_df = df_students.copy()
-        # Look up real code column name in both
-        code_col_scores = col_lookup(scores_df, "student_code")
-        code_col_students = col_lookup(students_df, "student_code")
-        # Standardize for merge
-        scores_df[code_col_scores] = scores_df[code_col_scores].astype(str).str.strip()
-        scores_df = scores_df.rename(columns={code_col_scores: "studentcode"})
-        students_df[code_col_students] = students_df[code_col_students].astype(str).str.strip()
-        students_df = students_df.rename(columns={code_col_students: "studentcode"})
-        merged = scores_df.merge(
-            students_df[['studentcode', 'level']], on='studentcode', how='left'
-        )
-        # Remove double columns if needed
-        if 'level_x' in merged.columns and 'level_y' in merged.columns:
-            merged['level'] = merged['level_x'].combine_first(merged['level_y'])
-        elif 'level' not in merged.columns and 'level_y' in merged.columns:
-            merged['level'] = merged['level_y']
-        return merged.drop(columns=[c for c in merged.columns if c.endswith('_x') or c.endswith('_y')], errors='ignore')
-    df_sheet_scores = add_level_column(df_sheet_scores)
-    if 'level' not in df_sqlite_scores.columns:
-        df_sqlite_scores['level'] = None
-
-    # --- Combine Sheet & App scores ---
+    # --- 5. Combine and deduplicate (keep latest date per student + assignment)
     df_scores = pd.concat([df_sheet_scores, df_sqlite_scores], ignore_index=True)
-    df_scores = df_scores.drop_duplicates(subset=['studentcode', 'assignment', 'date'], keep='last')
+    df_scores['date'] = pd.to_datetime(df_scores['date'], errors='coerce')
+    df_scores = df_scores.sort_values('date').drop_duplicates(['studentcode', 'assignment'], keep='last')
 
-    # --- Show full history from both sources ---
+    # --- 6. Ensure 'level' is present and filled (Sheet wins if duplicate, else from students) ---
+    if 'level' not in df_scores.columns or df_scores['level'].isnull().all():
+        df_scores = df_scores.merge(
+            df_students[['studentcode', 'level']],
+            on='studentcode', how='left', suffixes=('', '_student')
+        )
+        df_scores['level'] = df_scores['level'].combine_first(df_scores.get('level_student'))
+        if 'level_student' in df_scores.columns:
+            df_scores = df_scores.drop(columns=['level_student'])
+
+    # --- 7. Show all score history ---
     st.markdown("#### 📚 All Score History (Sheet + App)")
     st.dataframe(df_scores, use_container_width=True)
 
-    # ---- Merge Level into scores for download ----
-    df_scores_with_level = df_scores.merge(
-        df_students[['studentcode', 'level']],
-        left_on='studentcode',
-        right_on='studentcode',
-        how='left'
-    )
-
+    # --- 8. Download button with level ---
     st.download_button(
         "⬇️ Download All Scores as CSV (with Level)",
-        data=df_scores_with_level.to_csv(index=False),
+        data=df_scores.to_csv(index=False),
         file_name="all_scores_with_level.csv"
     )
 
