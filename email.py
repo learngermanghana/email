@@ -1762,43 +1762,34 @@ with tabs[7]:
     st.markdown("### 📋 Score History")
     st.dataframe(history_df[['assignment','score','comments','date']], use_container_width=True)
 
-    # --- 7. PDF Report (includes reference answers for this assignment) ---
-    st.markdown("---")
-    st.subheader("📄 Download PDF Report")
     def generate_pdf_report(name: str, history: pd.DataFrame, assignment: str = None) -> bytes:
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", "B", 14)
-        pdf.cell(0, 10, safe_pdf(f"Report for {name}"), ln=True)
-        pdf.ln(5)
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 15)
+    pdf.cell(0, 12, safe_pdf(f"Report for {name}"), ln=True)
+    pdf.ln(6)
+    # Reference answers section
+    if assignment and assignment in ref_answers and ref_answers[assignment]:
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(0, 10, safe_pdf(f"Reference Answers for: {assignment}"), ln=True)
         pdf.set_font("Arial", "", 11)
-        if assignment and assignment in ref_answers:
-            pdf.multi_cell(0, 8, safe_pdf("Reference Answers:"))
-            for ref in ref_answers[assignment]:
-                pdf.multi_cell(0, 8, safe_pdf(ref))
-            pdf.ln(4)
-        report_lines = [
-            f"{row.assignment}: {row.score}/100 - Comments: {row.comments}"
-            for row in history.itertuples()
-        ]
-        for line in report_lines:
-            pdf.multi_cell(0, 8, safe_pdf(line))
-            pdf.ln(2)
-        return pdf.output(dest="S").encode("latin-1", "replace")
+        for ref in ref_answers[assignment]:
+            pdf.multi_cell(0, 8, safe_pdf(ref))
+        pdf.ln(3)
+    # Score history section
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(0, 10, "Score History:", ln=True)
+    pdf.set_font("Arial", "", 11)
+    report_lines = [
+        f"{row.assignment}: {row.score}/100"
+        + (f" - Comments: {row.comments}" if row.comments else "")
+        for row in history.itertuples()
+    ]
+    for line in report_lines:
+        pdf.multi_cell(0, 8, safe_pdf(line))
+        pdf.ln(1)
+    pdf.ln(6)
+    return pdf.output(dest="S").encode("latin-1", "replace")
 
-    pdf_bytes = generate_pdf_report(student_row['name'], history_df, assignment)
-    st.download_button(
-        "Download Report PDF",
-        data=pdf_bytes,
-        file_name=f"{student_row['name'].replace(' ', '_')}_report.pdf",
-        mime="application/pdf"
-    )
-    if student_row.get('email'):
-        if st.button("✉️ Email Report", key="email_report"):
-            html = f"<p>Hello {student_row['name']},</p><p>Your score report is attached.</p>"
-            send_email_report(pdf_bytes, student_row['email'],
-                              f"Score Report – {SCHOOL_NAME}", html)
-            st.success("Email sent!")
-    else:
-        st.warning("No email on record for this student.")
 
+#EndofTab
