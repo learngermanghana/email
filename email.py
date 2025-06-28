@@ -1791,6 +1791,7 @@ with tabs[7]:
     df_scores_with_name = df_scores.merge(
         df_students[["studentcode", "name", "level"]],
         on="studentcode", how="left"
+        st.dataframe(df_scores_with_name)
     )
 
     # --- Show full score history ---
