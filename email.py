@@ -905,98 +905,62 @@ Asadu Felix
 
 # --- End of Stage 2 ---
 
-# ==== 7. TAB 0: PENDING REGISTRATIONS ====
 with tabs[0]:
-    st.title("📝 Pending Registrations")
+    st.title("🕒 Pending Students")
 
-    # 1. Load registrations from Google Sheets CSV export (change the link as needed)
-    sheet_csv_url = (
+    # --- 1. LOAD DATA ---
+    pending_csv_url = (
         "https://docs.google.com/spreadsheets/d/"
-        "1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo"
-        "/export?format=csv"
+        "1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo/export?format=csv"
     )
+    @st.cache_data(ttl=0)
+    def load_pending():
+        df = pd.read_csv(pending_csv_url, dtype=str)
+        df.columns = [c.strip().lower().replace(" ", "").replace("_", "") for c in df.columns]
+        return df
+    df = load_pending()
+    st.caption("Preview of pending students loaded from Google Sheet:")
+    st.dataframe(df, use_container_width=True)
 
+    # --- 2. COLUMN LOOKUP ---
+    def col_lookup(df, name):
+        key = name.lower().replace(" ", "").replace("_", "")
+        for c in df.columns:
+            if c.lower().replace(" ", "").replace("_", "") == key:
+                return c
+        raise KeyError(f"Column '{name}' not found in DataFrame")
+
+    # Try to auto-detect column names
     try:
-        new_students = pd.read_csv(sheet_csv_url)
-        new_students = normalize_columns(new_students)
-        st.success("✅ Loaded columns: " + ", ".join(new_students.columns))
-    except Exception as e:
-        st.error(f"❌ Could not load registration sheet: {e}")
-        new_students = pd.DataFrame()
+        name_col = col_lookup(df, "name")
+    except:
+        name_col = df.columns[0]
+    try:
+        code_col = col_lookup(df, "studentcode") if "studentcode" in df.columns else col_lookup(df, "student_code")
+    except:
+        code_col = df.columns[1]
+    try:
+        phone_col = col_lookup(df, "phone")
+    except:
+        phone_col = df.columns[-1]
 
-    # 2. Approve & add each new student
-    if new_students.empty:
-        st.info("No new registrations to process.")
-    else:
-        for i, row in new_students.iterrows():
-            fullname  = row.get("full_name") or row.get("name") or f"Student {i+1}"
-            phone     = row.get("phone_number") or row.get("phone") or ""
-            email     = str(row.get("email") or row.get("email_address") or "").strip()
-            level     = str(row.get("class") or row.get("level") or "").strip()
-            location  = str(row.get("location") or "").strip()
-            emergency = str(row.get("emergency_contact_phone_number") or row.get("emergency") or "").strip()
+    # --- 3. SEARCH ---
+    search = st.text_input("Search by name, code, or phone", key="pending_search")
+    filt = df.copy()
+    if search:
+        mask1 = filt[name_col].str.contains(search, case=False, na=False)
+        mask2 = filt[code_col].str.contains(search, case=False, na=False)
+        mask3 = filt[phone_col].str.contains(search, case=False, na=False)
+        filt = filt[mask1 | mask2 | mask3]
 
-            with st.expander(f"{fullname} — {phone}"):
-                st.write(f"**Email:** {email or '—'}")
-                student_code    = st.text_input("Assign Student Code", key=f"code_{i}")
-                contract_start  = st.date_input("Contract Start", value=date.today(), key=f"start_{i}")
-                course_length   = st.number_input("Course Length (weeks)", min_value=1, value=12, key=f"length_{i}")
-                contract_end    = st.date_input(
-                    "Contract End",
-                    value=contract_start + timedelta(weeks=course_length),
-                    key=f"end_{i}"
-                )
-                paid            = st.number_input("Amount Paid (GHS)", min_value=0.0, step=1.0, key=f"paid_{i}")
-                balance         = st.number_input("Balance Due (GHS)", min_value=0.0, step=1.0, key=f"bal_{i}")
-                first_instalment= st.number_input("First Instalment (GHS)", min_value=0.0, value=1500.0, key=f"firstinst_{i}")
-                send_email      = st.checkbox("Send Welcome Email?", value=bool(email), key=f"email_{i}")
-                attach_pdf      = st.checkbox("Attach PDF to Email?", value=True, key=f"pdf_{i}")
+    st.dataframe(filt, use_container_width=True)
 
-                if st.button("Approve & Add", key=f"approve_{i}"):
-                    if not student_code:
-                        st.warning("❗ Please enter a unique student code.")
-                        continue
-
-                    # Load or initialize approved students CSV
-                    student_file = "students.csv"
-                    if os.path.exists(student_file):
-                        approved_df = pd.read_csv(student_file)
-                    else:
-                        approved_df = pd.DataFrame(columns=[
-                            "Name","Phone","Email","Location","Level",
-                            "Paid","Balance","ContractStart","ContractEnd",
-                            "StudentCode","Emergency Contact (Phone Number)"
-                        ])
-
-                    # Prevent duplicate codes
-                    if student_code in approved_df["StudentCode"].astype(str).values:
-                        st.warning("❗ Student code already exists.")
-                        continue
-
-                    # Compose student dict for saving
-                    student_dict = {
-                        "Name": fullname,
-                        "Phone": phone,
-                        "Email": email,
-                        "Location": location,
-                        "Level": level,
-                        "Paid": paid,
-                        "Balance": balance,
-                        "ContractStart": contract_start.isoformat(),
-                        "ContractEnd": contract_end.isoformat(),
-                        "StudentCode": student_code,
-                        "Emergency Contact (Phone Number)": emergency
-                    }
-
-                    # Append to CSV
-                    approved_df = pd.concat([approved_df, pd.DataFrame([student_dict])], ignore_index=True)
-                    approved_df.to_csv(student_file, index=False)
-
-                    # TODO: Add PDF generation and optional email sending if desired
-                    # pdf_file = generate_receipt_and_contract_pdf(...) # Fill in as needed
-
-                    st.success(f"✅ {fullname} approved and saved.")
-                    st.experimental_rerun()  # Update tab to reflect new student
+    # --- 4. DOWNLOAD ---
+    st.download_button(
+        "⬇️ Download Pending Students as CSV",
+        filt.to_csv(index=False),
+        file_name="pending_students.csv"
+    )
 
 # ==== 9. ALL STUDENTS TAB ====
 with tabs[1]:
