@@ -1720,6 +1720,8 @@ with tabs[6]:
                        data=pdf.output(dest='S').encode('latin-1'),
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
+
+
 with tabs[7]:
     st.title("📝 Assignment Marking & Scores")
 
@@ -1785,24 +1787,22 @@ with tabs[7]:
     df_scores = df_scores.sort_values("date").drop_duplicates(["studentcode", "assignment"], keep="last")
     df_scores = df_scores.reset_index(drop=True)
 
-    # --- Merge level from students if still missing ---
-    if df_scores["level"].isnull().any():
-        df_scores = df_scores.merge(
-            df_students[["studentcode", "level"]],
-            on="studentcode", how="left", suffixes=("", "_student")
-        )
-        df_scores["level"] = df_scores["level"].combine_first(df_scores.get("level_student"))
-        if "level_student" in df_scores.columns:
-            df_scores = df_scores.drop(columns=["level_student"])
+    # --- Merge NAME and LEVEL from students for complete download ---
+    df_scores_with_name = df_scores.merge(
+        df_students[["studentcode", "name", "level"]],
+        on="studentcode", how="left"
+    )
 
     # --- Show full score history ---
     st.markdown("#### 📚 All Score History (Sheet + App)")
-    st.dataframe(df_scores, use_container_width=True)
+    st.dataframe(df_scores_with_name, use_container_width=True)
 
+    # --- Download with name and level ---
+    cols = ['studentcode', 'name', 'assignment', 'score', 'comments', 'date', 'level']
     st.download_button(
-        "⬇️ Download All Scores as CSV (with Level)",
-        data=df_scores.to_csv(index=False),
-        file_name="all_scores_with_level.csv"
+        "⬇️ Download All Scores as CSV (with Name & Level)",
+        data=df_scores_with_name[cols].to_csv(index=False),
+        file_name="all_scores_with_name_level.csv"
     )
 
     # --- Student search and select ---
