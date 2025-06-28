@@ -1677,14 +1677,10 @@ with tabs[6]:
 with tabs[7]:
     st.title("📝 Assignment Marking & Scores")
 
-    # Google Sheets URLs
+    # --- 1. Load data from Google Sheets and SQLite ---
     students_csv_url = (
         "https://docs.google.com/spreadsheets/d/"
         "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
-    )
-    scores_csv_url = (
-        "https://docs.google.com/spreadsheets/d/"
-        "1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/export?format=csv"
     )
 
     @st.cache_data(show_spinner=False)
@@ -1693,7 +1689,7 @@ with tabs[7]:
         return normalize_columns(df)
     df_students = load_students()
 
-    @st.cache_data(ttl=0)  # or remove cache for always fresh
+    @st.cache_data(ttl=0)
     def fetch_scores_from_sqlite() -> pd.DataFrame:
         conn = init_sqlite_connection()
         df = pd.read_sql("SELECT studentcode,assignment,score,comments,date FROM scores", conn)
@@ -1702,7 +1698,7 @@ with tabs[7]:
 
     df_scores = fetch_scores_from_sqlite()
 
-    # --- Search for student ---
+    # --- 2. Student search and select ---
     st.subheader("🔎 Search Student")
     search_student = st.text_input("Type student name or code...")
     students_filtered = df_students[
@@ -1710,7 +1706,6 @@ with tabs[7]:
         df_students['studentcode'].astype(str).str.contains(search_student, case=False, na=False)
     ] if search_student else df_students
 
-    # --- Student selection ---
     name_col, code_col = "name", "studentcode"
     student_list = students_filtered[name_col] + " (" + students_filtered[code_col].astype(str) + ")"
     chosen = st.selectbox("Select Student", student_list, key="single_student")
@@ -1720,10 +1715,9 @@ with tabs[7]:
         st.stop()
     student_code = chosen.split("(")[-1].replace(")", "").strip()
     student_row = students_filtered[students_filtered[code_col] == student_code].iloc[0]
-
     st.markdown(f"**Selected:** {student_row['name']} ({student_code})")
 
-    # --- Assignment search ---
+    # --- 3. Assignment search and select ---
     st.subheader("🔎 Search Assignment")
     search_assign = st.text_input("Type assignment title...", key="search_assign")
     assignments = sorted(set(df_scores['assignment']).union(ref_answers.keys()))
@@ -1733,12 +1727,12 @@ with tabs[7]:
         st.stop()
     assignment = st.selectbox("Select Assignment", filtered, key="assign_select")
 
-    # --- Reference Answers ---
+    # --- 4. Show Reference Answers (if available) ---
     st.markdown("**Reference Answers:**")
     for ans in ref_answers.get(assignment, []):
         st.write(f"- {ans}")
 
-    # --- Score Input ---
+    # --- 5. Score entry form (pre-fills previous score and comment if exists) ---
     prev = df_scores[
         (df_scores['studentcode'] == student_code) &
         (df_scores['assignment'] == assignment)
@@ -1762,12 +1756,13 @@ with tabs[7]:
         st.success("Score saved! Refreshing...")
         st.rerun()
 
-    # --- Show Score History for Student ---
-    history_df = df_scores[df_scores['studentcode'] == student_code].sort_values('date', ascending=False)
+    # --- 6. Show Score History for Student (live from SQLite) ---
+    history_df = fetch_scores_from_sqlite()  # Always fresh
+    history_df = history_df[history_df['studentcode'] == student_code].sort_values('date', ascending=False)
     st.markdown("### 📋 Score History")
     st.dataframe(history_df[['assignment','score','comments','date']], use_container_width=True)
 
-    # --- PDF Report with Reference Answers ---
+    # --- 7. PDF Report (includes reference answers for this assignment) ---
     st.markdown("---")
     st.subheader("📄 Download PDF Report")
     def generate_pdf_report(name: str, history: pd.DataFrame, assignment: str = None) -> bytes:
