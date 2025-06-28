@@ -1696,13 +1696,9 @@ with tabs[7]:
     @st.cache_data(ttl=0)
     def load_sheet_scores():
         df = pd.read_csv(scores_csv_url)
-        # Only lowercase and strip spaces
         df.columns = [c.strip().lower().replace(" ", "") for c in df.columns]
         return df
     df_sheet_scores = load_sheet_scores()
-    st.write("Google Sheet Score History:")
-    st.dataframe(df_sheet_scores)
-
 
     @st.cache_data(ttl=0)
     def fetch_sqlite_scores():
@@ -1712,9 +1708,14 @@ with tabs[7]:
         return df
     df_sqlite_scores = fetch_sqlite_scores()
 
-    # Combine scores: Sheet + App (deduplicate on student, assignment, date)
+    # --- Combine scores: Sheet + App ---
     df_scores = pd.concat([df_sheet_scores, df_sqlite_scores], ignore_index=True)
     df_scores = df_scores.drop_duplicates(subset=['studentcode', 'assignment', 'date'], keep='last')
+
+    # --- Show full history from both sources ---
+    st.markdown("#### 📚 All Score History (Sheet + App)")
+    st.dataframe(df_scores, use_container_width=True)
+    st.download_button("⬇️ Download All Scores as CSV", data=df_scores.to_csv(index=False), file_name="all_scores.csv")
 
     # --- 2. Student search and select ---
     st.subheader("🔎 Search Student")
@@ -1774,51 +1775,48 @@ with tabs[7]:
         st.success("Score saved! Refreshing...")
         st.rerun()
 
-    # --- 6. Show Score History for Student (live from SQLite) ---
-    history_df = fetch_scores_from_sqlite()  # Always fresh
-    history_df = history_df[history_df['studentcode'] == student_code].sort_values('date', ascending=False)
-    st.markdown("### 📋 Score History")
-    st.dataframe(history_df[['assignment','score','comments','date']], use_container_width=True)
+    # --- 6. Show Score History for this student ---
+    student_history = df_scores[df_scores['studentcode'] == student_code].sort_values('date', ascending=False)
+    st.markdown("### 📋 Score History for Student")
+    st.dataframe(student_history[['assignment','score','comments','date']], use_container_width=True)
 
-def generate_pdf_report(name: str, history: pd.DataFrame, assignment: str = None) -> bytes:
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", "B", 15)
-    pdf.cell(0, 12, safe_pdf(f"Report for {name}"), ln=True)
-    pdf.ln(6)
-    # Reference answers section
-    if assignment and assignment in ref_answers and ref_answers[assignment]:
+    # --- 7. Download PDF Report ---
+    def generate_pdf_report(name: str, history: pd.DataFrame, assignment: str = None) -> bytes:
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", "B", 15)
+        pdf.cell(0, 12, safe_pdf(f"Report for {name}"), ln=True)
+        pdf.ln(6)
+        # Reference answers section
+        if assignment and assignment in ref_answers and ref_answers[assignment]:
+            pdf.set_font("Arial", "B", 12)
+            pdf.cell(0, 10, safe_pdf(f"Reference Answers for: {assignment}"), ln=True)
+            pdf.set_font("Arial", "", 11)
+            for ref in ref_answers[assignment]:
+                pdf.multi_cell(0, 8, safe_pdf(ref))
+            pdf.ln(3)
+        # Score history section
         pdf.set_font("Arial", "B", 12)
-        pdf.cell(0, 10, safe_pdf(f"Reference Answers for: {assignment}"), ln=True)
+        pdf.cell(0, 10, "Score History:", ln=True)
         pdf.set_font("Arial", "", 11)
-        for ref in ref_answers[assignment]:
-            pdf.multi_cell(0, 8, safe_pdf(ref))
-        pdf.ln(3)
-    # Score history section
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(0, 10, "Score History:", ln=True)
-    pdf.set_font("Arial", "", 11)
-    report_lines = [
-        f"{row.assignment}: {row.score}/100"
-        + (f" - Comments: {row.comments}" if row.comments else "")
-        for row in history.itertuples()
-    ]
-    for line in report_lines:
-        pdf.multi_cell(0, 8, safe_pdf(line))
-        pdf.ln(1)
-    pdf.ln(6)
-    return pdf.output(dest="S").encode("latin-1", "replace")
+        report_lines = [
+            f"{row.assignment}: {row.score}/100"
+            + (f" - Comments: {row.comments}" if row.comments else "")
+            for row in history.itertuples()
+        ]
+        for line in report_lines:
+            pdf.multi_cell(0, 8, safe_pdf(line))
+            pdf.ln(1)
+        pdf.ln(6)
+        return pdf.output(dest="S").encode("latin-1", "replace")
 
-# --- Download button using student name + assignment ---
-pdf_bytes = generate_pdf_report(student_row['name'], history_df, assignment)
-pdf_filename = f"{student_row['name'].replace(' ', '_')}_{assignment.replace(' ', '_')}_report.pdf"
-st.download_button(
-    "Download Report PDF",
-    data=pdf_bytes,
-    file_name=pdf_filename,
-    mime="application/pdf"
-)
+    pdf_bytes = generate_pdf_report(student_row['name'], student_history, assignment)
+    pdf_filename = f"{student_row['name'].replace(' ', '_')}_{assignment.replace(' ', '_')}_report.pdf"
+    st.download_button(
+        "Download Report PDF",
+        data=pdf_bytes,
+        file_name=pdf_filename,
+        mime="application/pdf"
+    )
 
 #EndofTab
-
-
