@@ -539,6 +539,19 @@ ref_answers = {
         "3. B) Ein Piknik",
         "4. C) in eienem restaurant",
         "5. A) Spielen und Spazieren gehen"
+            ],
+    "A2 2.5": [
+        "1. c) Nudeln, Pizza und Salat",
+        "2. c) Den grünen Salat",
+        "3. c) Schokoladenkuchen und Tiramisu",
+        "4. b) Die Suppe ist kalt",
+        "5. c) In bar",
+        "",
+        "1. A)  Sie trinkt Tee",
+        "2. B) Mensch aregre",
+        "3. A) Sie geht jogeen ",
+        "4. B) in den Bergen",
+        "5. B) Klassische Musik"
     ],
     "A2 3.6": [
         "1. b) Weil ich studiere",
