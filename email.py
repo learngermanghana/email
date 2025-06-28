@@ -818,16 +818,7 @@ ref_answers = {
     ]
 })  # End of A2 4.11–10.28 update
 
-# ==== 8. REFERENCE ANSWERS ====
-#def ref_answers
 
-ref_answers = {
-    # All your A1, A2 up to 4.10...
-}
-
-ref_answers.update({
-    # All your A2 4.11 to 10.28...
-})
 
 
 # ==== 5. TABS LAYOUT ====
