@@ -1788,10 +1788,24 @@ with tabs[7]:
     df_scores = pd.concat([df_sheet_scores, df_sqlite_scores], ignore_index=True)
     df_scores = df_scores.drop_duplicates(subset=['studentcode', 'assignment', 'date'], keep='last')
 
-    # --- Show full history (all data) ---
-    st.markdown("#### 📚 All Score History (Sheet + App, with Levels)")
+    # --- Show full history from both sources ---
+    st.markdown("#### 📚 All Score History (Sheet + App)")
     st.dataframe(df_scores, use_container_width=True)
-    st.download_button("⬇️ Download All Scores as CSV", data=df_scores.to_csv(index=False), file_name="all_scores.csv")
+
+    # ---- Merge Level into scores for download ----
+    df_scores_with_level = df_scores.merge(
+        df_students[['studentcode', 'level']],
+        left_on='studentcode',
+        right_on='studentcode',
+        how='left'
+    )
+
+    st.download_button(
+        "⬇️ Download All Scores as CSV (with Level)",
+        data=df_scores_with_level.to_csv(index=False),
+        file_name="all_scores_with_level.csv"
+    )
+
 
     # --- 2. Student search and select ---
     st.subheader("🔎 Search Student")
