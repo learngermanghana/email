@@ -1696,7 +1696,9 @@ with tabs[7]:
     @st.cache_data(ttl=0)
     def load_sheet_scores():
         df = pd.read_csv(scores_csv_url)
-        return normalize_columns(df)
+        # Only lowercase and strip spaces
+        df.columns = [c.strip().lower().replace(" ", "") for c in df.columns]
+        return df
     df_sheet_scores = load_sheet_scores()
 
     @st.cache_data(ttl=0)
@@ -1707,7 +1709,7 @@ with tabs[7]:
         return df
     df_sqlite_scores = fetch_sqlite_scores()
 
-    # Combine scores: Sheet + App
+    # Combine scores: Sheet + App (deduplicate on student, assignment, date)
     df_scores = pd.concat([df_sheet_scores, df_sqlite_scores], ignore_index=True)
     df_scores = df_scores.drop_duplicates(subset=['studentcode', 'assignment', 'date'], keep='last')
 
@@ -1718,7 +1720,6 @@ with tabs[7]:
         df_students['name'].str.contains(search_student, case=False, na=False) |
         df_students['studentcode'].astype(str).str.contains(search_student, case=False, na=False)
     ] if search_student else df_students
-
 
     name_col, code_col = "name", "studentcode"
     student_list = students_filtered[name_col] + " (" + students_filtered[code_col].astype(str) + ")"
