@@ -1731,9 +1731,7 @@ with tabs[7]:
     hist_r = df_scores[df_scores['studentcode']==code_r].sort_values('date', ascending=False)
 
     pdf_bytes = generate_pdf_report(row_r['name'], hist_r)
-    st.download_button("Download PDF", pdf_bytes, file_name=f"{row_r['name'].replace(' ','_')}_report.pdf")
-
-        email = row_r['email']
+    st.download_button("Download PDF", pdf_bytes, file_name=f"{row_r['name'].replace(' ','_')}_report.pdf")    email = row_r['email']
     if email and st.button("Email PDF", key=f"email_{code_r}"):
         html = f"<p>Hello {row_r['name']},</p><p>Please find your report attached.</p>"
         send_email_report(pdf_bytes, email, f"Your Results - {SCHOOL_NAME}", html)
