@@ -1411,6 +1411,7 @@ with tabs[5]:
     email_col = col_lookup(df_students, "email")
     level_col = col_lookup(df_students, "level")
     code_col  = col_lookup(df_students, "student_code") if "student_code" in df_students.columns else "studentcode"
+    start_col = col_lookup(df_students, "contractstart") if "contractstart" in df_students.columns else ""
 
     # --- 1b. Load score sheet (for assignment results) ---
     scores_csv_url = (
@@ -1429,7 +1430,9 @@ with tabs[5]:
         "Template", template_opts, key="tab6_template"
     )
 
-    # --- 3. Template body logic ---
+    # --- 3. Defaults per template ---
+    subj_def = ""
+    body_def = ""
     if selected_template == "Welcome":
         subj_def = "Welcome to Learn Language Education Academy!"
         body_def = (
@@ -1437,9 +1440,10 @@ with tabs[5]:
             "Welcome to Learn Language Education Academy! We have helped many students succeed, and we’re excited to support you as well.<br><br>"
             "<b>Your contract starts on the date indicated in the attached course schedule.</b> "
             "Please refer to the schedule for both your class start and end dates.<br><br>"
-            "You can join classes in person or online via Zoom (link will be sent before class).<br><br>"
-            "We've attached your course outline so you can preview how your class will progress.<br><br>"
-            "You can use our Falowen App (<a href='https://falowen.streamlit.app/'>falowen.streamlit.app</a>) to track your progress, see assignments, and practice your skills. Log in with your student code or email.<br><br>"
+            "You can join your <b>{level}</b> class either in person or online via Zoom (link will be shared before class).<br><br>"
+            "Attached is your course outline, so you can preview how the class will progress.<br><br>"
+            "You will use our Falowen App (<a href='https://falowen.streamlit.app/'>falowen.streamlit.app</a>) "
+            "to track your progress, see assignments, and practice your skills (log in with your student code or email).<br><br>"
             "Assignments, course books, and recorded lectures are all available in Google Classroom.<br><br>"
             "We wish you a great start and look forward to seeing your progress!<br><br>"
             "Best regards,<br>"
@@ -1450,40 +1454,40 @@ with tabs[5]:
         subj_def = "Friendly Payment Reminder"
         body_def = (
             "Hi {name},<br><br>"
-            "Just a reminder: your balance for {level} is due on {due_date}.<br><br>"
-            "Thank you!<br><br>"
-            "Learn Language Education Academy"
+            "Just a reminder: your balance for {level} is due soon.<br><br>"
+            "Thank you!"
         )
     elif selected_template == "Assignment Results":
         subj_def = "Your Assignment Results"
         body_def = (
             "Hello {name},<br><br>"
-            "Here are your latest assignment scores from Learn Language Education Academy.<br><br>"
-            "You can view all your results and practice vocab, writing, and chat in the Falowen app (https://falowen.streamlit.app/), using your student code or email.<br><br>"
-            "Books, assignments, and recorded lectures are in Google Classroom.<br><br>"
+            "Below are your latest assignment scores:<br><br>"
+            "{results_table}<br><br>"
             "Best,<br>Learn Language Education Academy"
         )
     else:
         subj_def = ""
         body_def = ""
 
-    # --- 4. Pick recipients (w/ search) ---
+    # --- 4. Student search/filter at the bottom ---
+    st.subheader("🔎 Search for Student")
+    search_val = st.text_input("Search by name, email, or code", value="", key="tab6_search")
+    if search_val:
+        df_students_filtered = df_students[
+            df_students[name_col].str.contains(search_val, case=False, na=False) |
+            df_students[email_col].str.contains(search_val, case=False, na=False) |
+            df_students[code_col].astype(str).str.contains(search_val, case=False, na=False)
+        ]
+    else:
+        df_students_filtered = df_students
+
     student_options = [
         f"{row[name_col]} <{row[email_col]}>"
-        for _, row in df_students.iterrows()
+        for _, row in df_students_filtered.iterrows()
         if pd.notna(row[email_col]) and row[email_col] != ""
     ]
-    st.subheader("🔍 Search Student")
-    student_search = st.text_input("Search by name, code, or email...", key="tab6_student_search")
-    def filter_options(query, options):
-        query = query.strip().lower()
-        if not query:
-            return options
-        return [opt for opt in options if query in opt.lower()]
-    filtered_student_options = filter_options(student_search, student_options)
-
     selected_recipients = st.multiselect(
-        "Recipients", filtered_student_options, key="tab6_recipients"
+        "Recipients", student_options, key="tab6_recipients"
     )
 
     # --- 5. Compose ---
@@ -1497,72 +1501,43 @@ with tabs[5]:
         "Email Body (HTML)",
         value=body_def,
         key="tab6_email_body",
-        height=300
+        height=200
     )
 
-    # --- 6. Attachment ---
+    # --- 6. Preview before sending ---
+    if selected_recipients:
+        preview_nm = selected_recipients[0].split("<")[0].strip()
+        preview_lvl = df_students.loc[df_students[name_col]==preview_nm, level_col].iloc[0] if preview_nm in df_students[name_col].values else ""
+        preview_code = df_students.loc[df_students[name_col]==preview_nm, code_col].iloc[0] if preview_nm in df_students[name_col].values else ""
+        results_table = ""
+        if selected_template == "Assignment Results" and preview_code in df_scores['studentcode'].values:
+            results = df_scores[df_scores['studentcode']==preview_code][["assignment","score"]].dropna()
+            if not results.empty:
+                results_table = "<table border=1><tr><th>Assignment</th><th>Score</th></tr>"
+                for _, row in results.iterrows():
+                    results_table += f"<tr><td>{row['assignment']}</td><td>{row['score']}</td></tr>"
+                results_table += "</table>"
+        else:
+            results_table = ""
+        st.markdown("##### Preview (for first recipient):")
+        st.markdown(email_body.format(
+            name=preview_nm,
+            level=preview_lvl,
+            results_table=results_table,
+            start_date=""
+        ), unsafe_allow_html=True)
+
+    # --- 7. Attachment ---
     st.subheader("Attachment (optional)")
     attachment_file = st.file_uploader(
         "Upload file", type=None, key="tab6_attachment"
     )
 
-    # --- 7. Preview Functionality ---
-    st.subheader("🖥️ Preview Email (for first selected recipient)")
-    preview_html = ""
-    preview_name, preview_email, preview_code, preview_level, preview_start = "", "", "", "", ""
-    preview_due = ""
-
-    if selected_recipients:
-        pick = selected_recipients[0]
-        nm, addr = pick.split("<")
-        addr = addr.strip(">").strip()
-        nm = nm.strip()
-        preview_name = nm
-        preview_email = addr
-        preview_level = df_students.loc[df_students[name_col]==nm, level_col].iloc[0] if nm in df_students[name_col].values else ""
-        preview_code  = df_students.loc[df_students[name_col]==nm, code_col].iloc[0] if nm in df_students[name_col].values else ""
-        preview_start = df_students.loc[df_students[name_col]==nm, start_col].iloc[0] if start_col and nm in df_students[name_col].values else ""
-        preview_due   = (pd.to_datetime(preview_start) + pd.Timedelta(days=30)).date() if preview_start else ""
-
-        # Assignment Results: Show recent 5
-        latest_scores = ""
-        if selected_template == "Assignment Results" and preview_code:
-            results = df_scores[df_scores["studentcode"].astype(str) == str(preview_code)]
-            if not results.empty:
-                latest_scores = "<br>".join(
-                    f"<b>{row['assignment']}:</b> {row['score']} ({row['comments']})"
-                    if pd.notna(row['comments']) and row['comments']
-                    else f"<b>{row['assignment']}:</b> {row['score']}"
-                    for _, row in results.sort_values("date", ascending=False).head(5).iterrows()
-                )
-                if latest_scores:
-                    latest_scores = "<br><br><b>Recent Scores:</b><br>" + latest_scores
-
-        # Build preview (using text input value, so will always reflect current box)
-        try:
-            preview_html = email_body.format(
-                name=preview_name,
-                email=preview_email,
-                level=preview_level,
-                code=preview_code,
-                start_date=start_date if selected_template == "Welcome" else preview_start,
-                due_date=preview_due
-            ) + (latest_scores if selected_template == "Assignment Results" else "")
-        except Exception as e:
-            preview_html = f"<span style='color: red;'>Template error: {e}</span>"
-
-        st.markdown("**Subject:** " + email_subject)
-        st.markdown("**To:** " + preview_email)
-        st.markdown("----")
-        st.markdown(preview_html, unsafe_allow_html=True)
-    else:
-        st.info("Select at least one recipient to preview email.")
-
-    # --- 8. SendGrid config ---
+    # --- 8. SendGrid config
     sendgrid_key = st.secrets["general"]["SENDGRID_API_KEY"]
     sender_email = st.secrets["general"]["SENDER_EMAIL"]
 
-    # --- 9. Send button ---
+    # --- 9. Send button
     if st.button("Send Emails", key="tab6_send"):
         if not selected_recipients:
             st.warning("Select at least one recipient.")
@@ -1576,44 +1551,33 @@ with tabs[5]:
             successes, failures = [], []
             for pick in selected_recipients:
                 nm, addr = pick.split("<")
-                addr = addr.strip(">").strip()
                 nm = nm.strip()
-                # personalize
+                addr = addr.strip(">").strip()
                 lvl = df_students.loc[df_students[name_col]==nm, level_col].iloc[0] if nm in df_students[name_col].values else ""
                 code = df_students.loc[df_students[name_col]==nm, code_col].iloc[0] if nm in df_students[name_col].values else ""
-                sd  = df_students.loc[df_students[name_col]==nm, start_col].iloc[0] if start_col and nm in df_students[name_col].values else ""
-                due = (pd.to_datetime(sd) + pd.Timedelta(days=30)).date() if sd else ""
-                latest_scores = ""
-                if selected_template == "Assignment Results" and code:
-                    results = df_scores[df_scores["studentcode"].astype(str) == str(code)]
+                results_table = ""
+                if selected_template == "Assignment Results" and code in df_scores['studentcode'].values:
+                    results = df_scores[df_scores['studentcode']==code][["assignment","score"]].dropna()
                     if not results.empty:
-                        latest_scores = "<br>".join(
-                            f"<b>{row['assignment']}:</b> {row['score']} ({row['comments']})"
-                            if pd.notna(row['comments']) and row['comments']
-                            else f"<b>{row['assignment']}:</b> {row['score']}"
-                            for _, row in results.sort_values("date", ascending=False).head(5).iterrows()
-                        )
-                        if latest_scores:
-                            latest_scores = "<br><br><b>Recent Scores:</b><br>" + latest_scores
-                try:
-                    filled_body = email_body.format(
-                        name=nm,
-                        email=addr,
-                        level=lvl,
-                        code=code,
-                        start_date=start_date if selected_template == "Welcome" else sd,
-                        due_date=due
-                    ) + (latest_scores if selected_template == "Assignment Results" else "")
-                except Exception as e:
-                    st.error(f"Template error: {e}")
-                    continue
+                        results_table = "<table border=1><tr><th>Assignment</th><th>Score</th></tr>"
+                        for _, row in results.iterrows():
+                            results_table += f"<tr><td>{row['assignment']}</td><td>{row['score']}</td></tr>"
+                        results_table += "</table>"
+                else:
+                    results_table = ""
 
+                # Always provide start_date as an empty string for format()
                 try:
                     msg = Mail(
                         from_email=sender_email,
                         to_emails=addr,
                         subject=email_subject,
-                        html_content=filled_body
+                        html_content=email_body.format(
+                            name=nm,
+                            level=lvl,
+                            results_table=results_table,
+                            start_date=""
+                        )
                     )
                     # attach if present
                     if attachment_file:
@@ -1638,7 +1602,6 @@ with tabs[5]:
                 st.success(f"Sent to: {', '.join(successes)}")
             if failures:
                 st.error(f"Failures: {', '.join(failures)}")
-
 
 # ==== 14. TAB 6: COURSE SCHEDULE GENERATOR ====
 with tabs[6]:
