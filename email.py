@@ -1352,144 +1352,145 @@ with tabs[5]:
             st.success("✅ PDF generated and ready to download.")
 
 
-# ==== TAB 6: QUICK EMAIL SENDER ====
+
+# ==== Tab 6: QUICK EMAIL SENDER ====
 with tabs[6]:
     st.title("📧 Send Email (Quick)")
 
-    # 1. Load student emails for easy selection
-    student_file = "students.csv"
-    google_csv = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
+    # 1. Load student list from Google Sheets
+    students_csv_url = (
+        "https://docs.google.com/spreadsheets/d/"
+        "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/"
+        "export?format=csv"
+    )
     try:
-        df = pd.read_csv(student_file)
-    except FileNotFoundError:
-        df = pd.read_csv(google_csv)
-    df = normalize_columns(df)
+        df_students = pd.read_csv(students_csv_url)
+    except Exception as e:
+        st.error(f"❌ Could not load student list: {e}")
+        df_students = pd.DataFrame(columns=["name", "email", "level", "contractstart"])
+    df_students = normalize_columns(df_students)
+    name_col  = col_lookup(df_students, "name")
+    email_col = col_lookup(df_students, "email")
+    level_col = col_lookup(df_students, "level")
+    start_col = col_lookup(df_students, "contractstart")
 
-    name_col = col_lookup(df, "name")
-    email_col = col_lookup(df, "email")
-    level_col = col_lookup(df, "level")
-    code_col = col_lookup(df, "studentcode")
-    start_col = col_lookup(df, "contractstart")
-    end_col = col_lookup(df, "contractend")
-    paid_col = col_lookup(df, "paid")
-    bal_col = col_lookup(df, "balance")
+    # 2. Template selector
+    template_opts = [
+        "Custom",
+        "Welcome",
+        "Payment Reminder",
+        "Assignment Results"
+    ]
+    selected_template = st.selectbox(
+        "Choose Template", template_opts, key="email_tab_template"
+    )
 
-    # 2. Pick students (multi-select)
-    student_names = df[name_col].tolist()
-    student_emails = df[email_col].tolist()
-    student_options = [f"{n} <{e}>" for n, e in zip(student_names, student_emails) if pd.notna(e) and e != ""]
-    selected_recipients = st.multiselect("Recipients (student)", student_options)
-
-    # 3. Email templates
-    TEMPLATES = {
-        "Custom": {
-            "subject": "",
-            "body": ""
-        },
-        "Class Schedule Confirmation": {
-            "subject": "Your {level} Class Schedule",
-            "body": """Dear {name},<br><br>
-This is to confirm your schedule for the <b>{level}</b> class.<br>
-<b>Start Date:</b> {contractstart}<br>
-<b>End Date:</b> {contractend}<br>
-Please let us know if you have any questions.<br><br>
-Regards,<br>
-Felix Asadu<br>
-{school}
-"""
-        },
-        "Payment Confirmation": {
-            "subject": "Payment Received – Thank You!",
-            "body": """Hello {name},<br><br>
-We have received your payment of <b>GHS {paid}</b> for your {level} class.<br>
-<b>Balance Due:</b> GHS {balance}<br>
-If you have already settled your balance, kindly disregard this message.<br><br>
-Thank you for your prompt payment!<br>
-Felix Asadu<br>
-{school}
-"""
-        },
-        "Feedback Request": {
-            "subject": "We Value Your Feedback!",
-            "body": """Hello {name},<br><br>
-We would love to hear your thoughts about your {level} class so far.<br>
-Your feedback helps us improve our courses.<br><br>
-Thank you!<br>
-Felix Asadu<br>
-{school}
-"""
-        }
-    }
-
-    st.subheader("Choose Email Template")
-    selected_template = st.selectbox("Template", list(TEMPLATES.keys()), index=0)
-
-    # 4. Compose (auto-fill for 1 recipient, else blank/custom)
-    if selected_recipients and selected_template != "Custom":
-        # If only one recipient, get their data for autofill
-        first_email = selected_recipients[0].split("<")[-1].replace(">", "").strip()
-        rec_row = df[df[email_col] == first_email].iloc[0] if first_email in df[email_col].values else {}
-        fmt = {
-            "name": rec_row.get(name_col, ""),
-            "level": rec_row.get(level_col, ""),
-            "studentcode": rec_row.get(code_col, ""),
-            "school": SCHOOL_NAME,
-            "paid": rec_row.get(paid_col, "0.00"),
-            "balance": rec_row.get(bal_col, "0.00"),
-            "contractstart": rec_row.get(start_col, ""),
-            "contractend": rec_row.get(end_col, ""),
-        }
-        subject = TEMPLATES[selected_template]["subject"].format(**fmt)
-        body = TEMPLATES[selected_template]["body"].format(**fmt)
+    # 3. Default subject/body per template
+    if selected_template == "Welcome":
+        subject_default = "Welcome to Learn Language Education Academy!"
+        body_default = (
+            "Hello {name},<br><br>"
+            "Welcome aboard! Your {level} class starts on {start_date}.<br>"
+            "We're excited to have you with us.<br><br>"
+            "Best regards,<br>Felix Asadu"
+        )
+    elif selected_template == "Payment Reminder":
+        subject_default = "Friendly Payment Reminder"
+        body_default = (
+            "Hello {name},<br><br>"
+            "This is a reminder that your balance for the {level} class "
+            "is due by {due_date}.<br><br>"
+            "Thank you!<br>Learn Language Education Academy"
+        )
+    elif selected_template == "Assignment Results":
+        subject_default = "Your Assignment Results"
+        body_default = (
+            "Hello {name},<br><br>"
+            "Please find attached your latest assignment scores.<br><br>"
+            "Best regards,<br>Learn Language Education Academy"
+        )
     else:
-        subject = st.text_input("Subject", value=TEMPLATES[selected_template]["subject"])
-        body = st.text_area("Body (HTML allowed)", value=TEMPLATES[selected_template]["body"])
+        subject_default = ""
+        body_default = ""
 
-    # Manual override/edit if needed
-    subject = st.text_input("Subject", value=subject)
-    body = st.text_area("Body (HTML allowed)", value=body, height=200)
+    # 4. Pick recipients
+    student_options = [
+        f"{row[name_col]} <{row[email_col]}>"
+        for _, row in df_students.iterrows()
+        if pd.notna(row[email_col]) and row[email_col] != ""
+    ]
+    selected_recipients = st.multiselect(
+        "Recipients (student)",
+        student_options,
+        key="quick_email_recipients"
+    )
 
-    # 5. Attachments (optional)
+    # 5. Compose fields
+    st.subheader("Compose Email")
+    subject = st.text_input(
+        "Subject",
+        value=subject_default,
+        key="quick_email_subject"
+    )
+    body = st.text_area(
+        "Body (HTML allowed)",
+        value=body_default,
+        key="quick_email_body",
+        height=200
+    )
+
+    # 6. Attachments (optional)
     st.subheader("Attach File (Optional)")
-    file = st.file_uploader("Upload file (PDF, DOCX, TXT, JPG, PNG, etc)", type=None, key="quick_email_file")
+    file = st.file_uploader(
+        "Upload file (PDF, DOCX, TXT, JPG, PNG, etc)",
+        type=None,
+        key="quick_email_file"
+    )
 
-    # 6. SendGrid config
-    sendgrid_key = st.secrets["general"]["SENDGRID_API_KEY"]
-    sender_email = st.secrets["general"]["SENDER_EMAIL"]
+    # 7. SendGrid config
+    sendgrid_key  = st.secrets["general"]["SENDGRID_API_KEY"]
+    sender_email  = st.secrets["general"]["SENDER_EMAIL"]
 
-    # 7. Send
-    if st.button("📧 Send Email(s) Now"):
+    # 8. Send emails
+    if st.button("📧 Send Email(s) Now", key="send_email_now"):
         if not selected_recipients:
             st.warning("Please select at least one recipient.")
         elif not subject or not body:
-            st.warning("Please fill in subject and body.")
+            st.warning("Please fill in both subject and body.")
         else:
             from sendgrid import SendGridAPIClient
             from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
             import base64
 
-            # Extract real emails from label
-            recipients = [s.split("<")[-1].replace(">", "").strip() for s in selected_recipients if "@" in s]
             success, fail = [], []
-            for email in recipients:
+            for pick in selected_recipients:
+                name, addr = pick.split("<")
+                addr = addr.replace(">", "").strip()
+                # Personalize if using a template
+                personalized_body = body.format(
+                    name=name.strip(),
+                    level=df_students.loc[df_students[name_col] == name.strip(), level_col].iloc[0]
+                            if name.strip() in df_students[name_col].values else "",
+                    start_date=df_students.loc[df_students[name_col] == name.strip(), start_col].iloc[0]
+                               if start_col in df_students else "",
+                    due_date=(pd.to_datetime(df_students[start_col]).dt.date + pd.Timedelta(days=30)).iloc[0]
+                             if start_col in df_students else ""
+                )
                 try:
                     msg = Mail(
                         from_email=sender_email,
-                        to_emails=email,
+                        to_emails=addr,
                         subject=subject,
-                        html_content=body
+                        html_content=personalized_body
                     )
-                    # Attach uploaded file if present
+                    # Attach file if present
                     if file is not None:
-                        fdata = file.read()
+                        fdata   = file.read()
                         encoded = base64.b64encode(fdata).decode()
-                        filename = file.name
-                        # Guess filetype for common formats
-                        import mimetypes
-                        ftype = mimetypes.guess_type(filename)[0] or "application/octet-stream"
-                        attach = Attachment(
+                        ftype   = __import__("mimetypes").guess_type(file.name)[0] or "application/octet-stream"
+                        attach  = Attachment(
                             FileContent(encoded),
-                            FileName(filename),
+                            FileName(file.name),
                             FileType(ftype),
                             Disposition("attachment")
                         )
@@ -1497,18 +1498,17 @@ Felix Asadu<br>
 
                     sg = SendGridAPIClient(sendgrid_key)
                     sg.send(msg)
-                    success.append(email)
+                    success.append(addr)
                 except Exception as e:
-                    fail.append((email, str(e)))
+                    fail.append(f"{addr} ({e})")
+
             if success:
                 st.success(f"Sent to: {', '.join(success)}")
             if fail:
-                st.error(f"Failed: {', '.join([f'{em} ({err})' for em, err in fail])}")
+                st.error(f"Failed: {', '.join(fail)}")
 
-    # 8. Email Log (just shows the most recent action, session only)
-    # If you want a persistent log, write to a file/db here.
-
-# --- End of Tab 6 ---
+    # 9. Email Log (session only)
+    # You can extend this to write to a database or file for persistence.
 
 
 # ==== TAB: CLASS SCHEDULE, ZOOM & IN-PERSON INFO ====
