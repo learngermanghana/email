@@ -1863,7 +1863,7 @@ with tabs[7]:
             'score'      : float(score),
             'comments'   : comment,
             'date'       : datetime.now().strftime("%Y-%m-%d")
-            'level'      : student_row.get('level', '')
+            'level'      : student_row.get('level', ''),
         })
         st.success("Score saved! Refreshing...")
         st.rerun()
