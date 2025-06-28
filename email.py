@@ -1761,8 +1761,7 @@ with tabs[7]:
     history_df = history_df[history_df['studentcode'] == student_code].sort_values('date', ascending=False)
     st.markdown("### 📋 Score History")
     st.dataframe(history_df[['assignment','score','comments','date']], use_container_width=True)
-
-    def generate_pdf_report(name: str, history: pd.DataFrame, assignment: str = None) -> bytes:
+def generate_pdf_report(name: str, history: pd.DataFrame, assignment: str = None) -> bytes:
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", "B", 15)
@@ -1791,5 +1790,5 @@ with tabs[7]:
     pdf.ln(6)
     return pdf.output(dest="S").encode("latin-1", "replace")
 
-
 #EndofTab
+
