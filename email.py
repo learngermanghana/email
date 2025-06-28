@@ -1088,160 +1088,144 @@ with tabs[2]:
 with tabs[3]:
     st.title("📲 WhatsApp Reminders for Debtors")
 
-    # 1. Load Expenses for financial summary
-    exp_sheet_id = "1I5mGFcWbWdK6YQrJtabTg_g-XBEVaIRK1aMFm72vDEM"
-    exp_csv_url  = f"https://docs.google.com/spreadsheets/d/{exp_sheet_id}/export?format=csv"
-    try:
-        df_exp = pd.read_csv(exp_csv_url)
-        df_exp = normalize_columns(df_exp)
-        total_expenses = pd.to_numeric(df_exp.get("amount", []), errors="coerce").fillna(0).sum()
-    except Exception:
-        total_expenses = 0.0
+    # --- 1. LOAD STUDENT DATA FROM GOOGLE SHEET ---
+    students_csv_url = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
+    @st.cache_data(ttl=0)
+    def load_students():
+        df = pd.read_csv(students_csv_url, dtype=str)
+        df.columns = [c.strip().lower().replace(" ", "").replace("_", "") for c in df.columns]
+        return df
+    df = load_students()
+    st.caption("Preview of student data loaded from Google Sheet:")
+    st.dataframe(df)
 
-    # 2. Load Students
-    student_file = "students.csv"
-    google_csv   = (
-        "https://docs.google.com/spreadsheets/d/"
-        "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
-    )
-    github_csv   = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
-    df = safe_read_csv(student_file, google_csv or github_csv)
-    df = normalize_columns(df)
-    def getcol(key): return col_lookup(df, key)
+    def col_lookup(df, name):
+        key = name.lower().replace(" ", "").replace("_", "")
+        for c in df.columns:
+            if c.lower().replace(" ", "").replace("_", "") == key:
+                return c
+        raise KeyError(f"Column '{name}' not found in DataFrame")
 
-    cs    = getcol("contractstart")
-    paid  = getcol("paid")
-    bal   = getcol("balance")
-    lvl   = getcol("level")
+    # --- 2. FINANCIAL COLUMN LOOKUPS ---
+    name_col  = col_lookup(df, "name")
+    code_col  = col_lookup(df, "studentcode")
+    phone_col = col_lookup(df, "phone")
+    bal_col   = col_lookup(df, "balance")
+    paid_col  = col_lookup(df, "paid")
+    lvl_col   = col_lookup(df, "level")
+    cs_col    = col_lookup(df, "contractstart")
 
-    # Parse dates & amounts
-    df[cs]   = pd.to_datetime(df.get(cs, pd.NaT), errors="coerce")
-    df[paid] = pd.to_numeric(df.get(paid, 0), errors="coerce").fillna(0)
-    df[bal]  = pd.to_numeric(df.get(bal, 0), errors="coerce").fillna(0)
+    # --- 3. CLEAN DATA TYPES ---
+    df[bal_col] = pd.to_numeric(df[bal_col], errors="coerce").fillna(0)
+    df[paid_col] = pd.to_numeric(df[paid_col], errors="coerce").fillna(0)
+    df[cs_col] = pd.to_datetime(df[cs_col], errors="coerce")
+    df[phone_col] = df[phone_col].astype(str).str.replace(r"[^\d+]", "", regex=True)
 
-    # 3. Financial Metrics
-    total_collected = df[paid].sum()
-    net_profit      = total_collected - total_expenses
-
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Total Students", len(df))
-    m2.metric("Total Collected (GHS)", f"{total_collected:,.2f}")
-    m3.metric("Total Expenses (GHS)",  f"{total_expenses:,.2f}")
-    m4.metric("Net Profit (GHS)",      f"{net_profit:,.2f}")
-
-    st.markdown("---")
-
-    # 4. Toggle for viewing all vs. debtors only
-    show_all = st.toggle("Show all students (not just debtors)", value=False)
-    if show_all:
-        filt = df
-    else:
-        filt = df[df[bal] > 0]
-
-    # 5. Filters
-    search = st.text_input("Search by name or code", key="wa_search")
-    opts   = ["All"] + sorted(df[lvl].dropna().unique().tolist()) if lvl in df.columns else ["All"]
-    selected = st.selectbox("Filter by Level", opts, key="wa_level")
-
-    # 6. Compute Due Dates - use CALENDAR MONTH logic
-    from dateutil.relativedelta import relativedelta
-    df["due_date"] = df[cs].apply(lambda x: x + relativedelta(months=1) if pd.notnull(x) else pd.NaT)
+    # --- 4. CALCULATE DUE DATE & DAYS LEFT ---
+    df["due_date"] = df[cs_col] + pd.Timedelta(days=30)
     df["due_date_str"] = df["due_date"].dt.strftime("%d %b %Y")
-    df["days_left"] = (df["due_date"] - pd.Timestamp.today()).dt.days.astype("Int64")  # can be <NA>
+    df["days_left"] = (df["due_date"] - pd.Timestamp.today()).dt.days
 
-    # Assign to filtered
-    filt["due_date"] = df.loc[filt.index, "due_date"]
-    filt["due_date_str"] = df.loc[filt.index, "due_date_str"]
-    filt["days_left"] = df.loc[filt.index, "days_left"]
-
-    # Apply search & filter
-    if search:
-        mask1 = filt[getcol("name")].str.contains(search, case=False, na=False)
-        mask2 = filt[getcol("studentcode")].astype(str).str.contains(search, case=False, na=False)
-        filt  = filt[mask1 | mask2]
-    if selected != "All":
-        filt = filt[filt[lvl] == selected]
+    # --- 5. FINANCIAL SUMMARY ---
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Total Students", len(df))
+    m2.metric("Total Collected (GHS)", f"{df[paid_col].sum():,.2f}")
+    m3.metric("Total Outstanding (GHS)", f"{df[bal_col].sum():,.2f}")
 
     st.markdown("---")
 
-    if filt.empty:
-        st.success("✅ No students currently owing a balance.")
-    else:
-        st.metric("Number of Records", len(filt))
-        tbl_cols = [getcol("name"), lvl, bal, "due_date_str", "days_left"]
-        tbl = filt[tbl_cols].rename(columns={
-            getcol("name"): "Name",
-            lvl:            "Level",
-            bal:            "Balance (GHS)",
-            "due_date_str": "Due Date",
-            "days_left":    "Days Until Due"
+    # --- 6. FILTER/SEARCH ---
+    show_all = st.toggle("Show all students (not just debtors)", value=False)
+    search = st.text_input("Search by name, code, or phone", key="wa_search")
+    selected_level = st.selectbox("Filter by Level", ["All"] + sorted(df[lvl_col].dropna().unique()), key="wa_level")
+
+    filt = df.copy()
+    if not show_all:
+        filt = filt[filt[bal_col] > 0]
+    if search:
+        mask1 = filt[name_col].str.contains(search, case=False, na=False)
+        mask2 = filt[code_col].str.contains(search, case=False, na=False)
+        mask3 = filt[phone_col].str.contains(search, case=False, na=False)
+        filt = filt[mask1 | mask2 | mask3]
+    if selected_level != "All":
+        filt = filt[filt[lvl_col] == selected_level]
+
+    st.markdown("---")
+
+    # --- 7. TABLE PREVIEW ---
+    tbl = filt[[name_col, code_col, phone_col, lvl_col, bal_col, "due_date_str", "days_left"]].rename(columns={
+        name_col: "Name", code_col: "Student Code", phone_col: "Phone",
+        lvl_col: "Level", bal_col: "Balance (GHS)", "due_date_str": "Due Date", "days_left": "Days Left"
+    })
+    st.dataframe(tbl, use_container_width=True)
+
+    # --- 8. PHONE FORMAT FUNCTION ---
+    def clean_phone(phone):
+        phone = str(phone).replace(" ", "").replace("-", "")
+        if phone.startswith("+233"):
+            return phone[1:]
+        if phone.startswith("233"):
+            return phone
+        if phone.startswith("0") and len(phone) == 10:
+            return "233" + phone[1:]
+        # fallback: return as is
+        return phone
+
+    # --- 9. WHATSAPP LINK AND MESSAGE ---
+    wa_template = st.text_area(
+        "Custom WhatsApp Message Template",
+        value="Hi {name}! Friendly reminder: your payment for the {level} class is due by {due}. {msg} Thank you!",
+        help="You can use {name}, {level}, {due}, {bal}, {days}, {msg}"
+    )
+
+    links = []
+    for _, row in filt.iterrows():
+        phone = clean_phone(row[phone_col])
+        # Balance & msg
+        bal = f"GHS {row[bal_col]:,.2f}"
+        due = row["due_date_str"]
+        days = int(row["days_left"])
+        if days >= 0:
+            msg = f"You have {days} {'day' if days == 1 else 'days'} left to settle the {bal} balance."
+        else:
+            msg = f"Your payment is overdue by {abs(days)} {'day' if abs(days)==1 else 'days'}. Please settle as soon as possible."
+        # Format the template
+        text = wa_template.format(
+            name=row[name_col],
+            level=row[lvl_col],
+            due=due,
+            bal=bal,
+            days=days,
+            msg=msg
+        )
+        link = f"https://wa.me/{phone}?text={urllib.parse.quote(text)}" if phone else ""
+        links.append({
+            "Name": row[name_col],
+            "Student Code": row[code_col],
+            "Level": row[lvl_col],
+            "Balance (GHS)": bal,
+            "Due Date": due,
+            "Days Left": days,
+            "Phone": phone,
+            "WhatsApp Link": link
         })
-        st.dataframe(tbl, use_container_width=True)
 
-        # ---- 7. WhatsApp Message Template ----
-        default_template = (
-            "Hi {name}! Friendly reminder: your payment for the {level} class "
-            "is due by {due}. {msg} Thank you!"
-        )
-        wa_template = st.text_area(
-            "Custom WhatsApp Message Template",
-            value=st.session_state.get("wa_msg_template", default_template),
-            help=(
-                "You can use {name}, {level}, {due}, {bal}, {days}, {msg} in your message. "
-                "'{msg}' will be replaced by an auto-generated overdue/remaining message."
-            ),
-        )
-        st.session_state["wa_msg_template"] = wa_template  # persist
+    df_links = pd.DataFrame(links)
+    st.markdown("---")
+    st.dataframe(df_links[["Name", "Level", "Balance (GHS)", "Due Date", "Days Left", "WhatsApp Link"]], use_container_width=True)
 
-        # ---- 8. Clean phone numbers robustly ----
-        def clean_phone_series(s):
-            p = s.astype(str).str.replace(r"[+\- ]", "", regex=True)
-            p = p.where(~p.str.startswith("0"), "233" + p.str[1:])
-            p = p.str.extract(r"(\d{9,15})")[0]
-            return p
+    # --- 10. LIST LINKS ---
+    st.markdown("### Send WhatsApp Reminders")
+    for i, row in df_links.iterrows():
+        if row["WhatsApp Link"]:
+            st.markdown(f"- **{row['Name']}** ([Send WhatsApp]({row['WhatsApp Link']}))")
 
-        ws = filt.assign(
-            phone    = clean_phone_series(filt[getcol("phone")]),
-            due_str  = filt["due_date_str"],
-            bal_str  = filt[bal].map(lambda x: f"GHS {x:.2f}"),
-            days     = filt["days_left"].astype("Int64")
-        )
+    st.download_button(
+        "📁 Download Reminder Links CSV",
+        df_links[["Name", "Student Code", "Phone", "Level", "Balance (GHS)", "Due Date", "Days Left", "WhatsApp Link"]].to_csv(index=False),
+        file_name="debtor_whatsapp_links.csv"
+    )
 
-        # ---- 9. WhatsApp Link Generator ----
-        def make_link(row):
-            if pd.isnull(row.phone):
-                return ""
-            if row.days is pd.NA or pd.isnull(row.days):
-                msg = ""
-            elif row.days >= 0:
-                msg = f"You have {row.days} {'day' if row.days==1 else 'days'} left to settle the {row.bal_str} balance."
-            else:
-                od = abs(row.days)
-                msg = f"Your payment is overdue by {od} {'day' if od==1 else 'days'}. Please settle as soon as possible."
-            text = wa_template.format(
-                name=row[getcol('name')],
-                level=row[lvl],
-                due=row.due_str,
-                bal=row.bal_str,
-                days=row.days if not pd.isnull(row.days) else "",
-                msg=msg
-            )
-            return f"https://wa.me/{row.phone}?text={urllib.parse.quote(text)}"
-
-        ws["link"] = ws.apply(make_link, axis=1)
-        for nm, lk in ws[[getcol("name"), "link"]].itertuples(index=False):
-            if lk:
-                st.markdown(f"- **{nm}**: [Send Reminder]({lk})")
-
-        dl = ws[[getcol("name"), "link"]].rename(columns={
-            getcol("name"): "Name", "link": "WhatsApp URL"
-        })
-        st.download_button(
-            "📁 Download Reminder Links CSV",
-            dl.to_csv(index=False).encode("utf-8"),
-            file_name="debtor_whatsapp_links.csv",
-            mime="text/csv"
-        )
 
 # ==== 12. TAB 5: GENERATE CONTRACT & RECEIPT PDF FOR ANY STUDENT ====
 with tabs[4]:
