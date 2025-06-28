@@ -793,10 +793,16 @@ ref_answers = {
 }  # End of A2 4.11–10.28 update
 
 
-# ==== 7. TAB SETUP ====
+# ==== 5. TABS LAYOUT ====
 tabs = st.tabs([
-    "Dashboard", "Students", "Contracts", "Exams",
-    "Resources", "Payments", "Analytics", "Assignments"
+    "📝 Pending",                 # 0
+    "👩‍🎓 All Students",            # 1
+    "💵 Expenses",                # 2
+    "📲 Reminders",               # 3
+    "📄 Contract",                # 4
+    "📧 Send Email",              # 5 
+    "📆 Schedule",                # 6
+    "📝 Marking"                  # 7
 ])
 
 # ==== 6. AGREEMENT TEMPLATE (Persisted in Session State) ====
