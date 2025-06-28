@@ -826,8 +826,8 @@ tabs = st.tabs([
     "👩‍🎓 All Students",            # 1
     "💵 Expenses",                # 2
     "📲 Reminders",               # 3
-    "📧 Send Email",              # 4
-    "📊 Analytics & Export",      # 5
+    "📧 Contract",                # 4
+    "📊 Send Email",              # 5
     "📆 Schedule",                # 6
     "📝 Marking"                  # 7
 ])
