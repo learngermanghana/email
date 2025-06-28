@@ -66,10 +66,11 @@ def init_sqlite_connection():
             score REAL,
             comments TEXT,
             date TEXT
-            level TEXT
+            -- (maybe level is missing)
         )''')
     conn.commit()
     return conn
+
 
 def fetch_students_from_sqlite() -> pd.DataFrame:
     conn = init_sqlite_connection()
