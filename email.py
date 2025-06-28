@@ -1393,39 +1393,44 @@ with tabs[4]:
             st.success("✅ PDF generated and ready to download.")
 
 
-# ==== Tab 6: QUICK EMAIL SENDER ====
 with tabs[5]:
     st.title("📧 Send Email (Quick)")
 
-    # 1. Load student list from Google Sheets
+    # --- 1. Load student list from Google Sheets ---
     students_csv_url = (
         "https://docs.google.com/spreadsheets/d/"
-        "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/"
-        "export?format=csv"
+        "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
     )
     try:
         df_students = pd.read_csv(students_csv_url)
     except Exception as e:
         st.error(f"❌ Could not load student list: {e}")
-        df_students = pd.DataFrame(columns=["name", "email", "level", "contractstart"])
+        df_students = pd.DataFrame(columns=["name", "email", "level", "contractstart", "studentcode"])
     df_students = normalize_columns(df_students)
     name_col  = col_lookup(df_students, "name")
     email_col = col_lookup(df_students, "email")
     level_col = col_lookup(df_students, "level")
-    start_col = col_lookup(df_students, "contractstart")
+    code_col  = col_lookup(df_students, "studentcode")
+    start_col = col_lookup(df_students, "contractstart") if "contractstart" in df_students.columns else ""
 
-    # 2. Template selector
+    # --- 2. Template selector ---
     template_opts = ["Custom", "Welcome", "Payment Reminder", "Assignment Results"]
     selected_template = st.selectbox(
         "Template", template_opts, key="tab6_template"
     )
 
-    # 3. Defaults per template
+    # --- 3. Dynamic input for Welcome template ---
     if selected_template == "Welcome":
         subj_def = "Welcome to Learn Language Education Academy!"
+        st.markdown("**Enter class start date:**")
+        start_date = st.date_input("Class Start Date", value=date.today(), key="tab6_start_date")
         body_def = (
             "Hello {name},<br><br>"
-            "Your {level} class starts on {start_date}. Welcome aboard!<br><br>"
+            "Welcome to Learn Language Education Academy! We have helped many students succeed, and we’re excited to support you as you start your {level} course.<br><br>"
+            "<b>We have attached your course schedule</b> so you can preview how the class will progress.<br><br>"
+            "Your first lesson is on <b>{start_date}</b>. You can join us in person at our school, or online using the Zoom link which will be shared before class starts.<br><br>"
+            "Please log in to your personalized student dashboard at <a href='https://falowen.streamlit.app/'>falowen.streamlit.app</a> using your <b>student code or email</b> to access your assignments, results, and more.<br><br>"
+            "If you have any questions, don’t hesitate to ask. Wishing you a fantastic learning journey!<br><br>"
             "Best regards,<br>Felix Asadu"
         )
     elif selected_template == "Payment Reminder":
@@ -1446,7 +1451,7 @@ with tabs[5]:
         subj_def = ""
         body_def = ""
 
-    # 4. Pick recipients
+    # --- 4. Pick recipients ---
     student_options = [
         f"{row[name_col]} <{row[email_col]}>"
         for _, row in df_students.iterrows()
@@ -1456,31 +1461,38 @@ with tabs[5]:
         "Recipients", student_options, key="tab6_recipients"
     )
 
-    # 5. Compose
+    # --- 5. Compose ---
     st.subheader("Email Subject & Body")
     email_subject = st.text_input(
         "Email Subject",
         value=subj_def,
         key="tab6_email_subject"
     )
+
+    # For Welcome: auto-fill start date in template when rendering preview
+    if selected_template == "Welcome":
+        preview_body = body_def.replace("{start_date}", str(start_date))
+    else:
+        preview_body = body_def
+
     email_body = st.text_area(
         "Email Body (HTML)",
-        value=body_def,
+        value=preview_body,
         key="tab6_email_body",
         height=200
     )
 
-    # 6. Attachment
+    # --- 6. Attachment (optional, always available for all) ---
     st.subheader("Attachment (optional)")
     attachment_file = st.file_uploader(
-        "Upload file", type=None, key="tab6_attachment"
+        "Upload file (e.g., course schedule, results, etc.)", type=None, key="tab6_attachment"
     )
 
-    # 7. SendGrid config
+    # --- 7. SendGrid config ---
     sendgrid_key = st.secrets["general"]["SENDGRID_API_KEY"]
     sender_email = st.secrets["general"]["SENDER_EMAIL"]
 
-    # 8. Send button
+    # --- 8. Send button ---
     if st.button("Send Emails", key="tab6_send"):
         if not selected_recipients:
             st.warning("Select at least one recipient.")
@@ -1490,18 +1502,28 @@ with tabs[5]:
             from sendgrid import SendGridAPIClient
             from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
             import base64
+            import mimetypes
 
             successes, failures = [], []
             for pick in selected_recipients:
-                nm, addr = pick.split("<")
-                addr = addr.strip(">")
-                # personalize
-                lvl = df_students.loc[df_students[name_col]==nm.strip(), level_col].iloc[0] if nm.strip() in df_students[name_col].values else ""
-                sd  = df_students.loc[df_students[name_col]==nm.strip(), start_col].iloc[0] if start_col in df_students else ""
-                due = (pd.to_datetime(sd) + pd.Timedelta(days=30)).date() if sd else ""
-                body_filled = email_body.format(name=nm.strip(), level=lvl, start_date=sd, due_date=due)
-
                 try:
+                    nm, addr = pick.split("<")
+                    addr = addr.strip(">")
+                    nm = nm.strip()
+                    # personalize
+                    lvl = df_students.loc[df_students[name_col]==nm, level_col].iloc[0] if nm in df_students[name_col].values else ""
+                    sd = str(start_date) if selected_template == "Welcome" else (
+                        df_students.loc[df_students[name_col]==nm, start_col].iloc[0] if start_col else ""
+                    )
+                    due = (pd.to_datetime(sd) + pd.Timedelta(days=30)).date() if sd else ""
+                    # Always substitute safely, even if some fields are missing
+                    subs = dict(name=nm, level=lvl, start_date=sd, due_date=due, studentcode=df_students.loc[df_students[name_col]==nm, code_col].iloc[0] if nm in df_students[name_col].values else "")
+                    try:
+                        body_filled = email_body.format(**subs)
+                    except Exception as e:
+                        st.error(f"Format problem: {e}")
+                        body_filled = email_body  # fallback: send as-is
+
                     msg = Mail(
                         from_email=sender_email,
                         to_emails=addr,
@@ -1512,7 +1534,7 @@ with tabs[5]:
                     if attachment_file:
                         data = attachment_file.read()
                         enc  = base64.b64encode(data).decode()
-                        ftype = __import__("mimetypes").guess_type(attachment_file.name)[0] or "application/octet-stream"
+                        ftype = mimetypes.guess_type(attachment_file.name)[0] or "application/octet-stream"
                         attach = Attachment(
                             FileContent(enc),
                             FileName(attachment_file.name),
@@ -1531,6 +1553,7 @@ with tabs[5]:
                 st.success(f"Sent to: {', '.join(successes)}")
             if failures:
                 st.error(f"Failures: {', '.join(failures)}")
+
 
 # ==== 14. TAB 6: COURSE SCHEDULE GENERATOR ====
 with tabs[6]:
