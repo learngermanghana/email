@@ -1677,10 +1677,14 @@ with tabs[6]:
 with tabs[7]:
     st.title("📝 Assignment Marking & Scores")
 
-    # --- 1. Load data from Google Sheets and SQLite ---
+    # --- 1. Load data from Google Sheets ---
     students_csv_url = (
         "https://docs.google.com/spreadsheets/d/"
         "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
+    )
+    scores_csv_url = (
+        "https://docs.google.com/spreadsheets/d/"
+        "1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/export?format=csv"
     )
 
     @st.cache_data(show_spinner=False)
@@ -1689,14 +1693,11 @@ with tabs[7]:
         return normalize_columns(df)
     df_students = load_students()
 
-    @st.cache_data(ttl=0)
-    def fetch_scores_from_sqlite() -> pd.DataFrame:
-        conn = init_sqlite_connection()
-        df = pd.read_sql("SELECT studentcode,assignment,score,comments,date FROM scores", conn)
-        df.columns = [c.lower() for c in df.columns]
-        return df
+    @st.cache_data(ttl=0)  # Always pull latest scores from Google Sheet!
+    def load_scores():
+        return normalize_columns(pd.read_csv(scores_csv_url))
+    df_scores = load_scores()
 
-    df_scores = fetch_scores_from_sqlite()
 
     # --- 2. Student search and select ---
     st.subheader("🔎 Search Student")
