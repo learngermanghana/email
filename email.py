@@ -115,19 +115,62 @@ def choose_student(df: pd.DataFrame, levels: list, key_suffix: str) -> tuple:
 def safe_pdf(text):
     # Remove or replace any character not in latin-1
     return "".join(c if ord(c) < 256 else "?" for c in str(text))
-
-def generate_pdf_report(name: str, history: pd.DataFrame) -> bytes:
+def generate_pdf_report(
+    name: str,
+    level: str,
+    history: pd.DataFrame,
+    assignment: str = None,
+    score_name: str = "",
+    tutor_name: str = "",
+    school_name: str = "",
+    footer_text: str = "",
+) -> bytes:
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Arial", "B", 14)
-    pdf.cell(0, 10, safe_pdf(f"Report for {name}"), ln=True)
-    pdf.ln(5)
+    pdf.set_font("Arial", "B", 15)
+    # Header with school, student, level, tutor, etc.
+    if school_name:
+        pdf.cell(0, 10, safe_pdf(school_name), ln=True, align="C")
+        pdf.ln(2)
+    pdf.set_font("Arial", "B", 13)
+    pdf.cell(0, 10, safe_pdf(f"Report for: {name} (Level: {level})"), ln=True)
+    if tutor_name:
+        pdf.set_font("Arial", "I", 11)
+        pdf.cell(0, 8, safe_pdf(f"Tutor: {tutor_name}"), ln=True)
+    if score_name:
+        pdf.set_font("Arial", "B", 11)
+        pdf.cell(0, 8, safe_pdf(f"Score/Assignment: {score_name}"), ln=True)
+    pdf.ln(4)
+    
+    # Reference answers section
+    if assignment and assignment in ref_answers and ref_answers[assignment]:
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(0, 10, safe_pdf(f"Reference Answers for: {assignment}"), ln=True)
+        pdf.set_font("Arial", "", 11)
+        for idx, ref in enumerate(ref_answers[assignment], 1):
+            pdf.multi_cell(0, 8, safe_pdf(f"{idx}. {ref}"))
+        pdf.ln(2)
+    
+    # Score history section
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(0, 10, "Score History:", ln=True)
     pdf.set_font("Arial", "", 11)
-    report_lines = [f"{row.assignment}: {row.score}/100 - Comments: {row.comments}" for row in history.itertuples()]
+    report_lines = [
+        f"{row.assignment}: {row.score}/100"
+        + (f" - Comments: {row.comments}" if row.comments else "")
+        for row in history.itertuples()
+    ]
     for line in report_lines:
         pdf.multi_cell(0, 8, safe_pdf(line))
-        pdf.ln(3)
+        pdf.ln(1)
+    pdf.ln(6)
+    
+    # Footer/Remark
+    if footer_text:
+        pdf.set_font("Arial", "I", 10)
+        pdf.cell(0, 10, safe_pdf(footer_text), ln=True, align="C")
     return pdf.output(dest="S").encode("latin-1", "replace")
+
 
 def send_email_report(pdf_bytes: bytes, to: str, subject: str, html_content: str):
     try:
@@ -1814,63 +1857,28 @@ with tabs[7]:
     st.markdown(f"### 📋 Score History for {student_row[name_col]} (Level: {student_level})")
     st.dataframe(student_history[['assignment','score','comments','date','level']], use_container_width=True)
 
-def generate_pdf_report(
-    name: str,
-    level: str,
-    history: pd.DataFrame,
-    assignment: str = None,
-    score_name: str = "",
-    tutor_name: str = "",
-    school_name: str = "",
-    footer_text: str = "",
-) -> bytes:
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", "B", 15)
-    # Header with school, student, level, tutor, etc.
-    if school_name:
-        pdf.cell(0, 10, safe_pdf(school_name), ln=True, align="C")
-        pdf.ln(2)
-    pdf.set_font("Arial", "B", 13)
-    pdf.cell(0, 10, safe_pdf(f"Report for: {name} (Level: {level})"), ln=True)
-    if tutor_name:
-        pdf.set_font("Arial", "I", 11)
-        pdf.cell(0, 8, safe_pdf(f"Tutor: {tutor_name}"), ln=True)
-    if score_name:
-        pdf.set_font("Arial", "B", 11)
-        pdf.cell(0, 8, safe_pdf(f"Score/Assignment: {score_name}"), ln=True)
-    pdf.ln(4)
-    
-    # Reference answers section
-    if assignment and assignment in ref_answers and ref_answers[assignment]:
-        pdf.set_font("Arial", "B", 12)
-        pdf.cell(0, 10, safe_pdf(f"Reference Answers for: {assignment}"), ln=True)
-        pdf.set_font("Arial", "", 11)
-        for idx, ref in enumerate(ref_answers[assignment], 1):
-            pdf.multi_cell(0, 8, safe_pdf(f"{idx}. {ref}"))
-        pdf.ln(2)
-    
-    # Score history section
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(0, 10, "Score History:", ln=True)
-    pdf.set_font("Arial", "", 11)
-    report_lines = [
-        f"{row.assignment}: {row.score}/100"
-        + (f" - Comments: {row.comments}" if row.comments else "")
-        for row in history.itertuples()
-    ]
-    for line in report_lines:
-        pdf.multi_cell(0, 8, safe_pdf(line))
-        pdf.ln(1)
-    pdf.ln(6)
-    
-    # Footer/Remark
-    if footer_text:
-        pdf.set_font("Arial", "I", 10)
-        pdf.cell(0, 10, safe_pdf(footer_text), ln=True, align="C")
-    return pdf.output(dest="S").encode("latin-1", "replace")
+    # --- PDF GENERATION & DOWNLOAD BUTTON ---
+    pdf_bytes = generate_pdf_report(
+        name=student_row['name'],
+        level=student_row.get('level', ''),
+        history=student_history,
+        assignment=assignment,
+        score_name=assignment,
+        tutor_name="Mr. Felix Asadu",
+        school_name="Learn Language Education Academy",
+        footer_text="Thank you for your hard work! Contact your tutor if you have any questions."
+    )
+    pdf_filename = f"{student_row['name'].replace(' ', '_')}_{assignment.replace(' ', '_')}_report.pdf"
 
-#EndofTab
+    st.download_button(
+        "Download Report PDF",
+        data=pdf_bytes,
+        file_name=pdf_filename,
+        mime="application/pdf"
+    )
+
+#EndofTab1
+
 
 
 
