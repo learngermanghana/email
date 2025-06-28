@@ -66,6 +66,7 @@ def init_sqlite_connection():
             score REAL,
             comments TEXT,
             date TEXT
+            level TEXT
         )''')
     conn.commit()
     return conn
@@ -1862,6 +1863,7 @@ with tabs[7]:
             'score'      : float(score),
             'comments'   : comment,
             'date'       : datetime.now().strftime("%Y-%m-%d")
+            'level'      : student_row.get('level', '')
         })
         st.success("Score saved! Refreshing...")
         st.rerun()
