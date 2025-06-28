@@ -71,6 +71,24 @@ def init_sqlite_connection():
     conn.commit()
     return conn
 
+# --- One-time: Recreate scores table with 'level' (WILL ERASE EXISTING SCORES!) ---
+conn = init_sqlite_connection()
+cur = conn.cursor()
+cur.execute("DROP TABLE IF EXISTS scores")
+cur.execute('''
+    CREATE TABLE IF NOT EXISTS scores (
+        id INTEGER PRIMARY KEY,
+        studentcode TEXT,
+        assignment TEXT,
+        score REAL,
+        comments TEXT,
+        date TEXT,
+        level TEXT         -- <--- this is now included!
+    )
+''')
+conn.commit()
+
+
 
 def fetch_students_from_sqlite() -> pd.DataFrame:
     conn = init_sqlite_connection()
