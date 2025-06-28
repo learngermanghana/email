@@ -1790,5 +1790,15 @@ def generate_pdf_report(name: str, history: pd.DataFrame, assignment: str = None
     pdf.ln(6)
     return pdf.output(dest="S").encode("latin-1", "replace")
 
+    # --- Download button using student name + assignment ---
+    pdf_bytes = generate_pdf_report(student_row['name'], history_df, assignment)
+    pdf_filename = f"{student_row['name'].replace(' ', '_')}_{assignment.replace(' ', '_')}_report.pdf"
+    st.download_button(
+        "Download Report PDF",
+        data=pdf_bytes,
+        file_name=pdf_filename,
+        mime="application/pdf"
+    )
+
 #EndofTab
 
