@@ -1,7 +1,7 @@
 # ==== 1. IMPORTS ====
 import base64
 import re
-from datetime import datetime
+from datetime import datetime, date, timedelta
 import pandas as pd
 import streamlit as st
 from fpdf import FPDF
