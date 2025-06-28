@@ -4,6 +4,7 @@ import base64
 import re
 from datetime import datetime, date, timedelta
 import pandas as pd
+from dateutil.relativedelta import relativedelta
 import streamlit as st
 from fpdf import FPDF
 from sendgrid import SendGridAPIClient
@@ -1084,7 +1085,6 @@ with tabs[2]:
         mime="text/csv"
     )
 
-# ==== 11. TAB 3: WHATSAPP REMINDERS FOR DEBTORS ====
 with tabs[3]:
     st.title("📲 WhatsApp Reminders for Debtors")
 
@@ -1109,12 +1109,13 @@ with tabs[3]:
     df = normalize_columns(df)
     def getcol(key): return col_lookup(df, key)
 
-    cs  = getcol("contractstart")
-    paid = getcol("paid")
-    bal  = getcol("balance")
+    cs    = getcol("contractstart")
+    paid  = getcol("paid")
+    bal   = getcol("balance")
+    lvl   = getcol("level")
 
     # Parse dates & amounts
-    df[cs]   = pd.to_datetime(df.get(cs, pd.NaT), errors="coerce").fillna(pd.Timestamp.today())
+    df[cs]   = pd.to_datetime(df.get(cs, pd.NaT), errors="coerce")
     df[paid] = pd.to_numeric(df.get(paid, 0), errors="coerce").fillna(0)
     df[bal]  = pd.to_numeric(df.get(bal, 0), errors="coerce").fillna(0)
 
@@ -1139,20 +1140,24 @@ with tabs[3]:
 
     # 5. Filters
     search = st.text_input("Search by name or code", key="wa_search")
-    lvl    = getcol("level")
     opts   = ["All"] + sorted(df[lvl].dropna().unique().tolist()) if lvl in df.columns else ["All"]
     selected = st.selectbox("Filter by Level", opts, key="wa_level")
 
-    # 6. Compute Due Dates
-    df["due_date"]  = df[cs] + timedelta(days=30)
-    df["days_left"] = (df["due_date"] - pd.Timestamp.today()).dt.days.astype(int)
-    filt["due_date"]  = df["due_date"]
-    filt["days_left"] = df["days_left"]
+    # 6. Compute Due Dates - use CALENDAR MONTH logic
+    from dateutil.relativedelta import relativedelta
+    df["due_date"] = df[cs].apply(lambda x: x + relativedelta(months=1) if pd.notnull(x) else pd.NaT)
+    df["due_date_str"] = df["due_date"].dt.strftime("%d %b %Y")
+    df["days_left"] = (df["due_date"] - pd.Timestamp.today()).dt.days.astype("Int64")  # can be <NA>
+
+    # Assign to filtered
+    filt["due_date"] = df.loc[filt.index, "due_date"]
+    filt["due_date_str"] = df.loc[filt.index, "due_date_str"]
+    filt["days_left"] = df.loc[filt.index, "days_left"]
 
     # Apply search & filter
     if search:
         mask1 = filt[getcol("name")].str.contains(search, case=False, na=False)
-        mask2 = filt[getcol("studentcode")].str.contains(search, case=False, na=False)
+        mask2 = filt[getcol("studentcode")].astype(str).str.contains(search, case=False, na=False)
         filt  = filt[mask1 | mask2]
     if selected != "All":
         filt = filt[filt[lvl] == selected]
@@ -1163,12 +1168,12 @@ with tabs[3]:
         st.success("✅ No students currently owing a balance.")
     else:
         st.metric("Number of Records", len(filt))
-        tbl_cols = [getcol("name"), lvl, bal, "due_date", "days_left"]
+        tbl_cols = [getcol("name"), lvl, bal, "due_date_str", "days_left"]
         tbl = filt[tbl_cols].rename(columns={
             getcol("name"): "Name",
             lvl:            "Level",
             bal:            "Balance (GHS)",
-            "due_date":     "Due Date",
+            "due_date_str": "Due Date",
             "days_left":    "Days Until Due"
         })
         st.dataframe(tbl, use_container_width=True)
@@ -1193,22 +1198,22 @@ with tabs[3]:
             p = s.astype(str).str.replace(r"[+\- ]", "", regex=True)
             p = p.where(~p.str.startswith("0"), "233" + p.str[1:])
             p = p.str.extract(r"(\d{9,15})")[0]
-            # Optionally restrict to Ghana numbers:
-            # p = p.where(p.str.startswith("233"), None)
             return p
 
         ws = filt.assign(
             phone    = clean_phone_series(filt[getcol("phone")]),
-            due_str  = filt["due_date"].dt.strftime("%d %b %Y"),
+            due_str  = filt["due_date_str"],
             bal_str  = filt[bal].map(lambda x: f"GHS {x:.2f}"),
-            days     = filt["days_left"].astype(int)
+            days     = filt["days_left"].astype("Int64")
         )
 
         # ---- 9. WhatsApp Link Generator ----
         def make_link(row):
             if pd.isnull(row.phone):
                 return ""
-            if row.days >= 0:
+            if row.days is pd.NA or pd.isnull(row.days):
+                msg = ""
+            elif row.days >= 0:
                 msg = f"You have {row.days} {'day' if row.days==1 else 'days'} left to settle the {row.bal_str} balance."
             else:
                 od = abs(row.days)
@@ -1218,7 +1223,7 @@ with tabs[3]:
                 level=row[lvl],
                 due=row.due_str,
                 bal=row.bal_str,
-                days=row.days,
+                days=row.days if not pd.isnull(row.days) else "",
                 msg=msg
             )
             return f"https://wa.me/{row.phone}?text={urllib.parse.quote(text)}"
