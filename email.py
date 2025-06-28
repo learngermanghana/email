@@ -1757,7 +1757,7 @@ with tabs[7]:
             'date'       : datetime.now().strftime("%Y-%m-%d")
         })
         st.success("Score saved! Refreshing...")
-        st.rerun()
+        st.experimental_rerun()
 
     # --- Show Score History for Student ---
     history_df = df_scores[df_scores['studentcode'] == student_code].sort_values('date', ascending=False)
