@@ -119,7 +119,8 @@ def safe_read_csv(local_path, backup_url=None):
 def normalize_columns(df):
     """Make all DataFrame columns lowercase, replace spaces/dashes/slashes/parentheses with underscores."""
     df.columns = [
-        str(c).strip().lower().replace(" ", "_").replace("-", "_").replace("/", "_").replace("(", "").replace(")", "")
+        str(c).strip().lower().replace(" ", "_").replace("-", "_")
+                   .replace("/", "_").replace("(", "").replace(")", "")
         for c in df.columns
     ]
     return df
@@ -130,16 +131,20 @@ def col_lookup(df, name):
     for c in df.columns:
         if c.replace("_", "").lower() == key:
             return c
-    return name  # fallback, but will raise error if not present
+    raise KeyError(f"Column '{name}' not found in {df.columns.tolist()}")
+
+# Safe code extraction from selectbox values
+def extract_code(selection, label="student"):
+    if not selection or "(" not in selection:
+        st.warning(f"Please select a {label}.")
+        st.stop()
+    return selection.split("(")[-1].replace(")", "").strip()
 
 # For PDF-safe text
 def safe_pdf(text):
     return str(text).encode('latin-1', 'replace').decode('latin-1')
 
-# ---- Add more helpers as needed (PDF, Email) in future stages ----
-
 # ==== 4. SESSION STATE INITIALIZATION ====
-# (Ensures notification/email state is not lost on reruns)
 st.session_state.setdefault("emailed_expiries", set())
 st.session_state.setdefault("dismissed_notifs", set())
 
