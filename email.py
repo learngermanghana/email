@@ -1775,7 +1775,7 @@ with tabs[7]:
     @st.cache_data(ttl=0)
     def fetch_sqlite_scores():
         conn = init_sqlite_connection()
-        df = pd.read_sql("SELECT studentcode,assignment,score,comments,date FROM scores", conn)
+        df = pd.read_sql("SELECT studentcode,assignment,score,comments,date,level FROM scores", conn)
         df.columns = [c.lower() for c in df.columns]
         return df
     df_sqlite_scores = fetch_sqlite_scores()
@@ -1825,7 +1825,6 @@ with tabs[7]:
         data=df_scores_with_level.to_csv(index=False),
         file_name="all_scores_with_level.csv"
     )
-
 
     # --- 2. Student search and select ---
     st.subheader("🔎 Search Student")
@@ -1894,7 +1893,7 @@ with tabs[7]:
 
     # --- PDF GENERATION & DOWNLOAD BUTTON ---
     pdf_bytes = generate_pdf_report(
-        name=student_row['name'],
+        name=student_row[name_col],
         level=student_row.get('level', ''),
         history=student_history,
         assignment=assignment,
@@ -1903,7 +1902,7 @@ with tabs[7]:
         school_name="Learn Language Education Academy",
         footer_text="Thank you for your hard work! Contact your tutor if you have any questions."
     )
-    pdf_filename = f"{student_row['name'].replace(' ', '_')}_{assignment.replace(' ', '_')}_report.pdf"
+    pdf_filename = f"{student_row[name_col].replace(' ', '_')}_{assignment.replace(' ', '_')}_report.pdf"
 
     st.download_button(
         "Download Report PDF",
@@ -1913,7 +1912,3 @@ with tabs[7]:
     )
 
 #EndofTab1
-
-
-
-
