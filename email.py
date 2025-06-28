@@ -65,43 +65,11 @@ def init_sqlite_connection():
             assignment TEXT,
             score REAL,
             comments TEXT,
-            date TEXT
-            -- (maybe level is missing)
+            date TEXT,
+            level TEXT
         )''')
     conn.commit()
     return conn
-
-# --- One-time: Recreate scores table with 'level' (WILL ERASE EXISTING SCORES!) ---
-conn = init_sqlite_connection()
-cur = conn.cursor()
-cur.execute("DROP TABLE IF EXISTS scores")
-cur.execute('''
-    CREATE TABLE IF NOT EXISTS scores (
-        id INTEGER PRIMARY KEY,
-        studentcode TEXT,
-        assignment TEXT,
-        score REAL,
-        comments TEXT,
-        date TEXT,
-        level TEXT         -- <--- this is now included!
-    )
-''')
-conn.commit()
-
-
-
-def fetch_students_from_sqlite() -> pd.DataFrame:
-    conn = init_sqlite_connection()
-    df = pd.read_sql("SELECT studentcode,name,email,level FROM students", conn)
-    df.columns = [c.lower() for c in df.columns]
-    return df
-
-@st.cache_data(ttl=600)
-def fetch_scores_from_sqlite() -> pd.DataFrame:
-    conn = init_sqlite_connection()
-    df = pd.read_sql("SELECT studentcode,assignment,score,comments,date FROM scores", conn)
-    df.columns = [c.lower() for c in df.columns]
-    return df
 
 def save_score_to_sqlite(score: dict):
     conn = init_sqlite_connection()
@@ -111,6 +79,19 @@ def save_score_to_sqlite(score: dict):
     q = f"INSERT INTO scores ({cols}) VALUES ({','.join(['?']*len(vals))})"
     cur.execute(q, vals)
     conn.commit()
+
+@st.cache_data(ttl=600)
+def fetch_scores_from_sqlite() -> pd.DataFrame:
+    conn = init_sqlite_connection()
+    df = pd.read_sql("SELECT studentcode,assignment,score,comments,date,level FROM scores", conn)
+    df.columns = [c.lower() for c in df.columns]
+    return df
+
+def fetch_students_from_sqlite() -> pd.DataFrame:
+    conn = init_sqlite_connection()
+    df = pd.read_sql("SELECT studentcode,name,email,level FROM students", conn)
+    df.columns = [c.lower() for c in df.columns]
+    return df
 
 # ==== 5. GENERAL HELPERS ====
 def extract_code(selection: str, label: str = "student") -> str:
@@ -131,10 +112,10 @@ def choose_student(df: pd.DataFrame, levels: list, key_suffix: str) -> tuple:
     row = filtered[filtered['studentcode'] == code].iloc[0]
     return code, row
 
-# Add this helper first!
 def safe_pdf(text):
     # Remove or replace any character not in latin-1
     return "".join(c if ord(c) < 256 else "?" for c in str(text))
+
 def generate_pdf_report(
     name: str,
     level: str,
@@ -191,7 +172,6 @@ def generate_pdf_report(
         pdf.cell(0, 10, safe_pdf(footer_text), ln=True, align="C")
     return pdf.output(dest="S").encode("latin-1", "replace")
 
-
 def send_email_report(pdf_bytes: bytes, to: str, subject: str, html_content: str):
     try:
         msg = Mail(from_email=school_sender_email, to_emails=to, subject=subject, html_content=html_content)
@@ -204,6 +184,10 @@ def send_email_report(pdf_bytes: bytes, to: str, subject: str, html_content: str
         msg.attachment = attachment
         SendGridAPIClient(school_sendgrid_key).send(msg)
     except Exception as e:
+        st.error(f"Email send failed: {e}")
+
+
+
         st.error(f"Email send failed: {e}")
 
         
