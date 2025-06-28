@@ -816,8 +816,7 @@ ref_answers = {
         "6. c) Die Arbeitsagentur",
         "7. c) Kranken-, Renten- und Pflegeversicherung"
     ]
-})  # End of A2 4.11–10.28 update
-
+}  # End of A2 4.11–10.28 update
 
 
 
