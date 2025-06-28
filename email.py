@@ -562,10 +562,6 @@ ref_answers = {
         "4. B) Lederhosen und Dirndl",
         "5. B) Fahrgeschafte und Spiele"
     ],
-#def ref_answers (A2 4.11 - 10.28)
-
-ref_answers.update({
-
     "A2 4.11": [
         # Unterwegs: Verkehrsmittel vergleichen
         "1. b) In Italien",
