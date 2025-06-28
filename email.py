@@ -539,7 +539,8 @@ ref_answers = {
         "3. B) Ein Piknik",
         "4. C) in eienem restaurant",
         "5. A) Spielen und Spazieren gehen"
-            ],
+        
+     ],
     "A2 2.5": [
         "1. c) Nudeln, Pizza und Salat",
         "2. c) Den grünen Salat",
