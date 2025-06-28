@@ -9,6 +9,7 @@ from fpdf import FPDF
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
 import sqlite3
+import urllib.parse  
 
 # ==== 1.a. CSV & COLUMN HELPERS ====
 def safe_read_csv(local_path: str, remote_url: str) -> pd.DataFrame:
