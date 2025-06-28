@@ -1856,10 +1856,8 @@ with tabs[7]:
 
     # --- PDF & EMAIL REPORT ---
     st.markdown("### 📄 PDF / Email Full Report")
-    # Re-fetch history after any edits
     final_hist = fetch_scores_from_sqlite()[lambda d: d[studentcode_col] == code] \
                   .sort_values(date_col)
-    # Build PDF
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial","B",14)
@@ -1869,7 +1867,6 @@ with tabs[7]:
     for _, r in final_hist.iterrows():
         pdf.set_font("Arial","B",12)
         pdf.cell(0, 8, f"{r[assign_col]}: {r[score_col]}/100", ln=True)
-        # include reference answers if available
         if r[assign_col] in ref_answers:
             pdf.set_font("Arial","I",10)
             pdf.multi_cell(0, 6, "Ref: " + "; ".join(ref_answers[r[assign_col]]))
@@ -1902,6 +1899,6 @@ with tabs[7]:
             )
             msg.attachment = attach
             SendGridAPIClient(school_sendgrid_key).send(msg)
-            st.success("Emailed!") 
+            st.success("Emailed!")
     else:
         st.info("No email on file.")
