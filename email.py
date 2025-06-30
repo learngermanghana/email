@@ -1956,25 +1956,25 @@ with tabs[7]:
 
         # --- Format Reference Answers as HTML (if any) ---
         ref_ans_list = ref_answers.get(assignment, [])
+        ref_ans_html = ""
         if ref_ans_list:
-            ref_ans_html = "<b>Reference Answers:</b><br><ol>"
+            ref_ans_html = "<b>Reference Answers:</b><br><ol style='padding-left:16px'>"
             for a in ref_ans_list:
                 if not a.strip():
                     ref_ans_html += "<br>"
                 else:
                     ref_ans_html += f"<li>{a}</li>"
             ref_ans_html += "</ol><br>"
-        else:
-            ref_ans_html = ""
 
-        default_body = f"""Hello {student_row[name_col]},<br><br>
-Please find attached your score report for <b>{assignment}</b>.<br><br>
-{ref_ans_html}
-If you have any questions, reply directly to this email.<br><br>
-Best regards,<br>
-Mr. Felix Asadu<br>
-Learn Language Education Academy
-"""
+        default_body = (
+            f"Hello {student_row[name_col]},<br><br>"
+            f"Please find attached your score report for <b>{assignment}</b>.<br><br>"
+            f"{ref_ans_html}"
+            "If you have any questions, reply directly to this email.<br><br>"
+            "Best regards,<br>"
+            "Mr. Felix Asadu<br>"
+            "Learn Language Education Academy"
+        )
         email_subject = st.text_input("Email Subject", value=default_subject, key="pdf_email_subject")
         email_body = st.text_area("Email Body (HTML)", value=default_body, key="pdf_email_body", height=300)
 
@@ -1991,6 +1991,7 @@ Learn Language Education Academy
                 st.error(f"Failed to send email: {e}")
     else:
         st.info("No student email found to send report.")
+
 
     # --- WHATSAPP SHARE BUTTON ---
     def clean_ghana_phone(phone):
