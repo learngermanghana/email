@@ -200,6 +200,7 @@ def send_email_report(pdf_bytes: bytes, to: str, subject: str, html_content: str
     except Exception as e:
         st.error(f"Email send failed: {e}")
 
+
         
 # ==== 8. REFERENCE ANSWERS ====
 #def ref_answers
