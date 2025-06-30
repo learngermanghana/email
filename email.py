@@ -1978,3 +1978,43 @@ with tabs[7]:
     else:
         st.info("No student email found to send report.")
 
+    # --- WHATSAPP SHARE BUTTON ---
+    # Helper for Ghana phone format
+    def clean_ghana_phone(phone):
+        phone = str(phone).strip().replace(" ", "").replace("-", "")
+        phone = phone.replace("+", "")
+        # Remove leading zeros if any
+        if phone.startswith("0") and len(phone) == 10:
+            phone = "233" + phone[1:]
+        elif phone.startswith("233") and len(phone) == 12:
+            pass  # Already OK
+        elif len(phone) == 9:
+            phone = "233" + phone  # No leading zero, but missing country code
+        elif not phone.startswith("233") and len(phone) == 10:
+            phone = "233" + phone[1:]
+        return phone if phone.startswith("233") and len(phone) == 12 else ""
+
+    # Try to get student's phone
+    student_phone_col = None
+    for c in student_row.index:
+        if "phone" in c:
+            student_phone_col = c
+            break
+    student_phone_raw = student_row[student_phone_col] if student_phone_col else ""
+    wa_phone = clean_ghana_phone(student_phone_raw)
+
+    if wa_phone:
+        st.markdown("---")
+        st.subheader("💬 WhatsApp this Report")
+
+        default_wa_msg = f"""Hi {student_row[name_col]}, your report for *{assignment}* is ready!
+Score: {default_score}/100
+- {comment if comment else ""}
+Contact your tutor if you have questions.
+Learn Language Education Academy."""
+        wa_msg = st.text_area("WhatsApp Message", value=default_wa_msg, key="wa_msg_box", height=120)
+        # WhatsApp API link (Web & mobile compatible)
+        wa_link = f"https://wa.me/{wa_phone}?text={urllib.parse.quote(wa_msg)}"
+        st.markdown(f"[📲 Share on WhatsApp]({wa_link})", unsafe_allow_html=True)
+    else:
+        st.info("No valid phone number to send WhatsApp message.")
