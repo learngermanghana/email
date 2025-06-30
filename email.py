@@ -1940,4 +1940,19 @@ with tabs[7]:
     )
     
 
-
+if st.button("📧 Email Report PDF"):
+    if not to_email or "@" not in to_email:
+        st.error("Please enter a valid recipient email address.")
+    else:
+        try:
+            subject = f"{student_row[name_col]} - {assignment} Report"
+            body = "Please find attached your assignment report from Learn Language Education Academy."
+            response = send_email_with_attachment(
+                to_email, subject, body, pdf_bytes, pdf_filename, sendgrid_api_key, from_email
+            )
+            if response.status_code < 300:
+                st.success(f"Report sent to {to_email}!")
+            else:
+                st.error(f"Failed to send email: {response.text}")
+        except Exception as e:
+            st.error(f"Failed to send email: {e}")
