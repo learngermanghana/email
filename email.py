@@ -1939,20 +1939,28 @@ with tabs[7]:
         mime="application/pdf"
     )
     
+# === Email PDF Button ===
+st.markdown("---")
+st.subheader("📧 Email Report PDF")
 
-if st.button("📧 Email Report PDF"):
+# Try to get email from student_row or ask for it
+to_email = student_row.get("email", "") if "email" in student_row else ""
+if not to_email or not isinstance(to_email, str) or "@" not in to_email:
+    to_email = st.text_input("Recipient Email", value="", help="Enter recipient email address.")
+
+send_email = st.button("📧 Email Report PDF")
+if send_email:
     if not to_email or "@" not in to_email:
         st.error("Please enter a valid recipient email address.")
     else:
         try:
             subject = f"{student_row[name_col]} - {assignment} Report"
-            body = "Please find attached your assignment report from Learn Language Education Academy."
-            response = send_email_with_attachment(
-                to_email, subject, body, pdf_bytes, pdf_filename, sendgrid_api_key, from_email
+            body = (
+                f"Hello {student_row[name_col]},<br><br>"
+                f"Attached is your report for the assignment <b>{assignment}</b>.<br><br>"
+                "Thank you for your hard work!<br>Learn Language Education Academy"
             )
-            if response.status_code < 300:
-                st.success(f"Report sent to {to_email}!")
-            else:
-                st.error(f"Failed to send email: {response.text}")
+            send_email_report(pdf_bytes, to_email, subject, body)
+            st.success(f"Report sent to {to_email}!")
         except Exception as e:
             st.error(f"Failed to send email: {e}")
