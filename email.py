@@ -174,21 +174,8 @@ def generate_pdf_report(
     return pdf.output(dest="S").encode("latin-1", "replace")
 
 def send_email_report(pdf_bytes: bytes, to: str, subject: str, html_content: str):
-    # Validate recipient
-    if not to or '@' not in to:
-        st.error("Email send failed: Missing or invalid recipient email address.")
-        return
-    # Validate sender (just in case)
-    if not school_sender_email or '@' not in school_sender_email:
-        st.error("Email send failed: Missing or invalid sender email address.")
-        return
     try:
-        msg = Mail(
-            from_email=school_sender_email,
-            to_emails=to,
-            subject=subject,
-            html_content=html_content
-        )
+        msg = Mail(from_email=school_sender_email, to_emails=to, subject=subject, html_content=html_content)
         attachment = Attachment(
             FileContent(base64.b64encode(pdf_bytes).decode()),
             FileName(f"{to.replace('@','_')}_report.pdf"),
@@ -199,7 +186,6 @@ def send_email_report(pdf_bytes: bytes, to: str, subject: str, html_content: str
         SendGridAPIClient(school_sendgrid_key).send(msg)
     except Exception as e:
         st.error(f"Email send failed: {e}")
-
 
         
 # ==== 8. REFERENCE ANSWERS ====
