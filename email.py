@@ -1952,23 +1952,24 @@ with tabs[7]:
         file_name=pdf_filename,
         mime="application/pdf"
     )
-
     
-import streamlit as st
-import pandas as pd
 
-# ---- 1. LOAD AND NORMALIZE DATA ----
-# Example: Load from CSV, Google Sheet, or existing DataFrame
-# df_students = pd.read_csv("your_students_file.csv")
-# If already loaded, just normalize columns:
-df_students.columns = [c.strip().replace(" ", "").lower() for c in df_students.columns]
+# 1. Load data from your Google Sheet (always up to date!)
+students_csv_url = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
+@st.cache_data(ttl=0)
+def load_students():
+    df = pd.read_csv(students_csv_url, dtype=str)
+    df.columns = [c.strip().replace(" ", "").lower().replace("_", "") for c in df.columns]
+    return df
 
-# ---- 2. COLUMN LOOKUPS ----
+df_students = load_students()
+
+# 2. Column lookups based on your sheet
 name_col = "name"
 code_col = "studentcode"
 email_col = "email"
 
-# ---- 3. SEARCH & FILTER ----
+# 3. Search/filter
 search_student = st.text_input("Search student by name or code...")
 if search_student:
     students_filtered = df_students[
@@ -1978,30 +1979,28 @@ if search_student:
 else:
     students_filtered = df_students
 
-# ---- 4. SELECT STUDENT FROM DROPDOWN ----
+# 4. Dropdown for selection
 student_list = students_filtered[name_col] + " (" + students_filtered[code_col].astype(str) + ")"
 chosen = st.selectbox("Select Student", student_list, key="single_student")
 
-# ---- 5. SAFETY: Extract code and check ----
+# 5. Safety: parse and match
 if not chosen or "(" not in chosen:
     st.warning("No student selected or wrong format.")
     st.stop()
 
 student_code = chosen.split("(")[-1].replace(")", "").strip()
-
 matched = students_filtered[students_filtered[code_col] == student_code]
 if matched.empty:
     st.error("No matching student found. Please check your selection or refresh the student list.")
     st.stop()
-
 student_row = matched.iloc[0]
 
-# ---- 6. READY TO USE: student_row ----
+# 6. Show selection details (for debug/confirmation)
 st.success(f"Selected: {student_row[name_col]} ({student_code})")
 st.write(student_row)
 
-# ---- 7. EMAIL SENDING LOGIC EXAMPLE ----
-student_email = student_row[email_col].strip()
+# 7. Email section (insert your PDF, etc. logic below)
+student_email = str(student_row[email_col]).strip()
 if student_email and "@" in student_email:
     st.markdown("---")
     st.subheader("📧 Email this Report")
@@ -2017,11 +2016,11 @@ if student_email and "@" in student_email:
     email_subject = st.text_input("Email Subject", value=default_subject)
     email_body = st.text_area("Email Body (HTML)", value=default_body, height=300)
 
-    # EXAMPLE BUTTON (add your send_email_report logic here)
     if st.button("📧 Send Email", key="send_pdf_email"):
         try:
+            # --- Your email send function here:
             # send_email_report(pdf_bytes, to=student_email, subject=email_subject, html_content=email_body)
-            st.success(f"Email sent to {student_email}!")
+            st.success(f"Email sent to {student_email}!")  # Replace with your logic
         except Exception as e:
             st.error(f"Failed to send email: {e}")
 else:
