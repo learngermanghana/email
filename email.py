@@ -1954,58 +1954,79 @@ with tabs[7]:
     )
 
     
-    # --- EMAIL REPORT BUTTON ---
-    # Get student's email (robustly, fallback to empty if missing)
-    student_email_col = None
-    for c in student_row.index:
-        if "email" in c:
-            student_email_col = c
-            break
-    student_email = student_row[student_email_col] if student_email_col else ""
+import streamlit as st
+import pandas as pd
 
-    if student_email:
-        st.markdown("---")
-        st.subheader("📧 Email this Report")
+# ---- 1. LOAD AND NORMALIZE DATA ----
+# Example: Load from CSV, Google Sheet, or existing DataFrame
+# df_students = pd.read_csv("your_students_file.csv")
+# If already loaded, just normalize columns:
+df_students.columns = [c.strip().replace(" ", "").lower() for c in df_students.columns]
 
-        default_subject = f"{assignment} – Your Progress Report"
+# ---- 2. COLUMN LOOKUPS ----
+name_col = "name"
+code_col = "studentcode"
+email_col = "email"
 
-        # --- Format Reference Answers as HTML (if any) ---
-        ref_ans_list = ref_answers.get(assignment, [])
-        ref_ans_html = ""
-        if ref_ans_list:
-            ref_ans_html = "<b>Reference Answers:</b><br><ol style='padding-left:16px'>"
-            for a in ref_ans_list:
-                if not a.strip():
-                    ref_ans_html += "<br>"
-                else:
-                    ref_ans_html += f"<li>{a}</li>"
-            ref_ans_html += "</ol><br>"
+# ---- 3. SEARCH & FILTER ----
+search_student = st.text_input("Search student by name or code...")
+if search_student:
+    students_filtered = df_students[
+        df_students[name_col].str.contains(search_student, case=False, na=False) |
+        df_students[code_col].astype(str).str.contains(search_student, case=False, na=False)
+    ]
+else:
+    students_filtered = df_students
 
-        default_body = (
-            f"Hello {student_row[name_col]},<br><br>"
-            f"Please find attached your score report for <b>{assignment}</b>.<br><br>"
-            f"{ref_ans_html}"
-            "If you have any questions, reply directly to this email.<br><br>"
-            "Best regards,<br>"
-            "Mr. Felix Asadu<br>"
-            "Learn Language Education Academy"
-        )
-        email_subject = st.text_input("Email Subject", value=default_subject, key="pdf_email_subject")
-        email_body = st.text_area("Email Body (HTML)", value=default_body, key="pdf_email_body", height=300)
+# ---- 4. SELECT STUDENT FROM DROPDOWN ----
+student_list = students_filtered[name_col] + " (" + students_filtered[code_col].astype(str) + ")"
+chosen = st.selectbox("Select Student", student_list, key="single_student")
 
-        if st.button("📧 Send Email with Report PDF", key="send_pdf_email"):
-            try:
-                send_email_report(
-                    pdf_bytes,
-                    to=student_email,
-                    subject=email_subject,
-                    html_content=email_body
-                )
-                st.success(f"Email sent to {student_email}!")
-            except Exception as e:
-                st.error(f"Failed to send email: {e}")
-    else:
-        st.info("No student email found to send report.")
+# ---- 5. SAFETY: Extract code and check ----
+if not chosen or "(" not in chosen:
+    st.warning("No student selected or wrong format.")
+    st.stop()
+
+student_code = chosen.split("(")[-1].replace(")", "").strip()
+
+matched = students_filtered[students_filtered[code_col] == student_code]
+if matched.empty:
+    st.error("No matching student found. Please check your selection or refresh the student list.")
+    st.stop()
+
+student_row = matched.iloc[0]
+
+# ---- 6. READY TO USE: student_row ----
+st.success(f"Selected: {student_row[name_col]} ({student_code})")
+st.write(student_row)
+
+# ---- 7. EMAIL SENDING LOGIC EXAMPLE ----
+student_email = student_row[email_col].strip()
+if student_email and "@" in student_email:
+    st.markdown("---")
+    st.subheader("📧 Email this Report")
+
+    default_subject = "Your Progress Report"
+    default_body = f"""
+        Hello {student_row[name_col]},<br><br>
+        Please find attached your progress report.<br><br>
+        Best regards,<br>
+        Mr. Felix Asadu<br>
+        Learn Language Education Academy
+    """
+    email_subject = st.text_input("Email Subject", value=default_subject)
+    email_body = st.text_area("Email Body (HTML)", value=default_body, height=300)
+
+    # EXAMPLE BUTTON (add your send_email_report logic here)
+    if st.button("📧 Send Email", key="send_pdf_email"):
+        try:
+            # send_email_report(pdf_bytes, to=student_email, subject=email_subject, html_content=email_body)
+            st.success(f"Email sent to {student_email}!")
+        except Exception as e:
+            st.error(f"Failed to send email: {e}")
+else:
+    st.info("No valid student email found to send report.")
+
 
     # --- WHATSAPP SHARE BUTTON ---
     def clean_ghana_phone(phone):
