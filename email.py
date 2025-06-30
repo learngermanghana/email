@@ -482,6 +482,12 @@ ref_answers = {
         "H) Hand – Hand",
         "I) Fuß – Foot",
         "J) Bauch – Stomach"
+         "",
+        "1. A) Liebe Anna, wie geht es dir?",
+        "2. B) Halsschmerzen und Fieber",
+        "3.C)Ich habe Kopfschmerzen",
+        "4. D) Den Mund zu offnen",
+        "5. C) Viel Wasser zu trinken und sich auszuruhen",
     ],
     # --- A2 Section ---
     "A2 1.1": [
