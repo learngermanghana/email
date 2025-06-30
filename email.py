@@ -1939,29 +1939,37 @@ with tabs[7]:
         mime="application/pdf"
     )
     
-# === Email PDF Button ===
-st.markdown("---")
-st.subheader("📧 Email Report PDF")
+# --- Email Report Section ---
 
-# Try to get email from student_row or ask for it
-to_email = student_row.get("email", "") if "email" in student_row else ""
-if not to_email or not isinstance(to_email, str) or "@" not in to_email:
-    to_email = st.text_input("Recipient Email", value="", help="Enter recipient email address.")
+# Find email column (robust for different headers)
+email_col = None
+for c in student_row.index:
+    if "email" in c:
+        email_col = c
+        break
+to_email = student_row[email_col] if email_col else ""
 
-# --- Email sending section in Marking Tab ---
+# Always allow editing (in case the default is missing or wrong)
+to_email = st.text_input("Recipient Email", value=to_email, key="report_email")
 
-st.markdown("### 📧 Email Report PDF to Student")
+# Reference answers as HTML
+ref_ans_list = ref_answers.get(assignment, [])
+ref_ans_html = ""
+if ref_ans_list:
+    ref_ans_html = "<b>Reference Answers:</b><br><ol style='padding-left:16px'>"
+    for a in ref_ans_list:
+        if not a.strip():
+            ref_ans_html += "<br>"
+        else:
+            ref_ans_html += f"<li>{a}</li>"
+    ref_ans_html += "</ol><br>"
 
-# 1. Recipient Email Field
-to_email = st.text_input("Recipient Email", value=student_row.get("email", ""), key="report_email")
-
-# 2. Editable Message Box (HTML enabled)
 default_body = (
     f"Hello {student_row[name_col]},<br><br>"
     f"Attached is your report for the assignment <b>{assignment}</b>.<br><br>"
+    f"{ref_ans_html}"
     "Thank you for your hard work!<br>Learn Language Education Academy"
 )
-
 email_body = st.text_area(
     "Edit Email Message (HTML supported):",
     value=default_body,
@@ -1969,22 +1977,14 @@ email_body = st.text_area(
     key="report_email_body"
 )
 
-# 3. Reference Answers Preview (if available)
-if assignment in ref_answers and ref_answers[assignment]:
-    st.markdown("**Reference Answers included in the report:**")
-    for ref in ref_answers[assignment]:
-        st.write(f"- {ref}")
-
-# 4. Send Email Button
-send_email = st.button("📧 Email Report PDF")
-if send_email:
+# Send Email Button
+if st.button("📧 Email Report PDF"):
     if not to_email or "@" not in to_email:
         st.error("Please enter a valid recipient email address.")
     else:
         try:
             subject = f"{student_row[name_col]} - {assignment} Report"
-            body = email_body
-            send_email_report(pdf_bytes, to_email, subject, body)
+            send_email_report(pdf_bytes, to_email, subject, email_body)
             st.success(f"Report sent to {to_email}!")
         except Exception as e:
             st.error(f"Failed to send email: {e}")
