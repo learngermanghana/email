@@ -1938,6 +1938,29 @@ with tabs[7]:
         file_name=pdf_filename,
         mime="application/pdf"
     )
+
+# Show editable email message before sending
+st.markdown("#### 📧 Send Report to Student via Email")
+default_email = student_row.get('email', '') if 'email' in student_row else ""
+to_email = st.text_input("Recipient Email", value=default_email)
+subject = st.text_input("Subject", value=f"{student_row[name_col]} - {assignment} Report")
+body = st.text_area("Message (HTML allowed)", value=(
+    f"Hello {student_row[name_col]},<br><br>"
+    f"Attached is your report for the assignment <b>{assignment}</b>.<br><br>"
+    "Thank you for your hard work!<br>Learn Language Education Academy"
+))
+send_email = st.button("📧 Email Report PDF")
+
+if send_email:
+    if not to_email or "@" not in to_email:
+        st.error("Please enter a valid recipient email address.")
+    else:
+        try:
+            send_email_report(pdf_bytes, to_email, subject, body)
+            st.success(f"Report sent to {to_email}!")
+        except Exception as e:
+            st.error(f"Failed to send email: {e}")
+
     
 # --- WhatsApp Share Section ---
 
