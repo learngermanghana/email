@@ -1953,60 +1953,59 @@ with tabs[7]:
         mime="application/pdf"
     )
 
-# --- EMAIL REPORT BUTTON ---
-# Get student's email (robustly, fallback to empty if missing)
-student_email_col = None
-for c in student_row.index:
-    if "email" in c:
-        student_email_col = c
-        break
-student_email = student_row[student_email_col] if student_email_col else ""
-student_email = str(student_email).strip() if student_email else ""
+    
+    # --- EMAIL REPORT BUTTON ---
+    # Get student's email (robustly, fallback to empty if missing)
+    student_email_col = None
+    for c in student_row.index:
+        if "email" in c:
+            student_email_col = c
+            break
+    student_email = student_row[student_email_col] if student_email_col else ""
 
-if student_email and "@" in student_email:
-    st.markdown("---")
-    st.subheader("📧 Email this Report")
+    if student_email:
+        st.markdown("---")
+        st.subheader("📧 Email this Report")
 
-    default_subject = f"{assignment} – Your Progress Report"
+        default_subject = f"{assignment} – Your Progress Report"
 
-    # --- Format Reference Answers as HTML (if any) ---
-    ref_ans_list = ref_answers.get(assignment, [])
-    ref_ans_html = ""
-    if ref_ans_list:
-        ref_ans_html = "<b>Reference Answers:</b><br><ol style='padding-left:16px'>"
-        for a in ref_ans_list:
-            if not a.strip():
-                ref_ans_html += "<br>"
-            else:
-                ref_ans_html += f"<li>{a}</li>"
-        ref_ans_html += "</ol><br>"
+        # --- Format Reference Answers as HTML (if any) ---
+        ref_ans_list = ref_answers.get(assignment, [])
+        ref_ans_html = ""
+        if ref_ans_list:
+            ref_ans_html = "<b>Reference Answers:</b><br><ol style='padding-left:16px'>"
+            for a in ref_ans_list:
+                if not a.strip():
+                    ref_ans_html += "<br>"
+                else:
+                    ref_ans_html += f"<li>{a}</li>"
+            ref_ans_html += "</ol><br>"
 
-    default_body = (
-        f"Hello {student_row[name_col]},<br><br>"
-        f"Please find attached your score report for <b>{assignment}</b>.<br><br>"
-        f"{ref_ans_html}"
-        "If you have any questions, reply directly to this email.<br><br>"
-        "Best regards,<br>"
-        "Mr. Felix Asadu<br>"
-        "Learn Language Education Academy"
-    )
-    email_subject = st.text_input("Email Subject", value=default_subject, key="pdf_email_subject")
-    email_body = st.text_area("Email Body (HTML)", value=default_body, key="pdf_email_body", height=300)
+        default_body = (
+            f"Hello {student_row[name_col]},<br><br>"
+            f"Please find attached your score report for <b>{assignment}</b>.<br><br>"
+            f"{ref_ans_html}"
+            "If you have any questions, reply directly to this email.<br><br>"
+            "Best regards,<br>"
+            "Mr. Felix Asadu<br>"
+            "Learn Language Education Academy"
+        )
+        email_subject = st.text_input("Email Subject", value=default_subject, key="pdf_email_subject")
+        email_body = st.text_area("Email Body (HTML)", value=default_body, key="pdf_email_body", height=300)
 
-    if st.button("📧 Send Email with Report PDF", key="send_pdf_email"):
-        try:
-            send_email_report(
-                pdf_bytes,
-                to=student_email,
-                subject=email_subject,
-                html_content=email_body
-            )
-            st.success(f"Email sent to {student_email}!")
-        except Exception as e:
-            st.error(f"Failed to send email: {e}")
-else:
-    st.info("No valid student email found to send report.")
-
+        if st.button("📧 Send Email with Report PDF", key="send_pdf_email"):
+            try:
+                send_email_report(
+                    pdf_bytes,
+                    to=student_email,
+                    subject=email_subject,
+                    html_content=email_body
+                )
+                st.success(f"Email sent to {student_email}!")
+            except Exception as e:
+                st.error(f"Failed to send email: {e}")
+    else:
+        st.info("No student email found to send report.")
 
     # --- WHATSAPP SHARE BUTTON ---
     def clean_ghana_phone(phone):
