@@ -1948,6 +1948,34 @@ to_email = student_row.get("email", "") if "email" in student_row else ""
 if not to_email or not isinstance(to_email, str) or "@" not in to_email:
     to_email = st.text_input("Recipient Email", value="", help="Enter recipient email address.")
 
+# --- Email sending section in Marking Tab ---
+
+st.markdown("### 📧 Email Report PDF to Student")
+
+# 1. Recipient Email Field
+to_email = st.text_input("Recipient Email", value=student_row.get("email", ""), key="report_email")
+
+# 2. Editable Message Box (HTML enabled)
+default_body = (
+    f"Hello {student_row[name_col]},<br><br>"
+    f"Attached is your report for the assignment <b>{assignment}</b>.<br><br>"
+    "Thank you for your hard work!<br>Learn Language Education Academy"
+)
+
+email_body = st.text_area(
+    "Edit Email Message (HTML supported):",
+    value=default_body,
+    height=200,
+    key="report_email_body"
+)
+
+# 3. Reference Answers Preview (if available)
+if assignment in ref_answers and ref_answers[assignment]:
+    st.markdown("**Reference Answers included in the report:**")
+    for ref in ref_answers[assignment]:
+        st.write(f"- {ref}")
+
+# 4. Send Email Button
 send_email = st.button("📧 Email Report PDF")
 if send_email:
     if not to_email or "@" not in to_email:
@@ -1955,12 +1983,9 @@ if send_email:
     else:
         try:
             subject = f"{student_row[name_col]} - {assignment} Report"
-            body = (
-                f"Hello {student_row[name_col]},<br><br>"
-                f"Attached is your report for the assignment <b>{assignment}</b>.<br><br>"
-                "Thank you for your hard work!<br>Learn Language Education Academy"
-            )
+            body = email_body
             send_email_report(pdf_bytes, to_email, subject, body)
             st.success(f"Report sent to {to_email}!")
         except Exception as e:
             st.error(f"Failed to send email: {e}")
+
