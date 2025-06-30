@@ -1939,6 +1939,42 @@ with tabs[7]:
         mime="application/pdf"
     )
     
-#EndofTab7
+    # --- EMAIL REPORT BUTTON ---
+    # Get student's email (robustly, fallback to empty if missing)
+    student_email_col = None
+    for c in student_row.index:
+        if "email" in c:
+            student_email_col = c
+            break
+    student_email = student_row[student_email_col] if student_email_col else ""
 
-#EndofTab1
+    if student_email:
+        st.markdown("---")
+        st.subheader("📧 Email this Report")
+
+        default_subject = f"{assignment} – Your Progress Report"
+        default_body = f"""
+        Hello {student_row[name_col]},<br><br>
+        Please find attached your score report for <b>{assignment}</b>.<br><br>
+        If you have any questions, reply directly to this email.<br><br>
+        Best regards,<br>
+        Mr. Felix Asadu<br>
+        Learn Language Education Academy
+        """
+        email_subject = st.text_input("Email Subject", value=default_subject, key="pdf_email_subject")
+        email_body = st.text_area("Email Body (HTML)", value=default_body, key="pdf_email_body", height=180)
+
+        if st.button("📧 Send Email with Report PDF", key="send_pdf_email"):
+            try:
+                send_email_report(
+                    pdf_bytes,
+                    to=student_email,
+                    subject=email_subject,
+                    html_content=email_body
+                )
+                st.success(f"Email sent to {student_email}!")
+            except Exception as e:
+                st.error(f"Failed to send email: {e}")
+    else:
+        st.info("No student email found to send report.")
+
