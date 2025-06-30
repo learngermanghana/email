@@ -1964,46 +1964,55 @@ if send_email:
     
 # --- WhatsApp Share Section ---
 
+import urllib.parse
+
 st.markdown("---")
 st.subheader("📲 Share Report via WhatsApp")
 
-# Prepare WhatsApp recipient (use student's emergency contact, phone, or leave blank)
+# Try to get student's phone automatically from any relevant column
 wa_phone = ""
 wa_cols = [c for c in student_row.index if "phone" in c]
 for c in wa_cols:
-    if str(student_row[c]).startswith("233") or str(student_row[c]).startswith("0") or str(student_row[c]).isdigit():
-        wa_phone = str(student_row[c])
+    v = str(student_row[c])
+    if v.startswith("233") or v.startswith("0") or v.isdigit():
+        wa_phone = v
         break
+
+# Allow manual override or editing of phone number
 wa_phone = st.text_input("WhatsApp Number (International format, e.g., 233245022743)", value=wa_phone, key="wa_number")
 
-# Format reference answers as WhatsApp text (numbered list)
+# Prepare reference answers section, preserving original numbering
 ref_ans_list = ref_answers.get(assignment, [])
 ref_ans_wa = ""
 if ref_ans_list:
-    ref_ans_wa = "*Reference Answers:*\n"
-    for i, ans in enumerate(ref_ans_list, 1):
-        ref_ans_wa += f"{i}. {ans}\n"
+    ref_ans_wa = "*Reference Answers:*\n" + "\n".join(ref_ans_list) + "\n"
 
+# Prepare the WhatsApp message with reference answers
 default_wa_msg = (
     f"Hello {student_row[name_col]},\n\n"
     f"Here is your report for the assignment: *{assignment}*\n"
     f"{ref_ans_wa}"
     "Thank you for your hard work!\nLearn Language Education Academy"
 )
-wa_message = st.text_area("WhatsApp Message (edit before sending):", value=default_wa_msg, height=200, key="wa_message_edit")
+wa_message = st.text_area(
+    "WhatsApp Message (edit before sending):",
+    value=default_wa_msg, height=200, key="wa_message_edit"
+)
 
-# WhatsApp share URL logic
+# Format WhatsApp number for wa.me link
 wa_num_formatted = wa_phone.strip().replace(" ", "").replace("-", "")
 if wa_num_formatted.startswith("0"):
     wa_num_formatted = "233" + wa_num_formatted[1:]
 elif wa_num_formatted.startswith("+"):
     wa_num_formatted = wa_num_formatted[1:]
 elif not wa_num_formatted.startswith("233"):
-    # try to fix common mistakes
-    wa_num_formatted = "233" + wa_num_formatted[-9:]
+    wa_num_formatted = "233" + wa_num_formatted[-9:]  # fallback for local numbers
 
 # Create WhatsApp link
-wa_link = f"https://wa.me/{wa_num_formatted}?text={urllib.parse.quote(wa_message)}" if wa_num_formatted.isdigit() and len(wa_num_formatted) >= 11 else None
+wa_link = (
+    f"https://wa.me/{wa_num_formatted}?text={urllib.parse.quote(wa_message)}"
+    if wa_num_formatted.isdigit() and len(wa_num_formatted) >= 11 else None
+)
 
 # Show Share Button
 if wa_link:
