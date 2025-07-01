@@ -1805,7 +1805,6 @@ with tabs[6]:
                        data=pdf.output(dest='S').encode('latin-1'),
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
-
 with tabs[7]:
     st.title("📝 Assignment Marking & Scores")
 
@@ -1848,7 +1847,7 @@ with tabs[7]:
     df_sheet_scores = load_sheet_scores()
     df_sqlite_scores = fetch_sqlite_scores()
 
-    # --- Harmonize (guarantee "studentcode", "level" in both) ---
+    # --- Harmonize columns ---
     for df in [df_sheet_scores, df_sqlite_scores]:
         if "studentcode" not in df.columns:
             if "student_code" in df.columns:
@@ -1856,22 +1855,20 @@ with tabs[7]:
         if "level" not in df.columns:
             df["level"] = None
 
-    # --- Combine and Deduplicate (most recent by student+assignment) ---
+    # --- Combine and Deduplicate ---
     df_scores = pd.concat([df_sheet_scores, df_sqlite_scores], ignore_index=True)
     df_scores["date"] = pd.to_datetime(df_scores["date"], errors="coerce")
     df_scores = df_scores.sort_values("date").drop_duplicates(["studentcode", "assignment"], keep="last")
     df_scores = df_scores.reset_index(drop=True)
 
-    # --- Merge in NAME and LEVEL for all rows, fallback to sheet's name if missing ---
+    # --- Merge in NAME and LEVEL for all rows ---
     df_scores_with_name = df_scores.merge(
         df_students[["studentcode", "name", "level"]],
         on="studentcode", how="left", suffixes=("", "_student")
     )
-    # If name missing, fill from name_student
     if "name_student" in df_scores_with_name.columns:
         df_scores_with_name["name"] = df_scores_with_name["name"].combine_first(df_scores_with_name["name_student"])
         df_scores_with_name = df_scores_with_name.drop(columns=["name_student"])
-    # For robustness, fill name from original sheet if also available there (rare edge case)
     if "name" in df_sheet_scores.columns:
         df_scores_with_name = df_scores_with_name.merge(
             df_sheet_scores[["studentcode", "assignment", "name"]],
@@ -1881,7 +1878,6 @@ with tabs[7]:
         if "name_sheet" in df_scores_with_name.columns:
             df_scores_with_name = df_scores_with_name.drop(columns=["name_sheet"])
 
-    # --- Clean column order for display/download ---
     wanted_cols = ['studentcode', 'name', 'assignment', 'score', 'comments', 'date', 'level']
     for c in wanted_cols:
         if c not in df_scores_with_name.columns:
@@ -1928,8 +1924,9 @@ with tabs[7]:
     assignment = st.selectbox("Select Assignment", filtered, key="assign_select")
 
     # --- Reference Answers (if available) ---
+    ref_ans_list = ref_answers.get(assignment, [])
     st.markdown("**Reference Answers:**")
-    for ans in ref_answers.get(assignment, []):
+    for ans in ref_ans_list:
         st.write(f"- {ans}")
 
     # --- Score entry form (pre-fills previous score/comment if exists) ---
@@ -1981,6 +1978,7 @@ with tabs[7]:
         file_name=pdf_filename,
         mime="application/pdf"
     )
+
     # --- EMAIL SEND SECTION (with reference answers included) ---
     st.markdown("#### 📧 Send Report to Student via Email")
     default_email = student_row.get('email', '') if 'email' in student_row else ""
@@ -2039,7 +2037,7 @@ with tabs[7]:
         f"Hello {student_row[name_col]},\n\n"
         f"Here is your report for the assignment: *{assignment}*\n"
         f"{ref_ans_wa}"
-        "A copy has been sent to your email!"
+        "Thank you for your hard work!\nLearn Language Education Academy"
     )
     wa_message = st.text_area(
         "WhatsApp Message (edit before sending):",
@@ -2069,6 +2067,4 @@ with tabs[7]:
         )
     else:
         st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
-
-
 
