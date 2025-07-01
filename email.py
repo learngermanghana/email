@@ -1023,56 +1023,96 @@ with tabs[1]:
 with tabs[2]:
     st.title("💵 Expenses and Financial Summary")
 
-    # 1. Load expenses from Google Sheets CSV (edit link as needed)
-    sheet_id   = "1I5mGFcWbWdK6YQrJtabTg_g-XBEVaIRK1aMFm72vDEM"
-    sheet_csv  = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
-    try:
-        df_expenses = pd.read_csv(sheet_csv)
-        df_expenses = normalize_columns(df_expenses)
-        st.success("✅ Loaded expenses from Google Sheets.")
-    except Exception as e:
-        st.error(f"❌ Could not load expenses sheet: {e}")
-        df_expenses = pd.DataFrame(columns=["type", "item", "amount", "date"])
+# ==== LOAD SHEETS ====
+# Expenses
+expenses_id = "1I5mGFcWbWdK6YQrJtabTg_g-XBEVaIRK1aMFm72vDEM"
+expenses_csv = f"https://docs.google.com/spreadsheets/d/{expenses_id}/export?format=csv"
+try:
+    df_expenses = pd.read_csv(expenses_csv)
+    df_expenses.columns = [c.strip().lower() for c in df_expenses.columns]
+    st.success("✅ Loaded expenses from Google Sheets.")
+except Exception as e:
+    st.error(f"❌ Could not load expenses sheet: {e}")
+    df_expenses = pd.DataFrame(columns=["type", "item", "amount", "date"])
 
-    # 2. Add new expense via form
-    with st.form("add_expense_form"):
-        exp_type   = st.selectbox("Type", ["Bill","Rent","Salary","Marketing","Other"])
-        exp_item   = st.text_input("Expense Item")
-        exp_amount = st.number_input("Amount (GHS)", min_value=0.0, step=1.0)
-        exp_date   = st.date_input("Date", value=date.today())
-        submit     = st.form_submit_button("Add Expense")
-        if submit and exp_item and exp_amount > 0:
-            new_row = {"type": exp_type, "item": exp_item, "amount": exp_amount, "date": exp_date}
-            df_expenses = pd.concat([df_expenses, pd.DataFrame([new_row])], ignore_index=True)
-            st.success(f"✅ Recorded: {exp_type} – {exp_item}")
-            # Optionally, save to a local backup file:
-            df_expenses.to_csv("expenses_all.csv", index=False)
-            st.experimental_rerun()
+# Students
+students_id = "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U"
+students_csv = f"https://docs.google.com/spreadsheets/d/{students_id}/export?format=csv"
+try:
+    df_students = pd.read_csv(students_csv)
+    df_students.columns = [c.strip().lower() for c in df_students.columns]
+    st.success("✅ Loaded students from Google Sheets.")
+except Exception as e:
+    st.error(f"❌ Could not load students sheet: {e}")
+    df_students = pd.DataFrame(columns=["name", "paid", "balance"])
 
-    # 3. Display all expenses with pagination
-    st.write("### All Expenses")
-    ROWS_PER_PAGE = 10
-    total_rows    = len(df_expenses)
-    total_pages   = (total_rows - 1) // ROWS_PER_PAGE + 1
-    page = st.number_input(
-        f"Page (1-{total_pages})", min_value=1, max_value=total_pages, value=1, step=1, key="exp_page"
-    ) if total_pages > 1 else 1
-    start = (page - 1) * ROWS_PER_PAGE
-    end   = start + ROWS_PER_PAGE
-    st.dataframe(df_expenses.iloc[start:end].reset_index(drop=True), use_container_width=True)
+# ==== ADD NEW EXPENSE ====
+with st.form("add_expense_form"):
+    exp_type   = st.selectbox("Type", ["Bill","Rent","Salary","Marketing","Other"])
+    exp_item   = st.text_input("Expense Item")
+    exp_amount = st.number_input("Amount (GHS)", min_value=0.0, step=1.0)
+    exp_date   = st.date_input("Date", value=date.today())
+    submit     = st.form_submit_button("Add Expense")
+    if submit and exp_item and exp_amount > 0:
+        new_row = {"type": exp_type, "item": exp_item, "amount": exp_amount, "date": exp_date}
+        df_expenses = pd.concat([df_expenses, pd.DataFrame([new_row])], ignore_index=True)
+        st.success(f"✅ Recorded: {exp_type} – {exp_item}")
+        df_expenses.to_csv("expenses_all.csv", index=False)
+        st.experimental_rerun()
 
-    # 4. Expense summary
-    total_expenses = pd.to_numeric(df_expenses["amount"], errors="coerce").fillna(0).sum() if not df_expenses.empty else 0.0
-    st.info(f"💸 **Total Expenses:** GHS {total_expenses:,.2f}")
+# ==== FINANCIAL SUMMARY ====
+st.write("## 📊 Financial Summary")
 
-    # 5. Export to CSV
-    csv_data = df_expenses.to_csv(index=False)
-    st.download_button(
-        "📁 Download Expenses CSV",
-        data=csv_data,
-        file_name="expenses_data.csv",
-        mime="text/csv"
-    )
+# Total Expenses
+total_expenses = pd.to_numeric(df_expenses["amount"], errors="coerce").fillna(0).sum() if not df_expenses.empty else 0.0
+
+# Total Income
+if "paid" in df_students.columns:
+    total_income = pd.to_numeric(df_students["paid"], errors="coerce").fillna(0).sum()
+else:
+    total_income = 0.0
+
+# Net Profit
+net_profit = total_income - total_expenses
+
+# Total Outstanding (Balance)
+if "balance" in df_students.columns:
+    total_balance_due = pd.to_numeric(df_students["balance"], errors="coerce").fillna(0).sum()
+else:
+    total_balance_due = 0.0
+
+# Student Count
+student_count = len(df_students) if not df_students.empty else 0
+
+# ==== DISPLAY SUMMARY ====
+col1, col2, col3 = st.columns(3)
+col1.metric("💰 Total Income (Paid)", f"GHS {total_income:,.2f}")
+col2.metric("💸 Total Expenses", f"GHS {total_expenses:,.2f}")
+col3.metric("🟢 Net Profit", f"GHS {net_profit:,.2f}")
+
+st.info(f"📋 **Students Enrolled:** {student_count}")
+st.info(f"🧾 **Outstanding Balances:** GHS {total_balance_due:,.2f}")
+
+# ==== PAGINATED EXPENSE TABLE ====
+st.write("### All Expenses")
+ROWS_PER_PAGE = 10
+total_rows    = len(df_expenses)
+total_pages   = (total_rows - 1) // ROWS_PER_PAGE + 1
+page = st.number_input(
+    f"Page (1-{total_pages})", min_value=1, max_value=total_pages, value=1, step=1, key="exp_page"
+) if total_pages > 1 else 1
+start = (page - 1) * ROWS_PER_PAGE
+end   = start + ROWS_PER_PAGE
+st.dataframe(df_expenses.iloc[start:end].reset_index(drop=True), use_container_width=True)
+
+# ==== EXPORT TO CSV ====
+csv_data = df_expenses.to_csv(index=False)
+st.download_button(
+    "📁 Download Expenses CSV",
+    data=csv_data,
+    file_name="expenses_data.csv",
+    mime="text/csv"
+)
 
 with tabs[3]:
     st.title("📲 WhatsApp Reminders for Debtors")
