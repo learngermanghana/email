@@ -3,7 +3,10 @@ import os
 import base64
 import re
 from datetime import datetime, date, timedelta
+import pygsheets
 import pandas as pd
+import json
+import io
 from dateutil.relativedelta import relativedelta
 import streamlit as st
 from fpdf import FPDF
@@ -11,6 +14,35 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
 import sqlite3
 import urllib.parse  
+
+
+
+# 1. Read the service account JSON from Streamlit secrets
+service_account_info = st.secrets["gcp_service_account"]
+if isinstance(service_account_info, str):
+    # Some deployments may parse it automatically; others may not
+    service_account_info = json.loads(service_account_info)
+
+# 2. Authorize pygsheets from dict
+gc = pygsheets.authorize(service_account_info=service_account_info)
+
+# 3. Use pygsheets as usual
+students_url = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/edit?usp=sharing"
+scores_url = "https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/edit"
+expenses_url = "https://docs.google.com/spreadsheets/d/1I5mGFcWbWdK6YQrJtabTg_g-XBEVaIRK1aMFm72vDEM/edit"
+
+sh_students = gc.open_by_url(students_url)
+wks_students = sh_students[0]
+df_students = wks_students.get_as_df()
+
+sh_scores = gc.open_by_url(scores_url)
+wks_scores = sh_scores[0]
+df_scores = wks_scores.get_as_df()
+
+sh_expenses = gc.open_by_url(expenses_url)
+wks_expenses = sh_expenses[0]
+df_expenses = wks_expenses.get_as_df()
+
 
 # ==== 1.a. CSV & COLUMN HELPERS ====
 def safe_read_csv(local_path: str, remote_url: str) -> pd.DataFrame:
