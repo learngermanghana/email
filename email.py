@@ -1981,14 +1981,12 @@ with tabs[7]:
         file_name=pdf_filename,
         mime="application/pdf"
     )
-
-    # --- EMAIL SEND SECTION ---
+    # --- EMAIL SEND SECTION (with reference answers included) ---
     st.markdown("#### 📧 Send Report to Student via Email")
     default_email = student_row.get('email', '') if 'email' in student_row else ""
     to_email = st.text_input("Recipient Email", value=default_email)
     subject = st.text_input("Subject", value=f"{student_row[name_col]} - {assignment} Report")
-    # Add reference answers (if any) to email body
-    ref_ans_list = ref_answers.get(assignment, [])
+    # Reference Answers as HTML ordered list
     ref_ans_html = ""
     if ref_ans_list:
         ref_ans_html = "<b>Reference Answers:</b><br><ol style='padding-left:16px'>"
@@ -2016,7 +2014,7 @@ with tabs[7]:
             except Exception as e:
                 st.error(f"Failed to send email: {e}")
 
-    # --- WhatsApp Share Section ---
+    # --- WhatsApp Share Section (with reference answers included) ---
     import urllib.parse
     st.markdown("---")
     st.subheader("📲 Share Report via WhatsApp")
@@ -2030,42 +2028,37 @@ with tabs[7]:
             wa_phone = v
             break
 
-    # Allow manual override or editing of phone number
     wa_phone = st.text_input("WhatsApp Number (International format, e.g., 233245022743)", value=wa_phone, key="wa_number")
 
-    # Prepare reference answers section, preserving original numbering
+    # Prepare reference answers for WhatsApp as text
     ref_ans_wa = ""
     if ref_ans_list:
-        ref_ans_wa = "*Reference Answers:*\n" + "\n".join(ref_ans_list) + "\n"
+        ref_ans_wa = "*Reference Answers:*\n" + "\n".join(f"{i+1}. {v}" for i, v in enumerate(ref_ans_list)) + "\n"
 
-    # Prepare the WhatsApp message with reference answers
     default_wa_msg = (
         f"Hello {student_row[name_col]},\n\n"
         f"Here is your report for the assignment: *{assignment}*\n"
         f"{ref_ans_wa}"
-        "Thank you for your hard work!\nLearn Language Education Academy"
+        "A copy has been sent to your email!"
     )
     wa_message = st.text_area(
         "WhatsApp Message (edit before sending):",
         value=default_wa_msg, height=200, key="wa_message_edit"
     )
 
-    # Format WhatsApp number for wa.me link
     wa_num_formatted = wa_phone.strip().replace(" ", "").replace("-", "")
     if wa_num_formatted.startswith("0"):
         wa_num_formatted = "233" + wa_num_formatted[1:]
     elif wa_num_formatted.startswith("+"):
         wa_num_formatted = wa_num_formatted[1:]
     elif not wa_num_formatted.startswith("233"):
-        wa_num_formatted = "233" + wa_num_formatted[-9:]  # fallback for local numbers
+        wa_num_formatted = "233" + wa_num_formatted[-9:]  # fallback
 
-    # Create WhatsApp link
     wa_link = (
         f"https://wa.me/{wa_num_formatted}?text={urllib.parse.quote(wa_message)}"
         if wa_num_formatted.isdigit() and len(wa_num_formatted) >= 11 else None
     )
 
-    # Show Share Button
     if wa_link:
         st.markdown(
             f'<a href="{wa_link}" target="_blank">'
