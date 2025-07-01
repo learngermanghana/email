@@ -1415,41 +1415,64 @@ with tabs[4]:
                 mime="application/pdf"
             )
             st.success("✅ PDF generated and ready to download.")
+
 with tabs[5]:
     st.title("📧 Send Email (Quick)")
 
     # --- 1. Load student list from Google Sheets ---
     students_csv_url = (
         "https://docs.google.com/spreadsheets/d/"
-        "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
+        "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/"
+        "export?format=csv"
     )
     try:
-        df_students = pd.read_csv(students_csv_url, dtype=str)
-        st.success("Student list loaded.")
+        df_students = pd.read_csv(students_csv_url)
     except Exception as e:
         st.error(f"❌ Could not load student list: {e}")
         df_students = pd.DataFrame(columns=["name", "email", "level", "contractstart", "student_code"])
     df_students = normalize_columns(df_students)
-
-    # --- Column helpers ---
-    name_col = col_lookup(df_students, "name")
+    name_col  = col_lookup(df_students, "name")
     email_col = col_lookup(df_students, "email")
     level_col = col_lookup(df_students, "level")
-    code_col = col_lookup(df_students, "student_code") if "student_code" in df_students.columns else col_lookup(df_students, "studentcode")
+    code_col  = col_lookup(df_students, "student_code") if "student_code" in df_students.columns else "studentcode"
+    start_col = col_lookup(df_students, "contractstart") if "contractstart" in df_students.columns else ""
 
-    # --- Templates ---
+    # --- 1b. Load score sheet (for assignment results) ---
+    scores_csv_url = (
+        "https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/export?format=csv"
+    )
+    try:
+        df_scores = pd.read_csv(scores_csv_url)
+        df_scores = normalize_columns(df_scores)
+    except Exception as e:
+        df_scores = pd.DataFrame(columns=["studentcode","assignment","score","comments","date","level"])
+        st.warning("⚠️ Could not load assignment scores. Assignment Results will be empty.")
+
+    # --- 2. Template selector ---
     template_opts = ["Custom", "Welcome", "Payment Reminder", "Assignment Results"]
-    selected_template = st.selectbox("Template", template_opts, key="email_template_select")
+    selected_template = st.selectbox(
+        "Template", template_opts, key="tab6_template"
+    )
 
-    subj_def, body_def = "", ""
+    # --- 3. Defaults per template ---
+    subj_def = ""
+    body_def = ""
     if selected_template == "Welcome":
         subj_def = "Welcome to Learn Language Education Academy!"
         body_def = (
             "Hello {name},<br><br>"
-            "Welcome to Learn Language Education Academy! We're excited to have you.<br><br>"
-            "<b>Your contract starts on the date indicated in the attached course schedule.</b><br><br>"
-            "You can join your <b>{level}</b> class in person or online (link will be shared).<br><br>"
-            "Best regards,<br>Felix Asadu"
+            "Welcome to Learn Language Education Academy! We have helped many students succeed, and we’re excited to support you as well.<br><br>"
+            "<b>Your contract starts on the date indicated in the attached course schedule.</b> "
+            "Please refer to the schedule for both your class start and end dates.<br><br>"
+            "You can join your <b>{level}</b> class either in person or online via Zoom (link will be shared before class).<br><br>"
+            "Attached is your course outline, so you can preview how the class will progress.<br><br>"
+            "You will use our Falowen App (<a href='https://falowen.streamlit.app/'>falowen.streamlit.app</a>) "
+            "to track your progress, see assignments, and practice your skills (log in with your student code or email).<br><br>"
+            "Assignments, course books, and recorded lectures are all available in Google Classroom.<br><br>"
+            "We wish you a great start and look forward to seeing your progress!<br><br>"
+            "Best regards,<br>"
+            "Felix Asadu<br>"
+            "Learn Language Education Academy"
         )
     elif selected_template == "Payment Reminder":
         subj_def = "Friendly Payment Reminder"
@@ -1467,142 +1490,142 @@ with tabs[5]:
             "Best,<br>Learn Language Education Academy"
         )
     else:
-        subj_def, body_def = "", ""
+        subj_def = ""
+        body_def = ""
 
-    # --- 2. Search & pick students ---
-    st.subheader("🔎 Search & Select Students")
-    def normalize_str(s):
-        return str(s).strip().lower().replace("_", "").replace(" ", "")
-
-    search_val = st.text_input("Search students by name, email, code, or level")
-    df_students["search_key"] = (
-        df_students[name_col].fillna("").apply(normalize_str)
-        + "|" + df_students[email_col].fillna("").apply(normalize_str)
-        + "|" + df_students[code_col].fillna("").apply(normalize_str)
-        + "|" + df_students[level_col].fillna("").apply(normalize_str)
-    )
-
-    # Filter for valid emails only
-    mask_valid_email = df_students[email_col].apply(lambda x: pd.notna(x) and "@" in str(x))
-    filt = df_students[mask_valid_email]
+    # --- 4. Student search/filter at the bottom ---
+    st.subheader("🔎 Search for Student")
+    search_val = st.text_input("Search by name, email, or code", value="", key="tab6_search")
     if search_val:
-        filt = filt[filt["search_key"].str.contains(normalize_str(search_val), na=False)]
+        df_students_filtered = df_students[
+            df_students[name_col].str.contains(search_val, case=False, na=False) |
+            df_students[email_col].str.contains(search_val, case=False, na=False) |
+            df_students[code_col].astype(str).str.contains(search_val, case=False, na=False)
+        ]
+    else:
+        df_students_filtered = df_students
 
-    # Build recipient dict by index
-    recipient_dict = {
-        i: f"{row[name_col]} <{row[email_col]}> ({row[code_col]})"
-        for i, row in filt.iterrows()
-    }
-    selected_indices = st.multiselect(
-        "Select from student list", options=list(recipient_dict.keys()),
-        format_func=lambda idx: recipient_dict[idx],
-        key="student_email_recipients"
+    student_options = [
+        f"{row[name_col]} <{row[email_col]}>"
+        for _, row in df_students_filtered.iterrows()
+        if pd.notna(row[email_col]) and row[email_col] != ""
+    ]
+    selected_recipients = st.multiselect(
+        "Recipients", student_options, key="tab6_recipients"
     )
 
-    # --- 3. Manual email entry ---
-    st.subheader("✏️ Add Manual Email(s)")
-    manual = st.text_area(
-        "Type additional email addresses (separated by comma, semicolon, or new lines):",
-        value="", key="manual_email_area"
+    # --- 5. Compose ---
+    st.subheader("Email Subject & Body")
+    email_subject = st.text_input(
+        "Email Subject",
+        value=subj_def,
+        key="tab6_email_subject"
     )
-    emails_manual = [e.strip() for e in re.split(r"[,;\n]", manual) if "@" in e]
+    email_body = st.text_area(
+        "Email Body (HTML)",
+        value=body_def,
+        key="tab6_email_body",
+        height=200
+    )
 
-    # --- 4. Combine recipients (deduplicate by email) ---
-    all_recipients = []
-    # Students: (name, email, level, code)
-    if selected_indices:
-        sel_rows = filt.loc[selected_indices]
-        for _, row in sel_rows.iterrows():
-            all_recipients.append((row[name_col], row[email_col], row.get(level_col,""), row.get(code_col,"")))
-    # Manual: (email only; fake name and level)
-    for email in emails_manual:
-        if not any(email == rec[1] for rec in all_recipients):
-            all_recipients.append((email.split("@")[0], email, "", ""))
-
-    # --- 5. Email composition ---
-    st.subheader("✍️ Compose Email")
-    email_subject = st.text_input("Subject", value=subj_def)
-    email_body = st.text_area("Body (HTML allowed)", value=body_def, height=160)
-
-    # --- 6. (Optional) Attachments ---
-    st.subheader("📎 Attachments (optional)")
-    attachments = st.file_uploader("Upload files", accept_multiple_files=True, key="email_attachments")
-
-    # --- 7. Assignment Results Table (only for preview and Assignment Results template) ---
-    results_table = ""
-    if selected_template == "Assignment Results":
-        # Load the assignment scores sheet (replace with your sheet if needed)
-        scores_csv_url = (
-            "https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/export?format=csv"
-        )
-        try:
-            df_scores = pd.read_csv(scores_csv_url)
-            df_scores = normalize_columns(df_scores)
-        except Exception as e:
-            df_scores = pd.DataFrame(columns=["studentcode", "assignment", "score", "comments", "date", "level"])
-
-    # --- 8. Preview (for first recipient) ---
-    if all_recipients:
-        preview_name, preview_email, preview_level, preview_code = all_recipients[0]
+    # --- 6. Preview before sending ---
+    if selected_recipients:
+        preview_nm = selected_recipients[0].split("<")[0].strip()
+        preview_lvl = df_students.loc[df_students[name_col]==preview_nm, level_col].iloc[0] if preview_nm in df_students[name_col].values else ""
+        preview_code = df_students.loc[df_students[name_col]==preview_nm, code_col].iloc[0] if preview_nm in df_students[name_col].values else ""
         results_table = ""
-        if selected_template == "Assignment Results" and 'df_scores' in locals():
-            # Find by code or email
-            rec_scores = df_scores[
-                (df_scores['studentcode'] == str(preview_code)) |
-                (df_scores['studentcode'] == str(preview_email))
-            ][["assignment", "score"]].dropna()
-            if not rec_scores.empty:
+        if selected_template == "Assignment Results" and preview_code in df_scores['studentcode'].values:
+            results = df_scores[df_scores['studentcode']==preview_code][["assignment","score"]].dropna()
+            if not results.empty:
                 results_table = "<table border=1><tr><th>Assignment</th><th>Score</th></tr>"
-                for _, row in rec_scores.iterrows():
+                for _, row in results.iterrows():
                     results_table += f"<tr><td>{row['assignment']}</td><td>{row['score']}</td></tr>"
                 results_table += "</table>"
-
-        st.markdown("**Preview for first recipient:**")
+        else:
+            results_table = ""
+        st.markdown("##### Preview (for first recipient):")
         st.markdown(email_body.format(
-            name=preview_name, email=preview_email, level=preview_level, results_table=results_table
+            name=preview_nm,
+            level=preview_lvl,
+            results_table=results_table,
+            start_date=""
         ), unsafe_allow_html=True)
 
-    # --- 9. Send emails ---
-    send_btn = st.button("📧 Send Email(s)")
-    if send_btn:
-        if not all_recipients:
-            st.warning("No recipient selected or typed in.")
+    # --- 7. Attachment ---
+    st.subheader("Attachment (optional)")
+    attachment_file = st.file_uploader(
+        "Upload file", type=None, key="tab6_attachment"
+    )
+
+    # --- 8. SendGrid config
+    sendgrid_key = st.secrets["general"]["SENDGRID_API_KEY"]
+    sender_email = st.secrets["general"]["SENDER_EMAIL"]
+
+    # --- 9. Send button
+    if st.button("Send Emails", key="tab6_send"):
+        if not selected_recipients:
+            st.warning("Select at least one recipient.")
         elif not email_subject or not email_body:
-            st.warning("Subject and body are required.")
+            st.warning("Subject and body cannot be empty.")
         else:
             from sendgrid import SendGridAPIClient
             from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
-            import base64, mimetypes
+            import base64
 
             successes, failures = [], []
-            for name, email, level, code in all_recipients:
+            for pick in selected_recipients:
+                nm, addr = pick.split("<")
+                nm = nm.strip()
+                addr = addr.strip(">").strip()
+                lvl = df_students.loc[df_students[name_col]==nm, level_col].iloc[0] if nm in df_students[name_col].values else ""
+                code = df_students.loc[df_students[name_col]==nm, code_col].iloc[0] if nm in df_students[name_col].values else ""
+                results_table = ""
+                if selected_template == "Assignment Results" and code in df_scores['studentcode'].values:
+                    results = df_scores[df_scores['studentcode']==code][["assignment","score"]].dropna()
+                    if not results.empty:
+                        results_table = "<table border=1><tr><th>Assignment</th><th>Score</th></tr>"
+                        for _, row in results.iterrows():
+                            results_table += f"<tr><td>{row['assignment']}</td><td>{row['score']}</td></tr>"
+                        results_table += "</table>"
+                else:
+                    results_table = ""
+
+                # Always provide start_date as an empty string for format()
                 try:
-                    mail_vars = dict(name=name, email=email, level=level, code=code, results_table=results_table)
                     msg = Mail(
-                        from_email=st.secrets["general"]["SENDER_EMAIL"],
-                        to_emails=email,
-                        subject=email_subject.format(**mail_vars),
-                        html_content=email_body.format(**mail_vars)
+                        from_email=sender_email,
+                        to_emails=addr,
+                        subject=email_subject,
+                        html_content=email_body.format(
+                            name=nm,
+                            level=lvl,
+                            results_table=results_table,
+                            start_date=""
+                        )
                     )
-                    # Attach files
-                    if attachments:
-                        for file in attachments:
-                            data = file.read()
-                            enc = base64.b64encode(data).decode()
-                            ftype = mimetypes.guess_type(file.name)[0] or "application/octet-stream"
-                            attach = Attachment(FileContent(enc), FileName(file.name), FileType(ftype), Disposition("attachment"))
-                            msg.add_attachment(attach)
-                    SendGridAPIClient(st.secrets["general"]["SENDGRID_API_KEY"]).send(msg)
-                    successes.append(email)
+                    # attach if present
+                    if attachment_file:
+                        data = attachment_file.read()
+                        enc  = base64.b64encode(data).decode()
+                        ftype = __import__("mimetypes").guess_type(attachment_file.name)[0] or "application/octet-stream"
+                        attach = Attachment(
+                            FileContent(enc),
+                            FileName(attachment_file.name),
+                            FileType(ftype),
+                            Disposition("attachment")
+                        )
+                        msg.attachment = attach
+
+                    sg = SendGridAPIClient(sendgrid_key)
+                    sg.send(msg)
+                    successes.append(addr)
                 except Exception as e:
-                    failures.append(f"{email}: {e}")
+                    failures.append(f"{addr}: {e}")
+
             if successes:
                 st.success(f"Sent to: {', '.join(successes)}")
             if failures:
-                st.error(f"Failed: {', '.join(failures)}")
-
-
-
+                st.error(f"Failures: {', '.join(failures)}")
 
 # ==== 14. TAB 6: COURSE SCHEDULE GENERATOR ====
 with tabs[6]:
