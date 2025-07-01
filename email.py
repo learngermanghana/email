@@ -15,14 +15,8 @@ from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileT
 import sqlite3
 import urllib.parse  
 
-
-
 # 1. Read the service account JSON from Streamlit secrets
-service_account_info = st.secrets["gcp_service_account"]
-if isinstance(service_account_info, str):
-    # Some deployments may parse it automatically; others may not
-    service_account_info = json.loads(service_account_info)
-
+service_account_info = dict(st.secrets["gcp_service_account"])
 # 2. Authorize pygsheets from dict
 gc = pygsheets.authorize(service_account_info=service_account_info)
 
