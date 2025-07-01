@@ -2012,14 +2012,13 @@ with tabs[7]:
             except Exception as e:
                 st.error(f"Failed to send email: {e}")
 
-# --- WhatsApp Share Section ---
-
+# --- WhatsApp Share Section (only inside Marking & Scores tab) ---
 import urllib.parse
 
 st.markdown("---")
 st.subheader("📲 Share Report via WhatsApp")
 
-# Try to get student's phone automatically from any relevant column
+# Get student's phone from any relevant column
 wa_phone = ""
 wa_cols = [c for c in student_row.index if "phone" in c]
 for c in wa_cols:
@@ -2029,20 +2028,25 @@ for c in wa_cols:
         break
 
 # Allow manual override or editing of phone number
-wa_phone = st.text_input("WhatsApp Number (International format, e.g., 233245022743)", value=wa_phone, key="wa_number")
+wa_phone = st.text_input(
+    "WhatsApp Number (International format, e.g., 233245022743)",
+    value=wa_phone, key="wa_number"
+)
 
-# Prepare reference answers section, preserving original numbering
+# Prepare reference answers for WhatsApp: 1. C, 2. C, etc.
 ref_ans_list = ref_answers.get(assignment, [])
 ref_ans_wa = ""
 if ref_ans_list:
-    ref_ans_wa = "*Reference Answers:*\n" + "\n".join(ref_ans_list) + "\n"
+    ref_ans_wa = "*Reference Answers:*\n" + "\n".join(
+        f"{i+1}. {v.strip()}" for i, v in enumerate(ref_ans_list) if v.strip()
+    ) + "\n"
 
-# Prepare the WhatsApp message with reference answers
+# WhatsApp message (with reference answers and custom thank you)
 default_wa_msg = (
-    f"Hello {student_row[name_col]},\n\n"
     f"Here is your report for the assignment: *{assignment}*\n"
     f"{ref_ans_wa}"
-    "Thank you for your hard work!\nLearn Language Education Academy"
+    "Thank you\n"
+    "Learn Language Education Academy"
 )
 wa_message = st.text_area(
     "WhatsApp Message (edit before sending):",
@@ -2056,15 +2060,13 @@ if wa_num_formatted.startswith("0"):
 elif wa_num_formatted.startswith("+"):
     wa_num_formatted = wa_num_formatted[1:]
 elif not wa_num_formatted.startswith("233"):
-    wa_num_formatted = "233" + wa_num_formatted[-9:]  # fallback for local numbers
+    wa_num_formatted = "233" + wa_num_formatted[-9:]
 
-# Create WhatsApp link
 wa_link = (
     f"https://wa.me/{wa_num_formatted}?text={urllib.parse.quote(wa_message)}"
     if wa_num_formatted.isdigit() and len(wa_num_formatted) >= 11 else None
 )
 
-# Show Share Button
 if wa_link:
     st.markdown(
         f'<a href="{wa_link}" target="_blank">'
