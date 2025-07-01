@@ -1805,6 +1805,7 @@ with tabs[6]:
                        data=pdf.output(dest='S').encode('latin-1'),
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
+
 with tabs[7]:
     st.title("📝 Assignment Marking & Scores")
 
@@ -1847,7 +1848,7 @@ with tabs[7]:
     df_sheet_scores = load_sheet_scores()
     df_sqlite_scores = fetch_sqlite_scores()
 
-    # --- Harmonize columns ---
+    # --- Harmonize ---
     for df in [df_sheet_scores, df_sqlite_scores]:
         if "studentcode" not in df.columns:
             if "student_code" in df.columns:
@@ -1855,13 +1856,13 @@ with tabs[7]:
         if "level" not in df.columns:
             df["level"] = None
 
-    # --- Combine and Deduplicate ---
+    # --- Combine & Deduplicate ---
     df_scores = pd.concat([df_sheet_scores, df_sqlite_scores], ignore_index=True)
     df_scores["date"] = pd.to_datetime(df_scores["date"], errors="coerce")
     df_scores = df_scores.sort_values("date").drop_duplicates(["studentcode", "assignment"], keep="last")
     df_scores = df_scores.reset_index(drop=True)
 
-    # --- Merge in NAME and LEVEL for all rows ---
+    # --- Merge in NAME and LEVEL ---
     df_scores_with_name = df_scores.merge(
         df_students[["studentcode", "name", "level"]],
         on="studentcode", how="left", suffixes=("", "_student")
@@ -1886,7 +1887,6 @@ with tabs[7]:
 
     st.markdown("#### 📚 All Score History (Sheet + App)")
     st.dataframe(df_scores_with_name, use_container_width=True)
-
     st.download_button(
         "⬇️ Download All Scores as CSV (with Name & Level)",
         data=df_scores_with_name.to_csv(index=False),
@@ -1894,7 +1894,6 @@ with tabs[7]:
     )
 
     # --- Student search and select ---
-    st.subheader("🔎 Search Student")
     name_col, code_col = col_lookup(df_students, "name"), col_lookup(df_students, "studentcode")
     search_student = st.text_input("Type student name or code...")
     students_filtered = df_students[
@@ -1916,18 +1915,18 @@ with tabs[7]:
     # --- Assignment search and select ---
     st.subheader("🔎 Search Assignment")
     search_assign = st.text_input("Type assignment title...", key="search_assign")
-    assignments = sorted(set(df_scores['assignment']).union(ref_answers.keys()))
+    assignments = sorted(set(df_scores['assignment']))  # or union with ref_answers.keys() if needed
     filtered = [a for a in assignments if search_assign.lower() in a.lower()]
     if not filtered:
         st.info("No assignments match your search.")
         st.stop()
     assignment = st.selectbox("Select Assignment", filtered, key="assign_select")
 
-    # --- Reference Answers (if available) ---
-    ref_ans_list = ref_answers.get(assignment, [])
+    # --- Reference Answers ---
     st.markdown("**Reference Answers:**")
-    for ans in ref_ans_list:
-        st.write(f"- {ans}")
+    ref_ans_list = ref_answers.get(assignment, [])
+    for i, ans in enumerate(ref_ans_list):
+        st.write(f"{i+1}. {ans}")
 
     # --- Score entry form (pre-fills previous score/comment if exists) ---
     prev = df_scores[
@@ -1968,7 +1967,7 @@ with tabs[7]:
         score_name=assignment,
         tutor_name="Mr. Felix Asadu",
         school_name="Learn Language Education Academy",
-        footer_text="Thank you for your hard work! Contact your tutor if you have any questions."
+        footer_text="Thank you! Contact your tutor if you have any questions."
     )
     pdf_filename = f"{student_row[name_col].replace(' ', '_')}_{assignment.replace(' ', '_')}_report.pdf"
 
@@ -1979,29 +1978,29 @@ with tabs[7]:
         mime="application/pdf"
     )
 
-    # --- EMAIL SEND SECTION (with reference answers included) ---
+    # --- EMAIL SECTION (editable, with reference answers) ---
     st.markdown("#### 📧 Send Report to Student via Email")
     default_email = student_row.get('email', '') if 'email' in student_row else ""
     to_email = st.text_input("Recipient Email", value=default_email)
     subject = st.text_input("Subject", value=f"{student_row[name_col]} - {assignment} Report")
-    # Reference Answers as HTML ordered list
+
+    # Format reference answers for email
     ref_ans_html = ""
     if ref_ans_list:
         ref_ans_html = "<b>Reference Answers:</b><br><ol style='padding-left:16px'>"
-        for a in ref_ans_list:
-            if not a.strip():
-                ref_ans_html += "<br>"
-            else:
+        for i, a in enumerate(ref_ans_list):
+            if a.strip():
                 ref_ans_html += f"<li>{a}</li>"
         ref_ans_html += "</ol><br>"
+
     body = st.text_area("Message (HTML allowed)", value=(
         f"Hello {student_row[name_col]},<br><br>"
         f"Attached is your report for the assignment <b>{assignment}</b>.<br><br>"
         f"{ref_ans_html}"
-        "Thank you for your hard work!<br>Learn Language Education Academy"
+        "Thank you<br>Learn Language Education Academy"
     ))
-    send_email = st.button("📧 Email Report PDF")
 
+    send_email = st.button("📧 Email Report PDF")
     if send_email:
         if not to_email or "@" not in to_email:
             st.error("Please enter a valid recipient email address.")
@@ -2012,70 +2011,61 @@ with tabs[7]:
             except Exception as e:
                 st.error(f"Failed to send email: {e}")
 
-# --- WhatsApp Share Section (only inside Marking & Scores tab) ---
-import urllib.parse
+    # --- WhatsApp Share Section (with correct numbering and logic) ---
+    import urllib.parse
+    st.markdown("---")
+    st.subheader("📲 Share Report via WhatsApp")
 
-st.markdown("---")
-st.subheader("📲 Share Report via WhatsApp")
+    # Try to get student's phone automatically from any relevant column
+    wa_phone = ""
+    wa_cols = [c for c in student_row.index if "phone" in c]
+    for c in wa_cols:
+        v = str(student_row[c])
+        if v.startswith("233") or v.startswith("0") or v.isdigit():
+            wa_phone = v
+            break
 
-# Get student's phone from any relevant column
-wa_phone = ""
-wa_cols = [c for c in student_row.index if "phone" in c]
-for c in wa_cols:
-    v = str(student_row[c])
-    if v.startswith("233") or v.startswith("0") or v.isdigit():
-        wa_phone = v
-        break
+    wa_phone = st.text_input("WhatsApp Number (International format, e.g., 233245022743)", value=wa_phone, key="wa_number")
 
-# Allow manual override or editing of phone number
-wa_phone = st.text_input(
-    "WhatsApp Number (International format, e.g., 233245022743)",
-    value=wa_phone, key="wa_number"
-)
+    # Prepare reference answers for WhatsApp as text with numbering
+    ref_ans_wa = ""
+    if ref_ans_list:
+        ref_ans_wa = "*Reference Answers:*\n" + "\n".join(f"{i+1}. {v.strip()}" for i, v in enumerate(ref_ans_list) if v.strip()) + "\n"
 
-# Prepare reference answers for WhatsApp: 1. C, 2. C, etc.
-ref_ans_list = ref_answers.get(assignment, [])
-ref_ans_wa = ""
-if ref_ans_list:
-    ref_ans_wa = "*Reference Answers:*\n" + "\n".join(
-        f"{i+1}. {v.strip()}" for i, v in enumerate(ref_ans_list) if v.strip()
-    ) + "\n"
-
-# WhatsApp message (with reference answers and custom thank you)
-default_wa_msg = (
-    f"Here is your report for the assignment: *{assignment}*\n"
-    f"{ref_ans_wa}"
-    "Thank you\n"
-    "Learn Language Education Academy"
-)
-wa_message = st.text_area(
-    "WhatsApp Message (edit before sending):",
-    value=default_wa_msg, height=200, key="wa_message_edit"
-)
-
-# Format WhatsApp number for wa.me link
-wa_num_formatted = wa_phone.strip().replace(" ", "").replace("-", "")
-if wa_num_formatted.startswith("0"):
-    wa_num_formatted = "233" + wa_num_formatted[1:]
-elif wa_num_formatted.startswith("+"):
-    wa_num_formatted = wa_num_formatted[1:]
-elif not wa_num_formatted.startswith("233"):
-    wa_num_formatted = "233" + wa_num_formatted[-9:]
-
-wa_link = (
-    f"https://wa.me/{wa_num_formatted}?text={urllib.parse.quote(wa_message)}"
-    if wa_num_formatted.isdigit() and len(wa_num_formatted) >= 11 else None
-)
-
-if wa_link:
-    st.markdown(
-        f'<a href="{wa_link}" target="_blank">'
-        f'<button style="background-color:#25d366;color:white;border:none;padding:10px 20px;border-radius:5px;font-size:16px;cursor:pointer;">'
-        '📲 Share on WhatsApp'
-        '</button></a>',
-        unsafe_allow_html=True
+    default_wa_msg = (
+        f"Here is your report for the assignment: *{assignment}*\n"
+        f"{ref_ans_wa}"
+        "Thank you\n"
+        "Learn Language Education Academy"
     )
-else:
-    st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
+    wa_message = st.text_area(
+        "WhatsApp Message (edit before sending):",
+        value=default_wa_msg, height=200, key="wa_message_edit"
+    )
+
+    wa_num_formatted = wa_phone.strip().replace(" ", "").replace("-", "")
+    if wa_num_formatted.startswith("0"):
+        wa_num_formatted = "233" + wa_num_formatted[1:]
+    elif wa_num_formatted.startswith("+"):
+        wa_num_formatted = wa_num_formatted[1:]
+    elif not wa_num_formatted.startswith("233"):
+        wa_num_formatted = "233" + wa_num_formatted[-9:]  # fallback
+
+    wa_link = (
+        f"https://wa.me/{wa_num_formatted}?text={urllib.parse.quote(wa_message)}"
+        if wa_num_formatted.isdigit() and len(wa_num_formatted) >= 11 else None
+    )
+
+    if wa_link:
+        st.markdown(
+            f'<a href="{wa_link}" target="_blank">'
+            f'<button style="background-color:#25d366;color:white;border:none;padding:10px 20px;border-radius:5px;font-size:16px;cursor:pointer;">'
+            '📲 Share on WhatsApp'
+            '</button></a>',
+            unsafe_allow_html=True
+        )
+    else:
+        st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
+
 
 
