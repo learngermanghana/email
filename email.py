@@ -1897,8 +1897,6 @@ with tabs[7]:
         file_name="all_scores_with_name_level.csv"
     )
 
-
-
     # --- Student search and select ---
     st.subheader("🔎 Search Student")
     name_col, code_col = col_lookup(df_students, "name"), col_lookup(df_students, "studentcode")
@@ -1984,92 +1982,100 @@ with tabs[7]:
         mime="application/pdf"
     )
 
-# Show editable email message before sending
-st.markdown("#### 📧 Send Report to Student via Email")
-default_email = student_row.get('email', '') if 'email' in student_row else ""
-to_email = st.text_input("Recipient Email", value=default_email)
-subject = st.text_input("Subject", value=f"{student_row[name_col]} - {assignment} Report")
-body = st.text_area("Message (HTML allowed)", value=(
-    f"Hello {student_row[name_col]},<br><br>"
-    f"Attached is your report for the assignment <b>{assignment}</b>.<br><br>"
-    "Thank you for your hard work!<br>Learn Language Education Academy"
-))
-send_email = st.button("📧 Email Report PDF")
+    # --- EMAIL SEND SECTION ---
+    st.markdown("#### 📧 Send Report to Student via Email")
+    default_email = student_row.get('email', '') if 'email' in student_row else ""
+    to_email = st.text_input("Recipient Email", value=default_email)
+    subject = st.text_input("Subject", value=f"{student_row[name_col]} - {assignment} Report")
+    # Add reference answers (if any) to email body
+    ref_ans_list = ref_answers.get(assignment, [])
+    ref_ans_html = ""
+    if ref_ans_list:
+        ref_ans_html = "<b>Reference Answers:</b><br><ol style='padding-left:16px'>"
+        for a in ref_ans_list:
+            if not a.strip():
+                ref_ans_html += "<br>"
+            else:
+                ref_ans_html += f"<li>{a}</li>"
+        ref_ans_html += "</ol><br>"
+    body = st.text_area("Message (HTML allowed)", value=(
+        f"Hello {student_row[name_col]},<br><br>"
+        f"Attached is your report for the assignment <b>{assignment}</b>.<br><br>"
+        f"{ref_ans_html}"
+        "Thank you for your hard work!<br>Learn Language Education Academy"
+    ))
+    send_email = st.button("📧 Email Report PDF")
 
-if send_email:
-    if not to_email or "@" not in to_email:
-        st.error("Please enter a valid recipient email address.")
-    else:
-        try:
-            send_email_report(pdf_bytes, to_email, subject, body)
-            st.success(f"Report sent to {to_email}!")
-        except Exception as e:
-            st.error(f"Failed to send email: {e}")
+    if send_email:
+        if not to_email or "@" not in to_email:
+            st.error("Please enter a valid recipient email address.")
+        else:
+            try:
+                send_email_report(pdf_bytes, to_email, subject, body)
+                st.success(f"Report sent to {to_email}!")
+            except Exception as e:
+                st.error(f"Failed to send email: {e}")
 
-    
-# --- WhatsApp Share Section ---
+    # --- WhatsApp Share Section ---
+    import urllib.parse
+    st.markdown("---")
+    st.subheader("📲 Share Report via WhatsApp")
 
-import urllib.parse
+    # Try to get student's phone automatically from any relevant column
+    wa_phone = ""
+    wa_cols = [c for c in student_row.index if "phone" in c]
+    for c in wa_cols:
+        v = str(student_row[c])
+        if v.startswith("233") or v.startswith("0") or v.isdigit():
+            wa_phone = v
+            break
 
-st.markdown("---")
-st.subheader("📲 Share Report via WhatsApp")
+    # Allow manual override or editing of phone number
+    wa_phone = st.text_input("WhatsApp Number (International format, e.g., 233245022743)", value=wa_phone, key="wa_number")
 
-# Try to get student's phone automatically from any relevant column
-wa_phone = ""
-wa_cols = [c for c in student_row.index if "phone" in c]
-for c in wa_cols:
-    v = str(student_row[c])
-    if v.startswith("233") or v.startswith("0") or v.isdigit():
-        wa_phone = v
-        break
+    # Prepare reference answers section, preserving original numbering
+    ref_ans_wa = ""
+    if ref_ans_list:
+        ref_ans_wa = "*Reference Answers:*\n" + "\n".join(ref_ans_list) + "\n"
 
-# Allow manual override or editing of phone number
-wa_phone = st.text_input("WhatsApp Number (International format, e.g., 233245022743)", value=wa_phone, key="wa_number")
-
-# Prepare reference answers section, preserving original numbering
-ref_ans_list = ref_answers.get(assignment, [])
-ref_ans_wa = ""
-if ref_ans_list:
-    ref_ans_wa = "*Reference Answers:*\n" + "\n".join(ref_ans_list) + "\n"
-
-# Prepare the WhatsApp message with reference answers
-default_wa_msg = (
-    f"Hello {student_row[name_col]},\n\n"
-    f"Here is your report for the assignment: *{assignment}*\n"
-    f"{ref_ans_wa}"
-    "Thank you for your hard work!\nLearn Language Education Academy"
-)
-wa_message = st.text_area(
-    "WhatsApp Message (edit before sending):",
-    value=default_wa_msg, height=200, key="wa_message_edit"
-)
-
-# Format WhatsApp number for wa.me link
-wa_num_formatted = wa_phone.strip().replace(" ", "").replace("-", "")
-if wa_num_formatted.startswith("0"):
-    wa_num_formatted = "233" + wa_num_formatted[1:]
-elif wa_num_formatted.startswith("+"):
-    wa_num_formatted = wa_num_formatted[1:]
-elif not wa_num_formatted.startswith("233"):
-    wa_num_formatted = "233" + wa_num_formatted[-9:]  # fallback for local numbers
-
-# Create WhatsApp link
-wa_link = (
-    f"https://wa.me/{wa_num_formatted}?text={urllib.parse.quote(wa_message)}"
-    if wa_num_formatted.isdigit() and len(wa_num_formatted) >= 11 else None
-)
-
-# Show Share Button
-if wa_link:
-    st.markdown(
-        f'<a href="{wa_link}" target="_blank">'
-        f'<button style="background-color:#25d366;color:white;border:none;padding:10px 20px;border-radius:5px;font-size:16px;cursor:pointer;">'
-        '📲 Share on WhatsApp'
-        '</button></a>',
-        unsafe_allow_html=True
+    # Prepare the WhatsApp message with reference answers
+    default_wa_msg = (
+        f"Hello {student_row[name_col]},\n\n"
+        f"Here is your report for the assignment: *{assignment}*\n"
+        f"{ref_ans_wa}"
+        "Thank you for your hard work!\nLearn Language Education Academy"
     )
-else:
-    st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
+    wa_message = st.text_area(
+        "WhatsApp Message (edit before sending):",
+        value=default_wa_msg, height=200, key="wa_message_edit"
+    )
+
+    # Format WhatsApp number for wa.me link
+    wa_num_formatted = wa_phone.strip().replace(" ", "").replace("-", "")
+    if wa_num_formatted.startswith("0"):
+        wa_num_formatted = "233" + wa_num_formatted[1:]
+    elif wa_num_formatted.startswith("+"):
+        wa_num_formatted = wa_num_formatted[1:]
+    elif not wa_num_formatted.startswith("233"):
+        wa_num_formatted = "233" + wa_num_formatted[-9:]  # fallback for local numbers
+
+    # Create WhatsApp link
+    wa_link = (
+        f"https://wa.me/{wa_num_formatted}?text={urllib.parse.quote(wa_message)}"
+        if wa_num_formatted.isdigit() and len(wa_num_formatted) >= 11 else None
+    )
+
+    # Show Share Button
+    if wa_link:
+        st.markdown(
+            f'<a href="{wa_link}" target="_blank">'
+            f'<button style="background-color:#25d366;color:white;border:none;padding:10px 20px;border-radius:5px;font-size:16px;cursor:pointer;">'
+            '📲 Share on WhatsApp'
+            '</button></a>',
+            unsafe_allow_html=True
+        )
+    else:
+        st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
 
 
 
