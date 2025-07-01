@@ -2011,8 +2011,7 @@ with tabs[7]:
                 st.success(f"Report sent to {to_email}!")
             except Exception as e:
                 st.error(f"Failed to send email: {e}")
-
-# --- WhatsApp Share Section (with reference answers included, numbered as "1. 1. C" etc.) ---
+# --- WhatsApp Share Section (correct numbering for reference answers: 1. C, 2. C, etc.) ---
 import urllib.parse
 st.markdown("---")
 st.subheader("📲 Share Report via WhatsApp")
@@ -2028,12 +2027,9 @@ for c in wa_cols:
 
 wa_phone = st.text_input("WhatsApp Number (International format, e.g., 233245022743)", value=wa_phone, key="wa_number")
 
-# Prepare reference answers for WhatsApp
+# Prepare reference answers for WhatsApp (now: 1. C, 2. C, etc.)
 ref_ans_list = ref_answers.get(assignment, [])
-lines = []
-for i, v in enumerate(ref_ans_list):
-    answer_text = v.strip()
-    lines.append(f"{i+1}. {answer_text}")
+lines = [f"{i+1}. {v.strip()}" for i, v in enumerate(ref_ans_list) if v.strip()]
 ref_ans_wa = "*Reference Answers:*\n" + "\n".join(lines) if lines else ""
 
 default_wa_msg = (
