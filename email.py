@@ -41,6 +41,12 @@ def safe_pdf(text: str) -> str:
     """Ensure strings are PDF-safe (Latin-1)."""
     return text.encode("latin-1", "replace").decode("latin-1")
 
+
+def strip_leading_number(text):
+    # Removes leading digits, dots, and spaces (e.g., "1. C" or "2) D" -> "C" or "D")
+    return re.sub(r"^\s*\d+[\.\)]?\s*", "", text).strip()
+
+
 # ==== 2. CONFIG / CONSTANTS ====
 SCHOOL_NAME         = "Learn Language Education Academy"
 school_sendgrid_key = st.secrets.get("general", {}).get("SENDGRID_API_KEY")
