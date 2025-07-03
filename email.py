@@ -1289,10 +1289,29 @@ with tabs[4]:
         phone_col   = getcol("phone")
         level_col   = getcol("level")
 
-        # 3. Select student (dropdown)
-        student_names = df[name_col].tolist()
+        # -- SEARCH BOX at the bottom (but must be placed before dropdown for Streamlit)
+        search_val = st.text_input(
+            "Search students by name, code, phone, or level (case insensitive):", value="", key="pdf_tab_search"
+        )
+
+        # Filtered student list
+        filtered_df = df.copy()
+        if search_val:
+            sv = search_val.strip().lower()
+            filtered_df = df[
+                df[name_col].str.lower().str.contains(sv, na=False)
+                | df[code_col].astype(str).str.lower().str.contains(sv, na=False)
+                | df[phone_col].astype(str).str.lower().str.contains(sv, na=False)
+                | df[level_col].astype(str).str.lower().str.contains(sv, na=False)
+            ]
+
+        # 3. Select student (dropdown, now uses filtered list)
+        student_names = filtered_df[name_col].tolist()
+        if not student_names:
+            st.warning("No students match your search.")
+            st.stop()
         selected_name = st.selectbox("Select Student", student_names)
-        row = df[df[name_col] == selected_name].iloc[0]
+        row = filtered_df[filtered_df[name_col] == selected_name].iloc[0]
 
         # 4. Editable fields before PDF generation
         default_paid    = float(row.get(paid_col, 0))
