@@ -1266,13 +1266,12 @@ with tabs[3]:
 with tabs[4]:
     st.title("📄 Generate Contract & Receipt PDF for Any Student")
 
-    # 1. Google Sheet as main source, fallback to local file if offline
-    student_file = "students.csv"
-    google_csv   = (
+    # --- Google Sheet as the ONLY source ---
+    google_csv = (
         "https://docs.google.com/spreadsheets/d/"
         "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
     )
-    df = safe_read_csv(student_file, google_csv)
+    df = pd.read_csv(google_csv)
     df = normalize_columns(df)
 
     if df.empty:
@@ -1289,12 +1288,12 @@ with tabs[4]:
         phone_col   = getcol("phone")
         level_col   = getcol("level")
 
-        # -- SEARCH BOX at the bottom (but must be placed before dropdown for Streamlit)
+        # --- SEARCH BOX at the bottom (shown above dropdown) ---
         search_val = st.text_input(
-            "Search students by name, code, phone, or level (case insensitive):", value="", key="pdf_tab_search"
+            "Search students by name, code, phone, or level:", value="", key="pdf_tab_search"
         )
 
-        # Filtered student list
+        # Filter students
         filtered_df = df.copy()
         if search_val:
             sv = search_val.strip().lower()
@@ -1305,7 +1304,6 @@ with tabs[4]:
                 | df[level_col].astype(str).str.lower().str.contains(sv, na=False)
             ]
 
-        # 3. Select student (dropdown, now uses filtered list)
         student_names = filtered_df[name_col].tolist()
         if not student_names:
             st.warning("No students match your search.")
@@ -1434,6 +1432,7 @@ with tabs[4]:
                 mime="application/pdf"
             )
             st.success("✅ PDF generated and ready to download.")
+
 
 with tabs[5]:
     st.title("📧 Send Email (Quick)")
