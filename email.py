@@ -1803,7 +1803,6 @@ with tabs[6]:
                        data=pdf.output(dest='S').encode('latin-1'),
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
-
 with tabs[7]:
     import re
     import urllib.parse
@@ -1918,8 +1917,11 @@ with tabs[7]:
 
     # --- Assignment search and select ---
     st.subheader("🔎 Search Assignment")
+    # FIX: Ensure assignment titles are always strings
+    assignments_sheet = set(str(a) for a in df_scores['assignment'].dropna() if str(a).strip())
+    assignments_ref = set(str(a) for a in ref_answers.keys() if str(a).strip())
+    assignments = sorted(assignments_sheet | assignments_ref)
     search_assign = st.text_input("Type assignment title...", key="search_assign")
-    assignments = sorted(set(df_scores['assignment']).union(ref_answers.keys()))
     filtered = [a for a in assignments if search_assign.lower() in a.lower()]
     if not filtered:
         st.info("No assignments match your search.")
@@ -1936,13 +1938,14 @@ with tabs[7]:
         (df_scores['studentcode'] == student_code) &
         (df_scores['assignment'] == assignment)
     ]
-    default_score   = int(prev['score'].iloc[0]) if not prev.empty else 0
+    default_score = int(prev['score'].iloc[0]) if not prev.empty else 0
     default_comment = prev['comments'].iloc[0] if not prev.empty else ""
 
     with st.form(f"form_single_{student_code}_{assignment}"):
-        score   = st.number_input("Score (0–100)", 0, 100, default_score, key="score_single")
+        score = st.number_input("Score (0–100)", 0, 100, default_score, key="score_single")
         comment = st.text_area("Comments", value=default_comment, key="comment_single")
         submitted = st.form_submit_button("Save Score")
+
 
     if submitted:
         save_score_to_sqlite({
