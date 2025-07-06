@@ -241,42 +241,40 @@ Asadu Felix
 # --- End of Stage 2 ---
 
 with tabs[0]:
-    import pandas as pd
-    import streamlit as st
 
     st.title("🕒 Pending Students")
 
-    # --- 1. LOAD DATA ---
-    pending_csv_url = (
-        "https://docs.google.com/spreadsheets/d/"
-        "1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo/export?format=csv"
-    )
+    # Load Data
+    pending_csv_url = "https://docs.google.com/spreadsheets/d/1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo/export?format=csv"
     @st.cache_data(ttl=0)
     def load_pending():
         df = pd.read_csv(pending_csv_url, dtype=str)
-        # Keep original column names for display, but also make a lower-case version for searching
         df_display = df.copy()
         df_search = df.copy()
         df_search.columns = [c.strip().lower().replace(" ", "").replace("_", "") for c in df_search.columns]
         return df_display, df_search
-
     df_display, df_search = load_pending()
 
-    # --- 2. UNIVERSAL SEARCH (any field) ---
-    search = st.text_input("🔎 Search all columns (name, code, email, level, etc.)")
+    # Universal Search
+    search = st.text_input("🔎 Search any field (name, code, email, etc.)")
     if search:
         mask = df_search.apply(lambda row: row.astype(str).str.contains(search, case=False, na=False).any(), axis=1)
         filt = df_display[mask]
     else:
         filt = df_display
 
-    # --- 3. SHOW EVERYTHING FOR EASY COPY ---
-    st.caption("All fields (including email, level, etc.) are shown. Double-click to copy, or use the button to download.")
-    st.dataframe(filt, use_container_width=True)
+    # Column Selector
+    all_cols = list(filt.columns)
+    selected_cols = st.multiselect(
+        "Show columns (for easy viewing):", all_cols, default=all_cols[:6]
+    )
 
-    # --- 4. DOWNLOAD CSV (all fields) ---
+    # Show Table (with scroll bar)
+    st.dataframe(filt[selected_cols], use_container_width=True, height=400)
+
+    # Download Always Includes All Columns
     st.download_button(
-        "⬇️ Download as CSV",
+        "⬇️ Download all columns as CSV",
         filt.to_csv(index=False),
         file_name="pending_students.csv"
     )
