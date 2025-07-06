@@ -1804,8 +1804,7 @@ with tabs[6]:
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
 with tabs[7]:
-    import re
-    import urllib.parse
+
 
     st.title("📝 Assignment Marking & Scores")
 
