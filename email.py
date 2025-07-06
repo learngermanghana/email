@@ -2132,24 +2132,22 @@ with tabs[7]:
     st.markdown("#### 📚 All Score History (Sheet + App)")
     st.dataframe(df_scores, use_container_width=True)
     st.download_button(
-        "⬇️ Download All Scores as CSV",
-        data=df_scores.to_csv(index=False),
-        file_name="all_scores_with_name_level.csv"
+        "⬇️ Download All Scores as CSV", data=df_scores.to_csv(index=False),
+        file_name="all_scores_with_name_level.csv", key="download_all_scores_tab7"
     )
 
     # --- Student Search & Select ---
     st.subheader("🔎 Search Student")
     name_col, code_col = col_lookup(df_students, "name"), col_lookup(df_students, "studentcode")
-    q = st.text_input("Type student name or code...")
+    q = st.text_input("Type student name or code...", key="tab7_search_student")
     sf = (
         df_students[
             df_students[name_col].str.contains(q, case=False, na=False) |
             df_students[code_col].astype(str).str.contains(q, case=False, na=False)
-        ]
-        if q else df_students
+        ] if q else df_students
     )
     opts = sf[name_col] + " (" + sf[code_col].astype(str) + ")"
-    choice = st.selectbox("Select Student", opts, key="single_student")
+    choice = st.selectbox("Select Student", opts, key="tab7_select_student")
     if "(" not in choice:
         st.warning("Select a student.")
         st.stop()
@@ -2163,12 +2161,12 @@ with tabs[7]:
     asn_sheet = {str(a).strip() for a in df_scores['assignment'].dropna() if str(a).strip()}
     asn_ref   = set(ref_answers.keys())
     all_asn   = sorted(asn_sheet | asn_ref)
-    term      = st.text_input("Type assignment title...", key="search_assign")
+    term      = st.text_input("Type assignment title...", key="tab7_search_assign")
     filt_asn  = [a for a in all_asn if term.lower() in a.lower()]
     if not filt_asn:
         st.info("No assignments match.")
         st.stop()
-    assignment = st.selectbox("Select Assignment", filt_asn, key="assign_select")
+    assignment = st.selectbox("Select Assignment", filt_asn, key="tab7_select_assign")
 
     # --- Display Reference Answers ---
     st.markdown("**Reference Answers:**")
@@ -2180,9 +2178,9 @@ with tabs[7]:
     d_score   = int(prev.score.iloc[0]) if not prev.empty else 0
     d_comment = prev.comments.iloc[0] if not prev.empty else ""
     with st.form(f"form_{stud_code}_{assignment}"):
-        score   = st.number_input("Score (0–100)", 0, 100, d_score, key="score_single")
-        comment = st.text_area("Comments", value=d_comment, key="comment_single")
-        submitted = st.form_submit_button("Save Score")
+        score   = st.number_input("Score (0–100)", 0, 100, d_score, key="tab7_score_input")
+        comment = st.text_area("Comments", value=d_comment, key="tab7_comment_input")
+        submitted = st.form_submit_button("Save Score", key="tab7_save_score")
 
     if submitted:
         save_score_to_sqlite({
@@ -2213,13 +2211,13 @@ with tabs[7]:
         footer_text="Thank you! Contact your tutor if you have any questions."
     )
     pdf_file = f"{stud_row[name_col].replace(' ','_')}_{assignment.replace(' ','_')}_report.pdf"
-    st.download_button("Download Report PDF", data=pdf_bytes, file_name=pdf_file, mime="application/pdf")
+    st.download_button("Download Report PDF", data=pdf_bytes, file_name=pdf_file, mime="application/pdf", key="download_report_pdf_tab7")
 
     # --- Email the PDF ---
     st.markdown("#### 📧 Email Report PDF")
     default_email = stud_row.get("email", "")
-    to_email = st.text_input("Recipient Email", value=default_email)
-    subject  = st.text_input("Subject", value=f"{stud_row[name_col]} - {assignment} Report")
+    to_email = st.text_input("Recipient Email", value=default_email, key="tab7_email_input")
+    subject  = st.text_input("Subject", value=f"{stud_row[name_col]} - {assignment} Report", key="tab7_email_subject")
     ref_list = ref_answers.get(assignment, [])
     ref_html = "<ol>" + "".join(f"<li>{re.sub(r'^\d+[\.\)]?\s*','',a)}</li>" for a in ref_list) + "</ol>" if ref_list else ""
     body = st.text_area("Message (HTML allowed)", value=(
@@ -2227,8 +2225,8 @@ with tabs[7]:
         f"Attached is your report for <b>{assignment}</b>.<br><br>"
         f"{ref_html}"
         "Thank you,<br>Learn Language Education Academy"
-    ))
-    if st.button("Send Email"):
+    ), key="tab7_email_body")
+    if st.button("Send Email", key="tab7_send_email"):
         if "@" not in to_email:
             st.error("Enter a valid email.")
         else:
@@ -2243,14 +2241,14 @@ with tabs[7]:
     st.subheader("📲 Share via WhatsApp")
     wa_cols  = [c for c in stud_row.index if "phone" in c]
     wa_phone = next((str(stud_row[c]) for c in wa_cols if str(stud_row[c]).strip()), "")
-    wa_phone = st.text_input("WhatsApp # (e.g. 233XXXXXXXXX)", value=wa_phone, key="wa_number")
+    wa_phone = st.text_input("WhatsApp # (e.g. 233XXXXXXXXX)", value=wa_phone, key="tab7_whatsapp_input")
     ref_txt  = "\n".join(f"{i+1}. {re.sub(r'^\d+[\.\)]?\s*','',a)}" for i,a in enumerate(ref_list))
     wa_msg   = (
         f"Hello {stud_row[name_col]},\n\n"
         f"Your report for *{assignment}*:\n{ref_txt}\n\n"
         "Thank you\nLearn Language Education Academy"
     )
-    wa_msg   = st.text_area("WhatsApp Message", value=wa_msg, height=200, key="wa_message")
+    wa_msg   = st.text_area("WhatsApp Message", value=wa_msg, height=200, key="tab7_whatsapp_msg")
     num      = wa_phone.lstrip("+").replace(" ", "").replace("-", "")
     if num.startswith("0"):
         num = "233" + num[1:]
