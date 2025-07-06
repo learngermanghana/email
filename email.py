@@ -2041,65 +2041,69 @@ with tabs[7]:
             except Exception as e:
                 st.error(f"Failed to send email: {e}")
 
-    # --- WHATSAPP SECTION ---
-    st.markdown("---")
-    st.subheader("📲 Share Report via WhatsApp")
-    wa_phone = ""
-    wa_cols = [c for c in student_row.index if "phone" in c]
-    for c in wa_cols:
-        v = str(student_row[c])
-        if v.startswith("233") or v.startswith("0") or v.isdigit():
-            wa_phone = v
-            break
-    wa_phone = st.text_input("WhatsApp Number (International format, e.g., 233245022743)", value=wa_phone, key="tab7_wa_number")
+# --- WhatsApp Share Section ---
 
-    # Properly clean/number answers for WhatsApp (no double numbers)
-    import re
-    def strip_leading_number(text):
-        return re.sub(r"^\s*[\dA-Za-z]+[\.\)\:]?\s*", "", text).strip()
-    wa_answers = []
-    if answers_combined_str:
-        wa_answers = [strip_leading_number(a) for a in answers_combined_str.split('\n') if a.strip()]
-    if wa_answers:
-        ref_ans_wa = "*Reference Answers:*\n" + "\n".join(f"{i+1}. {ans}" for i, ans in enumerate(wa_answers)) + "\n"
-    else:
-        ref_ans_wa = ""
+import urllib.parse
 
-    default_wa_msg = (
-        f"Hello {student_row[name_col]},\n\n"
-        f"Here is your report for the assignment: *{assignment}*\n"
-        f"{ref_ans_wa}"
-        "Thank you\nLearn Language Education Academy\n\n"
-        "👉 For your full results and scores, please log in to the app."
+st.markdown("---")
+st.subheader("📲 Share Report via WhatsApp")
+
+# Try to get student's phone automatically from any relevant column
+wa_phone = ""
+wa_cols = [c for c in student_row.index if "phone" in c]
+for c in wa_cols:
+    v = str(student_row[c])
+    if v.startswith("233") or v.startswith("0") or v.isdigit():
+        wa_phone = v
+        break
+
+# Allow manual override or editing of phone number
+wa_phone = st.text_input("WhatsApp Number (International format, e.g., 233245022743)", value=wa_phone, key="wa_number")
+
+# Prepare reference answers section, preserving original numbering
+ref_ans_list = ref_answers.get(assignment, [])
+ref_ans_wa = ""
+if ref_ans_list:
+    ref_ans_wa = "*Reference Answers:*\n" + "\n".join(ref_ans_list) + "\n"
+
+# Prepare the WhatsApp message with reference answers
+default_wa_msg = (
+    f"Hello {student_row[name_col]},\n\n"
+    f"Here is your report for the assignment: *{assignment}*\n"
+    f"{ref_ans_wa}"
+    "Thank you for your hard work!\nLearn Language Education Academy"
+)
+wa_message = st.text_area(
+    "WhatsApp Message (edit before sending):",
+    value=default_wa_msg, height=200, key="wa_message_edit"
+)
+
+# Format WhatsApp number for wa.me link
+wa_num_formatted = wa_phone.strip().replace(" ", "").replace("-", "")
+if wa_num_formatted.startswith("0"):
+    wa_num_formatted = "233" + wa_num_formatted[1:]
+elif wa_num_formatted.startswith("+"):
+    wa_num_formatted = wa_num_formatted[1:]
+elif not wa_num_formatted.startswith("233"):
+    wa_num_formatted = "233" + wa_num_formatted[-9:]  # fallback for local numbers
+
+# Create WhatsApp link
+wa_link = (
+    f"https://wa.me/{wa_num_formatted}?text={urllib.parse.quote(wa_message)}"
+    if wa_num_formatted.isdigit() and len(wa_num_formatted) >= 11 else None
+)
+
+# Show Share Button
+if wa_link:
+    st.markdown(
+        f'<a href="{wa_link}" target="_blank">'
+        f'<button style="background-color:#25d366;color:white;border:none;padding:10px 20px;border-radius:5px;font-size:16px;cursor:pointer;">'
+        '📲 Share on WhatsApp'
+        '</button></a>',
+        unsafe_allow_html=True
     )
-    wa_message = st.text_area(
-        "WhatsApp Message (edit before sending):",
-        value=default_wa_msg, height=200, key="tab7_wa_message_edit"
-    )
-
-    wa_num_formatted = wa_phone.strip().replace(" ", "").replace("-", "")
-    if wa_num_formatted.startswith("0"):
-        wa_num_formatted = "233" + wa_num_formatted[1:]
-    elif wa_num_formatted.startswith("+"):
-        wa_num_formatted = wa_num_formatted[1:]
-    elif not wa_num_formatted.startswith("233"):
-        wa_num_formatted = "233" + wa_num_formatted[-9:]
-
-    wa_link = (
-        f"https://wa.me/{wa_num_formatted}?text={urllib.parse.quote(wa_message)}"
-        if wa_num_formatted.isdigit() and len(wa_num_formatted) >= 11 else None
-    )
-
-    if wa_link:
-        st.markdown(
-            f'<a href="{wa_link}" target="_blank">'
-            f'<button style="background-color:#25d366;color:white;border:none;padding:10px 20px;border-radius:5px;font-size:16px;cursor:pointer;">'
-            '📲 Share on WhatsApp'
-            '</button></a>',
-            unsafe_allow_html=True
-        )
-    else:
-        st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
+else:
+    st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
 
 #
 
