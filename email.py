@@ -2068,9 +2068,9 @@ with tabs[7]:
         f"Hello {student_row[name_col]},\n\n"
         f"Here is your report for the assignment: *{assignment}*\n"
         f"{ref_ans_wa}"
-        "Thank you for your hard work!\n"
+        "Thank you!\n"
         "Learn Language Education Academy\n\n"
-        "Check your full results and other feedback in the Academy app."
+        "Check your full results and other feedback in the Falowen app."
     )
     wa_message = st.text_area(
         "WhatsApp Message (edit before sending):",
