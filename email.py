@@ -939,59 +939,34 @@ Asadu Felix
 with tabs[0]:
     st.title("🕒 Pending Students")
 
-    # --- 1. LOAD DATA ---
-    pending_csv_url = (
-        "https://docs.google.com/spreadsheets/d/"
-        "1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo/export?format=csv"
-    )
+    # 1. Load Data
+    PENDING_URL = "https://docs.google.com/spreadsheets/d/1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo/export?format=csv"
     @st.cache_data(ttl=0)
     def load_pending():
-        df = pd.read_csv(pending_csv_url, dtype=str)
-        df.columns = [c.strip().lower().replace(" ", "").replace("_", "") for c in df.columns]
+        df = pd.read_csv(PENDING_URL, dtype=str)
+        df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
         return df
     df = load_pending()
-    st.caption("Preview of pending students loaded from Google Sheet:")
+
+    st.caption("Below is a live preview of all pending students:")
     st.dataframe(df, use_container_width=True)
 
-    # --- 2. COLUMN LOOKUP ---
-    def col_lookup(df, name):
-        key = name.lower().replace(" ", "").replace("_", "")
-        for c in df.columns:
-            if c.lower().replace(" ", "").replace("_", "") == key:
-                return c
-        raise KeyError(f"Column '{name}' not found in DataFrame")
-
-    # Try to auto-detect column names
-    try:
-        name_col = col_lookup(df, "name")
-    except:
-        name_col = df.columns[0]
-    try:
-        code_col = col_lookup(df, "studentcode") if "studentcode" in df.columns else col_lookup(df, "student_code")
-    except:
-        code_col = df.columns[1]
-    try:
-        phone_col = col_lookup(df, "phone")
-    except:
-        phone_col = df.columns[-1]
-
-    # --- 3. SEARCH ---
-    search = st.text_input("Search by name, code, or phone", key="pending_search")
-    filt = df.copy()
+    # 2. Simple Search
+    search = st.text_input("🔍 Search name, code, or phone")
     if search:
-        mask1 = filt[name_col].str.contains(search, case=False, na=False)
-        mask2 = filt[code_col].str.contains(search, case=False, na=False)
-        mask3 = filt[phone_col].str.contains(search, case=False, na=False)
-        filt = filt[mask1 | mask2 | mask3]
+        filt = df[df.apply(lambda row: search.lower() in str(row).lower(), axis=1)]
+    else:
+        filt = df
 
     st.dataframe(filt, use_container_width=True)
 
-    # --- 4. DOWNLOAD ---
+    # 3. Quick Download
     st.download_button(
-        "⬇️ Download Pending Students as CSV",
+        "⬇️ Download as CSV",
         filt.to_csv(index=False),
         file_name="pending_students.csv"
     )
+
 
 # ==== 9. ALL STUDENTS TAB ====
 with tabs[1]:
