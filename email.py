@@ -1805,7 +1805,6 @@ with tabs[6]:
                        mime="application/pdf")
 
 
-
 # --- 1. URLS ---
 students_csv_url = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
 scores_csv_url = "https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/export?format=csv"
@@ -1935,32 +1934,33 @@ with tabs[7]:
         st.stop()
     assignment = st.selectbox("Select Assignment", filtered, key="tab7_assign_select")
 
-    # --- REFERENCE ANSWERS (DYNAMIC TABS) ---
+    # --- REFERENCE ANSWERS (DYNAMIC TABS + SINGLE COMBINED BOX) ---
     ref_answers = []
+    answer_cols = []
     if assignment:
         assignment_row = ref_df[ref_df['assignment'] == assignment]
         if not assignment_row.empty:
             answer_cols = [col for col in assignment_row.columns if col.startswith('answer')]
             answer_cols = [col for col in answer_cols if pd.notnull(assignment_row.iloc[0][col]) and str(assignment_row.iloc[0][col]).strip() != '']
-            if answer_cols:
-                if len(answer_cols) == 1:
-                    st.markdown("**Reference Answer:**")
-                    answer = str(assignment_row.iloc[0][answer_cols[0]])
-                    st.write(answer)
-                    ref_answers = [answer]
-                else:
-                    st.markdown("**Reference Answers:**")
-                    tab_objs = st.tabs([f"Answer {i+1}" for i in range(len(answer_cols))])
-                    ref_answers = []
-                    for i, col in enumerate(answer_cols):
-                        with tab_objs[i]:
-                            ans = str(assignment_row.iloc[0][col])
-                            st.write(ans)
-                            ref_answers.append(ans)
-            else:
-                st.info("No answers found for this assignment.")
+            ref_answers = [str(assignment_row.iloc[0][col]) for col in answer_cols]
+
+    # -- SHOW DYNAMIC TABS IF MULTIPLE ANSWERS, ELSE SINGLE BOX --
+    if ref_answers:
+        if len(ref_answers) == 1:
+            st.markdown("**Reference Answer:**")
+            st.write(ref_answers[0])
         else:
-            st.info("Assignment not found in answer sheet.")
+            tab_objs = st.tabs([f"Answer {i+1}" for i in range(len(ref_answers))])
+            for i, ans in enumerate(ref_answers):
+                with tab_objs[i]:
+                    st.write(ans)
+
+        # For WhatsApp/Email/PDF, combine all into one clean box:
+        answers_combined_str = "\n".join([f"{i+1}. {ans}" for i, ans in enumerate(ref_answers)])
+        answers_combined_html = "<br>".join([f"{i+1}. {ans}" for i, ans in enumerate(ref_answers)])
+    else:
+        answers_combined_str = "No answer available."
+        answers_combined_html = "No answer available."
 
     # --- Score entry form ---
     prev = df_scores[
@@ -1973,7 +1973,7 @@ with tabs[7]:
     with st.form(f"form_tab7_{student_code}_{assignment}"):
         score = st.number_input("Score (0–100)", 0, 100, default_score, key=f"tab7_score_{student_code}_{assignment}")
         comment = st.text_area("Comments", value=default_comment, key=f"tab7_comment_{student_code}_{assignment}")
-        submitted = st.form_submit_button("Save Score", key=f"tab7_save_score_{student_code}_{assignment}")
+        submitted = st.form_submit_button("Save Score")
 
     if submitted:
         save_score_to_sqlite({
@@ -2001,7 +2001,7 @@ with tabs[7]:
         score_name=assignment,
         tutor_name="Mr. Felix Asadu",
         school_name="Learn Language Education Academy",
-        footer_text="Thank you! Contact your tutor if you have any questions."
+        footer_text=f"Reference Answers:<br>{answers_combined_html}<br>Thank you! Contact your tutor if you have any questions."
     )
     pdf_filename = f"{student_row[name_col].replace(' ', '_')}_{assignment.replace(' ', '_')}_report.pdf"
     st.download_button(
@@ -2018,12 +2018,7 @@ with tabs[7]:
     to_email = st.text_input("Recipient Email", value=default_email, key="tab7_email")
     subject = st.text_input("Subject", value=f"{student_row[name_col]} - {assignment} Report", key="tab7_subject")
 
-    ref_ans_email = ""
-    if ref_answers:
-        ref_ans_email = "<b>Reference Answers:</b><br><ol style='padding-left:16px;margin-top:0px'>"
-        for i, a in enumerate(ref_answers):
-            ref_ans_email += f"<li>{a}</li>"
-        ref_ans_email += "</ol><br>"
+    ref_ans_email = f"<b>Reference Answers:</b><br>{answers_combined_html}<br>"
 
     body = st.text_area("Message (HTML allowed)", value=(
         f"Hello {student_row[name_col]},<br><br>"
@@ -2055,10 +2050,7 @@ with tabs[7]:
             break
     wa_phone = st.text_input("WhatsApp Number (International format, e.g., 233245022743)", value=wa_phone, key="tab7_wa_number")
 
-    ref_ans_wa = ""
-    if ref_answers:
-        ref_ans_wa = "*Reference Answers:*\n" + "\n".join(f"{i+1}. {ans}" for i, ans in enumerate(ref_answers)) + "\n"
-
+    ref_ans_wa = "*Reference Answers:*\n" + answers_combined_str + "\n" if ref_answers else ""
     default_wa_msg = (
         f"Hello {student_row[name_col]},\n\n"
         f"Here is your report for the assignment: *{assignment}*\n"
@@ -2093,6 +2085,5 @@ with tabs[7]:
         )
     else:
         st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
-
 
 
