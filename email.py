@@ -241,6 +241,8 @@ Asadu Felix
 # --- End of Stage 2 ---
 
 with tabs[0]:
+    import pandas as pd
+    import streamlit as st
 
     st.title("🕒 Pending Students")
 
@@ -252,31 +254,32 @@ with tabs[0]:
     @st.cache_data(ttl=0)
     def load_pending():
         df = pd.read_csv(pending_csv_url, dtype=str)
-        df.columns = [c.strip().lower().replace(" ", "").replace("_", "") for c in df.columns]
-        return df
+        # Keep original column names for display, but also make a lower-case version for searching
+        df_display = df.copy()
+        df_search = df.copy()
+        df_search.columns = [c.strip().lower().replace(" ", "").replace("_", "") for c in df_search.columns]
+        return df_display, df_search
 
-    df = load_pending()
+    df_display, df_search = load_pending()
 
-    # --- 2. SIMPLE SEARCH ---
-    search = st.text_input("🔎 Search (name, code, or phone)")
+    # --- 2. UNIVERSAL SEARCH (any field) ---
+    search = st.text_input("🔎 Search all columns (name, code, email, level, etc.)")
     if search:
-        mask = df.apply(lambda row: row.astype(str).str.contains(search, case=False, na=False).any(), axis=1)
-        filt = df[mask]
+        mask = df_search.apply(lambda row: row.astype(str).str.contains(search, case=False, na=False).any(), axis=1)
+        filt = df_display[mask]
     else:
-        filt = df
+        filt = df_display
 
-    # --- 3. SHOW TABLE FOR EASY COPY ---
-    st.caption("✅ Double-click to copy any value. Filter or scroll to select.")
+    # --- 3. SHOW EVERYTHING FOR EASY COPY ---
+    st.caption("All fields (including email, level, etc.) are shown. Double-click to copy, or use the button to download.")
     st.dataframe(filt, use_container_width=True)
 
-    # --- 4. DOWNLOAD ---
+    # --- 4. DOWNLOAD CSV (all fields) ---
     st.download_button(
         "⬇️ Download as CSV",
         filt.to_csv(index=False),
         file_name="pending_students.csv"
     )
-
-
 
 
 # ==== 9. ALL STUDENTS TAB ====
