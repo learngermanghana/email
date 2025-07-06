@@ -939,7 +939,6 @@ Asadu Felix
 with tabs[0]:
     st.title("🕒 Pending Students")
 
-    # 1. Load Data
     PENDING_URL = "https://docs.google.com/spreadsheets/d/1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo/export?format=csv"
     @st.cache_data(ttl=0)
     def load_pending():
@@ -948,24 +947,24 @@ with tabs[0]:
         return df
     df = load_pending()
 
-    st.caption("Below is a live preview of all pending students:")
-    st.dataframe(df, use_container_width=True)
-
-    # 2. Simple Search
-    search = st.text_input("🔍 Search name, code, or phone")
+    # --- SEARCH ---
+    search = st.text_input("🔍 Search by name, code, or phone")
     if search:
         filt = df[df.apply(lambda row: search.lower() in str(row).lower(), axis=1)]
     else:
         filt = df
 
-    st.dataframe(filt, use_container_width=True)
+    # --- DISPLAY AS PLAIN TEXT FOR EASY COPY ---
+    # Choose which columns you want to show/copy:
+    copy_cols = [c for c in filt.columns if "name" in c or "code" in c or "phone" in c]
+    text_data = filt[copy_cols].to_csv(index=False, sep="\t")  # tab-separated for Excel/WhatsApp
 
-    # 3. Quick Download
-    st.download_button(
-        "⬇️ Download as CSV",
-        filt.to_csv(index=False),
-        file_name="pending_students.csv"
-    )
+    st.markdown("#### 📋 Copy-ready Table (select all and Ctrl+C):")
+    st.code(text_data, language="")  # No language: raw copy
+
+    # Optionally, show the table visually too
+    st.dataframe(filt[copy_cols], use_container_width=True)
+
 
 
 # ==== 9. ALL STUDENTS TAB ====
