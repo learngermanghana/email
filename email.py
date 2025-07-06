@@ -1803,11 +1803,7 @@ with tabs[6]:
                        data=pdf.output(dest='S').encode('latin-1'),
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
-
 with tabs[7]:
-    import re
-    import urllib.parse
-    from datetime import datetime
 
     st.title("📝 Assignment Marking & Scores")
 
@@ -2007,7 +2003,7 @@ with tabs[7]:
         else:
             try:
                 send_email_report(pdf_bytes, to_email, subject, body)
-                st.success(f"Sent to {to_EMAIL}!")
+                st.success(f"Sent to {to_email}!")
             except Exception as e:
                 st.error(f"Email failed: {e}")
 
@@ -2032,7 +2028,6 @@ with tabs[7]:
         st.markdown(f"[📲 Send on WhatsApp]({wa_link})")
     else:
         st.info("Enter a valid WhatsApp number.")
-
 
 
 
