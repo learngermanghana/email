@@ -1382,9 +1382,10 @@ with tabs[7]:
         f"Hello {student_row[name_col]},\n\n"
         f"Here is your report for the assignment: *{assignment}*\n"
         f"{ref_ans_wa}"
+        "Check your full results and other feedback in the Falowen app.\n\n"
+        "You can also get the pdf in your email. Mostly at spam or junk. You can mark our email as safe for it to always be in inbox."
+        "Dont forget to click the refresh bottom at my results for latest score"
         "Thank you!\n"
-        "Learn Language Education Academy\n\n"
-        "Check your full results and other feedback in the Falowen app. Dont forget to click the refresh bottom at my results for latest score"
     )
     wa_message = st.text_area(
         "WhatsApp Message (edit before sending):",
