@@ -1384,7 +1384,7 @@ with tabs[7]:
         f"{ref_ans_wa}"
         "Thank you!\n"
         "Learn Language Education Academy\n\n"
-        "Check your full results and other feedback in the Falowen app."
+        "Check your full results and other feedback in the Falowen app. Dont forget to click the refresh bottom at my results for latest score"
     )
     wa_message = st.text_area(
         "WhatsApp Message (edit before sending):",
