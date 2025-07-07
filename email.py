@@ -1378,13 +1378,29 @@ with tabs[7]:
         ref_ans_wa = ""
 
     # WhatsApp message
+    # --- Find score and comments from scores DataFrame (Google Sheet) ---
+    this_score = ""
+    this_comment = ""
+    score_row = df_scores_with_name[
+        (df_scores_with_name['studentcode'] == student_code) &
+        (df_scores_with_name['assignment'] == assignment)
+    ]
+    if not score_row.empty:
+        this_score = str(score_row.iloc[0]['score'])
+        this_comment = str(score_row.iloc[0]['comments'])
+
+    wa_score_line = f"Score: *{this_score}*" if this_score else ""
+    wa_comment_line = f"Comments: {this_comment}" if this_comment else ""
+
     default_wa_msg = (
         f"Hello {student_row[name_col]},\n\n"
         f"Here is your report for the assignment: *{assignment}*\n"
+        f"{wa_score_line}\n"
+        f"{wa_comment_line}\n"
         f"{ref_ans_wa}"
         "Check your full results and other feedback in the Falowen app.\n\n"
-        "You can also get the pdf in your email. Mostly at spam or junk. You can mark our email as safe for it to always be in inbox."
-        "Dont forget to click the refresh bottom at my results for latest score"
+        "You can also get the pdf in your email. Mostly at spam or junk. You can mark our email as safe for it to always be in inbox.\n"
+        "Don't forget to click the refresh button at 'My Results' for the latest score.\n"
         "Thank you!\n"
     )
     wa_message = st.text_area(
@@ -1418,7 +1434,7 @@ with tabs[7]:
         )
     else:
         st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
-#
+
 
 
 
