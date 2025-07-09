@@ -1114,9 +1114,6 @@ with tabs[6]:
                        mime="application/pdf")
     
 
-import streamlit as st
-import pandas as pd
-import urllib.parse
 
 # --- 1. URLS ---
 students_csv_url = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
