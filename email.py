@@ -1277,7 +1277,6 @@ with tabs[7]:
             except Exception as e:
                 st.error(f"Failed to send email: {e}")
 
-
     # --- WhatsApp Share Section ---
     st.subheader("7. Share Reference via WhatsApp")
     # Try to get student's phone automatically from any relevant column
@@ -1295,10 +1294,11 @@ with tabs[7]:
     default_wa_msg = (
         f"Hello {student_row[name_col]},\n\n"
         f"Here is the reference answer for your assignment: *{assignment}*\n"
-        f"{ref_ans_wa}"
+        f"{ref_ans_wa}\n"
+        "Open my results and resources on the Falowen app for scores and full comment.\n"
+        "Don't forget to click refresh for latest results for your new scores to show.\n"
         "Thank you!\n"
-        "Open my results and resources on the falowen app for scores and full comment."
-        "Learn Language Education Academy"
+        "Happy learning!"
     )
     wa_message = st.text_area(
         "WhatsApp Message (edit before sending):",
@@ -1329,7 +1329,8 @@ with tabs[7]:
     else:
         st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
 
-#
+
+
 
 
 
