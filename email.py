@@ -1124,62 +1124,99 @@ ref_answers_url = "https://docs.google.com/spreadsheets/d/1CtNlidMfmE836NBh5FmEF
 df = pd.read_csv(ref_answers_url, dtype=str)
 
 
+import streamlit as st
+import pandas as pd
+import difflib
+import urllib.parse
+
 with tabs[7]:
-    st.title("📝 Mark Student Work & Share Report")
+    st.title("📝 Mark Student Work & Share Report (AI)")
 
-    # 1. Enter basic student info
-    col1, col2 = st.columns(2)
-    with col1:
-        student_name = st.text_input("Student Name")
-        student_level = st.text_input("Level / Class")
-        assignment_title = st.text_input("Assignment Title")
-    with col2:
-        student_email = st.text_input("Student Email (optional)")
-        student_phone = st.text_input("WhatsApp Number (233...)", max_chars=15)
+    # 1. Load students and reference answers from Google Sheets
+    # Replace with your public CSV export links
+    students_csv_url = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
+    ref_answers_url = "https://docs.google.com/spreadsheets/d/1CtNlidMfmE836NBh5FmEF5tls9sLmMmkkhewMTQjkBo/export?format=csv"
 
-    # 2. Paste student work
-    st.subheader("Paste Student Work Here:")
+    @st.cache_data(show_spinner=False)
+    def load_students():
+        df = pd.read_csv(students_csv_url)
+        df.columns = [c.strip().lower().replace(" ", "").replace("_", "") for c in df.columns]
+        if "student_code" in df.columns:
+            df = df.rename(columns={"student_code": "studentcode"})
+        return df
+
+    @st.cache_data(show_spinner=False)
+    def load_ref_answers():
+        df = pd.read_csv(ref_answers_url, dtype=str)
+        df.columns = [c.strip().lower().replace(" ", "").replace("_", "") for c in df.columns]
+        return df
+
+    students_df = load_students()
+    ref_df = load_ref_answers()
+
+    # 2. Pick a student
+    st.subheader("Select Student")
+    name_col = "name" if "name" in students_df.columns else students_df.columns[0]
+    code_col = "studentcode" if "studentcode" in students_df.columns else students_df.columns[1]
+    student_list = students_df[name_col] + " (" + students_df[code_col].astype(str) + ")"
+    chosen = st.selectbox("Student", student_list)
+    student_row = students_df[students_df[code_col] == chosen.split("(")[-1].replace(")", "").strip()].iloc[0]
+    student_name = student_row[name_col]
+    student_level = student_row["level"] if "level" in student_row else ""
+    student_email = student_row["email"] if "email" in student_row else ""
+    student_phone = student_row["phone"] if "phone" in student_row else ""
+
+    # 3. Pick assignment number/title
+    st.subheader("Select Assignment")
+    assignments = ref_df['assignment'].dropna().unique().tolist()
+    assignment = st.selectbox("Assignment", assignments)
+    ref_row = ref_df[ref_df['assignment'] == assignment]
+    # Show all answer columns that are not empty
+    ref_answers = [str(ref_row.iloc[0][col]) for col in ref_row.columns if col.startswith("answer") and pd.notnull(ref_row.iloc[0][col]) and str(ref_row.iloc[0][col]).strip() != ""]
+    if not ref_answers:
+        ref_answers = ["No answer available."]
+
+    # 4. Paste student work
+    st.subheader("Paste Student Work Below")
     student_work = st.text_area("Student's Answer", height=200)
 
-    # 3. Reference answer(s)
-    st.subheader("Paste Reference Answer(s):")
-    ref_mode = st.radio("Reference Mode", ["Single Answer", "Multiple Answers (Tabs)"], horizontal=True)
-    if ref_mode == "Single Answer":
-        ref_answers = [st.text_area("Reference Answer", height=100)]
+    # 5. Show reference answers
+    st.subheader("Reference Answer(s)")
+    if len(ref_answers) == 1:
+        st.info(ref_answers[0])
     else:
-        n_refs = st.number_input("How many reference answers?", 2, 5, 2)
-        ref_answers = []
-        ref_tabs = st.tabs([f"Ref {i+1}" for i in range(int(n_refs))])
-        for i in range(int(n_refs)):
-            with ref_tabs[i]:
-                ref_answers.append(st.text_area(f"Reference Answer {i+1}", key=f"ref_answer_{i}"))
+        tabs_ref = st.tabs([f"Answer {i+1}" for i in range(len(ref_answers))])
+        for i, ans in enumerate(ref_answers):
+            with tabs_ref[i]:
+                st.write(ans)
 
-    # 4. Comparison / quick check
-    st.subheader("Comparison")
-    import difflib
-
-    if student_work.strip() and any(ans.strip() for ans in ref_answers):
+    # 6. AI Marking / Comparison
+    st.subheader("AI Similarity Check")
+    if student_work.strip() and ref_answers[0] != "No answer available.":
         matcher = difflib.SequenceMatcher(None, student_work.strip(), ref_answers[0].strip())
         ratio = matcher.ratio()
         st.markdown(f"**Similarity to Reference:** {round(ratio*100, 1)}%")
-        # Show a simple diff
         diff = difflib.ndiff(student_work.splitlines(), ref_answers[0].splitlines())
         st.code('\n'.join(diff), language="diff")
+        # Optionally, "automark" if 80%+ similarity
+        ai_score = int(round(ratio*100))
+        st.info(f"AI Estimated Score (out of 100): {ai_score}")
     else:
-        st.info("Paste both the student's answer and at least one reference answer to compare.")
+        ai_score = 0
+        st.info("Paste student work and pick assignment for marking.")
 
-    # 5. Mark and comment
-    st.subheader("Mark and Feedback")
-    score = st.number_input("Score (0–100)", 0, 100, 0)
+    # 7. Teacher marking
+    st.subheader("Your Mark & Feedback")
+    score = st.number_input("Score (0–100)", 0, 100, ai_score)
     comment = st.text_area("Feedback / Comments")
 
-    # 6. Prepare report preview
+    # 8. Report Preview
     st.subheader("Report Preview")
     ref_html = "<br>".join([f"{i+1}. {ans}" for i, ans in enumerate(ref_answers) if ans.strip()])
     report_html = f"""
     <b>Student:</b> {student_name}<br>
     <b>Level:</b> {student_level}<br>
-    <b>Assignment:</b> {assignment_title}<br>
+    <b>Assignment:</b> {assignment}<br>
     <b>Score:</b> {score}<br>
     <b>Comments:</b> {comment}<br><br>
     <b>Student Work:</b><br>{student_work.replace('\n', '<br>')}<br><br>
@@ -1187,13 +1224,14 @@ with tabs[7]:
     """
     st.markdown(report_html, unsafe_allow_html=True)
 
-    # 7. WhatsApp/Email share
-    import urllib.parse
+    # 9. WhatsApp / Email Share
+    st.markdown("---")
+    st.subheader("Share Report")
 
     # WhatsApp
     wa_message = f"""Hello {student_name},
 
-Here is your marked assignment: {assignment_title}
+Here is your marked assignment: {assignment}
 Score: {score}
 Comments: {comment}
 
@@ -1201,9 +1239,9 @@ Student Work:
 {student_work}
 
 Reference Answer(s):
-{ref_html.replace('<br>', '\n')}
+{'; '.join(ref_answers)}
     """
-    wa_num = student_phone.strip().replace(" ", "").replace("-", "")
+    wa_num = str(student_phone).strip().replace(" ", "").replace("-", "")
     if wa_num.startswith("0"):
         wa_num = "233" + wa_num[1:]
     elif wa_num.startswith("+"):
@@ -1214,7 +1252,7 @@ Reference Answer(s):
         f"https://wa.me/{wa_num}?text={urllib.parse.quote(wa_message)}"
         if wa_num.isdigit() and len(wa_num) >= 11 else None
     )
-
+    wa_phone_input = st.text_input("WhatsApp Number (233XXXXXXXXX)", value=wa_num)
     if wa_link:
         st.markdown(
             f'<a href="{wa_link}" target="_blank">'
@@ -1226,13 +1264,13 @@ Reference Answer(s):
     else:
         st.info("Enter a valid WhatsApp number (233XXXXXXXXX) to enable WhatsApp sharing.")
 
-    # Email
+    # Email (copy and paste)
     st.markdown("#### 📧 Email Report (copy content below)")
-    email_subject = f"{student_name} - {assignment_title} Marked Report"
-    email_body = report_html
+    email_subject = f"{student_name} - {assignment} Marked Report"
     st.text_input("Subject", value=email_subject, key="simple_email_subject")
     st.text_area("Email Body (HTML, copy & paste)", value=report_html, height=200, key="simple_email_body")
 
-    st.success("Paste student work and reference, then mark, compare, and share instantly!")
+    st.success("Paste student work, auto-load references, mark, compare, and share instantly!")
+
 
 
