@@ -9,6 +9,7 @@ import json
 import io
 from dateutil.relativedelta import relativedelta
 import streamlit as st
+import openai
 from fpdf import FPDF
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
@@ -1117,26 +1118,18 @@ with tabs[6]:
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
     
-# --- 1. URLS ---
+
+# --- OpenAI API key ---
+openai.api_key = st.secrets["openai"]["api_key"]
+
+# --- Google Sheet URLs (CSV export links) ---
 students_csv_url = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
-scores_csv_url = "https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/export?format=csv"
 ref_answers_url = "https://docs.google.com/spreadsheets/d/1CtNlidMfmE836NBh5FmEF5tls9sLmMmkkhewMTQjkBo/export?format=csv"
-df = pd.read_csv(ref_answers_url, dtype=str)
-
-
-import streamlit as st
-import pandas as pd
-import difflib
-import urllib.parse
 
 with tabs[7]:
-    st.title("📝 Mark Student Work & Share Report (AI)")
+    st.title("📝 Assignment Marking & Scores (AI Grading)")
 
-    # 1. Load students and reference answers from Google Sheets
-    # Replace with your public CSV export links
-    students_csv_url = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
-    ref_answers_url = "https://docs.google.com/spreadsheets/d/1CtNlidMfmE836NBh5FmEF5tls9sLmMmkkhewMTQjkBo/export?format=csv"
-
+    # --- Load Data ---
     @st.cache_data(show_spinner=False)
     def load_students():
         df = pd.read_csv(students_csv_url)
@@ -1149,128 +1142,101 @@ with tabs[7]:
     def load_ref_answers():
         df = pd.read_csv(ref_answers_url, dtype=str)
         df.columns = [c.strip().lower().replace(" ", "").replace("_", "") for c in df.columns]
+        if "assignment" not in df.columns:
+            raise Exception("No 'assignment' column found in reference answers sheet.")
         return df
 
-    students_df = load_students()
+    df_students = load_students()
     ref_df = load_ref_answers()
 
-    # 2. Pick a student
-    st.subheader("Select Student")
-    name_col = "name" if "name" in students_df.columns else students_df.columns[0]
-    code_col = "studentcode" if "studentcode" in students_df.columns else students_df.columns[1]
-    student_list = students_df[name_col] + " (" + students_df[code_col].astype(str) + ")"
-    chosen = st.selectbox("Student", student_list)
-    student_row = students_df[students_df[code_col] == chosen.split("(")[-1].replace(")", "").strip()].iloc[0]
-    student_name = student_row[name_col]
-    student_level = student_row["level"] if "level" in student_row else ""
-    student_email = student_row["email"] if "email" in student_row else ""
-    student_phone = student_row["phone"] if "phone" in student_row else ""
-
-    # 3. Pick assignment number/title
-    st.subheader("Select Assignment")
+    # --- Select Assignment ---
+    st.subheader("1. Choose Assignment")
     assignments = ref_df['assignment'].dropna().unique().tolist()
-    assignment = st.selectbox("Assignment", assignments)
-    ref_row = ref_df[ref_df['assignment'] == assignment]
-    # Show all answer columns that are not empty
-    ref_answers = [str(ref_row.iloc[0][col]) for col in ref_row.columns if col.startswith("answer") and pd.notnull(ref_row.iloc[0][col]) and str(ref_row.iloc[0][col]).strip() != ""]
-    if not ref_answers:
-        ref_answers = ["No answer available."]
+    assignment = st.selectbox("Assignment", assignments, key="tab7_assign")
 
-    # 4. Paste student work
-    st.subheader("Paste Student Work Below")
-    student_work = st.text_area("Student's Answer", height=200)
+    # --- Show Reference Answers ---
+    if assignment:
+        assignment_row = ref_df[ref_df['assignment'] == assignment]
+        answer_cols = [col for col in assignment_row.columns if col.startswith('answer')]
+        ref_answers = [str(assignment_row.iloc[0][col]) for col in answer_cols if pd.notnull(assignment_row.iloc[0][col]) and str(assignment_row.iloc[0][col]).strip() != '']
+        if ref_answers:
+            st.markdown("**Reference Answer(s):**")
+            for i, ans in enumerate(ref_answers):
+                st.info(f"**Answer {i+1}:** {ans}")
+        else:
+            st.warning("No reference answers for this assignment.")
 
-    # 5. Show reference answers
-    st.subheader("Reference Answer(s)")
-    if len(ref_answers) == 1:
-        st.info(ref_answers[0])
-    else:
-        tabs_ref = st.tabs([f"Answer {i+1}" for i in range(len(ref_answers))])
-        for i, ans in enumerate(ref_answers):
-            with tabs_ref[i]:
-                st.write(ans)
+    # --- Select Student ---
+    st.subheader("2. Choose Student (for reporting only)")
+    student_names = df_students['name'].dropna().tolist()
+    student_name = st.selectbox("Student", student_names, key="tab7_student")
 
-    # 6. AI Marking / Comparison
-    st.subheader("AI Similarity Check")
-    if student_work.strip() and ref_answers[0] != "No answer available.":
-        matcher = difflib.SequenceMatcher(None, student_work.strip(), ref_answers[0].strip())
-        ratio = matcher.ratio()
-        st.markdown(f"**Similarity to Reference:** {round(ratio*100, 1)}%")
-        diff = difflib.ndiff(student_work.splitlines(), ref_answers[0].splitlines())
-        st.code('\n'.join(diff), language="diff")
-        # Optionally, "automark" if 80%+ similarity
-        ai_score = int(round(ratio*100))
-        st.info(f"AI Estimated Score (out of 100): {ai_score}")
-    else:
-        ai_score = 0
-        st.info("Paste student work and pick assignment for marking.")
+    # --- Paste Student Work ---
+    st.subheader("3. Paste Student's Work")
+    student_work = st.text_area("Paste student's answer here:", height=150, key="tab7_student_work")
 
-    # 7. Teacher marking
-    st.subheader("Your Mark & Feedback")
-    score = st.number_input("Score (0–100)", 0, 100, ai_score)
-    comment = st.text_area("Feedback / Comments")
+    # --- AI Grading ---
+    st.subheader("4. AI Marking")
+    ai_feedback = ""
+    if st.button("Mark with AI"):
+        if not assignment or not student_work.strip():
+            st.error("Select an assignment and paste student work first.")
+        elif not ref_answers:
+            st.error("No reference answer found for this assignment.")
+        else:
+            with st.spinner("AI is marking..."):
+                ref_ans = ref_answers[0]  # Use first reference answer (customize as needed)
+                prompt = f"""
+You are a professional German language teacher. 
+Reference answer for this assignment:
 
-    # 8. Report Preview
-    st.subheader("Report Preview")
-    ref_html = "<br>".join([f"{i+1}. {ans}" for i, ans in enumerate(ref_answers) if ans.strip()])
-    report_html = f"""
-    <b>Student:</b> {student_name}<br>
-    <b>Level:</b> {student_level}<br>
-    <b>Assignment:</b> {assignment}<br>
-    <b>Score:</b> {score}<br>
-    <b>Comments:</b> {comment}<br><br>
-    <b>Student Work:</b><br>{student_work.replace('\n', '<br>')}<br><br>
-    <b>Reference Answer(s):</b><br>{ref_html}
-    """
-    st.markdown(report_html, unsafe_allow_html=True)
+{ref_ans}
 
-    # 9. WhatsApp / Email Share
-    st.markdown("---")
-    st.subheader("Share Report")
+Here is the student's answer:
 
-    # WhatsApp
-    wa_message = f"""Hello {student_name},
-
-Here is your marked assignment: {assignment}
-Score: {score}
-Comments: {comment}
-
-Student Work:
 {student_work}
 
-Reference Answer(s):
-{'; '.join(ref_answers)}
-    """
-    wa_num = str(student_phone).strip().replace(" ", "").replace("-", "")
-    if wa_num.startswith("0"):
-        wa_num = "233" + wa_num[1:]
-    elif wa_num.startswith("+"):
-        wa_num = wa_num[1:]
-    elif not wa_num.startswith("233") and wa_num.isdigit():
-        wa_num = "233" + wa_num[-9:]
-    wa_link = (
-        f"https://wa.me/{wa_num}?text={urllib.parse.quote(wa_message)}"
-        if wa_num.isdigit() and len(wa_num) >= 11 else None
-    )
-    wa_phone_input = st.text_input("WhatsApp Number (233XXXXXXXXX)", value=wa_num)
-    if wa_link:
-        st.markdown(
-            f'<a href="{wa_link}" target="_blank">'
-            f'<button style="background-color:#25d366;color:white;border:none;padding:10px 20px;border-radius:5px;font-size:16px;cursor:pointer;">'
-            '📲 Share on WhatsApp'
-            '</button></a>',
-            unsafe_allow_html=True
+Please:
+1. Give a mark out of 10 for content (does it answer the question?).
+2. Give a mark out of 10 for grammar.
+3. Give a mark out of 10 for vocabulary.
+4. Briefly explain each score.
+5. Give a total mark out of 100 with justification.
+6. Suggest concrete improvements in 2-3 lines.
+
+Output format:
+
+Content: __/10 (explanation)
+Grammar: __/10 (explanation)
+Vocabulary: __/10 (explanation)
+Suggestions: ...
+Total: __/100 (explanation)
+"""
+                response = openai.ChatCompletion.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "system", "content": "You are a professional German teacher and examiner."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=512,
+                    temperature=0.3,
+                )
+                ai_feedback = response["choices"][0]["message"]["content"]
+                st.success("AI marking complete!")
+
+    if ai_feedback:
+        st.markdown("### AI Grading Result")
+        st.markdown(ai_feedback)
+
+    # --- Allow copying or further use ---
+    if ai_feedback:
+        st.download_button(
+            "Download Feedback as Text",
+            data=ai_feedback,
+            file_name=f"{student_name}_{assignment}_AI_marking.txt",
+            key="tab7_dl_ai_feedback"
         )
-    else:
-        st.info("Enter a valid WhatsApp number (233XXXXXXXXX) to enable WhatsApp sharing.")
 
-    # Email (copy and paste)
-    st.markdown("#### 📧 Email Report (copy content below)")
-    email_subject = f"{student_name} - {assignment} Marked Report"
-    st.text_input("Subject", value=email_subject, key="simple_email_subject")
-    st.text_area("Email Body (HTML, copy & paste)", value=report_html, height=200, key="simple_email_body")
-
-    st.success("Paste student work, auto-load references, mark, compare, and share instantly!")
 
 
 
