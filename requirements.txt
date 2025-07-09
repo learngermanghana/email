@@ -6,4 +6,4 @@ numpy>=1.24.0
 pygsheets>=2.0.5
 google-auth>=2.22.0
 matplotlib
-
+openai
