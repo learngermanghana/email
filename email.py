@@ -1297,8 +1297,7 @@ with tabs[7]:
         f"Here is the reference answer for your assignment: *{assignment}*\n"
         f"{ref_ans_wa}"
         "Thank you!\n"
-        "Open my results and resources on the falowen app for scores and full comment. The reference answer has also been sent to your email."
-        "You can check spam or junk and mark our email as safe for future messages"
+        "Open my results and resources on the falowen app for scores and full comment."
         "Learn Language Education Academy"
     )
     wa_message = st.text_area(
