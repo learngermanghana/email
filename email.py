@@ -1370,15 +1370,12 @@ with tabs[7]:
     wa_phone = st.text_input("WhatsApp Number (International format, e.g., 233245022743)", value=wa_phone, key="tab7_wa_number")
 
     # Prepare reference answers section, preserving original tab text/numbering
-    # Build a list with the exact text from each tab (already formatted above)
-    # Use 'answers_combined_str' which is "\n".join([f"{i+1}. {ans}" for i, ans in enumerate(ref_answers)]) OR just "\n".join(ref_answers) if you want literal tab content
     if ref_answers:
         ref_ans_wa = "*Reference Answers:*\n" + "\n".join(ref_answers) + "\n"
     else:
         ref_ans_wa = ""
 
     # WhatsApp message
-    # --- Find score and comments from scores DataFrame (Google Sheet) ---
     this_score = ""
     this_comment = ""
     score_row = df_scores_with_name[
@@ -1410,30 +1407,7 @@ with tabs[7]:
 
     # Format WhatsApp number for wa.me link
     wa_num_formatted = wa_phone.strip().replace(" ", "").replace("-", "")
-    if wa_num_formatted.startswith("0"):
-        wa_num_formatted = "233" + wa_num_formatted[1:]
-    elif wa_num_formatted.startswith("+"):
-        wa_num_formatted = wa_num_formatted[1:]
-    elif not wa_num_formatted.startswith("233"):
-        wa_num_formatted = "233" + wa_num_formatted[-9:]  # fallback for local numbers
-
-    # Create WhatsApp link
-    wa_link = (
-        f"https://wa.me/{wa_num_formatted}?text={urllib.parse.quote(wa_message)}"
-        if wa_num_formatted.isdigit() and len(wa_num_formatted) >= 11 else None
-    )
-
-    # Show Share Button
-    if wa_link:
-        st.markdown(
-            f'<a href="{wa_link}" target="_blank">'
-            f'<button style="background-color:#25d366;color:white;border:none;padding:10px 20px;border-radius:5px;font-size:16px;cursor:pointer;">'
-            '📲 Share on WhatsApp'
-            '</button></a>',
-            unsafe_allow_html=True
-        )
-    else:
-        st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
+    if wa_num_f
 
 
 
