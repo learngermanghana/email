@@ -46,6 +46,23 @@ def strip_leading_number(text):
     # Removes leading digits, dots, and spaces (e.g., "1. C" or "2) D" -> "C" or "D")
     return re.sub(r"^\s*\d+[\.\)]?\s*", "", text).strip()
 
+import streamlit as st
+import sendgrid
+from sendgrid.helpers.mail import Mail
+
+def send_email_report(to_email, subject, body):
+    sg = sendgrid.SendGridAPIClient(api_key=st.secrets["general"]["sendgrid_api_key"])
+    sender_email = st.secrets["general"]["sender_email"]
+    email = Mail(
+        from_email=sender_email,
+        to_emails=to_email,
+        subject=subject,
+        html_content=body
+    )
+    response = sg.send(email)
+    return response
+
+
 
 # ==== 2. CONFIG / CONSTANTS ====
 SCHOOL_NAME         = "Learn Language Education Academy"
@@ -1237,12 +1254,16 @@ with tabs[7]:
     ref_ans_email = f"<b>Reference Answers:</b><br>{answers_combined_html}<br>"
 
     # Only share reference, not the student work!
-    body = st.text_area("Message (HTML allowed)", value=(
-        f"Hello {student_row[name_col]},<br><br>"
-        f"Here is the reference answer for your assignment <b>{assignment}</b>.<br><br>"
-        f"{ref_ans_email}"
-        "Thank you<br>Learn Language Education Academy"
-    ), key="tab7_body")
+    body = st.text_area(
+        "Message (HTML allowed)",
+        value=(
+            f"Hello {student_row[name_col]},<br><br>"
+            f"Here is the reference answer for your assignment <b>{assignment}</b>.<br><br>"
+            f"{ref_ans_email}"
+            "Thank you<br>Learn Language Education Academy"
+        ),
+        key="tab7_body"
+    )
     send_email = st.button("📧 Email Reference", key="tab7_send_email")
 
     if send_email:
@@ -1255,6 +1276,7 @@ with tabs[7]:
                 st.success(f"Reference sent to {to_email}!")
             except Exception as e:
                 st.error(f"Failed to send email: {e}")
+
 
     # --- WhatsApp Share Section ---
     st.subheader("7. Share Reference via WhatsApp")
@@ -1275,6 +1297,8 @@ with tabs[7]:
         f"Here is the reference answer for your assignment: *{assignment}*\n"
         f"{ref_ans_wa}"
         "Thank you!\n"
+        "Open my results and resources on the falowen app for scores and full comment. The reference answer has also been sent to your email."
+        "You can check spam or junk and mark our email as safe for future messages"
         "Learn Language Education Academy"
     )
     wa_message = st.text_area(
@@ -1305,6 +1329,8 @@ with tabs[7]:
         )
     else:
         st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
+
+#
 
 
 
