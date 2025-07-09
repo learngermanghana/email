@@ -1113,11 +1113,10 @@ with tabs[6]:
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
     
-import streamlit as st
-import pandas as pd
-import urllib.parse
+
 
 students_csv_url = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
+
 @st.cache_data(show_spinner=False)
 def load_students():
     df = pd.read_csv(students_csv_url)
@@ -1155,19 +1154,20 @@ with tabs[7]:
         st.stop()
 
     # --- Reference & Student Work input ---
-    st.subheader("3. Paste Reference Answers (to share with student)")
-    reference_text = st.text_area("Reference answers (model/expected answers)", height=120, key="tab7_ref_text")
+    st.subheader("3. Paste Reference Answer (to share with student)")
+    reference_text = st.text_area("Reference answer (model/expected answer)", height=120, key="tab7_ref_text")
 
     st.subheader("4. Paste Student Work (for your own review)")
     student_text = st.text_area("Student's submitted work", height=120, key="tab7_student_text")
 
     # --- Combined box for manual comparison ---
     st.markdown("#### 5. Copy Both (for AI/manual check outside this app)")
-    st.code(f"Reference Answer:\n{reference_text}\n\nStudent Work:\n{student_text}", language="text")
+    combined_box = f"Reference Answer:\n{reference_text}\n\nStudent Work:\n{student_text}"
+    st.code(combined_box, language="text")
 
     # --- WhatsApp & Email sharing: Only send reference! ---
     st.markdown("---")
-    st.markdown("### Share Reference Answers (not student work)")
+    st.markdown("### Share Reference Answer (not student work)")
 
     # WhatsApp
     wa_phone = ""
@@ -1226,10 +1226,7 @@ with tabs[7]:
             st.error("Please enter a valid recipient email address.")
         else:
             try:
-                send_email_report(b"", to_email, subject, body)  # Replace b"" with actual PDF if you ever attach
+                send_email_report(b"", to_email, subject, body)  # Replace b"" with PDF if attaching one
                 st.success(f"Reference sent to {to_email}!")
             except Exception as e:
                 st.error(f"Failed to send email: {e}")
-
-
-
