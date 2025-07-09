@@ -1117,34 +1117,21 @@ import streamlit as st
 import pandas as pd
 import urllib.parse
 
-# --- 1. URLS ---
 students_csv_url = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
-ref_answers_url = "https://docs.google.com/spreadsheets/d/1CtNlidMfmE836NBh5FmEF5tls9sLmMmkkhewMTQjkBo/export?format=csv"
+@st.cache_data(show_spinner=False)
+def load_students():
+    df = pd.read_csv(students_csv_url)
+    df.columns = [c.strip().lower().replace(" ", "").replace("_", "") for c in df.columns]
+    if "student_code" in df.columns:
+        df = df.rename(columns={"student_code": "studentcode"})
+    return df
+df_students = load_students()
 
 with tabs[7]:
-    st.title("📝 Assignment Reference & Feedback Sharing")
+    st.title("📝 Reference & Student Work Share")
 
-    # --- Load Data ---
-    @st.cache_data(show_spinner=False)
-    def load_students():
-        df = pd.read_csv(students_csv_url)
-        df.columns = [c.strip().lower().replace(" ", "").replace("_", "") for c in df.columns]
-        if "student_code" in df.columns:
-            df = df.rename(columns={"student_code": "studentcode"})
-        return df
-    df_students = load_students()
-
-    @st.cache_data(ttl=0)
-    def load_ref_answers():
-        df = pd.read_csv(ref_answers_url, dtype=str)
-        df.columns = [c.strip().lower().replace(" ", "").replace("_", "") for c in df.columns]
-        if "assignment" not in df.columns:
-            raise Exception("No 'assignment' column found in reference answers sheet.")
-        return df
-    ref_df = load_ref_answers()
-
-    # --- Student search and select ---
-    st.subheader("🔎 Search Student")
+    # --- Student select ---
+    st.subheader("1. Search & Select Student")
     name_col, code_col = "name", "studentcode"
     search_student = st.text_input("Type student name or code...")
     students_filtered = df_students[
@@ -1154,7 +1141,6 @@ with tabs[7]:
 
     student_list = students_filtered[name_col] + " (" + students_filtered[code_col].astype(str) + ")"
     chosen = st.selectbox("Select Student", student_list, key="tab7_single_student")
-
     if not chosen or "(" not in chosen:
         st.warning("No student selected or wrong student list format.")
         st.stop()
@@ -1162,74 +1148,28 @@ with tabs[7]:
     student_row = students_filtered[students_filtered[code_col] == student_code].iloc[0]
     st.markdown(f"**Selected:** {student_row[name_col]} ({student_code})")
 
-    # --- Assignment search and select ---
-    st.subheader("🔎 Search Assignment")
-    available_assignments = ref_df['assignment'].dropna().unique().tolist()
-    search_assign = st.text_input("Type assignment title...", key="tab7_search_assign")
-    filtered = [a for a in available_assignments if search_assign.lower() in str(a).lower()]
-    if not filtered:
-        st.info("No assignments match your search.")
+    # --- Assignment name ---
+    st.subheader("2. Assignment Title")
+    assignment = st.text_input("Enter assignment name/title:", key="tab7_assign_manual")
+    if not assignment:
         st.stop()
-    assignment = st.selectbox("Select Assignment", filtered, key="tab7_assign_select")
 
-    # --- REFERENCE ANSWERS (manual paste OR load from sheet) ---
-    st.markdown("#### Reference Answers")
-    # Option 1: Paste manually
-    manual_answers = st.text_area(
-        "Paste reference answers here (each answer on a new line):", value="", height=120
-    )
-    ref_answers = [a.strip() for a in manual_answers.split("\n") if a.strip()]
+    # --- Reference & Student Work input ---
+    st.subheader("3. Paste Reference Answers (to share with student)")
+    reference_text = st.text_area("Reference answers (model/expected answers)", height=120, key="tab7_ref_text")
 
-    # Option 2: Load from Google Sheet (optional, comment out if not wanted)
-    if st.checkbox("Or load reference answers from master sheet?"):
-        assignment_row = ref_df[ref_df['assignment'] == assignment]
-        answer_cols = [col for col in assignment_row.columns if col.startswith('answer')]
-        ref_answers_sheet = [str(assignment_row.iloc[0][col]) for col in answer_cols
-                             if pd.notnull(assignment_row.iloc[0][col]) and str(assignment_row.iloc[0][col]).strip() != '']
-        if ref_answers_sheet:
-            ref_answers = ref_answers_sheet
-            st.success("Loaded answers from sheet.")
-        else:
-            st.warning("No answers found in master sheet.")
+    st.subheader("4. Paste Student Work (for your own review)")
+    student_text = st.text_area("Student's submitted work", height=120, key="tab7_student_text")
 
-    # Display reference answers
-    if ref_answers:
-        st.markdown("##### Answers Preview")
-        for i, ans in enumerate(ref_answers, 1):
-            st.markdown(f"{i}. {ans}")
-        answers_combined_html = "<br>".join([f"{i}. {ans}" for i, ans in enumerate(ref_answers, 1)])
-        answers_combined_wa = "\n".join([f"{i}. {ans}" for i, ans in enumerate(ref_answers, 1)])
-    else:
-        answers_combined_html = "No answer available."
-        answers_combined_wa = "No answer available."
+    # --- Combined box for manual comparison ---
+    st.markdown("#### 5. Copy Both (for AI/manual check outside this app)")
+    st.code(f"Reference Answer:\n{reference_text}\n\nStudent Work:\n{student_text}", language="text")
 
-    # --- EMAIL SECTION ---
-    st.markdown("#### 📧 Send Reference to Student via Email")
-    default_email = student_row.get('email', '') if 'email' in student_row else ""
-    to_email = st.text_input("Recipient Email", value=default_email, key="tab7_email")
-    subject = st.text_input("Subject", value=f"{student_row[name_col]} - {assignment} Reference Answers", key="tab7_subject")
-    body = st.text_area("Message (HTML allowed)", value=(
-        f"Hello {student_row[name_col]},<br><br>"
-        f"Here are the reference answers for <b>{assignment}</b>.<br><br>"
-        f"<b>Reference Answers:</b><br>{answers_combined_html}<br><br>"
-        "Thank you<br>Learn Language Education Academy"
-    ), key="tab7_body")
-    send_email = st.button("📧 Email Reference Answers", key="tab7_send_email")
-
-    if send_email:
-        if not to_email or "@" not in to_email:
-            st.error("Please enter a valid recipient email address.")
-        else:
-            try:
-                # send_email_report(None, to_email, subject, body)  # Your email sending function here!
-                st.success(f"Reference sent to {to_email}!")
-            except Exception as e:
-                st.error(f"Failed to send email: {e}")
-
-    # --- WhatsApp Share Section ---
+    # --- WhatsApp & Email sharing: Only send reference! ---
     st.markdown("---")
-    st.subheader("📲 Share Reference Answers via WhatsApp")
+    st.markdown("### Share Reference Answers (not student work)")
 
+    # WhatsApp
     wa_phone = ""
     wa_cols = [c for c in student_row.index if "phone" in c]
     for c in wa_cols:
@@ -1239,17 +1179,12 @@ with tabs[7]:
             break
     wa_phone = st.text_input("WhatsApp Number (International format, e.g., 233245022743)", value=wa_phone, key="tab7_wa_number")
 
-    wa_msg = (
+    wa_message = (
         f"Hello {student_row[name_col]},\n\n"
-        f"Here are the reference answers for the assignment: *{assignment}*\n"
-        f"{answers_combined_wa}\n"
+        f"Here is the reference/model answer for your assignment: *{assignment}*\n\n"
+        f"{reference_text}\n\n"
         "Thank you!\nLearn Language Education Academy"
     )
-    wa_message = st.text_area(
-        "WhatsApp Message (edit before sending):",
-        value=wa_msg, height=200, key="tab7_wa_message_edit"
-    )
-
     wa_num_formatted = wa_phone.strip().replace(" ", "").replace("-", "")
     if wa_num_formatted.startswith("0"):
         wa_num_formatted = "233" + wa_num_formatted[1:]
@@ -1262,18 +1197,39 @@ with tabs[7]:
         f"https://wa.me/{wa_num_formatted}?text={urllib.parse.quote(wa_message)}"
         if wa_num_formatted.isdigit() and len(wa_num_formatted) >= 11 else None
     )
-
     if wa_link:
         st.markdown(
             f'<a href="{wa_link}" target="_blank">'
             f'<button style="background-color:#25d366;color:white;border:none;padding:10px 20px;border-radius:5px;font-size:16px;cursor:pointer;">'
-            '📲 Share on WhatsApp'
+            '📲 Share Reference on WhatsApp'
             '</button></a>',
             unsafe_allow_html=True
         )
     else:
         st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
 
+    # Email
+    st.markdown("#### 📧 Send Reference Answer by Email")
+    default_email = student_row.get('email', '') if 'email' in student_row else ""
+    to_email = st.text_input("Recipient Email", value=default_email, key="tab7_email")
+    subject = st.text_input("Subject", value=f"{student_row[name_col]} - {assignment} Reference Answer", key="tab7_subject")
+    body = st.text_area("Message (HTML allowed)", value=(
+        f"Hello {student_row[name_col]},<br><br>"
+        f"Attached is the reference/model answer for your assignment <b>{assignment}</b>.<br><br>"
+        f"{reference_text}<br><br>"
+        "Thank you<br>Learn Language Education Academy"
+    ), key="tab7_body")
+    send_email = st.button("📧 Email Reference Answer", key="tab7_send_email")
+
+    if send_email:
+        if not to_email or "@" not in to_email:
+            st.error("Please enter a valid recipient email address.")
+        else:
+            try:
+                send_email_report(b"", to_email, subject, body)  # Replace b"" with actual PDF if you ever attach
+                st.success(f"Reference sent to {to_email}!")
+            except Exception as e:
+                st.error(f"Failed to send email: {e}")
 
 
 
