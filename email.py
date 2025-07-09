@@ -17,6 +17,7 @@ import sqlite3
 import urllib.parse  
 
 
+openai.api_key = st.secrets["general"]["OPENAI_API_KEY"]
 
 # ==== 1.a. CSV & COLUMN HELPERS ====
 def safe_read_csv(local_path: str, remote_url: str) -> pd.DataFrame:
@@ -1119,8 +1120,7 @@ with tabs[6]:
                        mime="application/pdf")
     
 
-# --- OpenAI API key ---
-openai.api_key = st.secrets["openai"]["api_key"]
+
 
 # --- Google Sheet URLs (CSV export links) ---
 students_csv_url = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
