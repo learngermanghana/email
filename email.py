@@ -1123,6 +1123,7 @@ scores_csv_url = "https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9t
 ref_answers_url = "https://docs.google.com/spreadsheets/d/1CtNlidMfmE836NBh5FmEF5tls9sLmMmkkhewMTQjkBo/export?format=csv"
 df = pd.read_csv(ref_answers_url, dtype=str)
 
+
 with tabs[7]:
     st.title("📝 Assignment Marking & Scores")
 
@@ -1166,12 +1167,12 @@ with tabs[7]:
     ref_df = load_ref_answers()
 
     # --- Harmonize scores ---
-    for df in [df_sheet_scores, df_sqlite_scores]:
-        if "studentcode" not in df.columns:
-            if "student_code" in df.columns:
-                df["studentcode"] = df["student_code"]
-        if "level" not in df.columns:
-            df["level"] = None
+    for d in [df_sheet_scores, df_sqlite_scores]:
+        if "studentcode" not in d.columns:
+            if "student_code" in d.columns:
+                d["studentcode"] = d["student_code"]
+        if "level" not in d.columns:
+            d["level"] = None
 
     df_scores = pd.concat([df_sheet_scores, df_sqlite_scores], ignore_index=True)
     df_scores["date"] = pd.to_datetime(df_scores["date"], errors="coerce")
@@ -1369,7 +1370,7 @@ with tabs[7]:
     # Allow manual override or editing of phone number
     wa_phone = st.text_input("WhatsApp Number (International format, e.g., 233245022743)", value=wa_phone, key="tab7_wa_number")
 
-    # Prepare reference answers section, preserving original tab text/numbering
+    # Prepare reference answers for WhatsApp
     if ref_answers:
         ref_ans_wa = "*Reference Answers:*\n" + "\n".join(ref_answers) + "\n"
     else:
@@ -1407,7 +1408,30 @@ with tabs[7]:
 
     # Format WhatsApp number for wa.me link
     wa_num_formatted = wa_phone.strip().replace(" ", "").replace("-", "")
-    if wa_num_f
+    if wa_num_formatted.startswith("0"):
+        wa_num_formatted = "233" + wa_num_formatted[1:]
+    elif wa_num_formatted.startswith("+"):
+        wa_num_formatted = wa_num_formatted[1:]
+    elif not wa_num_formatted.startswith("233"):
+        wa_num_formatted = "233" + wa_num_formatted[-9:]  # fallback for local numbers
+
+    # Create WhatsApp link
+    wa_link = (
+        f"https://wa.me/{wa_num_formatted}?text={urllib.parse.quote(wa_message)}"
+        if wa_num_formatted.isdigit() and len(wa_num_formatted) >= 11 else None
+    )
+
+    # Show Share Button
+    if wa_link:
+        st.markdown(
+            f'<a href="{wa_link}" target="_blank">'
+            f'<button style="background-color:#25d366;color:white;border:none;padding:10px 20px;border-radius:5px;font-size:16px;cursor:pointer;">'
+            '📲 Share on WhatsApp'
+            '</button></a>',
+            unsafe_allow_html=True
+        )
+    else:
+        st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
 
 
 
