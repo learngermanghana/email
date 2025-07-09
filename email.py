@@ -1125,303 +1125,96 @@ df = pd.read_csv(ref_answers_url, dtype=str)
 
 
 with tabs[7]:
-    st.title("📝 Assignment Marking & Scores")
+    st.title("📝 Mark Student Work & Share Report")
 
-    # --- Load Data ---
-    @st.cache_data(show_spinner=False)
-    def load_students():
-        df = pd.read_csv(students_csv_url)
-        df.columns = [c.strip().lower().replace(" ", "").replace("_", "") for c in df.columns]
-        if "student_code" in df.columns:
-            df = df.rename(columns={"student_code": "studentcode"})
-        return df
-    df_students = load_students()
+    # 1. Enter basic student info
+    col1, col2 = st.columns(2)
+    with col1:
+        student_name = st.text_input("Student Name")
+        student_level = st.text_input("Level / Class")
+        assignment_title = st.text_input("Assignment Title")
+    with col2:
+        student_email = st.text_input("Student Email (optional)")
+        student_phone = st.text_input("WhatsApp Number (233...)", max_chars=15)
 
-    @st.cache_data(ttl=0)
-    def load_sheet_scores():
-        df = pd.read_csv(scores_csv_url)
-        df.columns = [c.strip().lower().replace(" ", "").replace("_", "") for c in df.columns]
-        if "student_code" in df.columns:
-            df = df.rename(columns={"student_code": "studentcode"})
-        if "level" not in df.columns:
-            df["level"] = None
-        return df
+    # 2. Paste student work
+    st.subheader("Paste Student Work Here:")
+    student_work = st.text_area("Student's Answer", height=200)
 
-    @st.cache_data(ttl=0)
-    def fetch_sqlite_scores():
-        conn = init_sqlite_connection()
-        df = pd.read_sql("SELECT studentcode,assignment,score,comments,date,level FROM scores", conn)
-        df.columns = [c.lower() for c in df.columns]
-        return df
-
-    @st.cache_data(ttl=0)
-    def load_ref_answers():
-        df = pd.read_csv(ref_answers_url, dtype=str)
-        df.columns = [c.strip().lower().replace(" ", "").replace("_", "") for c in df.columns]
-        if "assignment" not in df.columns:
-            raise Exception("No 'assignment' column found in reference answers sheet.")
-        return df
-
-    df_sheet_scores = load_sheet_scores()
-    df_sqlite_scores = fetch_sqlite_scores()
-    ref_df = load_ref_answers()
-
-    # --- Harmonize scores ---
-    for d in [df_sheet_scores, df_sqlite_scores]:
-        if "studentcode" not in d.columns:
-            if "student_code" in d.columns:
-                d["studentcode"] = d["student_code"]
-        if "level" not in d.columns:
-            d["level"] = None
-
-    df_scores = pd.concat([df_sheet_scores, df_sqlite_scores], ignore_index=True)
-    df_scores["date"] = pd.to_datetime(df_scores["date"], errors="coerce")
-    df_scores = df_scores.sort_values("date").drop_duplicates(["studentcode", "assignment"], keep="last")
-    df_scores = df_scores.reset_index(drop=True)
-
-    # --- Merge NAME and LEVEL ---
-    df_scores_with_name = df_scores.merge(
-        df_students[["studentcode", "name", "level"]],
-        on="studentcode", how="left", suffixes=("", "_student")
-    )
-    if "name_student" in df_scores_with_name.columns:
-        df_scores_with_name["name"] = df_scores_with_name["name"].combine_first(df_scores_with_name["name_student"])
-        df_scores_with_name = df_scores_with_name.drop(columns=["name_student"])
-    if "name" in df_sheet_scores.columns:
-        df_scores_with_name = df_scores_with_name.merge(
-            df_sheet_scores[["studentcode", "assignment", "name"]],
-            on=["studentcode", "assignment"], how="left", suffixes=("", "_sheet")
-        )
-        df_scores_with_name["name"] = df_scores_with_name["name"].combine_first(df_scores_with_name["name_sheet"])
-        if "name_sheet" in df_scores_with_name.columns:
-            df_scores_with_name = df_scores_with_name.drop(columns=["name_sheet"])
-
-    wanted_cols = ['studentcode', 'name', 'assignment', 'score', 'comments', 'date', 'level']
-    for c in wanted_cols:
-        if c not in df_scores_with_name.columns:
-            df_scores_with_name[c] = ""
-    df_scores_with_name = df_scores_with_name[wanted_cols]
-
-    st.markdown("#### 📚 All Score History (Sheet + App)")
-    st.dataframe(df_scores_with_name, use_container_width=True)
-    st.download_button(
-        "⬇️ Download All Scores as CSV (with Name & Level)",
-        data=df_scores_with_name.to_csv(index=False),
-        file_name="all_scores_with_name_level.csv",
-        key="tab7_download_scores"
-    )
-
-    # --- Student search and select ---
-    st.subheader("🔎 Search Student")
-    def col_lookup(df, name):
-        key = name.lower().replace(" ", "").replace("_", "")
-        for c in df.columns:
-            if c.lower().replace(" ", "").replace("_", "") == key:
-                return c
-        raise KeyError(f"Column '{name}' not found in DataFrame")
-
-    name_col, code_col = col_lookup(df_students, "name"), col_lookup(df_students, "studentcode")
-    search_student = st.text_input("Type student name or code...")
-    students_filtered = df_students[
-        df_students[name_col].str.contains(search_student, case=False, na=False) |
-        df_students[code_col].astype(str).str.contains(search_student, case=False, na=False)
-    ] if search_student else df_students
-
-    student_list = students_filtered[name_col] + " (" + students_filtered[code_col].astype(str) + ")"
-    chosen = st.selectbox("Select Student", student_list, key="tab7_single_student")
-
-    if not chosen or "(" not in chosen:
-        st.warning("No student selected or wrong student list format.")
-        st.stop()
-    student_code = chosen.split("(")[-1].replace(")", "").strip()
-    student_row = students_filtered[students_filtered[code_col] == student_code].iloc[0]
-    st.markdown(f"**Selected:** {student_row[name_col]} ({student_code})")
-    student_level = student_row['level'] if 'level' in student_row else ""
-
-    # --- Assignment search and select ---
-    st.subheader("🔎 Search Assignment")
-    available_assignments = ref_df['assignment'].dropna().unique().tolist()
-    search_assign = st.text_input("Type assignment title...", key="tab7_search_assign")
-    filtered = [a for a in available_assignments if search_assign.lower() in str(a).lower()]
-    if not filtered:
-        st.info("No assignments match your search.")
-        st.stop()
-    assignment = st.selectbox("Select Assignment", filtered, key="tab7_assign_select")
-
-    # --- REFERENCE ANSWERS (DYNAMIC TABS + SINGLE COMBINED BOX) ---
-    ref_answers = []
-    answer_cols = []
-    if assignment:
-        assignment_row = ref_df[ref_df['assignment'] == assignment]
-        if not assignment_row.empty:
-            answer_cols = [col for col in assignment_row.columns if col.startswith('answer')]
-            answer_cols = [col for col in answer_cols if pd.notnull(assignment_row.iloc[0][col]) and str(assignment_row.iloc[0][col]).strip() != '']
-            ref_answers = [str(assignment_row.iloc[0][col]) for col in answer_cols]
-
-    # -- SHOW DYNAMIC TABS IF MULTIPLE ANSWERS, ELSE SINGLE BOX --
-    if ref_answers:
-        if len(ref_answers) == 1:
-            st.markdown("**Reference Answer:**")
-            st.write(ref_answers[0])
-        else:
-            tab_objs = st.tabs([f"Answer {i+1}" for i in range(len(ref_answers))])
-            for i, ans in enumerate(ref_answers):
-                with tab_objs[i]:
-                    st.write(ans)
-
-        # For WhatsApp/Email/PDF, combine all into one clean box:
-        answers_combined_str = "\n".join([f"{i+1}. {ans}" for i, ans in enumerate(ref_answers)])
-        answers_combined_html = "<br>".join([f"{i+1}. {ans}" for i, ans in enumerate(ref_answers)])
+    # 3. Reference answer(s)
+    st.subheader("Paste Reference Answer(s):")
+    ref_mode = st.radio("Reference Mode", ["Single Answer", "Multiple Answers (Tabs)"], horizontal=True)
+    if ref_mode == "Single Answer":
+        ref_answers = [st.text_area("Reference Answer", height=100)]
     else:
-        answers_combined_str = "No answer available."
-        answers_combined_html = "No answer available."
+        n_refs = st.number_input("How many reference answers?", 2, 5, 2)
+        ref_answers = []
+        ref_tabs = st.tabs([f"Ref {i+1}" for i in range(int(n_refs))])
+        for i in range(int(n_refs)):
+            with ref_tabs[i]:
+                ref_answers.append(st.text_area(f"Reference Answer {i+1}", key=f"ref_answer_{i}"))
 
-    # --- Score entry form ---
-    prev = df_scores[
-        (df_scores['studentcode'] == student_code) &
-        (df_scores['assignment'] == assignment)
-    ]
-    default_score = int(prev['score'].iloc[0]) if not prev.empty else 0
-    default_comment = prev['comments'].iloc[0] if not prev.empty else ""
+    # 4. Comparison / quick check
+    st.subheader("Comparison")
+    import difflib
 
-    with st.form(f"form_tab7_{student_code}_{assignment}"):
-        score = st.number_input("Score (0–100)", 0, 100, default_score, key=f"tab7_score_{student_code}_{assignment}")
-        comment = st.text_area("Comments", value=default_comment, key=f"tab7_comment_{student_code}_{assignment}")
-        submitted = st.form_submit_button("Save Score")
+    if student_work.strip() and any(ans.strip() for ans in ref_answers):
+        matcher = difflib.SequenceMatcher(None, student_work.strip(), ref_answers[0].strip())
+        ratio = matcher.ratio()
+        st.markdown(f"**Similarity to Reference:** {round(ratio*100, 1)}%")
+        # Show a simple diff
+        diff = difflib.ndiff(student_work.splitlines(), ref_answers[0].splitlines())
+        st.code('\n'.join(diff), language="diff")
+    else:
+        st.info("Paste both the student's answer and at least one reference answer to compare.")
 
-    if submitted:
-        save_score_to_sqlite({
-            'studentcode': student_code,
-            'assignment': assignment,
-            'score': float(score),
-            'comments': comment,
-            'date': datetime.now().strftime("%Y-%m-%d"),
-            'level': student_row.get('level', '')
-        })
-        st.success("Score saved! Refreshing...")
-        st.rerun()
+    # 5. Mark and comment
+    st.subheader("Mark and Feedback")
+    score = st.number_input("Score (0–100)", 0, 100, 0)
+    comment = st.text_area("Feedback / Comments")
 
-    # --- Show Score History for this student ---
-    student_history = df_scores[df_scores['studentcode'] == student_code].sort_values('date', ascending=False)
-    st.markdown(f"### 📋 Score History for {student_row[name_col]} (Level: {student_level})")
-    st.dataframe(student_history[['assignment', 'score', 'comments', 'date', 'level']], use_container_width=True)
+    # 6. Prepare report preview
+    st.subheader("Report Preview")
+    ref_html = "<br>".join([f"{i+1}. {ans}" for i, ans in enumerate(ref_answers) if ans.strip()])
+    report_html = f"""
+    <b>Student:</b> {student_name}<br>
+    <b>Level:</b> {student_level}<br>
+    <b>Assignment:</b> {assignment_title}<br>
+    <b>Score:</b> {score}<br>
+    <b>Comments:</b> {comment}<br><br>
+    <b>Student Work:</b><br>{student_work.replace('\n', '<br>')}<br><br>
+    <b>Reference Answer(s):</b><br>{ref_html}
+    """
+    st.markdown(report_html, unsafe_allow_html=True)
 
-    # --- PDF GENERATION & DOWNLOAD BUTTON ---
-    pdf_bytes = generate_pdf_report(
-        name=student_row[name_col],
-        level=student_row.get('level', ''),
-        history=student_history,
-        assignment=assignment,
-        score_name=assignment,
-        tutor_name="Mr. Felix Asadu",
-        school_name="Learn Language Education Academy",
-        footer_text=f"Reference Answers:<br>{answers_combined_html}<br>Thank you! Contact your tutor if you have any questions."
-    )
-    pdf_filename = f"{student_row[name_col].replace(' ', '_')}_{assignment.replace(' ', '_')}_report.pdf"
-    st.download_button(
-        "Download Report PDF",
-        data=pdf_bytes,
-        file_name=pdf_filename,
-        mime="application/pdf",
-        key=f"tab7_pdf_{student_code}_{assignment}"
-    )
-
-    # --- EMAIL SECTION ---
-    st.markdown("#### 📧 Send Report to Student via Email")
-    default_email = student_row.get('email', '') if 'email' in student_row else ""
-    to_email = st.text_input("Recipient Email", value=default_email, key="tab7_email")
-    subject = st.text_input("Subject", value=f"{student_row[name_col]} - {assignment} Report", key="tab7_subject")
-
-    ref_ans_email = f"<b>Reference Answers:</b><br>{answers_combined_html}<br>"
-
-    body = st.text_area("Message (HTML allowed)", value=(
-        f"Hello {student_row[name_col]},<br><br>"
-        f"Attached is your report for the assignment <b>{assignment}</b>.<br><br>"
-        f"{ref_ans_email}"
-        "Thank you<br>Learn Language Education Academy"
-    ), key="tab7_body")
-    send_email = st.button("📧 Email Report PDF", key="tab7_send_email")
-
-    if send_email:
-        if not to_email or "@" not in to_email:
-            st.error("Please enter a valid recipient email address.")
-        else:
-            try:
-                send_email_report(pdf_bytes, to_email, subject, body)
-                st.success(f"Report sent to {to_email}!")
-            except Exception as e:
-                st.error(f"Failed to send email: {e}")
-
-    # --- WhatsApp Share Section ---
+    # 7. WhatsApp/Email share
     import urllib.parse
 
-    st.markdown("---")
-    st.subheader("📲 Share Report via WhatsApp")
+    # WhatsApp
+    wa_message = f"""Hello {student_name},
 
-    # Try to get student's phone automatically from any relevant column
-    wa_phone = ""
-    wa_cols = [c for c in student_row.index if "phone" in c]
-    for c in wa_cols:
-        v = str(student_row[c])
-        if v.startswith("233") or v.startswith("0") or v.isdigit():
-            wa_phone = v
-            break
+Here is your marked assignment: {assignment_title}
+Score: {score}
+Comments: {comment}
 
-    # Allow manual override or editing of phone number
-    wa_phone = st.text_input("WhatsApp Number (International format, e.g., 233245022743)", value=wa_phone, key="tab7_wa_number")
+Student Work:
+{student_work}
 
-    # Prepare reference answers for WhatsApp
-    if ref_answers:
-        ref_ans_wa = "*Reference Answers:*\n" + "\n".join(ref_answers) + "\n"
-    else:
-        ref_ans_wa = ""
-
-    # WhatsApp message
-    this_score = ""
-    this_comment = ""
-    score_row = df_scores_with_name[
-        (df_scores_with_name['studentcode'] == student_code) &
-        (df_scores_with_name['assignment'] == assignment)
-    ]
-    if not score_row.empty:
-        this_score = str(score_row.iloc[0]['score'])
-        this_comment = str(score_row.iloc[0]['comments'])
-
-    wa_score_line = f"Score: *{this_score}*" if this_score else ""
-    wa_comment_line = f"Comments: {this_comment}" if this_comment else ""
-
-    default_wa_msg = (
-        f"Hello {student_row[name_col]},\n\n"
-        f"Here is your report for the assignment: *{assignment}*\n"
-        f"{wa_score_line}\n"
-        f"{wa_comment_line}\n"
-        f"{ref_ans_wa}"
-        "Check your full results and other feedback in the Falowen app.\n\n"
-        "You can also get the pdf in your email. Mostly at spam or junk. You can mark our email as safe for it to always be in inbox.\n"
-        "Don't forget to click the refresh button at 'My Results' for the latest score.\n"
-        "Thank you!\n"
-    )
-    wa_message = st.text_area(
-        "WhatsApp Message (edit before sending):",
-        value=default_wa_msg, height=200, key="tab7_wa_message_edit"
-    )
-
-    # Format WhatsApp number for wa.me link
-    wa_num_formatted = wa_phone.strip().replace(" ", "").replace("-", "")
-    if wa_num_formatted.startswith("0"):
-        wa_num_formatted = "233" + wa_num_formatted[1:]
-    elif wa_num_formatted.startswith("+"):
-        wa_num_formatted = wa_num_formatted[1:]
-    elif not wa_num_formatted.startswith("233"):
-        wa_num_formatted = "233" + wa_num_formatted[-9:]  # fallback for local numbers
-
-    # Create WhatsApp link
+Reference Answer(s):
+{ref_html.replace('<br>', '\n')}
+    """
+    wa_num = student_phone.strip().replace(" ", "").replace("-", "")
+    if wa_num.startswith("0"):
+        wa_num = "233" + wa_num[1:]
+    elif wa_num.startswith("+"):
+        wa_num = wa_num[1:]
+    elif not wa_num.startswith("233") and wa_num.isdigit():
+        wa_num = "233" + wa_num[-9:]
     wa_link = (
-        f"https://wa.me/{wa_num_formatted}?text={urllib.parse.quote(wa_message)}"
-        if wa_num_formatted.isdigit() and len(wa_num_formatted) >= 11 else None
+        f"https://wa.me/{wa_num}?text={urllib.parse.quote(wa_message)}"
+        if wa_num.isdigit() and len(wa_num) >= 11 else None
     )
 
-    # Show Share Button
     if wa_link:
         st.markdown(
             f'<a href="{wa_link}" target="_blank">'
@@ -1431,8 +1224,15 @@ with tabs[7]:
             unsafe_allow_html=True
         )
     else:
-        st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
+        st.info("Enter a valid WhatsApp number (233XXXXXXXXX) to enable WhatsApp sharing.")
 
+    # Email
+    st.markdown("#### 📧 Email Report (copy content below)")
+    email_subject = f"{student_name} - {assignment_title} Marked Report"
+    email_body = report_html
+    st.text_input("Subject", value=email_subject, key="simple_email_subject")
+    st.text_area("Email Body (HTML, copy & paste)", value=report_html, height=200, key="simple_email_body")
 
+    st.success("Paste student work and reference, then mark, compare, and share instantly!")
 
 
