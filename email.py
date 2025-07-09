@@ -17,7 +17,10 @@ import sqlite3
 import urllib.parse  
 
 
-openai.api_key = st.secrets["general"]["OPENAI_API_KEY"]
+sendgrid_key = st.secrets["general"]["sendgrid_api_key"]
+sender_email = st.secrets["general"]["sender_email"]
+openai.api_key = st.secrets["general"]["openai_api_key"]
+
 
 # ==== 1.a. CSV & COLUMN HELPERS ====
 def safe_read_csv(local_path: str, remote_url: str) -> pd.DataFrame:
