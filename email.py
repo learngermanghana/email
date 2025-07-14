@@ -908,10 +908,9 @@ with tabs[5]:
                 else:
                     results_table = ""
 
-                # Always provide start_date as an empty string for format()
                 try:
                     msg = Mail(
-                        from_email=sender_email,
+                        from_email=school_sender_email,  # USE GLOBAL VAR
                         to_emails=addr,
                         subject=email_subject,
                         html_content=email_body.format(
@@ -921,7 +920,7 @@ with tabs[5]:
                             start_date=""
                         )
                     )
-                    # attach if present
+                    # Attach if present
                     if attachment_file:
                         data = attachment_file.read()
                         enc  = base64.b64encode(data).decode()
@@ -934,7 +933,7 @@ with tabs[5]:
                         )
                         msg.attachment = attach
 
-                    sg = SendGridAPIClient(sendgrid_key)
+                    sg = SendGridAPIClient(school_sendgrid_key)  # USE GLOBAL VAR
                     sg.send(msg)
                     successes.append(addr)
                 except Exception as e:
