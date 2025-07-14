@@ -7,6 +7,7 @@ from datetime import datetime, date, timedelta
 import pandas as pd
 import streamlit as st
 from fpdf import FPDF
+import urllib.parse
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
 
