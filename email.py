@@ -778,7 +778,7 @@ with tabs[4]:
             st.success("✅ PDF generated and ready to download.")
 
 
-])[5]:
+with tabs[5]:
     st.title("📧 Send Email / Letter (Templates, Attachments, PDF, Watermark, QR)")
 
     # 1. Student Selection
