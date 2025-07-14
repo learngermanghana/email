@@ -772,32 +772,40 @@ with tabs[4]:
                 mime="application/pdf"
             )
             st.success("✅ PDF generated and ready to download.")
-
+            
 
 with tabs[5]:
     st.title("📧 Send Email / Letter (Templates, Attachments, PDF, Watermark, QR)")
 
-    # 1. Student Selection
+    # 1. Student Selection with Search
     st.subheader("Select Student")
-    # --- Add search bar here ---
     search_val = st.text_input(
         "Search students by name, code, or email", 
         value="", key="student_search"
     )
-    # Filter the DataFrame based on search input
+
+    # --- Robust column checks for missing columns ---
+    code_col = "studentcode" if "studentcode" in df_students.columns else df_students.columns[df_students.columns.str.contains("code", case=False, na=False)].tolist()[0] if any(df_students.columns.str.contains("code", case=False, na=False)) else None
+    email_col = "email" if "email" in df_students.columns else df_students.columns[df_students.columns.str.contains("email", case=False, na=False)].tolist()[0] if any(df_students.columns.str.contains("email", case=False, na=False)) else None
+
     if search_val:
         filtered_students = df_students[
             df_students["name"].str.contains(search_val, case=False, na=False)
-            | df_students.get("studentcode", pd.Series(dtype=str)).astype(str).str.contains(search_val, case=False, na=False)
-            | df_students.get("email", pd.Series(dtype=str)).astype(str).str.contains(search_val, case=False, na=False)
+            | (df_students[code_col].astype(str).str.contains(search_val, case=False, na=False) if code_col else False)
+            | (df_students[email_col].astype(str).str.contains(search_val, case=False, na=False) if email_col else False)
         ]
     else:
         filtered_students = df_students
 
     student_names = filtered_students["name"].dropna().unique().tolist()
+    if not student_names:
+        st.warning("No students match your search. Please try again.")
+        st.stop()
+
     student_name = st.selectbox("Student Name", student_names)
     if not student_name:
         st.stop()
+
     # Use the filtered DataFrame to find the selected row
     student_row = filtered_students[filtered_students["name"] == student_name].iloc[0]
     student_level = student_row["level"]
@@ -807,7 +815,6 @@ with tabs[5]:
     payment = float(student_row.get("paid", 0))
     balance = float(student_row.get("balance", 0))
     payment_status = "Full Payment" if balance == 0 else "Installment Plan"
-
 
     # 2. Message Type Selection
     st.subheader("Choose Message Type")
@@ -826,6 +833,9 @@ with tabs[5]:
 
     # 4. Compose Body
     st.subheader("Compose/Preview Message")
+    student_code = student_row.get("studentcode", "")
+    student_link = f"https://falowen.streamlit.app/?code={student_code}" if student_code else "https://falowen.streamlit.app/"
+
     if msg_type == "Welcome Message":
         body_default = (
             f"Hello {student_name},<br><br>"
@@ -833,9 +843,8 @@ with tabs[5]:
             f"<b>Your contract starts on {enrollment_start.strftime('%d %B %Y')}.</b> "
             f"You can join your <b>{student_level}</b> class in person or online (Zoom link will be shared before class).<br><br>"
             f"<b>Your payment status: {payment_status}.</b> Paid: GHS {payment:.2f} / Balance: GHS {balance:.2f}<br><br>"
-            f"All your course materials and assignments are on our <a href='https://falowen.streamlit.app/'>Falowen App</a>.<br><br>"
+            f"All your course materials and assignments are on our <a href='{student_link}'>Falowen App</a>.<br><br>"
             f"We wish you a great start and look forward to your progress!<br><br>"
-            f"Best regards,<br>Felix Asadu<br>Learn Language Education Academy"
         )
     elif msg_type == "Letter of Enrollment":
         body_default = (
@@ -859,9 +868,31 @@ with tabs[5]:
 
     email_subject = st.text_input("Subject", value=f"{msg_type} - {student_name}")
     email_body = st.text_area("Email Body (HTML supported)", value=body_default, height=220)
-
     # 5. Generate PDF Button (and preview)
     st.subheader("PDF Preview & Download")
+
+    import tempfile
+    import re
+
+    def safe_pdf(text):
+        """Remove non-latin-1 characters for PDF output."""
+        if not text:
+            return ""
+        return text.encode("latin-1", "replace").decode("latin-1")
+
+    def make_qr_code(link):
+        """Generate a QR code image file for embedding in FPDF."""
+        import qrcode
+        qr = qrcode.QRCode(
+            version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=4, border=1
+        )
+        qr.add_data(link)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        img.save(tmp, "PNG")
+        tmp.close()
+        return tmp.name
 
     class LetterPDF(FPDF):
         def header(self):
@@ -894,7 +925,7 @@ with tabs[5]:
                 watermark_tmp.close()
                 # Faint watermark in the center (width=110mm)
                 self.image(watermark_tmp.name, x=48, y=75, w=110)
-        
+
         def footer(self):
             # QR Code
             qr_tmp = make_qr_code(SCHOOL_WEBSITE)
@@ -909,17 +940,18 @@ with tabs[5]:
     pdf.watermark()
     pdf.set_font("Arial", size=12)
     # Insert body (convert <br> to \n)
-    import re
     pdf.multi_cell(0, 8, safe_pdf(re.sub(r"<br\s*/?>", "\n", email_body)), align="L")
     pdf.ln(6)
-    pdf.set_font("Arial", size=11)
-    pdf.cell(0, 8, f"{TUTOR_NAME}", ln=True)
-    pdf.cell(0, 7, f"{TUTOR_TITLE}", ln=True)
-    pdf.cell(0, 7, f"{SCHOOL_NAME}", ln=True)
+    # (No need to add extra signature block here since it's in email_body already)
     pdf_bytes = pdf.output(dest="S").encode("latin-1", "replace")
 
     # PDF download
-    st.download_button("📄 Download Letter/PDF", data=pdf_bytes, file_name=f"{student_name.replace(' ', '_')}_{msg_type.replace(' ','_')}.pdf", mime="application/pdf")
+    st.download_button(
+        "📄 Download Letter/PDF",
+        data=pdf_bytes,
+        file_name=f"{student_name.replace(' ', '_')}_{msg_type.replace(' ','_')}.pdf",
+        mime="application/pdf"
+    )
     st.caption("You can share this PDF on WhatsApp or by email.")
 
     # 6. Email Option
@@ -927,9 +959,6 @@ with tabs[5]:
     send_email = st.checkbox("Attach the generated PDF?")
     recipient_email = st.text_input("Recipient Email", value=student_email)
     if st.button("Send Email Now"):
-        from sendgrid import SendGridAPIClient
-        from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
-
         msg = Mail(
             from_email=SENDER_EMAIL,
             to_emails=recipient_email,
@@ -962,7 +991,6 @@ with tabs[5]:
         except Exception as e:
             st.error(f"Email send failed: {e}")
 
-# --- END OF TAB ---
 
 
 
