@@ -847,6 +847,7 @@ with tabs[5]:
         body_default = (
             f"Hello {student_name},<br><br>"
             f"Welcome to Learn Language Education Academy! We have helped many students succeed, and we’re excited to support you as well.<br><br>"
+            f"We have attached your letter of enrollment in this document<br><br>"
             f"<b>Your contract starts on {enrollment_start.strftime('%d %B %Y')}.</b> "
             f"You can join your <b>{student_level}</b> class in person or online (Zoom link will be shared before class).<br><br>"
             f"<b>Your payment status: {payment_status}.</b> Paid: GHS {payment:.2f} / Balance: GHS {balance:.2f}<br><br>"
