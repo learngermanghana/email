@@ -747,20 +747,102 @@ with tabs[5]:
 
     import tempfile, base64
     from fpdf import FPDF
+    import pandas as pd
 
-    # Student selection (auto-fill details, as before)
-    # ... (student picker code here) ...
+    def safe_pdf(text):
+        return "".join(c if ord(c) < 256 else "?" for c in str(text))
 
-    # --- Uploads ---
-    st.subheader("Upload Logo, Watermark, and Extra Attachments")
-    logo_file = st.file_uploader("Upload Logo for PDF Header (optional)", type=["jpg", "png"], key="logo")
-    watermark_file = st.file_uploader("Upload Watermark for PDF (optional)", type=["jpg", "png"], key="watermark")
-    extra_files = st.file_uploader("Attach Additional Documents to Email (any type, optional)", type=None, key="extra_files", accept_multiple_files=True)
+    # === 1. Load students ===
+    students_csv_url = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
+    df_students = pd.read_csv(students_csv_url, dtype=str)
+    df_students.columns = [c.strip().lower().replace(" ", "_") for c in df_students.columns]
 
-    # --- Message/PDF Setup ---
-    # (Your message selection, compose, preview, etc...)
+    st.subheader("1️⃣ Select Student")
+    search_name = st.text_input("Search student by name/code/email")
+    filtered = df_students
+    if search_name:
+        filtered = df_students[
+            df_students['name'].str.contains(search_name, case=False, na=False) |
+            df_students['studentcode'].astype(str).str.contains(search_name, case=False, na=False) |
+            df_students['email'].astype(str).str.contains(search_name, case=False, na=False)
+        ]
+    student_options = [f"{r['name']} ({r['studentcode']})" for _, r in filtered.iterrows()]
+    pick = st.selectbox("Choose student", student_options)
+    sel_row = filtered[filtered['name'] == pick.split(" (")[0]].iloc[0]
+    name = sel_row['name']
+    studentcode = sel_row['studentcode']
+    email = sel_row.get('email','')
+    course = sel_row.get('level','')
+    contract_start = sel_row.get('contractstart', '')
+    contract_end = sel_row.get('contractend', '')
+    paid = sel_row.get('paid', '')
+    balance = sel_row.get('balance', '')
+    phone = sel_row.get('phone', '')
 
-    # --- Generate PDF (if needed) ---
+    st.subheader("2️⃣ Choose Message Template")
+    template_opts = [
+        "Letter of Enrollment",
+        "Welcome Message",
+        "Assignment Results",
+        "Custom Message"
+    ]
+    choice = st.selectbox("Template", template_opts)
+
+    st.subheader("3️⃣ Upload Logo, Watermark, Attachments")
+    logo_file = st.file_uploader("Logo for PDF header (optional)", type=["jpg", "png"], key="logo")
+    watermark_file = st.file_uploader("PDF Watermark (faded, optional)", type=["jpg", "png"], key="watermark")
+    extra_files = st.file_uploader("Extra attachments (email only, any file type)", type=None, key="extras", accept_multiple_files=True)
+
+    st.subheader("4️⃣ Message Preview & Edit")
+
+    # === Compose template ===
+    subject, html_body, pdf_body = "", "", ""
+    if choice == "Letter of Enrollment":
+        subject = f"Letter of Enrollment for {name}"
+        reg_number = "BN173410224"
+        pdf_body = (
+            f"To Whom It May Concern,\n\n"
+            f"This is to certify that {name} is officially enrolled in the {course} programme at Learn Language Education Academy.\n"
+            f"Enrollment valid from {contract_start} to {contract_end}.\n\n"
+            f"Our institution is officially registered with Business Registration Number {reg_number}, in accordance with the Registration of Business Names Act, 1962 (No.151).\n\n"
+            f"If you require further confirmation, please contact us.\n\n"
+            f"Yours sincerely,\n\nFelix Asadu\nDirector\nLearn Language Education Academy"
+        )
+        html_body = pdf_body.replace("\n", "<br>")
+    elif choice == "Welcome Message":
+        subject = f"Welcome to Learn Language Education Academy!"
+        pay_status = "fully paid" if (str(balance).strip() in ["", "0", "0.0"]) else f"installment plan (outstanding: GHS {balance})"
+        pdf_body = (
+            f"Dear {name},\n\n"
+            f"Welcome to Learn Language Education Academy! We're excited to have you.\n\n"
+            f"Your contract starts on {contract_start}.\n"
+            f"Enrolled class: {course}\n"
+            f"Payment status: {pay_status}.\n\n"
+            f"Your course material and assignments are available on our Falowen App (https://falowen.streamlit.app/).\n\n"
+            f"Best regards,\nFelix Asadu\nLearn Language Education Academy"
+        )
+        html_body = pdf_body.replace("\n", "<br>")
+    elif choice == "Assignment Results":
+        subject = f"Your Assignment Results"
+        # TODO: Pull assignments/results from another sheet if desired
+        results = "[Insert assignment results table here]"
+        pdf_body = (
+            f"Dear {name},\n\nHere are your latest assignment results:\n{results}\n\n"
+            f"Best regards,\nLearn Language Education Academy"
+        )
+        html_body = pdf_body.replace("\n", "<br>")
+    else:
+        subject = st.text_input("Subject", value=f"Message from Learn Language Education Academy")
+        html_body = st.text_area("Email Body (HTML)", value=f"Dear {name},<br><br>[Your message here]<br><br>Best regards,<br>Learn Language Education Academy", height=200)
+        pdf_body = html_body.replace("<br>", "\n").replace("<br/>", "\n")
+
+    # === Preview ===
+    st.markdown("#### Email Preview")
+    st.markdown(html_body, unsafe_allow_html=True)
+
+    # === PDF Generation ===
+    st.markdown("---\n#### PDF Preview & Download")
+
     class LetterPDF(FPDF):
         def header(self):
             if logo_file:
@@ -768,65 +850,76 @@ with tabs[5]:
                 tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f'.{ext}')
                 tmp.write(logo_file.read())
                 tmp.close()
-                self.image(tmp.name, x=10, y=8, w=40)
+                self.image(tmp.name, x=10, y=8, w=38)
             self.set_font('Arial', 'B', 15)
-            self.cell(0, 10, "Your School Name", ln=True, align='C')
-            self.ln(5)
-        def footer(self):
-            self.set_y(-15)
-            self.set_font('Arial', 'I', 8)
-            self.cell(0, 10, "This letter was computer generated.", 0, 0, 'C')
+            self.cell(0, 10, safe_pdf("Learn Language Education Academy"), ln=True, align='C')
+            self.set_font('Arial', '', 11)
+            self.cell(0, 7, safe_pdf("www.learngermanghana.com | 0205706589 | Accra, Ghana"), ln=True, align='C')
+            self.set_font('Arial', 'I', 10)
+            self.cell(0, 7, safe_pdf("Business Registration Number: BN173410224"), ln=True, align='C')
+            self.ln(6)
         def watermark(self):
             if watermark_file:
                 ext = watermark_file.name.split('.')[-1]
                 tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f'.{ext}')
                 tmp.write(watermark_file.read())
                 tmp.close()
-                # Place faded image; for real watermarking you'd need to lower opacity, but FPDF can't, so just make the image faint manually before upload.
-                self.image(tmp.name, x=40, y=80, w=120)
-    # Create PDF, add watermark after add_page
+                # Place in the center of the page; opacity must be handled before upload
+                self.image(tmp.name, x=40, y=60, w=120)
+        def footer(self):
+            self.set_y(-15)
+            self.set_font('Arial', 'I', 8)
+            self.cell(0, 10, safe_pdf("Computer generated, valid without signature."), 0, 0, 'C')
+
     pdf = LetterPDF()
     pdf.add_page()
     pdf.watermark()
     pdf.set_font('Arial', '', 12)
-    pdf.multi_cell(0, 10, "Your PDF content goes here...")
+    for line in pdf_body.split('\n'):
+        pdf.multi_cell(0, 8, safe_pdf(line))
     pdf_bytes = pdf.output(dest='S').encode('latin-1', 'replace')
 
-    st.download_button("Download PDF", data=pdf_bytes, file_name="document.pdf", mime="application/pdf")
+    st.download_button(
+        "⬇️ Download as PDF",
+        data=pdf_bytes,
+        file_name=f"{choice.replace(' ', '_')}_{name.replace(' ','_')}.pdf",
+        mime="application/pdf"
+    )
 
-    # --- Email section ---
-    email_to = st.text_input("Recipient Email")
-    subject = st.text_input("Subject")
-    body = st.text_area("Body", height=200)
+    # === Email send ===
+    st.markdown("---\n#### Send Email")
+    email_to = st.text_input("Recipient Email", value=email)
     attach_pdf = st.checkbox("Attach above PDF", value=True)
-    send_btn = st.button("Send Email")
+    send_btn = st.button("Send Email Now")
 
     if send_btn:
         try:
             from sendgrid import SendGridAPIClient
             from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
-            sg = SendGridAPIClient(st.secrets["general"]["sendgrid_api_key"])
+            api_key = st.secrets["general"]["sendgrid_api_key"]
             sender_email = st.secrets["general"]["sender_email"]
             msg = Mail(
                 from_email=sender_email,
                 to_emails=email_to,
                 subject=subject,
-                html_content=body
+                html_content=html_body
             )
-            # Attach PDF if checked
+            # Attach PDF if requested
             if attach_pdf:
                 attach = Attachment(
                     FileContent(base64.b64encode(pdf_bytes).decode()),
-                    FileName("document.pdf"),
+                    FileName(f"{choice.replace(' ', '_')}_{name.replace(' ','_')}.pdf"),
                     FileType('application/pdf'),
                     Disposition('attachment')
                 )
                 msg.attachment = attach
-            # Attach additional files
+            # Attach other files
             if extra_files:
-                if not isinstance(extra_files, list): files = [extra_files]
-                else: files = extra_files
                 import mimetypes
+                if not isinstance(extra_files, list):
+                    files = [extra_files]
+                else:
+                    files = extra_files
                 for file in files:
                     file.seek(0)
                     file_data = file.read()
@@ -838,12 +931,13 @@ with tabs[5]:
                         Disposition('attachment')
                     )
                     msg.attachment = attach
+            sg = SendGridAPIClient(api_key)
             sg.send(msg)
-            st.success("Email sent!")
+            st.success(f"Email sent to {email_to}")
         except Exception as e:
-            st.error(f"Error: {e}")
+            st.error(f"Failed: {e}")
 
-    st.caption("Logo is for PDF header, watermark is for PDF background. Extra documents are only attached to email.")
+    st.info("Select student and template, upload logo/watermark (PDF), and/or any extra attachments (email only). All details are auto-filled from Google Sheet.")
 
 
 
