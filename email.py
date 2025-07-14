@@ -1,6 +1,7 @@
 # ==== 1. IMPORTS ====
 import os
 import base64
+import qrcode
 import re
 from datetime import datetime, date, timedelta
 import pygsheets
@@ -64,6 +65,40 @@ def send_email_report(to_email, subject, body):
 
 def safe_pdf(text):
     """Remove/replace any character not in latin-1 for PDF compatibility."""
+    return "".join(c if ord(c) < 256 else "?" for c in str(text))
+
+# -- CONFIGURATION --
+SCHOOL_NAME = "Learn Language Education Academy"
+SCHOOL_WEBSITE = "https://www.learngermanghana.com"
+SCHOOL_PHONE = "0205706589"
+SCHOOL_ADDRESS = "Accra, Ghana"
+BUSINESS_REG = "BN173410224"
+TUTOR_NAME = "Felix Asadu"
+TUTOR_TITLE = "Director"
+SENDER_EMAIL = st.secrets["general"]["sender_email"]
+SENDGRID_KEY = st.secrets["general"]["sendgrid_api_key"]
+
+# --- Load student data from Google Sheets ---
+students_csv_url = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
+df_students = pd.read_csv(students_csv_url)
+df_students.columns = [c.strip().lower().replace(" ", "_") for c in df_students.columns]
+
+# -- Utility: get student row --
+def get_student_row(name):
+    return df_students[df_students["name"] == name].iloc[0]
+
+# -- QR Code generator --
+def make_qr_code(url):
+    qr = qrcode.QRCode(box_size=3, border=1)
+    qr.add_data(url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+    img.save(tmp.name)
+    return tmp.name
+
+# -- Safe PDF string --
+def safe_pdf(text):
     return "".join(c if ord(c) < 256 else "?" for c in str(text))
 
 
@@ -742,59 +777,7 @@ with tabs[4]:
             )
             st.success("✅ PDF generated and ready to download.")
 
-import streamlit as st
-import pandas as pd
-from fpdf import FPDF
-import tempfile
-import base64
-import qrcode
-from datetime import date
-import os
 
-# -- CONFIGURATION --
-SCHOOL_NAME = "Learn Language Education Academy"
-SCHOOL_WEBSITE = "https://www.learngermanghana.com"
-SCHOOL_PHONE = "0205706589"
-SCHOOL_ADDRESS = "Accra, Ghana"
-BUSINESS_REG = "BN173410224"
-TUTOR_NAME = "Felix Asadu"
-TUTOR_TITLE = "Director"
-SENDER_EMAIL = st.secrets["general"]["sender_email"]
-SENDGRID_KEY = st.secrets["general"]["sendgrid_api_key"]
-
-# --- Load student data from Google Sheets ---
-students_csv_url = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
-df_students = pd.read_csv(students_csv_url)
-df_students.columns = [c.strip().lower().replace(" ", "_") for c in df_students.columns]
-
-# -- Utility: get student row --
-def get_student_row(name):
-    return df_students[df_students["name"] == name].iloc[0]
-
-# -- QR Code generator --
-def make_qr_code(url):
-    qr = qrcode.QRCode(box_size=3, border=1)
-    qr.add_data(url)
-    qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white")
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
-    img.save(tmp.name)
-    return tmp.name
-
-# -- Safe PDF string --
-def safe_pdf(text):
-    return "".join(c if ord(c) < 256 else "?" for c in str(text))
-
-# -- Email/PDF Tab Layout --
-with st.tabs([
-    "📝 Pending",
-    "👩‍🎓 All Students",
-    "💵 Expenses",
-    "📲 Reminders",
-    "📄 Contract",
-    "📧 Send Email / Letter", # This is our active tab (Tab 5)
-    "📆 Schedule",
-    "📝 Marking",
 ])[5]:
     st.title("📧 Send Email / Letter (Templates, Attachments, PDF, Watermark, QR)")
 
