@@ -779,11 +779,27 @@ with tabs[5]:
 
     # 1. Student Selection
     st.subheader("Select Student")
-    student_names = df_students["name"].dropna().unique().tolist()
+    # --- Add search bar here ---
+    search_val = st.text_input(
+        "Search students by name, code, or email", 
+        value="", key="student_search"
+    )
+    # Filter the DataFrame based on search input
+    if search_val:
+        filtered_students = df_students[
+            df_students["name"].str.contains(search_val, case=False, na=False)
+            | df_students.get("studentcode", pd.Series(dtype=str)).astype(str).str.contains(search_val, case=False, na=False)
+            | df_students.get("email", pd.Series(dtype=str)).astype(str).str.contains(search_val, case=False, na=False)
+        ]
+    else:
+        filtered_students = df_students
+
+    student_names = filtered_students["name"].dropna().unique().tolist()
     student_name = st.selectbox("Student Name", student_names)
     if not student_name:
         st.stop()
-    student_row = get_student_row(student_name)
+    # Use the filtered DataFrame to find the selected row
+    student_row = filtered_students[filtered_students["name"] == student_name].iloc[0]
     student_level = student_row["level"]
     student_email = student_row.get("email", "")
     enrollment_start = pd.to_datetime(student_row.get("contractstart", date.today()), errors="coerce").date()
@@ -791,6 +807,7 @@ with tabs[5]:
     payment = float(student_row.get("paid", 0))
     balance = float(student_row.get("balance", 0))
     payment_status = "Full Payment" if balance == 0 else "Installment Plan"
+
 
     # 2. Message Type Selection
     st.subheader("Choose Message Type")
