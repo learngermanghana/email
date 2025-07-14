@@ -1,20 +1,15 @@
-# ==== 1. IMPORTS ====
 import os
 import base64
-import qrcode
 import re
+import qrcode
+import tempfile
 from datetime import datetime, date, timedelta
-import pygsheets
 import pandas as pd
-import json
-import io
-from dateutil.relativedelta import relativedelta
 import streamlit as st
 from fpdf import FPDF
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
-import sqlite3
-import urllib.parse  
+
 
 
 
