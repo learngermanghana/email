@@ -828,8 +828,6 @@ with tabs[5]:
             f"Our institution is officially registered with Business Registration Number {BUSINESS_REG},<br>"
             f"in accordance with the Registration of Business Names Act, 1962 (No.151).<br><br>"
             f"If you require further confirmation, please contact us.<br><br>"
-            f"Yours sincerely,<br><br>"
-            f"Felix Asadu<br>Director<br>Learn Language Education Academy"
         )
     elif msg_type == "Assignment Results":
         # This is a placeholder—pull assignment data from your sheet if available.
