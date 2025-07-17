@@ -252,15 +252,15 @@ def send_email_report(pdf_bytes: bytes, to: str, subject: str, html_content: str
 
 # ==== 5. TABS LAYOUT ====
 tabs = st.tabs([
-    "📝 Pending",                 # 0
+    "📝 Brochure",                # 0
     "👩‍🎓 All Students",            # 1
     "💵 Expenses",                # 2
     "📲 Reminders",               # 3
     "📄 Contract",                # 4
     "📧 Send Email",              # 5 
     "📆 Schedule",                # 6
-    "📝 Marking",                  # 7
-    "📝 Letter of Enrollment Generator" #8
+    "📝 Marking"                  # 7
+
     
 ])
 
@@ -294,43 +294,161 @@ Asadu Felix
 # --- End of Stage 2 ---
 
 with tabs[0]:
+    st.title("🎉 Create Class Brochure / Flyer")
+    st.info("Generate a professional brochure for your next German class. Preview, download as PDF, or email to clients.")
 
-    st.title("🕒 Pending Students")
+    # --- Logo and Classroom Photo ---
+    logo_url = "https://i.imgur.com/iFiehrp.png"
+    st.image(logo_url, width=120, caption="Learn Language Academy Logo")
+    classroom_pic = st.file_uploader("Upload a Classroom Picture (optional)", type=["png", "jpg", "jpeg"], key="brochure_classroom")
 
-    # Load Data
-    pending_csv_url = "https://docs.google.com/spreadsheets/d/1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo/export?format=csv"
-    @st.cache_data(ttl=0)
-    def load_pending():
-        df = pd.read_csv(pending_csv_url, dtype=str)
-        df_display = df.copy()
-        df_search = df.copy()
-        df_search.columns = [c.strip().lower().replace(" ", "").replace("_", "") for c in df_search.columns]
-        return df_display, df_search
-    df_display, df_search = load_pending()
+    # --- Brochure Info Form ---
+    with st.form("brochure_form"):
+        school = st.text_input("School Name", value=SCHOOL_NAME)
+        contact = st.text_input("Contact Details", value=f"{SCHOOL_PHONE} | {SCHOOL_WEBSITE}")
+        email = st.text_input("Contact Email", value=SENDER_EMAIL)
+        headline = st.text_input("Brochure Headline", value="Join Our Next German Class!")
+        intro = st.text_area("Short Introduction", value="Boost your German with our friendly, proven program. Suitable for beginners and intermediates.")
 
-    # Universal Search
-    search = st.text_input("🔎 Search any field (name, code, email, etc.)")
-    if search:
-        mask = df_search.apply(lambda row: row.astype(str).str.contains(search, case=False, na=False).any(), axis=1)
-        filt = df_display[mask]
-    else:
-        filt = df_display
+        # Goethe Exam & Price
+        exam_start = st.date_input("Goethe Exam Start Date", key="brochure_exam_start")
+        course_price = st.text_input("Course Price (e.g. GHS 1,500)", value="GHS 1,500")
 
-    # Column Selector
-    all_cols = list(filt.columns)
-    selected_cols = st.multiselect(
-        "Show columns (for easy viewing):", all_cols, default=all_cols[:6]
-    )
+        # Add upcoming classes
+        st.markdown("### Upcoming Classes")
+        class_count = st.number_input("How many classes to show?", 1, 5, value=2, key="brochure_class_count")
+        classes = []
+        for i in range(int(class_count)):
+            st.markdown(f"**Class {i+1}:**")
+            level = st.selectbox(f"Level for Class {i+1}", ["A1", "A2", "B1", "B2"], key=f"brochure_level_{i}")
+            start = st.date_input(f"Start Date for Class {i+1}", key=f"brochure_start_{i}")
+            days = st.text_input(f"Days/Time (e.g. Mon-Wed, 5pm)", value="Mon-Wed, 5pm", key=f"brochure_days_{i}")
+            desc = st.text_area(f"Class {i+1} Description", value=f"Fun interactive lessons for {level}.", key=f"brochure_desc_{i}")
+            classes.append({"level": level, "start": start, "days": days, "desc": desc})
 
-    # Show Table (with scroll bar)
-    st.dataframe(filt[selected_cols], use_container_width=True, height=400)
+        # Special note about Falowen App
+        falowen_text = st.text_area(
+            "Falowen App Info (shown in the brochure)", 
+            value="All class assignments, materials, and results are available in our Falowen app. "
+                  "Every student gets a unique login to track progress and communicate with tutors. "
+                  "Visit: https://falowen.streamlit.app"
+        )
+        notes = st.text_area("Notes (discounts, deadlines, etc)", value="Register by the deadline to enjoy a discount.")
+        submit = st.form_submit_button("Preview Brochure")
 
-    # Download Always Includes All Columns
-    st.download_button(
-        "⬇️ Download all columns as CSV",
-        filt.to_csv(index=False),
-        file_name="pending_students.csv"
-    )
+    # --- Brochure Preview ---
+    if submit:
+        # HTML Preview
+        st.markdown("## 📄 Brochure Preview")
+        html = f"<div style='max-width:600px;'>"
+        html += f"<img src='{logo_url}' width='110'><br>"
+        html += f"<h2 style='color:#1565c0'>{headline}</h2>"
+        html += f"<b>{school}</b><br>{contact}<br>{email}<br><br>"
+        html += f"<p>{intro}</p>"
+        if classroom_pic:
+            import base64
+            img_bytes = classroom_pic.read()
+            img_base64 = base64.b64encode(img_bytes).decode()
+            html += f"<img src='data:image/png;base64,{img_base64}' width='380' style='border-radius:10px;margin:12px 0'><br>"
+        html += f"<hr><b>Goethe Exam Start Date:</b> {exam_start}<br>"
+        html += f"<b>Course Price:</b> {course_price}<br>"
+        html += "<hr><h3>Upcoming Classes</h3>"
+        for c in classes:
+            html += f"<b>Level:</b> {c['level']}<br>"
+            html += f"<b>Start:</b> {c['start']}<br>"
+            html += f"<b>Days/Time:</b> {c['days']}<br>"
+            html += f"{c['desc']}<br><br>"
+        html += f"<hr><b>About the Falowen App:</b><br>{falowen_text}<br>"
+        html += f"<hr><b>Notes:</b> {notes}"
+        html += "</div>"
+        st.markdown(html, unsafe_allow_html=True)
+
+        # --- PDF Download ---
+        from fpdf import FPDF
+        import tempfile
+
+        class BrochurePDF(FPDF):
+            def header(self):
+                # Logo from URL
+                self.set_xy(10, 10)
+                tmp_logo = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+                import requests
+                tmp_logo.write(requests.get(logo_url).content)
+                tmp_logo.close()
+                self.image(tmp_logo.name, x=10, y=8, w=36)
+                self.set_xy(50, 10)
+                self.set_font("Arial", "B", 16)
+                self.cell(0, 10, headline, ln=1, align="L")
+                self.set_font("Arial", "", 12)
+                self.cell(0, 8, school, ln=1, align="L")
+                self.set_font("Arial", "", 10)
+                self.cell(0, 6, f"{contact} | {email}", ln=1, align="L")
+                self.ln(3)
+
+            def footer(self):
+                self.set_y(-20)
+                self.set_font("Arial", "I", 9)
+                self.cell(0, 8, "Learn Language Education Academy – www.learngermanghana.com", 0, 0, "C")
+
+        pdf = BrochurePDF()
+        pdf.add_page()
+        pdf.set_font("Arial", "", 12)
+        pdf.multi_cell(0, 8, intro)
+        pdf.ln(2)
+        # Classroom pic
+        if classroom_pic:
+            ctmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+            ctmp.write(img_bytes)
+            ctmp.close()
+            pdf.image(ctmp.name, x=25, w=150)
+            pdf.ln(8)
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(0, 8, f"Goethe Exam Start Date: {exam_start}", ln=1)
+        pdf.cell(0, 8, f"Course Price: {course_price}", ln=1)
+        pdf.ln(2)
+        pdf.set_font("Arial", "B", 13)
+        pdf.cell(0, 10, "Upcoming Classes", ln=1)
+        pdf.set_font("Arial", "", 11)
+        for c in classes:
+            pdf.multi_cell(0, 8, f"Level: {c['level']} | Start: {c['start']} | {c['days']}\n{c['desc']}\n")
+            pdf.ln(1)
+        pdf.set_font("Arial", "B", 12)
+        pdf.multi_cell(0, 8, "About the Falowen App:")
+        pdf.set_font("Arial", "", 11)
+        pdf.multi_cell(0, 7, falowen_text)
+        pdf.ln(1)
+        pdf.set_font("Arial", "I", 10)
+        pdf.multi_cell(0, 7, f"Notes: {notes}")
+
+        pdf_bytes = pdf.output(dest="S").encode("latin-1", "replace")
+        st.download_button("📄 Download Brochure PDF", data=pdf_bytes, file_name="class_brochure.pdf", mime="application/pdf")
+
+        # --- Email Brochure (Optional) ---
+        st.markdown("---")
+        st.markdown("### 📧 Email This Brochure to a Client")
+        client_email = st.text_input("Client Email")
+        if st.button("Send Brochure to Client") and client_email:
+            from sendgrid import SendGridAPIClient
+            from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
+            msg = Mail(
+                from_email=email,
+                to_emails=client_email,
+                subject="German Class Brochure",
+                html_content=html
+            )
+            attach = Attachment(
+                FileContent(base64.b64encode(pdf_bytes).decode()),
+                FileName("class_brochure.pdf"),
+                FileType("application/pdf"),
+                Disposition("attachment")
+            )
+            msg.attachment = attach
+            try:
+                sg = SendGridAPIClient(SENDGRID_KEY)
+                sg.send(msg)
+                st.success(f"Brochure sent to {client_email}!")
+            except Exception as e:
+                st.error(f"Failed to send: {e}")
 
 
 # ==== 9. ALL STUDENTS TAB ====
