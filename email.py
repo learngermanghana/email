@@ -516,7 +516,11 @@ with tabs[0]:
         pdf.cell(0, 8, "0205706589 • learngermanghana@gmail.com", ln=True)
 
     class PDF(FPDF):
-        def header(self):
+    def __init__(self):
+        super().__init__()
+        # Register Unicode font
+        self.add_font("DejaVu", "", "DejaVuSans.ttf", uni=True)
+    def header(self):
             render_header(self)
         def footer(self):
             render_footer(self)
