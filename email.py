@@ -897,6 +897,8 @@ with tabs[5]:
     else:
         pdf_bytes = pdf_content
 
+    assert isinstance(pdf_bytes, bytes), "pdf_bytes is not bytes!"
+
     st.download_button(
         "📄 Download Letter/PDF", 
         data=pdf_bytes, 
