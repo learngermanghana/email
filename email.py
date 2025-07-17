@@ -1,12 +1,13 @@
 import os
 import re
 import base64
-import random  
 import tempfile
+import random
 from datetime import datetime, date, timedelta
 import pandas as pd
 import streamlit as st
 from fpdf import FPDF
+from PIL import Image
 import qrcode
 import urllib.parse
 
@@ -347,6 +348,52 @@ Asadu Felix
 # --- End of Stage 2 ---
 
 
+import os
+import re
+import base64
+import tempfile
+import random
+from datetime import datetime, date, timedelta
+import pandas as pd
+import streamlit as st
+from fpdf import FPDF
+from PIL import Image
+import qrcode
+import urllib.parse
+
+def safe_pdf(text):
+    return "".join(c if ord(c) < 256 else "?" for c in str(text))
+
+def get_random_reviews(sheet_url, n=2):
+    # Convert Google Sheet edit URL to CSV export URL
+    if "/edit" in sheet_url:
+        csv_url = sheet_url.replace("/edit?usp=sharing", "/export?format=csv")
+    else:
+        csv_url = sheet_url
+    try:
+        df = pd.read_csv(csv_url)
+    except Exception:
+        return []
+    review_cols = [col for col in df.columns if "review" in col.lower() or "comment" in col.lower()]
+    name_cols = [col for col in df.columns if "name" in col.lower()]
+    reviews = []
+    for _, row in df.iterrows():
+        review_text = str(row[review_cols[0]]) if review_cols else ""
+        reviewer = str(row[name_cols[0]]) if name_cols else ""
+        if review_text.strip():
+            reviews.append(f"“{review_text}” — {reviewer}" if reviewer else f"“{review_text}”")
+    random.shuffle(reviews)
+    return reviews[:min(n, len(reviews))]
+
+def make_qr_code(url):
+    qr = qrcode.QRCode(box_size=2, border=1)
+    qr.add_data(url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+    img.save(tmp.name)
+    return tmp.name
+
 with tabs[0]:
     st.title("🎓 Class Brochure / Flyer Generator")
     st.write("Generate a professional flyer or brochure for your upcoming German classes with dynamic reviews and Falowen app info.")
@@ -364,15 +411,13 @@ with tabs[0]:
         start_date = st.date_input("Class Start Date", value=date.today())
         end_date = st.date_input("Class End Date", value=date.today())
         times = st.text_input("Meeting Times", value="Mon 7pm, Wed 6pm")
-
-        # **Updated class description**
         desc = st.text_area(
             "Class Description",
             value="This is a hybrid class: Attend in-person, join online, or catch up with recorded lessons anytime via our Falowen app. Designed for total beginners with a focus on interaction and fun!"
         )
         price = st.text_input("Course Price (GHS)", value="1,500")
 
-        # **Goethe Exam extra clarity**
+        # Goethe exam info, clear note
         goethe_date = st.text_input("Goethe Exam Date", value="2024-09-10")
         goethe_price = st.text_input("Goethe Exam Price (GHS)", value="1,200")
         st.caption("Note: Goethe exam fee is paid directly to Goethe-Institut. The only money you pay to us is our school fees above.")
@@ -382,7 +427,6 @@ with tabs[0]:
             value="Why choose us? Our students achieve top results, our team is friendly and professional, and you get 24/7 access to unique learning materials and practice on our Falowen app. Register early for discounts!"
         )
 
-        st.markdown("#### Show number of reviews")
         n_reviews = st.slider("Number of reviews to show", min_value=1, max_value=4, value=2)
 
         submitted = st.form_submit_button("Preview Brochure")
@@ -394,7 +438,6 @@ with tabs[0]:
         REVIEWS_SHEET = "https://docs.google.com/spreadsheets/d/137HANmV9jmMWJEdcA1klqGiP8nYihkDugcIbA-2V1Wc/edit?usp=sharing"
         reviews = get_random_reviews(REVIEWS_SHEET, n=n_reviews)
 
-        # --- Falowen image (example, can use any relevant image) ---
         falowen_img_url = "https://i.imgur.com/ihzwFSc.png"  # Demo image
         falowen_img_html = f'<img src="{falowen_img_url}" width="130" style="margin-bottom:0.7em;border-radius:9px">' if falowen_img_url else ""
 
@@ -440,9 +483,15 @@ with tabs[0]:
         """
 
         if classroom_img:
-            img_bytes = classroom_img.read()
-            img_b64 = base64.b64encode(img_bytes).decode("utf-8")
-            html += f'<img src="data:image/png;base64,{img_b64}" width="95%" style="margin:1em 0 1em 0;border-radius:10px"><br>'
+            try:
+                img = Image.open(classroom_img)
+                buffered = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+                img.save(buffered.name, format="PNG")
+                with open(buffered.name, "rb") as f:
+                    img_b64 = base64.b64encode(f.read()).decode("utf-8")
+                html += f'<img src="data:image/png;base64,{img_b64}" width="95%" style="margin:1em 0 1em 0;border-radius:10px"><br>'
+            except Exception as e:
+                st.warning(f"Could not display classroom image: {e}")
 
         if reviews:
             html += "<div style='margin-top:0.9em'><b>What Our Students Say:</b><ul>"
@@ -461,7 +510,7 @@ with tabs[0]:
         st.markdown("### Preview Brochure")
         st.markdown(html, unsafe_allow_html=True)
 
-        # --- PDF Generation code below stays similar; can be further styled if you want! ---
+        # --- PDF Generation ---
         class BrochurePDF(FPDF):
             def header(self):
                 if logo_url:
@@ -501,11 +550,15 @@ with tabs[0]:
             pdf.multi_cell(0, 7, safe_pdf(line))
         pdf.ln(2)
         if classroom_img:
-            tmp_img = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-            tmp_img.write(img_bytes)
-            tmp_img.close()
-            pdf.image(tmp_img.name, x=15, w=170)
-            pdf.ln(2)
+            try:
+                img = Image.open(classroom_img)
+                tmp_img = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+                img.save(tmp_img.name, format="PNG")
+                tmp_img.close()
+                pdf.image(tmp_img.name, x=15, w=170)
+                pdf.ln(2)
+            except Exception as e:
+                st.warning(f"Could not add classroom image to PDF: {e}")
         pdf.image(qr_path, x=170, y=pdf.get_y(), w=20)
         pdf.ln(18)
         if reviews:
@@ -523,7 +576,6 @@ with tabs[0]:
 
         pdf_bytes = pdf.output(dest="S").encode("latin-1","replace")
         st.download_button("📄 Download Brochure as PDF", data=pdf_bytes, file_name="Class_Brochure.pdf", mime="application/pdf")
-
 
 
 # ==== 9. ALL STUDENTS TAB ====
