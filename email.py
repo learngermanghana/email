@@ -385,28 +385,6 @@ def prepare_image_for_pdf(file_or_url):
     except Exception:
         return None
 
-def get_pdf_bytes(pdf):
-    """Generate bytes from FPDF instance, encoding if necessary."""
-    result = pdf.output(dest="S")
-    if isinstance(result, str):
-        try:
-            return result.encode("latin-1", "replace")
-        except Exception:
-            return result.encode("utf-8", "replace")
-    return result
-
-def safe_multi_cell(pdf, w, h, txt):
-    """Safely write multiline text, fallback to single-line cells on errors."""
-    try:
-        pdf.multi_cell(w, h, txt)
-    except Exception:
-        for line in txt.split("\n"):
-            try:
-                pdf.cell(0, h, line, ln=True)
-            except Exception:
-                continue
-
-
 REVIEWS_SHEET = "https://docs.google.com/spreadsheets/d/137HANmV9jmMWJEdcA1klqGiP8nYihkDugcIbA-2V1Wc/edit?usp=sharing"
 
 with tabs[0]:
@@ -438,7 +416,36 @@ with tabs[0]:
     # --- REVIEWS ---
     reviews = get_random_reviews(REVIEWS_SHEET, n=n_reviews)
 
-    # --- PDF GENERATION ---
+    # ---------- PDF Generation Helpers ----------
+    def get_pdf_bytes(pdf):
+        """Generate bytes from FPDF instance, encoding if necessary."""
+        result = pdf.output(dest="S")
+        if isinstance(result, str):
+            try:
+                return result.encode("latin-1", "replace")
+            except Exception:
+                return result.encode("utf-8", "replace")
+        # Handle bytes or bytearray
+        if isinstance(result, (bytes, bytearray)):
+            return bytes(result)
+        # Fallback: convert to bytes
+        return bytes(result).encode("latin-1", "replace")
+            except Exception:
+                return result.encode("utf-8", "replace")
+        return result
+
+    def safe_multi_cell(pdf, w, h, txt):
+        """Safely write multiline text, fallback to single-line cells on errors."""
+        try:
+            pdf.multi_cell(w, h, txt)
+        except Exception:
+            for line in txt.split("\n"):
+                try:
+                    pdf.cell(0, h, line, ln=True)
+                except Exception:
+                    continue
+
+    # ---------- PDF Download Button ----------
     if st.button("Download Brochure as PDF"):
         class PDF(FPDF):
             def header(self):
@@ -451,7 +458,14 @@ with tabs[0]:
             def footer(self):
                 self.set_y(-20)
                 self.set_font("Arial", "I", 8)
-                self.cell(0, 8, safe_pdf("Falowen app: falowen.streamlit.app"), 0, 0, 'C')
+                self.cell(
+                    0,
+                    8,
+                    safe_pdf("Falowen app: falowen.streamlit.app"),
+                    0,
+                    0,
+                    'C'
+                )
                 if qr_path:
                     self.image(qr_path, x=180, y=260, w=18)
 
@@ -529,6 +543,7 @@ with tabs[0]:
             file_name=f"{title.replace(' ', '_')}_brochure.pdf",
             mime="application/pdf"
         )
+
 
 
 # ==== 9. ALL STUDENTS TAB ====
