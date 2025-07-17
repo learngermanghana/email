@@ -44,10 +44,6 @@ def strip_leading_number(text):
     # Removes leading digits, dots, and spaces (e.g., "1. C" or "2) D" -> "C" or "D")
     return re.sub(r"^\s*\d+[\.\)]?\s*", "", text).strip()
 
-import streamlit as st
-import sendgrid
-from sendgrid.helpers.mail import Mail
-
 def send_email_report(to_email, subject, body):
     sg = sendgrid.SendGridAPIClient(api_key=st.secrets["general"]["sendgrid_api_key"])
     sender_email = st.secrets["general"]["sender_email"]
@@ -176,9 +172,6 @@ def choose_student(df: pd.DataFrame, levels: list, key_suffix: str) -> tuple:
     row = filtered[filtered['studentcode'] == code].iloc[0]
     return code, row
 
-def safe_pdf(text):
-    # Remove or replace any character not in latin-1
-    return "".join(c if ord(c) < 256 else "?" for c in str(text))
 
 def generate_pdf_report(
     name: str,
