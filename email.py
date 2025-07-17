@@ -945,9 +945,10 @@ with tabs[5]:
     # ---- Handle output bytes ----
     raw = pdf.output(dest="S")
     if isinstance(raw, str):
-        pdf_bytes = raw.encode("latin-1","replace")
-    else:
-        pdf_bytes = raw
+        raw = raw.encode("latin-1","replace")
+    if isinstance(raw, bytearray):
+        raw = bytes(raw)
+    pdf_bytes = raw
 
     st.download_button(
         "Download Letter/PDF",
@@ -955,7 +956,6 @@ with tabs[5]:
         file_name=f"{student_name.replace(' ','_')}_{msg_type.replace(' ','_')}.pdf",
         mime="application/pdf"
     )
-
 
 
 # ==== 14. TAB 6: COURSE SCHEDULE GENERATOR ====
