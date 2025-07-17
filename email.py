@@ -569,7 +569,10 @@ with tabs[0]:
         pdf.ln(2)
         pdf_data = pdf.output(dest="S")
         if isinstance(pdf_data, str):
-            pdf_bytes = pdf_data.encode("latin-1", "replace")
+            try:
+                pdf_bytes = pdf_data.encode("latin-1", "replace")
+            except Exception:
+                pdf_bytes = pdf_data.encode("utf-8", "replace")
         else:
             pdf_bytes = pdf_data
         st.download_button(
@@ -578,7 +581,6 @@ with tabs[0]:
             file_name=f"{title.replace(' ', '_')}_brochure.pdf",
             mime="application/pdf"
         )
-
 
 
 # ==== 9. ALL STUDENTS TAB ====
