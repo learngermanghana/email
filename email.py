@@ -34,9 +34,9 @@ def col_lookup(df: pd.DataFrame, name: str) -> str:
             return c
     raise KeyError(f"Column '{name}' not found in DataFrame")
 
-def safe_pdf(text: str) -> str:
-    """Ensure strings are PDF-safe (Latin-1)."""
-    return text.encode("latin-1", "replace").decode("latin-1")
+def safe_pdf(text):
+    # Keep only Latin-1 characters (0-255); replace everything else with '?'
+    return "".join(c if ord(c) < 256 else "?" for c in str(text))
 
 
 def strip_leading_number(text):
@@ -175,9 +175,6 @@ def choose_student(df: pd.DataFrame, levels: list, key_suffix: str) -> tuple:
     row = filtered[filtered['studentcode'] == code].iloc[0]
     return code, row
 
-def safe_pdf(text):
-    # Remove or replace any character not in latin-1
-    return "".join(c if ord(c) < 256 else "?" for c in str(text))
 
 def generate_pdf_report(
     name: str,
