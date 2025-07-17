@@ -891,13 +891,14 @@ with tabs[5]:
         pdf.cell(0, 7, "Director", ln=True)
         pdf.cell(0, 7, safe_pdf(SCHOOL_NAME), ln=True)
 
-    pdf_content = pdf.output(dest="S")
+        pdf_content = pdf.output(dest="S")
+    st.write("DEBUG: pdf_content type:", type(pdf_content))  # <--- See what you get!
     if isinstance(pdf_content, str):
         pdf_bytes = pdf_content.encode("latin-1", "replace")
     else:
         pdf_bytes = pdf_content
 
-    assert isinstance(pdf_bytes, bytes), "pdf_bytes is not bytes!"
+    st.write("DEBUG: pdf_bytes type:", type(pdf_bytes))  # <--- Should say <class 'bytes'>
 
     st.download_button(
         "📄 Download Letter/PDF", 
