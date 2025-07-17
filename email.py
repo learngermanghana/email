@@ -544,8 +544,11 @@ with tabs[0]:
         pdf.multi_cell(0, 7, safe_pdf(extra_notes))
         pdf.ln(3)
         if class_pdf:
-            pdf.image(class_pdf, x=15, w=170)
-            pdf.ln(2)
+            try:
+                pdf.image(class_pdf, x=15, w=170)
+                pdf.ln(2)
+            except Exception:
+                pass
         pdf.set_font("Arial", "B", 12)
         pdf.cell(0, 8, "Falowen App Features", ln=True)
         pdf.set_font("Arial", size=11)
@@ -564,7 +567,11 @@ with tabs[0]:
                 pdf.multi_cell(0, 7, safe_pdf(rev))
                 pdf.ln(1)
         pdf.ln(2)
-        pdf_bytes = bytes(pdf.output(dest="S"))
+        pdf_data = pdf.output(dest="S")
+        if isinstance(pdf_data, str):
+            pdf_bytes = pdf_data.encode("latin-1", "replace")
+        else:
+            pdf_bytes = pdf_data
         st.download_button(
             "📄 Download PDF Brochure",
             data=pdf_bytes,
