@@ -3,6 +3,7 @@ import re
 import base64
 import tempfile
 import random
+import requests
 from datetime import datetime, date, timedelta
 import pandas as pd
 import streamlit as st
