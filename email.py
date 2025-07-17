@@ -321,241 +321,108 @@ Asadu Felix
 
 # --- End of Stage 2 ---
 
-# Helpers (top of script – do not repeat if you already have)
-@st.cache_data
-def get_random_reviews(sheet_url, n=2):
-    csv_url = sheet_url.replace("/edit?usp=sharing", "/export?format=csv") if "/edit" in sheet_url else sheet_url
-    try:
-        df = pd.read_csv(csv_url)
-    except Exception:
-        return []
-    cols = [c for c in df.columns if "review" in c.lower() or "comment" in c.lower()]
-    names = [c for c in df.columns if "name" in c.lower()]
-    items = []
-    for _, r in df.iterrows():
-        text = str(r[cols[0]]) if cols else ""
-        author = str(r[names[0]]) if names else ""
-        if text.strip():
-            items.append(f"“{text}” — {author}" if author else f"“{text}”")
-    random.shuffle(items)
-    return items[:min(n, len(items))]
-
-def make_qr_code(url):
-    img = qrcode.make(url)
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
-    img.save(tmp.name)
-    return tmp.name
-
-def safe_pdf(txt):
-    return "".join(c if ord(c) < 256 else "?" for c in str(txt))
-
-def prepare_image_for_html(file_or_url):
-    if not file_or_url:
-        return ""
-    if isinstance(file_or_url, str) and file_or_url.startswith("http"):
-        return file_or_url
-    try:
-        img = Image.open(file_or_url)
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
-        img.save(tmp.name, format="PNG")
-        with open(tmp.name, 'rb') as f:
-            data = base64.b64encode(f.read()).decode()
-        os.remove(tmp.name)
-        return f"data:image/png;base64,{data}"
-    except Exception:
-        return ""
-
-def prepare_image_for_pdf(file_or_url):
-    if not file_or_url:
-        return None
-    if isinstance(file_or_url, str) and file_or_url.startswith("http"):
-        # Download the image first
-        resp = requests.get(file_or_url)
-        if resp.status_code == 200:
-            tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
-            tmp.write(resp.content)
-            tmp.close()
-            return tmp.name
-        return None
-    try:
-        img = Image.open(file_or_url)
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
-        img.save(tmp.name, format="PNG")
-        return tmp.name
-    except Exception:
-        return None
-
-REVIEWS_SHEET = "https://docs.google.com/spreadsheets/d/137HANmV9jmMWJEdcA1klqGiP8nYihkDugcIbA-2V1Wc/edit?usp=sharing"
-
-import io
-from PIL import Image, ImageDraw, ImageFont
-
 with tabs[0]:
-    st.title("🎓 Class Brochure / Flyer Generator")
-    st.write("Generate a professional flyer or brochure for your upcoming German classes with dynamic reviews and Falowen app info.")
+    st.title("🎉 Create Class Brochure / Flyer")
+    st.info("Generate a beautiful brochure for your next German class! You can preview, download as PDF, or email to your clients.")
 
-    title = st.text_input("Course Title", "German A1 Group")
-    level = st.text_input("Level", "A1")
-    start_dt = st.date_input("Start Date")
-    end_dt = st.date_input("End Date")
-    times = st.text_input("Class Times", "Mon 7pm, Tue 6pm")
-    fee = st.text_input("School Fee (GHS)", "650")
-    ge_dt = st.text_input("Goethe Exam Date", "Sep 2025")
-    ge_fee = st.text_input("Goethe Exam Fee (GHS)", "950")
-    logo_url = st.text_input("Logo URL", "https://i.imgur.com/iFiehrp.png")
-    class_img_url = st.text_input("Classroom Image URL (optional)", "")
-    desc = st.text_area("Short Course Description", "Hybrid format: Join in-person, online, or use recorded lectures on Falowen App.")
-    notes = st.text_area("Extra Notes", "Register by the deadline to enjoy a discount.")
-    extra_notes = st.text_area("Why Choose Us?", "Our students consistently pass Goethe exams. You get access to our Falowen app, expert tutors, and flexible study options.")
-    n_reviews = st.number_input("How many reviews to show?", 2, 10, 2)
-    reviews_url = st.text_input("Google Reviews Sheet Link", "https://docs.google.com/spreadsheets/d/137HANmV9jmMWJEdcA1klqGiP8nYihkDugcIbA-2V1Wc/edit?usp=sharing")
-    reviews = get_random_reviews(reviews_url, int(n_reviews))
+    # --- Logo upload ---
+    logo = st.file_uploader("Upload School Logo (optional)", type=["png", "jpg", "jpeg"], key="brochure_logo")
 
-    # Prepare images
-    def fetch_image(url):
-        if url:
-            try:
-                from PIL import Image
-                import requests
-                from io import BytesIO
-                r = requests.get(url)
-                return Image.open(BytesIO(r.content))
-            except Exception:
-                return None
-        return None
+    # --- Brochure Info Form ---
+    with st.form("brochure_form"):
+        school = st.text_input("School Name", value=SCHOOL_NAME)
+        contact = st.text_input("Contact Details", value=f"{SCHOOL_PHONE} | {SCHOOL_WEBSITE}")
+        email = st.text_input("Contact Email", value=SENDER_EMAIL)
+        headline = st.text_input("Brochure Headline", value="Join Our Next German Class!")
+        intro = st.text_area("Short Introduction", value="Boost your German with our proven, friendly program. Suitable for beginners and intermediates.")
+        
+        # Add upcoming classes dynamically
+        st.markdown("### Upcoming Classes")
+        class_count = st.number_input("How many classes to show?", 1, 5, value=2, key="brochure_class_count")
+        classes = []
+        for i in range(int(class_count)):
+            st.markdown(f"**Class {i+1}:**")
+            level = st.selectbox(f"Level for Class {i+1}", ["A1", "A2", "B1", "B2"], key=f"brochure_level_{i}")
+            start = st.date_input(f"Start Date for Class {i+1}", key=f"brochure_start_{i}")
+            days = st.text_input(f"Days/Time (e.g. Mon-Wed, 5pm)", value="Mon-Wed, 5pm", key=f"brochure_days_{i}")
+            desc = st.text_area(f"Class {i+1} Description", value=f"Fun interactive lessons for {level}.", key=f"brochure_desc_{i}")
+            classes.append({"level": level, "start": start, "days": days, "desc": desc})
+        
+        notes = st.text_area("Notes (discounts, deadlines, etc)", value="Register by the deadline to enjoy a discount.")
+        submit = st.form_submit_button("Preview Brochure")
 
-    logo_img = fetch_image(logo_url)
-    class_img = fetch_image(class_img_url) if class_img_url else None
-    qr_path = make_qr_code("https://falowen.streamlit.app")
-    qr_img = Image.open(qr_path)
+    # --- Brochure Preview ---
+    if submit:
+        # Generate HTML preview
+        st.markdown("## 📄 Brochure Preview")
+        html = f"<h2 style='color:#1565c0'>{headline}</h2>"
+        if logo:
+            import base64
+            img = base64.b64encode(logo.read()).decode()
+            html = f"<img src='data:image/png;base64,{img}' width='120'><br>" + html
+        html += f"<p><b>{school}</b><br>{contact}<br>{email}</p>"
+        html += f"<p>{intro}</p>"
+        html += "<hr><h3>Upcoming Classes</h3>"
+        for c in classes:
+            html += f"<b>Level:</b> {c['level']}<br>"
+            html += f"<b>Start:</b> {c['start']}<br>"
+            html += f"<b>Days/Time:</b> {c['days']}<br>"
+            html += f"{c['desc']}<br><br>"
+        html += f"<hr><b>Notes:</b> {notes}"
+        st.markdown(html, unsafe_allow_html=True)
 
-    # -------- PDF Generation --------
-    if st.button("Download Brochure as PDF"):
-        class PDF(FPDF):
-            def header(self):
-                if logo_img:
-                    tmp_logo = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-                    logo_img.save(tmp_logo.name)
-                    self.image(tmp_logo.name, x=10, y=8, w=36)
-                self.set_font("Arial", "B", 16)
-                self.cell(0, 10, safe_pdf(title), ln=True, align="C")
-                self.ln(2)
-
-            def footer(self):
-                self.set_y(-20)
-                self.set_font("Arial", "I", 8)
-                self.cell(0, 8, safe_pdf("Falowen app: falowen.streamlit.app"), 0, 0, 'C')
-                if qr_path:
-                    self.image(qr_path, x=180, y=260, w=18)
-
-        pdf = PDF()
+        # --- PDF Download ---
+        from fpdf import FPDF
+        pdf = FPDF()
         pdf.add_page()
-        pdf.set_font("Arial", size=12)
-        pdf.cell(0, 10, safe_pdf(f"{title} ({level})"), ln=True)
-        pdf.cell(0, 8, safe_pdf(f"Dates: {start_dt.strftime('%d %b %Y')} – {end_dt.strftime('%d %b %Y')}"), ln=True)
-        pdf.cell(0, 8, safe_pdf(f"Times: {times}"), ln=True)
-        pdf.cell(0, 8, safe_pdf(f"School Fee: GHS {fee}"), ln=True)
-        pdf.cell(0, 8, safe_pdf(f"Goethe Exam: {ge_dt} (GHS {ge_fee}, paid to Goethe Institute)"), ln=True)
+        pdf.set_font("Arial", 'B', 16)
+        pdf.cell(0, 12, headline, ln=True, align='C')
+        pdf.set_font("Arial", '', 12)
+        pdf.cell(0, 10, f"{school}", ln=True, align='C')
+        pdf.cell(0, 10, contact, ln=True, align='C')
+        pdf.cell(0, 10, email, ln=True, align='C')
+        pdf.ln(8)
+        pdf.set_font("Arial", '', 11)
+        pdf.multi_cell(0, 8, intro)
         pdf.ln(2)
-        pdf.set_font("Arial", "I", 11)
-        pdf.multi_cell(0, 7, safe_pdf(desc))
-        pdf.multi_cell(0, 7, safe_pdf(notes))
-        pdf.multi_cell(0, 7, safe_pdf(extra_notes))
+        pdf.set_font("Arial", 'B', 13)
+        pdf.cell(0, 10, "Upcoming Classes", ln=True)
+        pdf.set_font("Arial", '', 11)
+        for c in classes:
+            pdf.multi_cell(0, 8, f"Level: {c['level']} | Start: {c['start']} | {c['days']}\n{c['desc']}\n")
+            pdf.ln(1)
         pdf.ln(3)
-        if class_img:
-            tmp_class = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-            class_img.save(tmp_class.name)
-            pdf.image(tmp_class.name, x=15, w=170)
-            pdf.ln(2)
-        pdf.set_font("Arial", "B", 12)
-        pdf.cell(0, 8, "Falowen App Features", ln=True)
-        pdf.set_font("Arial", size=11)
-        pdf.multi_cell(0, 7, safe_pdf(
-            "• AI-powered writing correction\n"
-            "• Speaking feedback with pronunciation scoring\n"
-            "• Vocabulary & practice tools (exclusive for Falowen students)\n"
-            "• Hybrid learning: attend in-person, online or catch up anytime!"
-        ))
-        pdf.ln(2)
-        if reviews:
-            pdf.set_font("Arial", "B", 11)
-            pdf.cell(0, 8, "Student Reviews:", ln=True)
-            pdf.set_font("Arial", size=11)
-            for rev in reviews:
-                pdf.multi_cell(0, 7, safe_pdf(rev))
-                pdf.ln(1)
-        pdf.ln(2)
-        pdf_bytes = bytes(pdf.output(dest="S"))
-        st.download_button(
-            "📄 Download PDF Brochure",
-            data=pdf_bytes,
-            file_name=f"{title.replace(' ', '_')}_brochure.pdf",
-            mime="application/pdf"
-        )
+        pdf.set_font("Arial", 'I', 10)
+        pdf.multi_cell(0, 7, f"Notes: {notes}")
+        pdf_bytes = pdf.output(dest="S").encode("latin-1", "replace")
+        st.download_button("📄 Download Brochure PDF", data=pdf_bytes, file_name="class_brochure.pdf", mime="application/pdf")
 
-    # -------- PNG Generation --------
-    def generate_brochure_image():
-        img = Image.new("RGB", (900, 1300), "white")
-        draw = ImageDraw.Draw(img)
-        # Logo
-        if logo_img:
-            logo_thumb = logo_img.resize((120, 120))
-            img.paste(logo_thumb, (30, 30))
-        # Title
-        try:
-            font_title = ImageFont.truetype("arial.ttf", 44)
-            font_details = ImageFont.truetype("arial.ttf", 28)
-        except:
-            font_title = font_details = None
-        draw.text((170, 40), title, fill="black", font=font_title)
-        # Course details
-        y = 180
-        lines = [
-            desc, "",
-            f"Dates: {start_dt.strftime('%d %b %Y')} – {end_dt.strftime('%d %b %Y')}",
-            f"Times: {times}",
-            f"School Fee: GHS {fee}",
-            f"Goethe Exam: {ge_dt} (GHS {ge_fee}, paid to Goethe Institute)",
-            notes,
-            extra_notes,
-            "Falowen App Features:",
-            "• AI-powered writing correction",
-            "• Speaking feedback with pronunciation scoring",
-            "• Vocabulary & practice tools (exclusive for Falowen students)",
-            "• Hybrid learning: attend in-person, online or catch up anytime!"
-        ]
-        for line in lines:
-            draw.text((40, y), line, fill="black", font=font_details)
-            y += 40
-        # Reviews
-        if reviews:
-            draw.text((40, y), "Student Reviews:", fill="black", font=font_details)
-            y += 40
-            for rev in reviews:
-                draw.text((60, y), rev, fill="black", font=font_details)
-                y += 36
-        # Classroom image
-        if class_img:
-            class_thumb = class_img.resize((320, 160))
-            img.paste(class_thumb, (520, 160))
-        # QR code
-        if qr_img:
-            qr_thumb = qr_img.resize((120, 120))
-            img.paste(qr_thumb, (730, 1150))
-        return img
-
-    if st.button("Download Brochure as Image (PNG)"):
-        image = generate_brochure_image()
-        buf = io.BytesIO()
-        image.save(buf, format="PNG")
-        buf.seek(0)
-        st.download_button(
-            "🖼️ Download Brochure Image",
-            data=buf,
-            file_name=f"{title.replace(' ', '_')}_brochure.png",
-            mime="image/png"
-        )
-        st.image(buf, caption="Preview", use_column_width=True)
+        # --- Email Brochure (Optional) ---
+        st.markdown("---")
+        st.markdown("### 📧 Email This Brochure to a Client")
+        client_email = st.text_input("Client Email")
+        if st.button("Send Brochure to Client") and client_email:
+            from sendgrid import SendGridAPIClient
+            from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
+            msg = Mail(
+                from_email=email,
+                to_emails=client_email,
+                subject="German Class Brochure",
+                html_content=html
+            )
+            attach = Attachment(
+                FileContent(base64.b64encode(pdf_bytes).decode()),
+                FileName("class_brochure.pdf"),
+                FileType("application/pdf"),
+                Disposition("attachment")
+            )
+            msg.attachment = attach
+            try:
+                sg = SendGridAPIClient(SENDGRID_KEY)
+                sg.send(msg)
+                st.success(f"Brochure sent to {client_email}!")
+            except Exception as e:
+                st.error(f"Failed to send: {e}")
 
 
 # ==== 9. ALL STUDENTS TAB ====
