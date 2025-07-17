@@ -395,6 +395,17 @@ def get_pdf_bytes(pdf):
             return result.encode("utf-8", "replace")
     return result
 
+def safe_multi_cell(pdf, w, h, txt):
+    """Safely write multiline text, fallback to single-line cells on errors."""
+    try:
+        pdf.multi_cell(w, h, txt)
+    except Exception:
+        for line in txt.split("\n"):
+            try:
+                pdf.cell(0, h, line, ln=True)
+            except Exception:
+                continue
+
 
 REVIEWS_SHEET = "https://docs.google.com/spreadsheets/d/137HANmV9jmMWJEdcA1klqGiP8nYihkDugcIbA-2V1Wc/edit?usp=sharing"
 
