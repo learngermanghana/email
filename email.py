@@ -345,6 +345,7 @@ Asadu Felix
 
 # --- End of Stage 2 ---
 
+
 with tabs[0]:
     st.title("🎓 Class Brochure / Flyer Generator")
     st.write("Generate a professional flyer or brochure for your upcoming German classes with dynamic reviews and Falowen app info.")
@@ -362,10 +363,23 @@ with tabs[0]:
         start_date = st.date_input("Class Start Date", value=date.today())
         end_date = st.date_input("Class End Date", value=date.today())
         times = st.text_input("Meeting Times", value="Mon 7pm, Wed 6pm")
-        desc = st.text_area("Class Description", value="Fun, interactive lessons for total beginners.")
+
+        # **Updated class description**
+        desc = st.text_area(
+            "Class Description",
+            value="This is a hybrid class: Attend in-person, join online, or catch up with recorded lessons anytime via our Falowen app. Designed for total beginners with a focus on interaction and fun!"
+        )
         price = st.text_input("Course Price (GHS)", value="1,500")
-        goethe_date = st.text_input("Goethe Exam Start Date", value="")
-        notes = st.text_area("Extra Notes (e.g. discount reminder)", value="Register by the deadline to enjoy a discount.")
+
+        # **Goethe Exam extra clarity**
+        goethe_date = st.text_input("Goethe Exam Date", value="2024-09-10")
+        goethe_price = st.text_input("Goethe Exam Price (GHS)", value="1,200")
+        st.caption("Note: Goethe exam fee is paid directly to Goethe-Institut. The only money you pay to us is our school fees above.")
+
+        notes = st.text_area(
+            "Extra Notes (e.g. Why choose us?)",
+            value="Why choose us? Our students achieve top results, our team is friendly and professional, and you get 24/7 access to unique learning materials and practice on our Falowen app. Register early for discounts!"
+        )
 
         st.markdown("#### Show number of reviews")
         n_reviews = st.slider("Number of reviews to show", min_value=1, max_value=4, value=2)
@@ -379,11 +393,15 @@ with tabs[0]:
         REVIEWS_SHEET = "https://docs.google.com/spreadsheets/d/137HANmV9jmMWJEdcA1klqGiP8nYihkDugcIbA-2V1Wc/edit?usp=sharing"
         reviews = get_random_reviews(REVIEWS_SHEET, n=n_reviews)
 
+        # --- Falowen image (example, can use any relevant image) ---
+        falowen_img_url = "https://i.imgur.com/ihzwFSc.png"  # Demo image
+        falowen_img_html = f'<img src="{falowen_img_url}" width="130" style="margin-bottom:0.7em;border-radius:9px">' if falowen_img_url else ""
+
         falowen_text = (
             "Advanced Learning Tools – Powered by Our Own “Falowen” App\n\n"
-            "- AI-Powered Writing Correction: Instantly get feedback on your German writing, with corrections and tips built right into Falowen—developed by our own school for our students’ success.\n"
-            "- Speaking Feedback with Pronunciation Scoring: Practice speaking anytime, record your voice, and receive instant pronunciation scores. All features are available in the Falowen app, exclusive to our students.\n"
-            "- Vocabulary & Practice Tools: Build your vocabulary, practice grammar, and prepare for your exams using interactive quizzes and exercises—all in Falowen, created by Learn Language Education Academy, tailored for our classes.\n\n"
+            "- **AI-Powered Writing Correction:** Instantly get feedback on your German writing, with corrections and tips built right into Falowen—developed by our own school for our students’ success.\n"
+            "- **Speaking Feedback with Pronunciation Scoring:** Practice speaking anytime, record your voice, and receive instant pronunciation scores. All features are available in the Falowen app, exclusive to our students.\n"
+            "- **Vocabulary & Practice Tools:** Build your vocabulary, practice grammar, and prepare for your exams using interactive quizzes and exercises—all in Falowen, created by Learn Language Education Academy, tailored for our classes.\n\n"
             "Falowen is available to all enrolled students. Track your progress, submit assignments, and access learning materials—anytime, anywhere!\n"
             "Preview the app: https://falowen.streamlit.app"
         )
@@ -394,17 +412,19 @@ with tabs[0]:
         qr_html = f'<img src="data:image/png;base64,{qr_b64}" width="70"/>'
 
         html = f"""
-        <div style='background:#e3f2fd;padding:2em 1em 2em 1em;border-radius:15px;max-width:510px;margin:auto'>
+        <div style='background:#e3f2fd;padding:2em 1em 2em 1em;border-radius:15px;max-width:520px;margin:auto'>
         <img src="{logo_url}" width="120"/><br>
         <h2 style="color:#0d47a1;margin-bottom:0.3em">{class_label} ({level})</h2>
         <b>Start:</b> {start_date.strftime('%d %b %Y')} &nbsp; <b>End:</b> {end_date.strftime('%d %b %Y')}<br>
         <b>Meeting Times:</b> {times}<br>
         <div style='margin:1em 0 1em 0'>{desc}</div>
-        <b>Goethe Exam Start Date:</b> {goethe_date or '-'}<br>
-        <b>Course Price:</b> GHS {price}<br>
-        <div style="color:#ff7043;font-weight:bold">{notes}</div>
+        <b>Course Price (school fee):</b> GHS {price}<br>
+        <b>Goethe Exam Date:</b> {goethe_date or '-'} &nbsp; <b>Exam Fee:</b> GHS {goethe_price} <br>
+        <span style="color:#ff7043;"><i>Goethe exam fee is paid directly to Goethe-Institut. Our fee above covers all lessons, support, and access to Falowen.</i></span>
+        <div style="color:#1565c0;font-weight:bold;margin-top:0.8em">{notes}</div>
         <hr>
-        <div style="background:#e1f5fe;padding:0.5em 0.5em 0.5em 1.2em;border-radius:9px">
+        <div style="background:#e1f5fe;padding:0.7em 0.5em 0.7em 1.2em;border-radius:9px">
+        {falowen_img_html}
         <b>Advanced Learning Tools – Powered by Our Own “Falowen” App</b>
         <ul>
         <li><b>AI-Powered Writing Correction:</b> Instantly get feedback on your German writing, with corrections and tips built right into Falowen—developed by our own school for our students’ success.</li>
@@ -440,12 +460,14 @@ with tabs[0]:
         st.markdown("### Preview Brochure")
         st.markdown(html, unsafe_allow_html=True)
 
+        # --- PDF Generation code below stays similar; can be further styled if you want! ---
         class BrochurePDF(FPDF):
             def header(self):
                 if logo_url:
                     try:
                         import requests
                         from PIL import Image
+                        from io import BytesIO
                         response = requests.get(logo_url)
                         img = Image.open(BytesIO(response.content))
                         tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
@@ -468,8 +490,8 @@ with tabs[0]:
         pdf.cell(0, 8, safe_pdf(f"Start: {start_date.strftime('%d %b %Y')}  |  End: {end_date.strftime('%d %b %Y')}"), ln=1)
         pdf.cell(0, 8, safe_pdf(f"Meeting Times: {times}"), ln=1)
         pdf.multi_cell(0, 8, safe_pdf(desc))
-        pdf.cell(0, 8, safe_pdf(f"Goethe Exam Start Date: {goethe_date or '-'}"), ln=1)
-        pdf.cell(0, 8, safe_pdf(f"Course Price: GHS {price}"), ln=1)
+        pdf.cell(0, 8, safe_pdf(f"Course Price (school fee): GHS {price}"), ln=1)
+        pdf.cell(0, 8, safe_pdf(f"Goethe Exam Date: {goethe_date or '-'} | Exam Fee: GHS {goethe_price} (paid directly to Goethe-Institut)"), ln=1)
         pdf.ln(2)
         pdf.set_font("Arial", "B", 12)
         pdf.multi_cell(0, 8, safe_pdf("Advanced Learning Tools – Powered by Our Own “Falowen” App:"))
@@ -500,6 +522,7 @@ with tabs[0]:
 
         pdf_bytes = pdf.output(dest="S").encode("latin-1","replace")
         st.download_button("📄 Download Brochure as PDF", data=pdf_bytes, file_name="Class_Brochure.pdf", mime="application/pdf")
+
 
 
 # ==== 9. ALL STUDENTS TAB ====
