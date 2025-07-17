@@ -775,9 +775,6 @@ with tabs[4]:
             
 
 with tabs[5]:
-    import tempfile
-    from fpdf import FPDF
-    import re
 
     # ---- Helper: Ensure all text in PDF is ASCII / latin-1 safe ----
     def safe_pdf(text):
