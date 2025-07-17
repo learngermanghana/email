@@ -3,6 +3,7 @@ import base64
 import re
 import qrcode
 import tempfile
+import re
 from datetime import datetime, date, timedelta
 import pandas as pd
 import streamlit as st
@@ -980,7 +981,7 @@ with tabs[5]:
         except Exception as e:
             st.error(f"Email send failed: {e}")
 
-
+#
 
 
 # ==== 14. TAB 6: COURSE SCHEDULE GENERATOR ====
