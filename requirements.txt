@@ -5,4 +5,4 @@ sendgrid>=6.9.1
 pygsheets>=2.0.5
 google-auth>=2.22.0
 qrcode[pil]
-fpdf2>=2.7.0
+fpdf2>=1.7.0
