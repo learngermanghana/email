@@ -355,15 +355,17 @@ with tabs[0]:
     def safe_pdf(text):
         return "".join(c if ord(c) < 256 else "?" for c in str(text))
 
-    # --- Brochure Preview ---
+    # --- Brochure Preview & PDF Download ---
     if submit:
-        # Generate HTML preview
+        # --- HTML Preview ---
         st.markdown("## 📄 Brochure Preview")
         html = f"<h2 style='color:#1565c0'>{headline}</h2>"
+        logo_html_img = None
         if logo:
             import base64
-            img = base64.b64encode(logo.read()).decode()
-            html = f"<img src='data:image/png;base64,{img}' width='120'><br>" + html
+            img_bytes = logo.read()
+            logo_html_img = base64.b64encode(img_bytes).decode()
+            html = f"<img src='data:image/png;base64,{logo_html_img}' width='120'><br>" + html
         html += f"<p><b>{school}</b><br>{contact}<br>{email}</p>"
         html += f"<p>{intro}</p>"
         html += "<hr><h3>Upcoming Classes</h3>"
@@ -375,19 +377,22 @@ with tabs[0]:
         html += f"<hr><b>Notes:</b> {notes}"
         st.markdown(html, unsafe_allow_html=True)
 
-        # --- PDF Download ---
+        # --- PDF Generation ---
         from fpdf import FPDF
         import tempfile
+
         pdf = FPDF()
         pdf.add_page()
-        # Add logo if available
-        if logo:
+
+        # Add logo if uploaded
+        if logo and logo_html_img:
             ext = logo.name.split('.')[-1]
             tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
-            tmp.write(logo.getbuffer())
+            tmp.write(img_bytes)
             tmp.close()
             pdf.image(tmp.name, x=10, y=8, w=28)
             pdf.ln(25)
+
         pdf.set_font("Arial", 'B', 16)
         pdf.cell(0, 12, safe_pdf(headline), ln=True, align='C')
         pdf.set_font("Arial", '', 12)
@@ -408,10 +413,11 @@ with tabs[0]:
         pdf.set_font("Arial", 'I', 10)
         pdf.multi_cell(0, 7, safe_pdf(f"Notes: {notes}"))
 
-        # Handle fpdf output bytes
+        # --- FPDF Output (compatible with all fpdf/pyfpdf versions) ---
         pdf_bytes = pdf.output(dest="S")
-        if isinstance(pdf_bytes, str):
+        if isinstance(pdf_bytes, str):  # fpdf1 returns str, fpdf2 returns bytes
             pdf_bytes = pdf_bytes.encode("latin-1", "replace")
+        assert isinstance(pdf_bytes, bytes), f"pdf_bytes is not bytes: {type(pdf_bytes)}"
 
         st.download_button("📄 Download Brochure PDF", data=pdf_bytes, file_name="class_brochure.pdf", mime="application/pdf")
 
@@ -422,13 +428,13 @@ with tabs[0]:
         if st.button("Send Brochure to Client") and client_email:
             from sendgrid import SendGridAPIClient
             from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
-            import base64
             msg = Mail(
                 from_email=email,
                 to_emails=client_email,
                 subject="German Class Brochure",
                 html_content=html
             )
+            import base64
             attach = Attachment(
                 FileContent(base64.b64encode(pdf_bytes).decode()),
                 FileName("class_brochure.pdf"),
@@ -442,7 +448,6 @@ with tabs[0]:
                 st.success(f"Brochure sent to {client_email}!")
             except Exception as e:
                 st.error(f"Failed to send: {e}")
-
 
 
 # ==== 9. ALL STUDENTS TAB ====
