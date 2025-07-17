@@ -580,6 +580,7 @@ with tabs[0]:
         )
 
 
+
 # ==== 9. ALL STUDENTS TAB ====
 with tabs[1]:
     st.title("👩‍🎓 All Students")
