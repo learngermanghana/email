@@ -927,7 +927,7 @@ with tabs[5]:
     pdf.watermark()
     pdf.set_font("Arial", size=12)
     import re
-    pdf.multi_cell(0, 8, safe_pdf(re.sub(r"<br\s*/?>", "\n", email_body)), align="L")
+    pdf.multi_cell(0, 8, safe_pdf(re.sub(r"<br\s*/?>", "\n", email_body)))
     pdf.ln(6)
     if msg_type == "Letter of Enrollment":
         pdf.set_font("Arial", size=11)
@@ -936,6 +936,7 @@ with tabs[5]:
         pdf.cell(0, 7, "Director", ln=True)
         pdf.cell(0, 7, safe_pdf(SCHOOL_NAME), ln=True)
     pdf_bytes = pdf.output(dest="S").encode("latin-1", "replace")
+#
 
     st.download_button(
         "📄 Download Letter/PDF", 
