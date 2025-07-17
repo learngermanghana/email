@@ -3,6 +3,7 @@ import base64
 import re
 import qrcode
 import tempfile
+import sqlite3
 from datetime import datetime, date, timedelta
 import pandas as pd
 import streamlit as st
