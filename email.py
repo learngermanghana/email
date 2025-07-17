@@ -323,7 +323,7 @@ Asadu Felix
 
 with tabs[0]:
     st.title("🎉 Create Class Brochure / Flyer")
-    st.info("Generate a beautiful brochure for your next German class! You can preview, download as PDF, or email to your clients.")
+    st.info("Generate a beautiful brochure for your next German class! You can preview and email it to your clients.")
 
     # --- Logo upload ---
     logo = st.file_uploader("Upload School Logo (optional)", type=["png", "jpg", "jpeg"], key="brochure_logo")
@@ -351,16 +351,10 @@ with tabs[0]:
         notes = st.text_area("Notes (discounts, deadlines, etc)", value="Register by the deadline to enjoy a discount.")
         submit = st.form_submit_button("Preview Brochure")
 
-    # --- Helper for PDF latin-1 safe text ---
-    def safe_pdf(text):
-        return "".join(c if ord(c) < 256 else "?" for c in str(text))
-
-    # --- Brochure Preview & PDF Download ---
+    # --- Brochure Preview & Email Only ---
     if submit:
-        # --- HTML Preview ---
         st.markdown("## 📄 Brochure Preview")
         html = f"<h2 style='color:#1565c0'>{headline}</h2>"
-        logo_html_img = None
         if logo:
             import base64
             img_bytes = logo.read()
@@ -377,72 +371,20 @@ with tabs[0]:
         html += f"<hr><b>Notes:</b> {notes}"
         st.markdown(html, unsafe_allow_html=True)
 
-        # --- PDF Generation ---
-        from fpdf import FPDF
-        import tempfile
-
-        pdf = FPDF()
-        pdf.add_page()
-
-        # Add logo if uploaded
-        if logo and logo_html_img:
-            ext = logo.name.split('.')[-1]
-            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
-            tmp.write(img_bytes)
-            tmp.close()
-            pdf.image(tmp.name, x=10, y=8, w=28)
-            pdf.ln(25)
-
-        pdf.set_font("Arial", 'B', 16)
-        pdf.cell(0, 12, safe_pdf(headline), ln=True, align='C')
-        pdf.set_font("Arial", '', 12)
-        pdf.cell(0, 10, safe_pdf(school), ln=True, align='C')
-        pdf.cell(0, 10, safe_pdf(contact), ln=True, align='C')
-        pdf.cell(0, 10, safe_pdf(email), ln=True, align='C')
-        pdf.ln(8)
-        pdf.set_font("Arial", '', 11)
-        pdf.multi_cell(0, 8, safe_pdf(intro))
-        pdf.ln(2)
-        pdf.set_font("Arial", 'B', 13)
-        pdf.cell(0, 10, "Upcoming Classes", ln=True)
-        pdf.set_font("Arial", '', 11)
-        for c in classes:
-            pdf.multi_cell(0, 8, safe_pdf(f"Level: {c['level']} | Start: {c['start']} | {c['days']}\n{c['desc']}\n"))
-            pdf.ln(1)
-        pdf.ln(3)
-        pdf.set_font("Arial", 'I', 10)
-        pdf.multi_cell(0, 7, safe_pdf(f"Notes: {notes}"))
-
-        # --- FPDF Output (compatible with all fpdf/pyfpdf versions) ---
-        pdf_bytes = pdf.output(dest="S")
-        if isinstance(pdf_bytes, str):  # fpdf1 returns str, fpdf2 returns bytes
-            pdf_bytes = pdf_bytes.encode("latin-1", "replace")
-        assert isinstance(pdf_bytes, bytes), f"pdf_bytes is not bytes: {type(pdf_bytes)}"
-
-        st.download_button("📄 Download Brochure PDF", data=pdf_bytes, file_name="class_brochure.pdf", mime="application/pdf")
-
         # --- Email Brochure (Optional) ---
         st.markdown("---")
         st.markdown("### 📧 Email This Brochure to a Client")
         client_email = st.text_input("Client Email")
         if st.button("Send Brochure to Client") and client_email:
             from sendgrid import SendGridAPIClient
-            from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
-            msg = Mail(
-                from_email=email,
-                to_emails=client_email,
-                subject="German Class Brochure",
-                html_content=html
-            )
-            import base64
-            attach = Attachment(
-                FileContent(base64.b64encode(pdf_bytes).decode()),
-                FileName("class_brochure.pdf"),
-                FileType("application/pdf"),
-                Disposition("attachment")
-            )
-            msg.attachment = attach
+            from sendgrid.helpers.mail import Mail
             try:
+                msg = Mail(
+                    from_email=email,
+                    to_emails=client_email,
+                    subject="German Class Brochure",
+                    html_content=html
+                )
                 sg = SendGridAPIClient(SENDGRID_KEY)
                 sg.send(msg)
                 st.success(f"Brochure sent to {client_email}!")
