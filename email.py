@@ -275,34 +275,7 @@ def send_email_report(pdf_bytes: bytes, to: str, subject: str, html_content: str
         st.error(f"Email send failed: {e}")
 
 
-def image_url_to_pil(url):
-    try:
-        response = requests.get(url)
-        img = Image.open(BytesIO(response.content))
-        return img
-    except Exception:
-        return None
 
-
-def get_random_reviews(sheet_url, n=2):
-    if "/edit" in sheet_url:
-        csv_url = sheet_url.replace("/edit?usp=sharing", "/export?format=csv")
-    else:
-        csv_url = sheet_url
-    try:
-        df = pd.read_csv(csv_url)
-    except Exception:
-        return []
-    review_cols = [col for col in df.columns if "review" in col.lower() or "comment" in col.lower()]
-    name_cols = [col for col in df.columns if "name" in col.lower()]
-    reviews = []
-    for _, row in df.iterrows():
-        review_text = str(row[review_cols[0]]) if review_cols else ""
-        reviewer = str(row[name_cols[0]]) if name_cols else ""
-        if review_text.strip():
-            reviews.append(f"“{review_text}” — {reviewer}" if reviewer else f"“{review_text}”")
-    random.shuffle(reviews)
-    return reviews[:min(n, len(reviews))]
     
 # ==== 5. TABS LAYOUT ====
 tabs = st.tabs([
@@ -347,6 +320,58 @@ Asadu Felix
 
 # --- End of Stage 2 ---
 
+# -- Helper Functions (defined once at top) --
+@st.cache_data
+def get_random_reviews(sheet_url, n=2):
+    csv_url = sheet_url.replace("/edit?usp=sharing", "/export?format=csv") if "/edit" in sheet_url else sheet_url
+    try:
+        df = pd.read_csv(csv_url)
+    except:
+        return []
+    cols = [c for c in df.columns if "review" in c.lower() or "comment" in c.lower()]
+    names = [c for c in df.columns if "name" in c.lower()]
+    items = []
+    for _, r in df.iterrows():
+        text = str(r[cols[0]]) if cols else ""
+        author = str(r[names[0]]) if names else ""
+        if text.strip():
+            items.append(f"“{text}” — {author}" if author else f"“{text}”")
+    random.shuffle(items)
+    return items[:min(n, len(items))]
+
+
+def make_qr_code(url):
+    try:
+        img = qrcode.make(url)
+    except:
+        return None
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+    img.save(tmp.name)
+    return tmp.name
+
+
+def prepare_image_for_html(f):
+    try:
+        img = Image.open(f)
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+        img.save(tmp.name, format="PNG")
+        with open(tmp.name, 'rb') as file:
+            data = base64.b64encode(file.read()).decode()
+        os.remove(tmp.name)
+        return f'data:image/png;base64,{data}'
+    except:
+        return None
+
+
+def prepare_image_for_pdf(f):
+    try:
+        img = Image.open(f)
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+        img.save(tmp.name, format="PNG")
+        return tmp.name
+    except:
+        return None
+
 # -- Main UI --
 REVIEWS_SHEET = "https://docs.google.com/spreadsheets/d/137HANmV9jmMWJEdcA1klqGiP8nYihkDugcIbA-2V1Wc/edit?usp=sharing"
 
@@ -377,7 +402,7 @@ with tabs[0]:
         st.stop()
 
     reviews = get_random_reviews(REVIEWS_SHEET, n_reviews)
-    qr_path = make_qr_code("https://falowen.streamlit.app", size=3)
+    qr_path = make_qr_code("https://falowen.streamlit.app")
 
     # -- HTML Preview --
     if layout == "Single Column":
@@ -440,7 +465,7 @@ with tabs[0]:
         try:
             resp = requests.get(logo_url)
             tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
-            tmp.write(resp.content);
+            tmp.write(resp.content)
             tmp.close()
             pdf.image(tmp.name, x=10, y=8, w=28)
         except:
@@ -501,14 +526,13 @@ with tabs[0]:
     render_body(pdf)
     render_reviews(pdf)
 
-    pdf_bytes = pdf.output(dest="S").encode("utf-8")
+    pdf_bytes = bytes(pdf.output(dest="S"))
     st.download_button(
         "📄 Download PDF",
         data=pdf_bytes,
         file_name="Class_Brochure.pdf",
         mime="application/pdf"
     )
-
 
 
 # ==== 9. ALL STUDENTS TAB ====
