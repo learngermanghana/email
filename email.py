@@ -320,12 +320,13 @@ Asadu Felix
 
 # --- End of Stage 2 ---
 
+# Helpers (top of script – do not repeat if you already have)
 @st.cache_data
 def get_random_reviews(sheet_url, n=2):
     csv_url = sheet_url.replace("/edit?usp=sharing", "/export?format=csv") if "/edit" in sheet_url else sheet_url
     try:
         df = pd.read_csv(csv_url)
-    except:
+    except Exception:
         return []
     cols = [c for c in df.columns if "review" in c.lower() or "comment" in c.lower()]
     names = [c for c in df.columns if "name" in c.lower()]
@@ -338,44 +339,58 @@ def get_random_reviews(sheet_url, n=2):
     random.shuffle(items)
     return items[:min(n, len(items))]
 
-
 def make_qr_code(url):
-    try:
-        img = qrcode.make(url)
-    except:
-        return None
+    img = qrcode.make(url)
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
     img.save(tmp.name)
     return tmp.name
 
+def safe_pdf(txt):
+    return "".join(c if ord(c) < 256 else "?" for c in str(txt))
 
-def prepare_image_for_html(f):
+def prepare_image_for_html(file_or_url):
+    if not file_or_url:
+        return ""
+    if isinstance(file_or_url, str) and file_or_url.startswith("http"):
+        return file_or_url
     try:
-        img = Image.open(f)
+        img = Image.open(file_or_url)
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
         img.save(tmp.name, format="PNG")
-        with open(tmp.name, 'rb') as file:
-            data = base64.b64encode(file.read()).decode()
+        with open(tmp.name, 'rb') as f:
+            data = base64.b64encode(f.read()).decode()
         os.remove(tmp.name)
-        return f'data:image/png;base64,{data}'
-    except:
+        return f"data:image/png;base64,{data}"
+    except Exception:
+        return ""
+
+def prepare_image_for_pdf(file_or_url):
+    if not file_or_url:
         return None
-
-
-def prepare_image_for_pdf(f):
+    if isinstance(file_or_url, str) and file_or_url.startswith("http"):
+        # Download the image first
+        resp = requests.get(file_or_url)
+        if resp.status_code == 200:
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+            tmp.write(resp.content)
+            tmp.close()
+            return tmp.name
+        return None
     try:
-        img = Image.open(f)
+        img = Image.open(file_or_url)
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
         img.save(tmp.name, format="PNG")
         return tmp.name
-    except:
+    except Exception:
         return None
 
 REVIEWS_SHEET = "https://docs.google.com/spreadsheets/d/137HANmV9jmMWJEdcA1klqGiP8nYihkDugcIbA-2V1Wc/edit?usp=sharing"
 
+# =================== TAB 0 ======================
 with tabs[0]:
     st.title("🎓 Class Brochure / Flyer Generator")
-    st.write("Generate a premium PDF brochure for your German classes!")
+    st.write("Generate a professional flyer or brochure for your upcoming German classes with dynamic reviews and Falowen app info.")
+
     layout = st.selectbox("Layout Template", ["Single Column", "Two Column", "Poster Style"])
 
     with st.form("brochure_form"):
@@ -387,36 +402,55 @@ with tabs[0]:
         start_dt = st.date_input("Start Date", date.today())
         end_dt = st.date_input("End Date", date.today())
         times = st.text_input("Meeting Times", "Mon 7pm, Wed 6pm")
-        desc = st.text_area("Description", "Hybrid: In‑person, online or recorded via Falowen app.")
+        desc = st.text_area("Description", "Hybrid: In-person, online or recorded via Falowen app.")
         fee = st.text_input("School Fee (GHS)", "1,500")
         ge_dt = st.text_input("Goethe Exam Date", "2024-09-10")
         ge_fee = st.text_input("Goethe Exam Fee (GHS)", "1,200")
         notes = st.text_area("Why Choose Us?", "Top results, professional team, 24/7 Falowen access.")
         n_reviews = st.slider("Number of Reviews", 1, 4, 2)
+        extra_notes = st.text_area("Extra Notes", "Register by the deadline to enjoy a discount.")
         submitted = st.form_submit_button("Preview Brochure")
 
     if not submitted:
         st.info("Complete the form and click Preview.")
         st.stop()
 
+    # -- Prepare images for HTML & PDF
+    logo_html = prepare_image_for_html(logo_url)
+    class_html = prepare_image_for_html(classroom)
+    logo_pdf = prepare_image_for_pdf(logo_url)
+    class_pdf = prepare_image_for_pdf(classroom)
+
     reviews = get_random_reviews(REVIEWS_SHEET, n_reviews)
     qr_path = make_qr_code("https://falowen.streamlit.app")
+    qr_html = ""
+    if qr_path:
+        with open(qr_path, 'rb') as f:
+            qr_html = f"data:image/png;base64,{base64.b64encode(f.read()).decode()}"
 
+    # -- HTML PREVIEW --
     if layout == "Single Column":
         html = f"""
         <div style='max-width:500px;margin:auto;padding:1em;border:1px solid #ccc;border-radius:10px'>
-          <img src="{logo_url}" width="100"/><br>
+          <img src="{logo_html}" width="100"/><br>
           <h2>{title} ({level})</h2>
           <b>Dates:</b> {start_dt.strftime('%d %b %Y')} – {end_dt.strftime('%d %b %Y')}<br>
           <b>Times:</b> {times}<br>
           <p>{desc}</p>
           <b>School Fee:</b> GHS {fee}<br>
           <b>Goethe Exam:</b> {ge_dt} (Fee GHS {ge_fee})<br>
-          <i>{notes}</i><hr>
+          <b>Note:</b> Goethe fee is paid directly to Goethe Institute.<br>
+          <i>{notes}</i>
+          <hr>
           <h3>Falowen App</h3>
-          <p>AI Writing Correction, Pronunciation Scoring, Vocabulary & Practice.</p>
-          <img src="data:image/png;base64,{base64.b64encode(open(qr_path,'rb').read()).decode()}" width="80"/><br>
-          <a href="https://falowen.streamlit.app">falowen.streamlit.app</a><hr>
+          <p>AI Writing Correction, Pronunciation Scoring, Vocabulary & Practice. Built by our school, exclusive for students.</p>
+          <img src="{qr_html}" width="80"/><br>
+          <a href="https://falowen.streamlit.app">falowen.streamlit.app</a>
+          <hr>
+          {"<br>".join(reviews)}
+          <hr>
+          <div style='font-size:0.95em'>{extra_notes}</div>
+        </div>
         """
     elif layout == "Two Column":
         html = f"""
@@ -426,114 +460,116 @@ with tabs[0]:
             <p><b>Dates:</b> {start_dt.strftime('%d %b %Y')} – {end_dt.strftime('%d %b %Y')}<br>
             <b>Times:</b> {times}<br>
             <b>Fee:</b> GHS {fee}<br>
-            <b>Goethe:</b> {ge_dt} (GHS {ge_fee})</p>
+            <b>Goethe:</b> {ge_dt} (GHS {ge_fee}, paid to Goethe Institute)</p>
             <p>{desc}</p>
             <i>{notes}</i>
+            <p>{extra_notes}</p>
+            <h3>Falowen App</h3>
+            <ul>
+              <li>AI Writing Correction</li>
+              <li>Speaking feedback with pronunciation scoring</li>
+              <li>Vocabulary & practice tools — built by us, exclusive for students!</li>
+            </ul>
+            <img src="{qr_html}" width="70"/><br>
+            <a href="https://falowen.streamlit.app">falowen.streamlit.app</a>
+            <br><hr>
+            {"<br>".join(reviews)}
           </div>
           <div style='flex:1;padding:1em'>
-            <img src="{logo_url}" width="100%" style='margin-bottom:1em'/>
-            <img src="data:image/png;base64,{base64.b64encode(open(qr_path,'rb').read()).decode()}" width="80"/><br>
-            <a href="https://falowen.streamlit.app">falowen.streamlit.app</a>
+            <img src="{class_html or logo_html}" width="100%" style='margin-bottom:1em'/>
           </div>
+        </div>
         """
-    else:
+    else:  # Poster Style
         html = f"""
-        <div style='text-align:center;padding:2em;background:#f5f5f5;border-radius:15px'>
-          <h1>{title}</h1>
-          <h3>{level} Course</h3>
-          <p><b>{start_dt.strftime('%d %b %Y')} – {end_dt.strftime('%d %b %Y')}</b><br>{times}</p>
-          <p>{desc}</p>
-          <p><b>GHS {fee}</b></p>
-          <p><i>{notes}</i></p>
-          <img src="data:image/png;base64,{base64.b64encode(open(qr_path,'rb').read()).decode()}" width="100"/>
+        <div style='max-width:650px;margin:auto;padding:2em 1em 1em 1em;border:3px solid #0c7bb3;border-radius:18px;background:#fafdff;'>
+          <div style='display:flex;justify-content:space-between;align-items:center'>
+            <img src="{logo_html}" width="90"/>
+            <h1 style='margin:0'>{title}</h1>
+            <img src="{qr_html}" width="68"/>
+          </div>
+          <h3 style='color:#025'>{level} | {start_dt.strftime('%d %b')}–{end_dt.strftime('%d %b')}</h3>
+          <p style='font-size:1.2em'>{desc}</p>
+          <b>Schedule:</b> {times}<br>
+          <b>School Fee:</b> GHS {fee}<br>
+          <b>Goethe Exam:</b> {ge_dt} (GHS {ge_fee}, paid to Goethe Institute only)<br>
+          <i>{notes}</i>
+          <hr>
+          <img src="{class_html or logo_html}" width="100%" style='margin-bottom:1em;border-radius:8px'/>
+          <h3 style='margin-top:0'>Why Falowen?</h3>
+          <ul>
+            <li>AI writing correction & feedback</li>
+            <li>Pronunciation scoring</li>
+            <li>Exclusive access to all lesson replays, exercises & vocab practice</li>
+            <li>Hybrid learning: in-person, online or recorded — all flexible!</li>
+          </ul>
+          <hr>
+          {"<br>".join(reviews)}
+          <div style='font-size:0.98em;margin-top:0.6em'>{extra_notes}</div>
+        </div>
         """
 
-    img_html = prepare_image_for_html(classroom) if classroom else None
-    if img_html:
-        html += f'<img src="{img_html}" width="100%"/><hr>'
-    if reviews:
-        html += "<h3>Testimonials</h3><ul>" + "".join(f"<li>{r}</li>" for r in reviews) + "</ul>"
-    html += "<p><b>Contact:</b>0205706589 • learngermanghana@gmail.com</p></div>"
-    st.markdown("### Preview Brochure")
     st.markdown(html, unsafe_allow_html=True)
 
-    def render_header(pdf):
-        try:
-            resp = requests.get(logo_url)
-            tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
-            tmp.write(resp.content)
-            tmp.close()
-            pdf.image(tmp.name, x=10, y=8, w=28)
-        except:
-            pass
-        pdf.set_font("DejaVu", "B", 16)
-        pdf.cell(0, 12, f"{title} ({level})", ln=True, align="C")
+    # -------- PDF Generation --------
+    if st.button("Download Brochure as PDF"):
+        class PDF(FPDF):
+            def header(self):
+                if logo_pdf:
+                    self.image(logo_pdf, x=10, y=8, w=36)
+                self.set_font("Arial", "B", 16)
+                self.cell(0, 10, safe_pdf(title), ln=True, align="C")
+                self.ln(2)
+
+            def footer(self):
+                self.set_y(-20)
+                self.set_font("Arial", "I", 8)
+                self.cell(0, 8, safe_pdf("Falowen app: falowen.streamlit.app"), 0, 0, 'C')
+                if qr_path:
+                    self.image(qr_path, x=180, y=260, w=18)
+
+        pdf = PDF()
+        pdf.add_page()
+        pdf.set_font("Arial", size=12)
+        pdf.cell(0, 10, safe_pdf(f"{title} ({level})"), ln=True)
+        pdf.cell(0, 8, safe_pdf(f"Dates: {start_dt.strftime('%d %b %Y')} – {end_dt.strftime('%d %b %Y')}"), ln=True)
+        pdf.cell(0, 8, safe_pdf(f"Times: {times}"), ln=True)
+        pdf.cell(0, 8, safe_pdf(f"School Fee: GHS {fee}"), ln=True)
+        pdf.cell(0, 8, safe_pdf(f"Goethe Exam: {ge_dt} (GHS {ge_fee}, paid to Goethe Institute)"), ln=True)
         pdf.ln(2)
-
-    def render_body(pdf):
-        pdf.set_font("DejaVu", "", 12)
-        pdf.multi_cell(0, 8, f"Dates: {start_dt.strftime('%d %b %Y')} – {end_dt.strftime('%d %b %Y')}")
-        pdf.multi_cell(0, 8, f"Times: {times}")
-        pdf.multi_cell(0, 8, desc)
-        pdf.cell(0, 8, f"School Fee: GHS {fee}", ln=True)
-        pdf.cell(0, 8, f"Goethe Exam: {ge_dt} (GHS {ge_fee})", ln=True)
-        pdf.ln(4)
-        pdf.set_font("DejaVu", "B", 12)
-        pdf.cell(0, 8, "Why Choose Us?", ln=True)
-        pdf.set_font("DejaVu", "", 11)
-        pdf.multi_cell(0, 7, notes)
-        pdf.ln(4)
-        pdf.set_font("DejaVu", "B", 12)
+        pdf.set_font("Arial", "I", 11)
+        pdf.multi_cell(0, 7, safe_pdf(desc))
+        pdf.multi_cell(0, 7, safe_pdf(notes))
+        pdf.multi_cell(0, 7, safe_pdf(extra_notes))
+        pdf.ln(3)
+        if class_pdf:
+            pdf.image(class_pdf, x=15, w=170)
+            pdf.ln(2)
+        pdf.set_font("Arial", "B", 12)
         pdf.cell(0, 8, "Falowen App Features", ln=True)
-        pdf.set_font("DejaVu", "", 11)
-        pdf.multi_cell(0, 7, "• AI Writing Correction\n• Pronunciation Scoring\n• Vocabulary & Practice")
-        img_path = prepare_image_for_pdf(classroom) if classroom else None
-        if img_path:
-            pdf.image(img_path, x=30, w=150)
-            pdf.ln(10)
-        qr_tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
-        Image.open(qr_path).save(qr_tmp.name)
-        pdf.image(qr_tmp.name, x=pdf.get_x(), y=pdf.get_y(), w=28)
-        pdf.ln(20)
-
-    def render_reviews(pdf):
+        pdf.set_font("Arial", size=11)
+        pdf.multi_cell(0, 7, safe_pdf(
+            "• AI-powered writing correction\n"
+            "• Speaking feedback with pronunciation scoring\n"
+            "• Vocabulary & practice tools (exclusive for Falowen students)\n"
+            "• Hybrid learning: attend in-person, online or catch up anytime!"
+        ))
+        pdf.ln(2)
         if reviews:
-            pdf.set_font("DejaVu", "B", 12)
-            pdf.cell(0, 8, "Testimonials:", ln=True)
-            pdf.set_font("DejaVu", "I", 11)
-            for r in reviews:
-                pdf.multi_cell(0, 7, r)
-            pdf.ln(4)
-
-    def render_footer(pdf):
-        pdf.set_font("DejaVu", "B", 11)
-        pdf.cell(0, 8, "Contact & Registration:", ln=True)
-        pdf.set_font("DejaVu", "", 11)
-        pdf.cell(0, 8, "0205706589 • learngermanghana@gmail.com", ln=True)
-
-    class PDF(FPDF):
-        def __init__(self):
-            super().__init__()
-            self.add_font("DejaVu", "", "DejaVuSans.ttf", uni=True)
-
-        def header(self):
-            render_header(self)
-
-        def footer(self):
-            render_footer(self)
-
-    pdf = PDF()
-    pdf.add_page()
-    render_body(pdf)
-    render_reviews(pdf)
-
-    pdf_bytes = bytes(pdf.output(dest="S"))
-    st.download_button(
-        "📄 Download PDF",
-        data=pdf_bytes,
-        file_name="Class_Brochure.pdf",
-        mime="application/pdf"
-    )
+            pdf.set_font("Arial", "B", 11)
+            pdf.cell(0, 8, "Student Reviews:", ln=True)
+            pdf.set_font("Arial", size=11)
+            for rev in reviews:
+                pdf.multi_cell(0, 7, safe_pdf(rev))
+                pdf.ln(1)
+        pdf.ln(2)
+        pdf_bytes = bytes(pdf.output(dest="S"))
+        st.download_button(
+            "📄 Download PDF Brochure",
+            data=pdf_bytes,
+            file_name=f"{title.replace(' ', '_')}_brochure.pdf",
+            mime="application/pdf"
+        )
 
 
 # ==== 9. ALL STUDENTS TAB ====
