@@ -347,56 +347,59 @@ Asadu Felix
 
 # --- End of Stage 2 ---
 
-
 with tabs[0]:
-
-
-    # UI Form
     st.title("🎓 Class Brochure / Flyer Generator")
     st.write("Generate a premium PDF brochure for your German classes!")
 
-    with st.form("form"):
-        logo_url     = "https://i.imgur.com/iFiehrp.png"
+    # -- Form Inputs --
+    with st.form("brochure_form"):
+        logo_url  = "https://i.imgur.com/iFiehrp.png"
         st.image(logo_url, width=120)
 
-        classroom    = st.file_uploader("Classroom Photo (optional)", type=["png","jpg"])
-        title        = st.text_input("Class Title", "A1 Intensive Beginners")
-        level        = st.text_input("Level", "A1")
-        start_dt     = st.date_input("Start Date", date.today())
-        end_dt       = st.date_input("End Date", date.today())
-        times        = st.text_input("Meeting Times", "Mon 7pm, Wed 6pm")
-        desc         = st.text_area("Description", "Hybrid: In‑person, online live or recorded on Falowen app.")
-        fee          = st.text_input("School Fee (GHS)", "1,500")
-        ge_dt        = st.text_input("Goethe Exam Date", "2024-09-10")
-        ge_fee       = st.text_input("Goethe Exam Fee (GHS)", "1,200")
+        classroom = st.file_uploader("Classroom Photo (optional)", type=["png","jpg","jpeg"])
+        title     = st.text_input("Class Title", "A1 Intensive Beginners")
+        level     = st.text_input("Level", "A1")
+        start_dt  = st.date_input("Start Date", date.today())
+        end_dt    = st.date_input("End Date", date.today())
+        times     = st.text_input("Meeting Times", "Mon 7pm, Wed 6pm")
+        desc      = st.text_area(
+            "Description",
+            "Hybrid: In‑person, online live or recorded via our Falowen app. Fun, interactive for beginners!"
+        )
+        fee       = st.text_input("School Fee (GHS)", "1,500")
+        ge_dt     = st.text_input("Goethe Exam Date", "2024-09-10")
+        ge_fee    = st.text_input("Goethe Exam Fee (GHS)", "1,200")
         st.caption("Goethe fee paid to Goethe‑Institut; our fee above covers lessons & app access.")
-        notes        = st.text_area("Why Choose Us?", "Top results, friendly team, 24/7 Falowen access. Early‑bird discount!")
-        n_reviews    = st.slider("Number of Reviews", 1, 4, 2)
+        notes     = st.text_area(
+            "Why Choose Us?",
+            "Top results, professional team, 24/7 Falowen access. Register early for discounts!"
+        )
+        n_reviews = st.slider("Number of Reviews", 1, 4, 2)
 
-        submit = st.form_submit_button("Preview Brochure")
+        submitted = st.form_submit_button("Preview Brochure")
 
-    if not submit:
+    # -- Preview or Early Exit --
+    if not submitted:
         st.info("Complete the form and click Preview.")
     else:
-        # Fetch dynamic reviews
+        # Fetch reviews & generate QR
         REVIEWS_SHEET = "https://docs.google.com/spreadsheets/d/137HANmV9jmMWJEdcA1klqGiP8nYihkDugcIbA-2V1Wc/edit?usp=sharing"
         reviews = get_random_reviews(REVIEWS_SHEET, n_reviews)
-
-        # Generate QR for Falowen
         qr_path = make_qr_code("https://falowen.streamlit.app", size=3)
 
-        # HTML Preview
+        # -- HTML Preview --
         html = f"""
         <div style='max-width:500px;margin:auto;padding:1em;border:1px solid #ccc;border-radius:10px'>
           <img src="{logo_url}" width="100"/><br>
           <h2>{title} ({level})</h2>
           <b>Dates:</b> {start_dt.strftime('%d %b %Y')} – {end_dt.strftime('%d %b %Y')}<br>
-          <b>Times:</b> {times}<br><p>{desc}</p>
+          <b>Times:</b> {times}<br>
+          <p>{desc}</p>
           <b>School Fee:</b> GHS {fee}<br>
           <b>Goethe Exam:</b> {ge_dt} (Fee GHS {ge_fee} to Goethe‑Institut)<br>
           <i>{notes}</i><hr>
           <h3>Falowen App</h3>
-          <p>AI Writing Correction, Pronunciation Scoring, Vocabulary & Practice — all in our custom Falowen app!</p>
+          <p>AI Writing Correction, Pronunciation Scoring, Vocabulary & Practice—all in our custom app!</p>
           <img src="data:image/png;base64,{base64.b64encode(open(qr_path,'rb').read()).decode()}" width="80"/><br>
           <a href="https://falowen.streamlit.app">falowen.streamlit.app</a><hr>
         """
@@ -414,24 +417,29 @@ with tabs[0]:
             html += "</ul>"
 
         html += "<p><b>Contact:</b> 0205706589 • learngermanghana@gmail.com</p></div>"
+        st.markdown("### Preview Brochure")
         st.markdown(html, unsafe_allow_html=True)
 
-        # Premium Unicode PDF via fpdf2
+        # -- PDF Generation --
         class PremiumPDF(FPDF):
             def __init__(self):
                 super().__init__()
-                self.add_font("DejaVu", "", fname="DejaVuSans.ttf", uni=True)
+                # DejaVuSans.ttf must be in working dir or accessible
+                self.add_font("DejaVu", "", "DejaVuSans.ttf", uni=True)
                 self.set_auto_page_break(True, 16)
+
             def header(self):
                 try:
                     resp = requests.get(logo_url)
                     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
                     tmp.write(resp.content); tmp.close()
                     self.image(tmp.name, x=10, y=8, w=28)
-                except: pass
+                except:
+                    pass
                 self.set_font("DejaVu", "B", 16)
-                self.cell(0, 12, title + " (" + level + ")", ln=True, align="C")
+                self.cell(0, 12, f"{title} ({level})", ln=True, align="C")
                 self.ln(2)
+
             def footer(self):
                 self.set_y(-16)
                 self.set_font("DejaVu", "I", 9)
@@ -455,16 +463,14 @@ with tabs[0]:
         pdf.cell(0, 8, "Falowen App Features", ln=True)
         pdf.set_font("DejaVu", "", 11)
         pdf.multi_cell(0, 7, "• AI Writing Correction\n• Pronunciation Scoring\n• Vocabulary & Practice")
-        qr_img = Image.open(qr_path)
         tmpqr = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-        qr_img.save(tmpqr.name)
+        Image.open(qr_path).save(tmpqr.name)
         pdf.image(tmpqr.name, x=pdf.get_x(), y=pdf.get_y(), w=28)
         pdf.ln(20)
 
         if classroom:
-            img = Image.open(classroom)
             tmpc = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-            img.save(tmpc.name)
+            Image.open(classroom).save(tmpc.name)
             pdf.image(tmpc.name, x=30, w=150)
             pdf.ln(10)
 
@@ -481,11 +487,14 @@ with tabs[0]:
         pdf.set_font("DejaVu", "", 11)
         pdf.cell(0, 8, "Phone: 0205706589 • learngermanghana@gmail.com", ln=True)
 
+        # Output bytes in UTF-8
         pdf_bytes = pdf.output(dest="S").encode("utf-8")
-        st.download_button("📄 Download Premium PDF", data=pdf_bytes,
-                           file_name="Class_Brochure_Premium.pdf", mime="application/pdf")
-
-
+        st.download_button(
+            "📄 Download Premium PDF", 
+            data=pdf_bytes,
+            file_name="Class_Brochure_Premium.pdf", 
+            mime="application/pdf"
+        )
 
 
 # ==== 9. ALL STUDENTS TAB ====
