@@ -818,6 +818,7 @@ with tabs[5]:
     if not student_name:
         st.stop()
 
+    # Retrieve selected student data
     student_row = filtered_students[filtered_students["name"] == student_name].iloc[0]
     student_level = student_row.get("level", "")
     student_email = student_row.get("email", "")
@@ -853,7 +854,36 @@ with tabs[5]:
 
     # ---- 4. Compose/Preview Message ----
     st.subheader("Compose/Preview Message")
-    # ... (body_default logic remains unchanged) ...
+    # ensure body_default is always defined
+    if msg_type == "Custom Message":
+        body_default = ""
+    elif msg_type == "Welcome Message":
+        body_default = (
+            f"Hello {student_name},<br><br>"
+            f"Welcome to Learn Language Education Academy! We have helped many students succeed, and we’re excited to support you.<br><br>"
+            f"<b>Your contract starts on {enrollment_start.strftime('%d %B %Y')}.</b>"
+            f" You can join your <b>{student_level}</b> class in person or online.<br><br>"
+            f"<b>Your payment status: {payment_status}.</b> Paid: GHS {payment:.2f} / Balance: GHS {balance:.2f}<br><br>"
+            f"All materials are on our <a href='{student_link}'>Falowen App</a>.<br><br>"
+            f"We wish you a great start and look forward to your progress!"
+        )
+    elif msg_type == "Assignment Results":
+        body_default = (
+            f"Hello {student_name},<br><br>"
+            f"Below are your latest assignment results:<br>"
+            f"<ul><li>Assignment 1: 85%</li><li>Assignment 2: 90%</li></ul>"
+            f"Best regards,<br>Learn Language Education Academy"
+        )
+    elif msg_type == "Letter of Enrollment":
+        body_default = (
+            f"To Whom It May Concern,<br><br>"
+            f"This is to certify that {student_name} is enrolled in the {student_level} programme at Learn Language Education Academy.<br>"
+            f"Valid from {enrollment_start.strftime('%-m/%-d/%Y')} to {enrollment_end.strftime('%-m/%-d/%Y')}.<br><br>"
+            f"Institution registered under Business Registration Number {BUSINESS_REG}.<br><br>"
+            f"For confirmation, please contact us."
+        )
+    else:
+        body_default = ""
 
     email_subject = st.text_input("Subject", value=f"{msg_type} - {student_name}")
     email_body = st.text_area(
