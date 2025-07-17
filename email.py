@@ -3,16 +3,18 @@ import base64
 import re
 import qrcode
 import tempfile
-import sqlite3
 from datetime import datetime, date, timedelta
 import pandas as pd
 import streamlit as st
-import urllib.parse
 from fpdf import FPDF
+import urllib.parse
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
 
-# ==== 1. CSV & COLUMN HELPERS ====
+
+
+
+# ==== 1.a. CSV & COLUMN HELPERS ====
 def safe_read_csv(local_path: str, remote_url: str) -> pd.DataFrame:
     """Try local CSV first, else fall back to remote URL."""
     if os.path.exists(local_path):
@@ -32,24 +34,45 @@ def col_lookup(df: pd.DataFrame, name: str) -> str:
             return c
     raise KeyError(f"Column '{name}' not found in DataFrame")
 
+def safe_pdf(text: str) -> str:
+    """Ensure strings are PDF-safe (Latin-1)."""
+    return text.encode("latin-1", "replace").decode("latin-1")
+
+
 def strip_leading_number(text):
-    """Removes leading digits, dots, and spaces (e.g., '1. C' or '2) D' -> 'C' or 'D')."""
+    # Removes leading digits, dots, and spaces (e.g., "1. C" or "2) D" -> "C" or "D")
     return re.sub(r"^\s*\d+[\.\)]?\s*", "", text).strip()
 
-def safe_pdf(text: str) -> str:
+import streamlit as st
+import sendgrid
+from sendgrid.helpers.mail import Mail
+
+def send_email_report(to_email, subject, body):
+    sg = sendgrid.SendGridAPIClient(api_key=st.secrets["general"]["sendgrid_api_key"])
+    sender_email = st.secrets["general"]["sender_email"]
+    email = Mail(
+        from_email=sender_email,
+        to_emails=to_email,
+        subject=subject,
+        html_content=body
+    )
+    response = sg.send(email)
+    return response
+
+def safe_pdf(text):
     """Remove/replace any character not in latin-1 for PDF compatibility."""
     return "".join(c if ord(c) < 256 else "?" for c in str(text))
 
-# ==== 2. CONFIG / CONSTANTS ====
-SCHOOL_NAME      = "Learn Language Education Academy"
-SCHOOL_WEBSITE   = "https://www.learngermanghana.com"
-SCHOOL_PHONE     = "0205706589"
-SCHOOL_ADDRESS   = "Accra, Ghana"
-BUSINESS_REG     = "BN173410224"
-TUTOR_NAME       = "Felix Asadu"
-TUTOR_TITLE      = "Director"
-SENDER_EMAIL     = st.secrets["general"]["sender_email"]
-SENDGRID_KEY     = st.secrets["general"]["sendgrid_api_key"]
+# -- CONFIGURATION --
+SCHOOL_NAME = "Learn Language Education Academy"
+SCHOOL_WEBSITE = "https://www.learngermanghana.com"
+SCHOOL_PHONE = "0205706589"
+SCHOOL_ADDRESS = "Accra, Ghana"
+BUSINESS_REG = "BN173410224"
+TUTOR_NAME = "Felix Asadu"
+TUTOR_TITLE = "Director"
+SENDER_EMAIL = st.secrets["general"]["sender_email"]
+SENDGRID_KEY = st.secrets["general"]["sendgrid_api_key"]
 
 # --- Load student data from Google Sheets ---
 students_csv_url = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
@@ -70,7 +93,17 @@ def make_qr_code(url):
     img.save(tmp.name)
     return tmp.name
 
-# ==== 3. REFERENCE ANSWERS PLACEHOLDER ====
+# -- Safe PDF string --
+def safe_pdf(text):
+    return "".join(c if ord(c) < 256 else "?" for c in str(text))
+
+
+# ==== 2. CONFIG / CONSTANTS ====
+SCHOOL_NAME         = "Learn Language Education Academy"
+school_sendgrid_key = st.secrets.get("general", {}).get("SENDGRID_API_KEY")
+school_sender_email = st.secrets.get("general", {}).get("SENDER_EMAIL") or "Learngermanghana@gmail.com"
+
+# ==== 3. REFERENCE ANSWERS ====
 ref_answers = {
     # Put your full dictionary of ref_answers here...
 }
@@ -142,6 +175,10 @@ def choose_student(df: pd.DataFrame, levels: list, key_suffix: str) -> tuple:
     row = filtered[filtered['studentcode'] == code].iloc[0]
     return code, row
 
+def safe_pdf(text):
+    # Remove or replace any character not in latin-1
+    return "".join(c if ord(c) < 256 else "?" for c in str(text))
+
 def generate_pdf_report(
     name: str,
     level: str,
@@ -155,6 +192,7 @@ def generate_pdf_report(
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", "B", 15)
+    # Header with school, student, level, tutor, etc.
     if school_name:
         pdf.cell(0, 10, safe_pdf(school_name), ln=True, align="C")
         pdf.ln(2)
@@ -167,6 +205,8 @@ def generate_pdf_report(
         pdf.set_font("Arial", "B", 11)
         pdf.cell(0, 8, safe_pdf(f"Score/Assignment: {score_name}"), ln=True)
     pdf.ln(4)
+    
+    # Reference answers section
     if assignment and assignment in ref_answers and ref_answers[assignment]:
         pdf.set_font("Arial", "B", 12)
         pdf.cell(0, 10, safe_pdf(f"Reference Answers for: {assignment}"), ln=True)
@@ -174,6 +214,8 @@ def generate_pdf_report(
         for idx, ref in enumerate(ref_answers[assignment], 1):
             pdf.multi_cell(0, 8, safe_pdf(f"{idx}. {ref}"))
         pdf.ln(2)
+    
+    # Score history section
     pdf.set_font("Arial", "B", 12)
     pdf.cell(0, 10, "Score History:", ln=True)
     pdf.set_font("Arial", "", 11)
@@ -186,6 +228,8 @@ def generate_pdf_report(
         pdf.multi_cell(0, 8, safe_pdf(line))
         pdf.ln(1)
     pdf.ln(6)
+    
+    # Footer/Remark
     if footer_text:
         pdf.set_font("Arial", "I", 10)
         pdf.cell(0, 10, safe_pdf(footer_text), ln=True, align="C")
@@ -193,7 +237,7 @@ def generate_pdf_report(
 
 def send_email_report(pdf_bytes: bytes, to: str, subject: str, html_content: str):
     try:
-        msg = Mail(from_email=SENDER_EMAIL, to_emails=to, subject=subject, html_content=html_content)
+        msg = Mail(from_email=school_sender_email, to_emails=to, subject=subject, html_content=html_content)
         attachment = Attachment(
             FileContent(base64.b64encode(pdf_bytes).decode()),
             FileName(f"{to.replace('@','_')}_report.pdf"),
@@ -201,9 +245,10 @@ def send_email_report(pdf_bytes: bytes, to: str, subject: str, html_content: str
             Disposition('attachment')
         )
         msg.attachment = attachment
-        SendGridAPIClient(SENDGRID_KEY).send(msg)
+        SendGridAPIClient(school_sendgrid_key).send(msg)
     except Exception as e:
         st.error(f"Email send failed: {e}")
+
 
 # ==== 5. TABS LAYOUT ====
 tabs = st.tabs([
@@ -876,6 +921,7 @@ with tabs[5]:
             self.set_y(-18)
             self.set_font('Arial', 'I', 8)
             self.cell(0, 10, safe_pdf("This letter is computer generated and valid without a signature."), 0, 0, 'C')
+
     pdf = LetterPDF()
     pdf.add_page()
     pdf.watermark()
@@ -883,23 +929,13 @@ with tabs[5]:
     import re
     pdf.multi_cell(0, 8, safe_pdf(re.sub(r"<br\s*/?>", "\n", email_body)), align="L")
     pdf.ln(6)
-
     if msg_type == "Letter of Enrollment":
         pdf.set_font("Arial", size=11)
         pdf.cell(0, 8, "Yours sincerely,", ln=True)
         pdf.cell(0, 7, "Felix Asadu", ln=True)
         pdf.cell(0, 7, "Director", ln=True)
         pdf.cell(0, 7, safe_pdf(SCHOOL_NAME), ln=True)
-
-    pdf_content = pdf.output(dest="S")
-    st.write("DEBUG: pdf_content type:", type(pdf_content))  # This should run!
-    if isinstance(pdf_content, str):
-        pdf_bytes = pdf_content.encode("latin-1", "replace")
-    else:
-        pdf_bytes = pdf_content
-
-    st.write("DEBUG: pdf_bytes type:", type(pdf_bytes))  # This should run too!
-
+    pdf_bytes = pdf.output(dest="S").encode("latin-1", "replace")
 
     st.download_button(
         "📄 Download Letter/PDF", 
