@@ -3,7 +3,6 @@ import base64
 import re
 import qrcode
 import tempfile
-import re
 from datetime import datetime, date, timedelta
 import pandas as pd
 import streamlit as st
@@ -35,9 +34,9 @@ def col_lookup(df: pd.DataFrame, name: str) -> str:
             return c
     raise KeyError(f"Column '{name}' not found in DataFrame")
 
-def safe_pdf(text):
-    # Keep only Latin-1 characters (0-255); replace everything else with '?'
-    return "".join(c if ord(c) < 256 else "?" for c in str(text))
+def safe_pdf(text: str) -> str:
+    """Ensure strings are PDF-safe (Latin-1)."""
+    return text.encode("latin-1", "replace").decode("latin-1")
 
 
 def strip_leading_number(text):
@@ -176,6 +175,9 @@ def choose_student(df: pd.DataFrame, levels: list, key_suffix: str) -> tuple:
     row = filtered[filtered['studentcode'] == code].iloc[0]
     return code, row
 
+def safe_pdf(text):
+    # Remove or replace any character not in latin-1
+    return "".join(c if ord(c) < 256 else "?" for c in str(text))
 
 def generate_pdf_report(
     name: str,
@@ -924,15 +926,14 @@ with tabs[5]:
     pdf.add_page()
     pdf.watermark()
     pdf.set_font("Arial", size=12)
-    # Convert <br> and <br/> tags to \n
-    body_text = re.sub(r"<br\s*/?>", "\n", email_body)
-    pdf.multi_cell(0, 8, safe_pdf(body_text))
+    import re
+    pdf.multi_cell(0, 8, safe_pdf(re.sub(r"<br\s*/?>", "\n", email_body)), align="L")
     pdf.ln(6)
     if msg_type == "Letter of Enrollment":
         pdf.set_font("Arial", size=11)
-        pdf.cell(0, 8, safe_pdf("Yours sincerely,"), ln=True)
-        pdf.cell(0, 7, safe_pdf("Felix Asadu"), ln=True)
-        pdf.cell(0, 7, safe_pdf("Director"), ln=True)
+        pdf.cell(0, 8, "Yours sincerely,", ln=True)
+        pdf.cell(0, 7, "Felix Asadu", ln=True)
+        pdf.cell(0, 7, "Director", ln=True)
         pdf.cell(0, 7, safe_pdf(SCHOOL_NAME), ln=True)
     pdf_bytes = pdf.output(dest="S").encode("latin-1", "replace")
 
@@ -981,7 +982,7 @@ with tabs[5]:
         except Exception as e:
             st.error(f"Email send failed: {e}")
 
-#
+
 
 
 # ==== 14. TAB 6: COURSE SCHEDULE GENERATOR ====
