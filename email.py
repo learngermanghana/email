@@ -320,7 +320,6 @@ Asadu Felix
 
 # --- End of Stage 2 ---
 
-# -- Helper Functions (defined once at top) --
 @st.cache_data
 def get_random_reviews(sheet_url, n=2):
     csv_url = sheet_url.replace("/edit?usp=sharing", "/export?format=csv") if "/edit" in sheet_url else sheet_url
@@ -372,7 +371,6 @@ def prepare_image_for_pdf(f):
     except:
         return None
 
-# -- Main UI --
 REVIEWS_SHEET = "https://docs.google.com/spreadsheets/d/137HANmV9jmMWJEdcA1klqGiP8nYihkDugcIbA-2V1Wc/edit?usp=sharing"
 
 with tabs[0]:
@@ -404,7 +402,6 @@ with tabs[0]:
     reviews = get_random_reviews(REVIEWS_SHEET, n_reviews)
     qr_path = make_qr_code("https://falowen.streamlit.app")
 
-    # -- HTML Preview --
     if layout == "Single Column":
         html = f"""
         <div style='max-width:500px;margin:auto;padding:1em;border:1px solid #ccc;border-radius:10px'>
@@ -460,7 +457,6 @@ with tabs[0]:
     st.markdown("### Preview Brochure")
     st.markdown(html, unsafe_allow_html=True)
 
-    # -- PDF Rendering --
     def render_header(pdf):
         try:
             resp = requests.get(logo_url)
@@ -516,12 +512,13 @@ with tabs[0]:
         pdf.cell(0, 8, "0205706589 • learngermanghana@gmail.com", ln=True)
 
     class PDF(FPDF):
-    def __init__(self):
-        super().__init__()
-        # Register Unicode font
-        self.add_font("DejaVu", "", "DejaVuSans.ttf", uni=True)
-    def header(self):
+        def __init__(self):
+            super().__init__()
+            self.add_font("DejaVu", "", "DejaVuSans.ttf", uni=True)
+
+        def header(self):
             render_header(self)
+
         def footer(self):
             render_footer(self)
 
