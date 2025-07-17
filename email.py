@@ -428,11 +428,8 @@ with tabs[0]:
         # Handle bytes or bytearray
         if isinstance(result, (bytes, bytearray)):
             return bytes(result)
-        # Fallback: convert to bytes
-        return bytes(result).encode("latin-1", "replace")
-            except Exception:
-                return result.encode("utf-8", "replace")
-        return result
+        # Fallback: convert any other type to bytes
+        return bytes(result)
 
     def safe_multi_cell(pdf, w, h, txt):
         """Safely write multiline text, fallback to single-line cells on errors."""
