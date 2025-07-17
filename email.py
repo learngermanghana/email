@@ -346,7 +346,6 @@ Asadu Felix
 # --- End of Stage 2 ---
 
 with tabs[0]:
-
     st.title("🎓 Class Brochure / Flyer Generator")
     st.write("Generate a professional flyer or brochure for your upcoming German classes with dynamic reviews and Falowen app info.")
 
@@ -375,132 +374,132 @@ with tabs[0]:
 
     if not submitted:
         st.info("Fill in the fields and click 'Preview Brochure' to see your flyer.")
-        return
 
-    REVIEWS_SHEET = "https://docs.google.com/spreadsheets/d/137HANmV9jmMWJEdcA1klqGiP8nYihkDugcIbA-2V1Wc/edit?usp=sharing"
-    reviews = get_random_reviews(REVIEWS_SHEET, n=n_reviews)
+    else:
+        REVIEWS_SHEET = "https://docs.google.com/spreadsheets/d/137HANmV9jmMWJEdcA1klqGiP8nYihkDugcIbA-2V1Wc/edit?usp=sharing"
+        reviews = get_random_reviews(REVIEWS_SHEET, n=n_reviews)
 
-    falowen_text = (
-        "Advanced Learning Tools – Powered by Our Own “Falowen” App\n\n"
-        "- AI-Powered Writing Correction: Instantly get feedback on your German writing, with corrections and tips built right into Falowen—developed by our own school for our students’ success.\n"
-        "- Speaking Feedback with Pronunciation Scoring: Practice speaking anytime, record your voice, and receive instant pronunciation scores. All features are available in the Falowen app, exclusive to our students.\n"
-        "- Vocabulary & Practice Tools: Build your vocabulary, practice grammar, and prepare for your exams using interactive quizzes and exercises—all in Falowen, created by Learn Language Education Academy, tailored for our classes.\n\n"
-        "Falowen is available to all enrolled students. Track your progress, submit assignments, and access learning materials—anytime, anywhere!\n"
-        "Preview the app: https://falowen.streamlit.app"
-    )
+        falowen_text = (
+            "Advanced Learning Tools – Powered by Our Own “Falowen” App\n\n"
+            "- AI-Powered Writing Correction: Instantly get feedback on your German writing, with corrections and tips built right into Falowen—developed by our own school for our students’ success.\n"
+            "- Speaking Feedback with Pronunciation Scoring: Practice speaking anytime, record your voice, and receive instant pronunciation scores. All features are available in the Falowen app, exclusive to our students.\n"
+            "- Vocabulary & Practice Tools: Build your vocabulary, practice grammar, and prepare for your exams using interactive quizzes and exercises—all in Falowen, created by Learn Language Education Academy, tailored for our classes.\n\n"
+            "Falowen is available to all enrolled students. Track your progress, submit assignments, and access learning materials—anytime, anywhere!\n"
+            "Preview the app: https://falowen.streamlit.app"
+        )
 
-    qr_path = make_qr_code("https://falowen.streamlit.app")
-    with open(qr_path, "rb") as f:
-        qr_b64 = base64.b64encode(f.read()).decode("utf-8")
-    qr_html = f'<img src="data:image/png;base64,{qr_b64}" width="70"/>'
+        qr_path = make_qr_code("https://falowen.streamlit.app")
+        with open(qr_path, "rb") as f:
+            qr_b64 = base64.b64encode(f.read()).decode("utf-8")
+        qr_html = f'<img src="data:image/png;base64,{qr_b64}" width="70"/>'
 
-    html = f"""
-    <div style='background:#e3f2fd;padding:2em 1em 2em 1em;border-radius:15px;max-width:510px;margin:auto'>
-    <img src="{logo_url}" width="120"/><br>
-    <h2 style="color:#0d47a1;margin-bottom:0.3em">{class_label} ({level})</h2>
-    <b>Start:</b> {start_date.strftime('%d %b %Y')} &nbsp; <b>End:</b> {end_date.strftime('%d %b %Y')}<br>
-    <b>Meeting Times:</b> {times}<br>
-    <div style='margin:1em 0 1em 0'>{desc}</div>
-    <b>Goethe Exam Start Date:</b> {goethe_date or '-'}<br>
-    <b>Course Price:</b> GHS {price}<br>
-    <div style="color:#ff7043;font-weight:bold">{notes}</div>
-    <hr>
-    <div style="background:#e1f5fe;padding:0.5em 0.5em 0.5em 1.2em;border-radius:9px">
-    <b>Advanced Learning Tools – Powered by Our Own “Falowen” App</b>
-    <ul>
-    <li><b>AI-Powered Writing Correction:</b> Instantly get feedback on your German writing, with corrections and tips built right into Falowen—developed by our own school for our students’ success.</li>
-    <li><b>Speaking Feedback with Pronunciation Scoring:</b> Practice speaking anytime, record your voice, and receive instant pronunciation scores. All features are available in the Falowen app, exclusive to our students.</li>
-    <li><b>Vocabulary & Practice Tools:</b> Build your vocabulary, practice grammar, and prepare for your exams using interactive quizzes and exercises—all in Falowen, created by Learn Language Education Academy, tailored for our classes.</li>
-    </ul>
-    <i>Falowen is available to all enrolled students. Track your progress, submit assignments, and access learning materials—anytime, anywhere!</i>
-    <br>Preview the app: {qr_html}<br>
-    <a href="https://falowen.streamlit.app" target="_blank">https://falowen.streamlit.app</a>
-    </div>
-    <hr>
-    """
+        html = f"""
+        <div style='background:#e3f2fd;padding:2em 1em 2em 1em;border-radius:15px;max-width:510px;margin:auto'>
+        <img src="{logo_url}" width="120"/><br>
+        <h2 style="color:#0d47a1;margin-bottom:0.3em">{class_label} ({level})</h2>
+        <b>Start:</b> {start_date.strftime('%d %b %Y')} &nbsp; <b>End:</b> {end_date.strftime('%d %b %Y')}<br>
+        <b>Meeting Times:</b> {times}<br>
+        <div style='margin:1em 0 1em 0'>{desc}</div>
+        <b>Goethe Exam Start Date:</b> {goethe_date or '-'}<br>
+        <b>Course Price:</b> GHS {price}<br>
+        <div style="color:#ff7043;font-weight:bold">{notes}</div>
+        <hr>
+        <div style="background:#e1f5fe;padding:0.5em 0.5em 0.5em 1.2em;border-radius:9px">
+        <b>Advanced Learning Tools – Powered by Our Own “Falowen” App</b>
+        <ul>
+        <li><b>AI-Powered Writing Correction:</b> Instantly get feedback on your German writing, with corrections and tips built right into Falowen—developed by our own school for our students’ success.</li>
+        <li><b>Speaking Feedback with Pronunciation Scoring:</b> Practice speaking anytime, record your voice, and receive instant pronunciation scores. All features are available in the Falowen app, exclusive to our students.</li>
+        <li><b>Vocabulary & Practice Tools:</b> Build your vocabulary, practice grammar, and prepare for your exams using interactive quizzes and exercises—all in Falowen, created by Learn Language Education Academy, tailored for our classes.</li>
+        </ul>
+        <i>Falowen is available to all enrolled students. Track your progress, submit assignments, and access learning materials—anytime, anywhere!</i>
+        <br>Preview the app: {qr_html}<br>
+        <a href="https://falowen.streamlit.app" target="_blank">https://falowen.streamlit.app</a>
+        </div>
+        <hr>
+        """
 
-    if classroom_img:
-        img_bytes = classroom_img.read()
-        img_b64 = base64.b64encode(img_bytes).decode("utf-8")
-        html += f'<img src="data:image/png;base64,{img_b64}" width="95%" style="margin:1em 0 1em 0;border-radius:10px"><br>'
+        if classroom_img:
+            img_bytes = classroom_img.read()
+            img_b64 = base64.b64encode(img_bytes).decode("utf-8")
+            html += f'<img src="data:image/png;base64,{img_b64}" width="95%" style="margin:1em 0 1em 0;border-radius:10px"><br>'
 
-    if reviews:
-        html += "<div style='margin-top:0.9em'><b>What Our Students Say:</b><ul>"
-        for rev in reviews:
-            html += f"<li>{rev}</li>"
-        html += "</ul></div>"
+        if reviews:
+            html += "<div style='margin-top:0.9em'><b>What Our Students Say:</b><ul>"
+            for rev in reviews:
+                html += f"<li>{rev}</li>"
+            html += "</ul></div>"
 
-    html += """
-    <hr>
-    <b>Contact & Registration:</b><br>
-    Phone: 0205706589 &nbsp; Email: learngermanghana@gmail.com<br>
-    <a href='https://www.learngermanghana.com' target='_blank'>www.learngermanghana.com</a>
-    </div>
-    """
+        html += """
+        <hr>
+        <b>Contact & Registration:</b><br>
+        Phone: 0205706589 &nbsp; Email: learngermanghana@gmail.com<br>
+        <a href='https://www.learngermanghana.com' target='_blank'>www.learngermanghana.com</a>
+        </div>
+        """
 
-    st.markdown("### Preview Brochure")
-    st.markdown(html, unsafe_allow_html=True)
+        st.markdown("### Preview Brochure")
+        st.markdown(html, unsafe_allow_html=True)
 
-    class BrochurePDF(FPDF):
-        def header(self):
-            if logo_url:
-                try:
-                    import requests
-                    from PIL import Image
-                    response = requests.get(logo_url)
-                    img = Image.open(BytesIO(response.content))
-                    tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
-                    img.save(tmp.name)
-                    self.image(tmp.name, x=10, y=8, w=36)
-                    self.ln(25)
-                except Exception:
-                    pass
-            self.set_font("Arial", "B", 15)
-            self.cell(0, 10, safe_pdf(f"{class_label} ({level})"), ln=1, align="C")
+        class BrochurePDF(FPDF):
+            def header(self):
+                if logo_url:
+                    try:
+                        import requests
+                        from PIL import Image
+                        response = requests.get(logo_url)
+                        img = Image.open(BytesIO(response.content))
+                        tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+                        img.save(tmp.name)
+                        self.image(tmp.name, x=10, y=8, w=36)
+                        self.ln(25)
+                    except Exception:
+                        pass
+                self.set_font("Arial", "B", 15)
+                self.cell(0, 10, safe_pdf(f"{class_label} ({level})"), ln=1, align="C")
 
-        def footer(self):
-            self.set_y(-20)
-            self.set_font("Arial", "I", 9)
-            self.cell(0, 10, safe_pdf("Learn Language Education Academy • www.learngermanghana.com"), 0, 0, "C")
+            def footer(self):
+                self.set_y(-20)
+                self.set_font("Arial", "I", 9)
+                self.cell(0, 10, safe_pdf("Learn Language Education Academy • www.learngermanghana.com"), 0, 0, "C")
 
-    pdf = BrochurePDF()
-    pdf.add_page()
-    pdf.set_font("Arial", "", 12)
-    pdf.cell(0, 8, safe_pdf(f"Start: {start_date.strftime('%d %b %Y')}  |  End: {end_date.strftime('%d %b %Y')}"), ln=1)
-    pdf.cell(0, 8, safe_pdf(f"Meeting Times: {times}"), ln=1)
-    pdf.multi_cell(0, 8, safe_pdf(desc))
-    pdf.cell(0, 8, safe_pdf(f"Goethe Exam Start Date: {goethe_date or '-'}"), ln=1)
-    pdf.cell(0, 8, safe_pdf(f"Course Price: GHS {price}"), ln=1)
-    pdf.ln(2)
-    pdf.set_font("Arial", "B", 12)
-    pdf.multi_cell(0, 8, safe_pdf("Advanced Learning Tools – Powered by Our Own “Falowen” App:"))
-    pdf.set_font("Arial", "", 11)
-    for line in falowen_text.split("\n"):
-        pdf.multi_cell(0, 7, safe_pdf(line))
-    pdf.ln(2)
-    if classroom_img:
-        tmp_img = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-        tmp_img.write(img_bytes)
-        tmp_img.close()
-        pdf.image(tmp_img.name, x=15, w=170)
+        pdf = BrochurePDF()
+        pdf.add_page()
+        pdf.set_font("Arial", "", 12)
+        pdf.cell(0, 8, safe_pdf(f"Start: {start_date.strftime('%d %b %Y')}  |  End: {end_date.strftime('%d %b %Y')}"), ln=1)
+        pdf.cell(0, 8, safe_pdf(f"Meeting Times: {times}"), ln=1)
+        pdf.multi_cell(0, 8, safe_pdf(desc))
+        pdf.cell(0, 8, safe_pdf(f"Goethe Exam Start Date: {goethe_date or '-'}"), ln=1)
+        pdf.cell(0, 8, safe_pdf(f"Course Price: GHS {price}"), ln=1)
         pdf.ln(2)
-    pdf.image(qr_path, x=170, y=pdf.get_y(), w=20)
-    pdf.ln(18)
-    if reviews:
         pdf.set_font("Arial", "B", 12)
-        pdf.cell(0, 8, safe_pdf("What Our Students Say:"), ln=1)
-        pdf.set_font("Arial", "I", 11)
-        for rev in reviews:
-            pdf.multi_cell(0, 7, safe_pdf(rev))
-        pdf.ln(3)
-    pdf.set_font("Arial", "B", 11)
-    pdf.cell(0, 8, safe_pdf("Contact & Registration:"), ln=1)
-    pdf.set_font("Arial", "", 11)
-    pdf.cell(0, 8, safe_pdf("Phone: 0205706589   Email: learngermanghana@gmail.com"), ln=1)
-    pdf.cell(0, 8, safe_pdf("www.learngermanghana.com"), ln=1)
+        pdf.multi_cell(0, 8, safe_pdf("Advanced Learning Tools – Powered by Our Own “Falowen” App:"))
+        pdf.set_font("Arial", "", 11)
+        for line in falowen_text.split("\n"):
+            pdf.multi_cell(0, 7, safe_pdf(line))
+        pdf.ln(2)
+        if classroom_img:
+            tmp_img = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+            tmp_img.write(img_bytes)
+            tmp_img.close()
+            pdf.image(tmp_img.name, x=15, w=170)
+            pdf.ln(2)
+        pdf.image(qr_path, x=170, y=pdf.get_y(), w=20)
+        pdf.ln(18)
+        if reviews:
+            pdf.set_font("Arial", "B", 12)
+            pdf.cell(0, 8, safe_pdf("What Our Students Say:"), ln=1)
+            pdf.set_font("Arial", "I", 11)
+            for rev in reviews:
+                pdf.multi_cell(0, 7, safe_pdf(rev))
+            pdf.ln(3)
+        pdf.set_font("Arial", "B", 11)
+        pdf.cell(0, 8, safe_pdf("Contact & Registration:"), ln=1)
+        pdf.set_font("Arial", "", 11)
+        pdf.cell(0, 8, safe_pdf("Phone: 0205706589   Email: learngermanghana@gmail.com"), ln=1)
+        pdf.cell(0, 8, safe_pdf("www.learngermanghana.com"), ln=1)
 
-    pdf_bytes = pdf.output(dest="S").encode("latin-1","replace")
-    st.download_button("📄 Download Brochure as PDF", data=pdf_bytes, file_name="Class_Brochure.pdf", mime="application/pdf")
+        pdf_bytes = pdf.output(dest="S").encode("latin-1","replace")
+        st.download_button("📄 Download Brochure as PDF", data=pdf_bytes, file_name="Class_Brochure.pdf", mime="application/pdf")
 
 
 # ==== 9. ALL STUDENTS TAB ====
