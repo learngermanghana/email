@@ -318,15 +318,24 @@ Asadu Felix
 # --- End of Stage 2 ---
 
 with tabs[0]:
-    st.title("🎉 Create Class Brochure / Flyer")
-    st.info("Generate a professional brochure for your next German class. Preview, download as PDF, or email to clients.")
+    import streamlit as st
+    import base64
+    import tempfile
+    from datetime import date
+    from fpdf import FPDF
+    import qrcode
+    import io
+    import requests
 
-    # --- Logo and Classroom Photo ---
+    st.title("🎉 Create Class Brochure / Flyer")
+    st.info("Generate a professional, flexible brochure for your German classes. Preview, download as PDF, or email to clients.")
+
+    # --- LOGO & PHOTO ---
     logo_url = "https://i.imgur.com/iFiehrp.png"
-    st.image(logo_url, width=120, caption="Learn Language Academy Logo")
+    st.image(logo_url, width=120, caption="School Logo")
     classroom_pic = st.file_uploader("Upload a Classroom Picture (optional)", type=["png", "jpg", "jpeg"], key="brochure_classroom")
 
-    # --- Brochure Info Form ---
+    # --- FORM FIELDS ---
     with st.form("brochure_form"):
         school = st.text_input("School Name", value=SCHOOL_NAME)
         contact = st.text_input("Contact Details", value=f"{SCHOOL_PHONE} | {SCHOOL_WEBSITE}")
@@ -334,72 +343,108 @@ with tabs[0]:
         headline = st.text_input("Brochure Headline", value="Join Our Next German Class!")
         intro = st.text_area("Short Introduction", value="Boost your German with our friendly, proven program. Suitable for beginners and intermediates.")
 
-        # Goethe Exam & Price
         exam_start = st.date_input("Goethe Exam Start Date", key="brochure_exam_start")
         course_price = st.text_input("Course Price (e.g. GHS 1,500)", value="GHS 1,500")
 
-        # Add upcoming classes
-        st.markdown("### Upcoming Classes")
-        class_count = st.number_input("How many classes to show?", 1, 5, value=2, key="brochure_class_count")
-        classes = []
-        for i in range(int(class_count)):
-            st.markdown(f"**Class {i+1}:**")
-            level = st.selectbox(f"Level for Class {i+1}", ["A1", "A2", "B1", "B2"], key=f"brochure_level_{i}")
-            start = st.date_input(f"Start Date for Class {i+1}", key=f"brochure_start_{i}")
-            days = st.text_input(f"Days/Time (e.g. Mon-Wed, 5pm)", value="Mon-Wed, 5pm", key=f"brochure_days_{i}")
-            desc = st.text_area(f"Class {i+1} Description", value=f"Fun interactive lessons for {level}.", key=f"brochure_desc_{i}")
-            classes.append({"level": level, "start": start, "days": days, "desc": desc})
-
-        # Special note about Falowen App
         falowen_text = st.text_area(
-            "Falowen App Info (shown in the brochure)", 
+            "About the Falowen App (shown in the brochure)",
             value="All class assignments, materials, and results are available in our Falowen app. "
                   "Every student gets a unique login to track progress and communicate with tutors. "
-                  "Visit: https://falowen.streamlit.app"
+                  "Access here: https://falowen.streamlit.app"
         )
         notes = st.text_area("Notes (discounts, deadlines, etc)", value="Register by the deadline to enjoy a discount.")
+
+        # --- FLEXIBLE CLASS LIST ---
+        st.markdown("### Upcoming Classes")
+        if "brochure_classes" not in st.session_state:
+            st.session_state["brochure_classes"] = [
+                {
+                    "level": "A1",
+                    "label": "Intensive Beginners",
+                    "start": date.today(),
+                    "end": date.today(),
+                    "times": "Mon 7pm, Wed 6pm",
+                    "desc": "Fun, interactive lessons for total beginners."
+                }
+            ]
+
+        remove_idx = None
+        for idx, class_info in enumerate(st.session_state["brochure_classes"]):
+            with st.expander(f"Class {idx+1}: {class_info['label']}", expanded=True):
+                class_info["level"] = st.selectbox("Level", ["A1", "A2", "B1", "B2"], key=f"level_{idx}", index=["A1", "A2", "B1", "B2"].index(class_info["level"]))
+                class_info["label"] = st.text_input("Class Title/Label", value=class_info["label"], key=f"label_{idx}")
+                class_info["start"] = st.date_input("Start Date", value=class_info["start"], key=f"start_{idx}")
+                class_info["end"] = st.date_input("End Date", value=class_info["end"], key=f"end_{idx}")
+                class_info["times"] = st.text_input("Meeting Times (e.g. Mon 7pm, Tue 6pm)", value=class_info["times"], key=f"times_{idx}")
+                class_info["desc"] = st.text_area("Short Description", value=class_info["desc"], key=f"desc_{idx}")
+                # Remove button
+                if st.button("Remove This Class", key=f"remove_{idx}"):
+                    remove_idx = idx
+        if remove_idx is not None:
+            st.session_state["brochure_classes"].pop(remove_idx)
+            st.experimental_rerun()
+        if st.button("Add Class"):
+            st.session_state["brochure_classes"].append({
+                "level": "A1",
+                "label": f"New Class {len(st.session_state['brochure_classes'])+1}",
+                "start": date.today(),
+                "end": date.today(),
+                "times": "",
+                "desc": ""
+            })
+            st.experimental_rerun()
+
         submit = st.form_submit_button("Preview Brochure")
 
-    # --- Brochure Preview ---
+    # --- BROCHURE PREVIEW ---
     if submit:
-        # HTML Preview
         st.markdown("## 📄 Brochure Preview")
+        # QR code for Falowen app
+        qr = qrcode.QRCode(box_size=2, border=1)
+        qr.add_data("https://falowen.streamlit.app")
+        qr.make(fit=True)
+        qr_img = qr.make_image(fill_color="black", back_color="white")
+        qr_buf = io.BytesIO()
+        qr_img.save(qr_buf, format="PNG")
+        qr_b64 = base64.b64encode(qr_buf.getvalue()).decode()
+        qr_html = f"<img src='data:image/png;base64,{qr_b64}' width='80'><br>"
+
         html = f"<div style='max-width:600px;'>"
         html += f"<img src='{logo_url}' width='110'><br>"
         html += f"<h2 style='color:#1565c0'>{headline}</h2>"
         html += f"<b>{school}</b><br>{contact}<br>{email}<br><br>"
         html += f"<p>{intro}</p>"
         if classroom_pic:
-            import base64
             img_bytes = classroom_pic.read()
-            img_base64 = base64.b64encode(img_bytes).decode()
-            html += f"<img src='data:image/png;base64,{img_base64}' width='380' style='border-radius:10px;margin:12px 0'><br>"
+            img_b64 = base64.b64encode(img_bytes).decode()
+            html += f"<img src='data:image/png;base64,{img_b64}' width='380' style='border-radius:10px;margin:12px 0'><br>"
         html += f"<hr><b>Goethe Exam Start Date:</b> {exam_start}<br>"
         html += f"<b>Course Price:</b> {course_price}<br>"
         html += "<hr><h3>Upcoming Classes</h3>"
-        for c in classes:
-            html += f"<b>Level:</b> {c['level']}<br>"
+        for c in st.session_state["brochure_classes"]:
+            html += f"<b>{c['label']} ({c['level']})</b><br>"
             html += f"<b>Start:</b> {c['start']}<br>"
-            html += f"<b>Days/Time:</b> {c['days']}<br>"
+            html += f"<b>End:</b> {c['end']}<br>"
+            html += f"<b>Meeting Times:</b> {c['times']}<br>"
             html += f"{c['desc']}<br><br>"
-        html += f"<hr><b>About the Falowen App:</b><br>{falowen_text}<br>"
+        html += f"<hr><b>About the Falowen App:</b><br>{falowen_text}<br>{qr_html}"
         html += f"<hr><b>Notes:</b> {notes}"
         html += "</div>"
         st.markdown(html, unsafe_allow_html=True)
 
-        # --- PDF Download ---
-        from fpdf import FPDF
-        import tempfile
-
+        # --- PDF GENERATION ---
         class BrochurePDF(FPDF):
             def header(self):
-                # Logo from URL
-                self.set_xy(10, 10)
-                tmp_logo = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-                import requests
-                tmp_logo.write(requests.get(logo_url).content)
-                tmp_logo.close()
-                self.image(tmp_logo.name, x=10, y=8, w=36)
+                try:
+                    tmp_logo = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+                    r = requests.get(logo_url)
+                    if r.status_code == 200:
+                        tmp_logo.write(r.content)
+                        tmp_logo.flush()
+                        self.image(tmp_logo.name, x=10, y=8, w=36)
+                    tmp_logo.close()
+                except Exception as e:
+                    pass  # skip logo if any error
                 self.set_xy(50, 10)
                 self.set_font("Arial", "B", 16)
                 self.cell(0, 10, headline, ln=1, align="L")
@@ -408,9 +453,20 @@ with tabs[0]:
                 self.set_font("Arial", "", 10)
                 self.cell(0, 6, f"{contact} | {email}", ln=1, align="L")
                 self.ln(3)
-
             def footer(self):
-                self.set_y(-20)
+                self.set_y(-26)
+                try:
+                    # Add QR code to Falowen app
+                    qr = qrcode.QRCode(box_size=2, border=1)
+                    qr.add_data("https://falowen.streamlit.app")
+                    qr.make(fit=True)
+                    img = qr.make_image(fill_color="black", back_color="white")
+                    tmp_qr = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+                    img.save(tmp_qr.name)
+                    self.image(tmp_qr.name, x=168, y=260, w=28)
+                    tmp_qr.close()
+                except:
+                    pass
                 self.set_font("Arial", "I", 9)
                 self.cell(0, 8, "Learn Language Education Academy – www.learngermanghana.com", 0, 0, "C")
 
@@ -423,9 +479,13 @@ with tabs[0]:
         if classroom_pic:
             ctmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
             ctmp.write(img_bytes)
+            ctmp.flush()
             ctmp.close()
-            pdf.image(ctmp.name, x=25, w=150)
-            pdf.ln(8)
+            try:
+                pdf.image(ctmp.name, x=30, w=150)
+                pdf.ln(8)
+            except:
+                pass
         pdf.set_font("Arial", "B", 12)
         pdf.cell(0, 8, f"Goethe Exam Start Date: {exam_start}", ln=1)
         pdf.cell(0, 8, f"Course Price: {course_price}", ln=1)
@@ -433,21 +493,22 @@ with tabs[0]:
         pdf.set_font("Arial", "B", 13)
         pdf.cell(0, 10, "Upcoming Classes", ln=1)
         pdf.set_font("Arial", "", 11)
-        for c in classes:
-            pdf.multi_cell(0, 8, f"Level: {c['level']} | Start: {c['start']} | {c['days']}\n{c['desc']}\n")
+        for c in st.session_state["brochure_classes"]:
+            pdf.multi_cell(0, 8, f"{c['label']} ({c['level']})")
+            pdf.multi_cell(0, 8, f"Start: {c['start']}  |  End: {c['end']}  |  Times: {c['times']}\n{c['desc']}\n")
             pdf.ln(1)
         pdf.set_font("Arial", "B", 12)
         pdf.multi_cell(0, 8, "About the Falowen App:")
         pdf.set_font("Arial", "", 11)
         pdf.multi_cell(0, 7, falowen_text)
-        pdf.ln(1)
+        pdf.ln(2)
         pdf.set_font("Arial", "I", 10)
         pdf.multi_cell(0, 7, f"Notes: {notes}")
 
         pdf_bytes = pdf.output(dest="S").encode("latin-1", "replace")
         st.download_button("📄 Download Brochure PDF", data=pdf_bytes, file_name="class_brochure.pdf", mime="application/pdf")
 
-        # --- Email Brochure (Optional) ---
+        # --- EMAIL TO CLIENT ---
         st.markdown("---")
         st.markdown("### 📧 Email This Brochure to a Client")
         client_email = st.text_input("Client Email")
@@ -473,6 +534,7 @@ with tabs[0]:
                 st.success(f"Brochure sent to {client_email}!")
             except Exception as e:
                 st.error(f"Failed to send: {e}")
+
 
 
 # ==== 9. ALL STUDENTS TAB ====
