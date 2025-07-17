@@ -387,67 +387,56 @@ def prepare_image_for_pdf(file_or_url):
 
 REVIEWS_SHEET = "https://docs.google.com/spreadsheets/d/137HANmV9jmMWJEdcA1klqGiP8nYihkDugcIbA-2V1Wc/edit?usp=sharing"
 
+import io
+from PIL import Image, ImageDraw, ImageFont
+
 with tabs[0]:
     st.title("🎓 Class Brochure / Flyer Generator")
     st.write("Generate a professional flyer or brochure for your upcoming German classes with dynamic reviews and Falowen app info.")
 
-    # --- INPUTS ---
-    title = st.text_input("Class Title", "German A1 Intensive")
-    level = st.selectbox("Level", ["A1", "A2", "B1", "B2"])
-    start_dt = st.date_input("Start Date", date.today())
-    end_dt = st.date_input("End Date", date.today() + timedelta(days=30))
-    times = st.text_input("Meeting Times", "Mon 7pm, Tue 6pm (edit as needed)")
-    fee = st.text_input("School Fee (GHS)", "950")
-    ge_dt = st.text_input("Goethe Exam Date", "")
-    ge_fee = st.text_input("Goethe Exam Fee (GHS)", "")
+    title = st.text_input("Course Title", "German A1 Group")
+    level = st.text_input("Level", "A1")
+    start_dt = st.date_input("Start Date")
+    end_dt = st.date_input("End Date")
+    times = st.text_input("Class Times", "Mon 7pm, Tue 6pm")
+    fee = st.text_input("School Fee (GHS)", "650")
+    ge_dt = st.text_input("Goethe Exam Date", "Sep 2025")
+    ge_fee = st.text_input("Goethe Exam Fee (GHS)", "950")
     logo_url = st.text_input("Logo URL", "https://i.imgur.com/iFiehrp.png")
-    class_img_url = st.text_input("Classroom Image URL", "")
-    desc = st.text_area("Class Description", "Hybrid format: join in-person, online, or use recorded lectures on our Falowen app. All students receive full support, exercises, and guidance for exam success.")
-    notes = st.text_area("Notes", "Register by the deadline to enjoy a discount.")
-    extra_notes = st.text_area("Why Choose Us?", "We are an official Goethe partner with 98% pass rate. Only our fee is paid to us; exam fee goes to Goethe Institute. The Falowen app was built by us and is exclusive to our students.")
-    n_reviews = st.number_input("How many reviews to show?", min_value=0, max_value=10, value=2)
-    REVIEWS_SHEET = st.text_input("Google Reviews Sheet Link", "https://docs.google.com/spreadsheets/d/137HANmV9jmMWJEdcA1klqGiP8nYihkDugcIbA-2V1Wc/edit?usp=sharing")
-    qr_url = "https://falowen.streamlit.app"
-    # --- GET IMAGES, QR ---
-    logo_pdf = prepare_image_for_pdf(logo_url) if logo_url else None
-    class_pdf = prepare_image_for_pdf(class_img_url) if class_img_url else None
-    qr_path = make_qr_code(qr_url) if qr_url else None
+    class_img_url = st.text_input("Classroom Image URL (optional)", "")
+    desc = st.text_area("Short Course Description", "Hybrid format: Join in-person, online, or use recorded lectures on Falowen App.")
+    notes = st.text_area("Extra Notes", "Register by the deadline to enjoy a discount.")
+    extra_notes = st.text_area("Why Choose Us?", "Our students consistently pass Goethe exams. You get access to our Falowen app, expert tutors, and flexible study options.")
+    n_reviews = st.number_input("How many reviews to show?", 2, 10, 2)
+    reviews_url = st.text_input("Google Reviews Sheet Link", "https://docs.google.com/spreadsheets/d/137HANmV9jmMWJEdcA1klqGiP8nYihkDugcIbA-2V1Wc/edit?usp=sharing")
+    reviews = get_random_reviews(reviews_url, int(n_reviews))
 
-    # --- REVIEWS ---
-    reviews = get_random_reviews(REVIEWS_SHEET, n=n_reviews)
-
-    # ---------- PDF Generation Helpers ----------
-    def get_pdf_bytes(pdf):
-        """Generate bytes from FPDF instance, encoding if necessary."""
-        result = pdf.output(dest="S")
-        if isinstance(result, str):
+    # Prepare images
+    def fetch_image(url):
+        if url:
             try:
-                return result.encode("latin-1", "replace")
+                from PIL import Image
+                import requests
+                from io import BytesIO
+                r = requests.get(url)
+                return Image.open(BytesIO(r.content))
             except Exception:
-                return result.encode("utf-8", "replace")
-        # Handle bytes or bytearray
-        if isinstance(result, (bytes, bytearray)):
-            return bytes(result)
-        # Fallback: convert any other type to bytes
-        return bytes(result)
+                return None
+        return None
 
-    def safe_multi_cell(pdf, w, h, txt):
-        """Safely write multiline text, fallback to single-line cells on errors."""
-        try:
-            pdf.multi_cell(w, h, txt)
-        except Exception:
-            for line in txt.split("\n"):
-                try:
-                    pdf.cell(0, h, line, ln=True)
-                except Exception:
-                    continue
+    logo_img = fetch_image(logo_url)
+    class_img = fetch_image(class_img_url) if class_img_url else None
+    qr_path = make_qr_code("https://falowen.streamlit.app")
+    qr_img = Image.open(qr_path)
 
-    # ---------- PDF Download Button ----------
+    # -------- PDF Generation --------
     if st.button("Download Brochure as PDF"):
         class PDF(FPDF):
             def header(self):
-                if logo_pdf:
-                    self.image(logo_pdf, x=10, y=8, w=36)
+                if logo_img:
+                    tmp_logo = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+                    logo_img.save(tmp_logo.name)
+                    self.image(tmp_logo.name, x=10, y=8, w=36)
                 self.set_font("Arial", "B", 16)
                 self.cell(0, 10, safe_pdf(title), ln=True, align="C")
                 self.ln(2)
@@ -455,14 +444,7 @@ with tabs[0]:
             def footer(self):
                 self.set_y(-20)
                 self.set_font("Arial", "I", 8)
-                self.cell(
-                    0,
-                    8,
-                    safe_pdf("Falowen app: falowen.streamlit.app"),
-                    0,
-                    0,
-                    'C'
-                )
+                self.cell(0, 8, safe_pdf("Falowen app: falowen.streamlit.app"), 0, 0, 'C')
                 if qr_path:
                     self.image(qr_path, x=180, y=260, w=18)
 
@@ -470,70 +452,40 @@ with tabs[0]:
         pdf.add_page()
         pdf.set_font("Arial", size=12)
         pdf.cell(0, 10, safe_pdf(f"{title} ({level})"), ln=True)
-        pdf.cell(
-            0,
-            8,
-            safe_pdf(
-                f"Dates: {start_dt.strftime('%d %b %Y')} – {end_dt.strftime('%d %b %Y')}"
-            ),
-            ln=True
-        )
+        pdf.cell(0, 8, safe_pdf(f"Dates: {start_dt.strftime('%d %b %Y')} – {end_dt.strftime('%d %b %Y')}"), ln=True)
         pdf.cell(0, 8, safe_pdf(f"Times: {times}"), ln=True)
-        pdf.cell(
-            0,
-            8,
-            safe_pdf(
-                f"School Fee: GHS {fee}"
-            ),
-            ln=True
-        )
-        pdf.cell(
-            0,
-            8,
-            safe_pdf(
-                f"Goethe Exam: {ge_dt} (GHS {ge_fee}, paid to Goethe Institute)"
-            ),
-            ln=True
-        )
+        pdf.cell(0, 8, safe_pdf(f"School Fee: GHS {fee}"), ln=True)
+        pdf.cell(0, 8, safe_pdf(f"Goethe Exam: {ge_dt} (GHS {ge_fee}, paid to Goethe Institute)"), ln=True)
         pdf.ln(2)
         pdf.set_font("Arial", "I", 11)
-        safe_multi_cell(pdf, 0, 7, safe_pdf(desc))
-        safe_multi_cell(pdf, 0, 7, safe_pdf(notes))
-        safe_multi_cell(pdf, 0, 7, safe_pdf(extra_notes))
+        pdf.multi_cell(0, 7, safe_pdf(desc))
+        pdf.multi_cell(0, 7, safe_pdf(notes))
+        pdf.multi_cell(0, 7, safe_pdf(extra_notes))
         pdf.ln(3)
-        if class_pdf:
-            try:
-                pdf.image(class_pdf, x=15, w=170)
-                pdf.ln(2)
-            except Exception:
-                pass
+        if class_img:
+            tmp_class = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+            class_img.save(tmp_class.name)
+            pdf.image(tmp_class.name, x=15, w=170)
+            pdf.ln(2)
         pdf.set_font("Arial", "B", 12)
         pdf.cell(0, 8, "Falowen App Features", ln=True)
         pdf.set_font("Arial", size=11)
-        safe_multi_cell(
-            pdf,
-            0,
-            7,
-            safe_pdf(
-                "• AI-powered writing correction\n"
-                "• Speaking feedback with pronunciation scoring\n"
-                "• Vocabulary & practice tools (exclusive for Falowen students)\n"
-                "• Hybrid learning: attend in-person, online or catch up anytime!"
-            )
-        )
+        pdf.multi_cell(0, 7, safe_pdf(
+            "• AI-powered writing correction\n"
+            "• Speaking feedback with pronunciation scoring\n"
+            "• Vocabulary & practice tools (exclusive for Falowen students)\n"
+            "• Hybrid learning: attend in-person, online or catch up anytime!"
+        ))
         pdf.ln(2)
         if reviews:
             pdf.set_font("Arial", "B", 11)
             pdf.cell(0, 8, "Student Reviews:", ln=True)
             pdf.set_font("Arial", size=11)
             for rev in reviews:
-                safe_multi_cell(pdf, 0, 7, safe_pdf(rev))
+                pdf.multi_cell(0, 7, safe_pdf(rev))
                 pdf.ln(1)
         pdf.ln(2)
-
-        # Serialize and encode PDF
-        pdf_bytes = get_pdf_bytes(pdf)
-
+        pdf_bytes = bytes(pdf.output(dest="S"))
         st.download_button(
             "📄 Download PDF Brochure",
             data=pdf_bytes,
@@ -541,6 +493,69 @@ with tabs[0]:
             mime="application/pdf"
         )
 
+    # -------- PNG Generation --------
+    def generate_brochure_image():
+        img = Image.new("RGB", (900, 1300), "white")
+        draw = ImageDraw.Draw(img)
+        # Logo
+        if logo_img:
+            logo_thumb = logo_img.resize((120, 120))
+            img.paste(logo_thumb, (30, 30))
+        # Title
+        try:
+            font_title = ImageFont.truetype("arial.ttf", 44)
+            font_details = ImageFont.truetype("arial.ttf", 28)
+        except:
+            font_title = font_details = None
+        draw.text((170, 40), title, fill="black", font=font_title)
+        # Course details
+        y = 180
+        lines = [
+            desc, "",
+            f"Dates: {start_dt.strftime('%d %b %Y')} – {end_dt.strftime('%d %b %Y')}",
+            f"Times: {times}",
+            f"School Fee: GHS {fee}",
+            f"Goethe Exam: {ge_dt} (GHS {ge_fee}, paid to Goethe Institute)",
+            notes,
+            extra_notes,
+            "Falowen App Features:",
+            "• AI-powered writing correction",
+            "• Speaking feedback with pronunciation scoring",
+            "• Vocabulary & practice tools (exclusive for Falowen students)",
+            "• Hybrid learning: attend in-person, online or catch up anytime!"
+        ]
+        for line in lines:
+            draw.text((40, y), line, fill="black", font=font_details)
+            y += 40
+        # Reviews
+        if reviews:
+            draw.text((40, y), "Student Reviews:", fill="black", font=font_details)
+            y += 40
+            for rev in reviews:
+                draw.text((60, y), rev, fill="black", font=font_details)
+                y += 36
+        # Classroom image
+        if class_img:
+            class_thumb = class_img.resize((320, 160))
+            img.paste(class_thumb, (520, 160))
+        # QR code
+        if qr_img:
+            qr_thumb = qr_img.resize((120, 120))
+            img.paste(qr_thumb, (730, 1150))
+        return img
+
+    if st.button("Download Brochure as Image (PNG)"):
+        image = generate_brochure_image()
+        buf = io.BytesIO()
+        image.save(buf, format="PNG")
+        buf.seek(0)
+        st.download_button(
+            "🖼️ Download Brochure Image",
+            data=buf,
+            file_name=f"{title.replace(' ', '_')}_brochure.png",
+            mime="image/png"
+        )
+        st.image(buf, caption="Preview", use_column_width=True)
 
 
 # ==== 9. ALL STUDENTS TAB ====
