@@ -385,6 +385,17 @@ def prepare_image_for_pdf(file_or_url):
     except Exception:
         return None
 
+def get_pdf_bytes(pdf):
+    """Generate bytes from FPDF instance, encoding if necessary."""
+    result = pdf.output(dest="S")
+    if isinstance(result, str):
+        try:
+            return result.encode("latin-1", "replace")
+        except Exception:
+            return result.encode("utf-8", "replace")
+    return result
+
+
 REVIEWS_SHEET = "https://docs.google.com/spreadsheets/d/137HANmV9jmMWJEdcA1klqGiP8nYihkDugcIbA-2V1Wc/edit?usp=sharing"
 
 with tabs[0]:
