@@ -63,6 +63,30 @@ def safe_pdf(text):
     """Remove/replace any character not in latin-1 for PDF compatibility."""
     return "".join(c if ord(c) < 256 else "?" for c in str(text))
 
+def header(self):
+    try:
+        import requests
+        # Download logo file
+        tmp_logo = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        r = requests.get(logo_url)
+        if r.status_code == 200:
+            tmp_logo.write(r.content)
+            tmp_logo.flush()
+            self.image(tmp_logo.name, x=10, y=8, w=36)
+        tmp_logo.close()
+    except Exception as e:
+        # Logo failed, skip
+        pass
+    self.set_xy(50, 10)
+    self.set_font("Arial", "B", 16)
+    self.cell(0, 10, headline, ln=1, align="L")
+    self.set_font("Arial", "", 12)
+    self.cell(0, 8, school, ln=1, align="L")
+    self.set_font("Arial", "", 10)
+    self.cell(0, 6, f"{contact} | {email}", ln=1, align="L")
+    self.ln(3)
+
+
 # -- CONFIGURATION --
 SCHOOL_NAME = "Learn Language Education Academy"
 SCHOOL_WEBSITE = "https://www.learngermanghana.com"
