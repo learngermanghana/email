@@ -775,7 +775,13 @@ with tabs[4]:
             
 
 with tabs[5]:
-
+    import tempfile
+    # ---- Helper: Ensure all text in PDF is latin-1 safe ----
+    def safe_pdf(text):
+        """Remove non-latin-1 characters for PDF output."""
+        if not text:
+            return ""
+        return text.encode("latin-1", "replace").decode("latin-1")
 
 
 # ==== 14. TAB 6: COURSE SCHEDULE GENERATOR ====
