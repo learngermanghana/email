@@ -335,7 +335,7 @@ with tabs[0]:
         email = st.text_input("Contact Email", value=SENDER_EMAIL)
         headline = st.text_input("Brochure Headline", value="Join Our Next German Class!")
         intro = st.text_area("Short Introduction", value="Boost your German with our proven, friendly program. Suitable for beginners and intermediates.")
-        
+
         # Add upcoming classes dynamically
         st.markdown("### Upcoming Classes")
         class_count = st.number_input("How many classes to show?", 1, 5, value=2, key="brochure_class_count")
@@ -347,9 +347,13 @@ with tabs[0]:
             days = st.text_input(f"Days/Time (e.g. Mon-Wed, 5pm)", value="Mon-Wed, 5pm", key=f"brochure_days_{i}")
             desc = st.text_area(f"Class {i+1} Description", value=f"Fun interactive lessons for {level}.", key=f"brochure_desc_{i}")
             classes.append({"level": level, "start": start, "days": days, "desc": desc})
-        
+
         notes = st.text_area("Notes (discounts, deadlines, etc)", value="Register by the deadline to enjoy a discount.")
         submit = st.form_submit_button("Preview Brochure")
+
+    # --- Helper for PDF latin-1 safe text ---
+    def safe_pdf(text):
+        return "".join(c if ord(c) < 256 else "?" for c in str(text))
 
     # --- Brochure Preview ---
     if submit:
@@ -373,28 +377,42 @@ with tabs[0]:
 
         # --- PDF Download ---
         from fpdf import FPDF
+        import tempfile
         pdf = FPDF()
         pdf.add_page()
+        # Add logo if available
+        if logo:
+            ext = logo.name.split('.')[-1]
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
+            tmp.write(logo.getbuffer())
+            tmp.close()
+            pdf.image(tmp.name, x=10, y=8, w=28)
+            pdf.ln(25)
         pdf.set_font("Arial", 'B', 16)
-        pdf.cell(0, 12, headline, ln=True, align='C')
+        pdf.cell(0, 12, safe_pdf(headline), ln=True, align='C')
         pdf.set_font("Arial", '', 12)
-        pdf.cell(0, 10, f"{school}", ln=True, align='C')
-        pdf.cell(0, 10, contact, ln=True, align='C')
-        pdf.cell(0, 10, email, ln=True, align='C')
+        pdf.cell(0, 10, safe_pdf(school), ln=True, align='C')
+        pdf.cell(0, 10, safe_pdf(contact), ln=True, align='C')
+        pdf.cell(0, 10, safe_pdf(email), ln=True, align='C')
         pdf.ln(8)
         pdf.set_font("Arial", '', 11)
-        pdf.multi_cell(0, 8, intro)
+        pdf.multi_cell(0, 8, safe_pdf(intro))
         pdf.ln(2)
         pdf.set_font("Arial", 'B', 13)
         pdf.cell(0, 10, "Upcoming Classes", ln=True)
         pdf.set_font("Arial", '', 11)
         for c in classes:
-            pdf.multi_cell(0, 8, f"Level: {c['level']} | Start: {c['start']} | {c['days']}\n{c['desc']}\n")
+            pdf.multi_cell(0, 8, safe_pdf(f"Level: {c['level']} | Start: {c['start']} | {c['days']}\n{c['desc']}\n"))
             pdf.ln(1)
         pdf.ln(3)
         pdf.set_font("Arial", 'I', 10)
-        pdf.multi_cell(0, 7, f"Notes: {notes}")
-        pdf_bytes = pdf.output(dest="S").encode("latin-1", "replace")
+        pdf.multi_cell(0, 7, safe_pdf(f"Notes: {notes}"))
+
+        # Handle fpdf output bytes
+        pdf_bytes = pdf.output(dest="S")
+        if isinstance(pdf_bytes, str):
+            pdf_bytes = pdf_bytes.encode("latin-1", "replace")
+
         st.download_button("📄 Download Brochure PDF", data=pdf_bytes, file_name="class_brochure.pdf", mime="application/pdf")
 
         # --- Email Brochure (Optional) ---
@@ -404,6 +422,7 @@ with tabs[0]:
         if st.button("Send Brochure to Client") and client_email:
             from sendgrid import SendGridAPIClient
             from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
+            import base64
             msg = Mail(
                 from_email=email,
                 to_emails=client_email,
@@ -423,6 +442,7 @@ with tabs[0]:
                 st.success(f"Brochure sent to {client_email}!")
             except Exception as e:
                 st.error(f"Failed to send: {e}")
+
 
 
 # ==== 9. ALL STUDENTS TAB ====
