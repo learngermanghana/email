@@ -387,132 +387,36 @@ def prepare_image_for_pdf(file_or_url):
 
 REVIEWS_SHEET = "https://docs.google.com/spreadsheets/d/137HANmV9jmMWJEdcA1klqGiP8nYihkDugcIbA-2V1Wc/edit?usp=sharing"
 
-# =================== TAB 0 ======================
 with tabs[0]:
     st.title("🎓 Class Brochure / Flyer Generator")
     st.write("Generate a professional flyer or brochure for your upcoming German classes with dynamic reviews and Falowen app info.")
 
-    layout = st.selectbox("Layout Template", ["Single Column", "Two Column", "Poster Style"])
+    # --- INPUTS ---
+    title = st.text_input("Class Title", "German A1 Intensive")
+    level = st.selectbox("Level", ["A1", "A2", "B1", "B2"])
+    start_dt = st.date_input("Start Date", date.today())
+    end_dt = st.date_input("End Date", date.today() + timedelta(days=30))
+    times = st.text_input("Meeting Times", "Mon 7pm, Tue 6pm (edit as needed)")
+    fee = st.text_input("School Fee (GHS)", "950")
+    ge_dt = st.text_input("Goethe Exam Date", "")
+    ge_fee = st.text_input("Goethe Exam Fee (GHS)", "")
+    logo_url = st.text_input("Logo URL", "https://i.imgur.com/iFiehrp.png")
+    class_img_url = st.text_input("Classroom Image URL", "")
+    desc = st.text_area("Class Description", "Hybrid format: join in-person, online, or use recorded lectures on our Falowen app. All students receive full support, exercises, and guidance for exam success.")
+    notes = st.text_area("Notes", "Register by the deadline to enjoy a discount.")
+    extra_notes = st.text_area("Why Choose Us?", "We are an official Goethe partner with 98% pass rate. Only our fee is paid to us; exam fee goes to Goethe Institute. The Falowen app was built by us and is exclusive to our students.")
+    n_reviews = st.number_input("How many reviews to show?", min_value=0, max_value=10, value=2)
+    REVIEWS_SHEET = st.text_input("Google Reviews Sheet Link", "https://docs.google.com/spreadsheets/d/137HANmV9jmMWJEdcA1klqGiP8nYihkDugcIbA-2V1Wc/edit?usp=sharing")
+    qr_url = "https://falowen.streamlit.app"
+    # --- GET IMAGES, QR ---
+    logo_pdf = prepare_image_for_pdf(logo_url) if logo_url else None
+    class_pdf = prepare_image_for_pdf(class_img_url) if class_img_url else None
+    qr_path = make_qr_code(qr_url) if qr_url else None
 
-    with st.form("brochure_form"):
-        logo_url = "https://i.imgur.com/iFiehrp.png"
-        st.image(logo_url, width=120)
-        classroom = st.file_uploader("Classroom Photo (optional)", ["png", "jpg", "jpeg"])
-        title = st.text_input("Class Title", "A1 Intensive Beginners")
-        level = st.text_input("Level", "A1")
-        start_dt = st.date_input("Start Date", date.today())
-        end_dt = st.date_input("End Date", date.today())
-        times = st.text_input("Meeting Times", "Mon 7pm, Wed 6pm")
-        desc = st.text_area("Description", "Hybrid: In-person, online or recorded via Falowen app.")
-        fee = st.text_input("School Fee (GHS)", "1,500")
-        ge_dt = st.text_input("Goethe Exam Date", "2024-09-10")
-        ge_fee = st.text_input("Goethe Exam Fee (GHS)", "1,200")
-        notes = st.text_area("Why Choose Us?", "Top results, professional team, 24/7 Falowen access.")
-        n_reviews = st.slider("Number of Reviews", 1, 4, 2)
-        extra_notes = st.text_area("Extra Notes", "Register by the deadline to enjoy a discount.")
-        submitted = st.form_submit_button("Preview Brochure")
+    # --- REVIEWS ---
+    reviews = get_random_reviews(REVIEWS_SHEET, n=n_reviews)
 
-    if not submitted:
-        st.info("Complete the form and click Preview.")
-        st.stop()
-
-    # -- Prepare images for HTML & PDF
-    logo_html = prepare_image_for_html(logo_url)
-    class_html = prepare_image_for_html(classroom)
-    logo_pdf = prepare_image_for_pdf(logo_url)
-    class_pdf = prepare_image_for_pdf(classroom)
-
-    reviews = get_random_reviews(REVIEWS_SHEET, n_reviews)
-    qr_path = make_qr_code("https://falowen.streamlit.app")
-    qr_html = ""
-    if qr_path:
-        with open(qr_path, 'rb') as f:
-            qr_html = f"data:image/png;base64,{base64.b64encode(f.read()).decode()}"
-
-    # -- HTML PREVIEW --
-    if layout == "Single Column":
-        html = f"""
-        <div style='max-width:500px;margin:auto;padding:1em;border:1px solid #ccc;border-radius:10px'>
-          <img src="{logo_html}" width="100"/><br>
-          <h2>{title} ({level})</h2>
-          <b>Dates:</b> {start_dt.strftime('%d %b %Y')} – {end_dt.strftime('%d %b %Y')}<br>
-          <b>Times:</b> {times}<br>
-          <p>{desc}</p>
-          <b>School Fee:</b> GHS {fee}<br>
-          <b>Goethe Exam:</b> {ge_dt} (Fee GHS {ge_fee})<br>
-          <b>Note:</b> Goethe fee is paid directly to Goethe Institute.<br>
-          <i>{notes}</i>
-          <hr>
-          <h3>Falowen App</h3>
-          <p>AI Writing Correction, Pronunciation Scoring, Vocabulary & Practice. Built by our school, exclusive for students.</p>
-          <img src="{qr_html}" width="80"/><br>
-          <a href="https://falowen.streamlit.app">falowen.streamlit.app</a>
-          <hr>
-          {"<br>".join(reviews)}
-          <hr>
-          <div style='font-size:0.95em'>{extra_notes}</div>
-        </div>
-        """
-    elif layout == "Two Column":
-        html = f"""
-        <div style='display:flex;max-width:800px;margin:auto'>
-          <div style='flex:1;padding:1em'>
-            <h2>{title} ({level})</h2>
-            <p><b>Dates:</b> {start_dt.strftime('%d %b %Y')} – {end_dt.strftime('%d %b %Y')}<br>
-            <b>Times:</b> {times}<br>
-            <b>Fee:</b> GHS {fee}<br>
-            <b>Goethe:</b> {ge_dt} (GHS {ge_fee}, paid to Goethe Institute)</p>
-            <p>{desc}</p>
-            <i>{notes}</i>
-            <p>{extra_notes}</p>
-            <h3>Falowen App</h3>
-            <ul>
-              <li>AI Writing Correction</li>
-              <li>Speaking feedback with pronunciation scoring</li>
-              <li>Vocabulary & practice tools — built by us, exclusive for students!</li>
-            </ul>
-            <img src="{qr_html}" width="70"/><br>
-            <a href="https://falowen.streamlit.app">falowen.streamlit.app</a>
-            <br><hr>
-            {"<br>".join(reviews)}
-          </div>
-          <div style='flex:1;padding:1em'>
-            <img src="{class_html or logo_html}" width="100%" style='margin-bottom:1em'/>
-          </div>
-        </div>
-        """
-    else:  # Poster Style
-        html = f"""
-        <div style='max-width:650px;margin:auto;padding:2em 1em 1em 1em;border:3px solid #0c7bb3;border-radius:18px;background:#fafdff;'>
-          <div style='display:flex;justify-content:space-between;align-items:center'>
-            <img src="{logo_html}" width="90"/>
-            <h1 style='margin:0'>{title}</h1>
-            <img src="{qr_html}" width="68"/>
-          </div>
-          <h3 style='color:#025'>{level} | {start_dt.strftime('%d %b')}–{end_dt.strftime('%d %b')}</h3>
-          <p style='font-size:1.2em'>{desc}</p>
-          <b>Schedule:</b> {times}<br>
-          <b>School Fee:</b> GHS {fee}<br>
-          <b>Goethe Exam:</b> {ge_dt} (GHS {ge_fee}, paid to Goethe Institute only)<br>
-          <i>{notes}</i>
-          <hr>
-          <img src="{class_html or logo_html}" width="100%" style='margin-bottom:1em;border-radius:8px'/>
-          <h3 style='margin-top:0'>Why Falowen?</h3>
-          <ul>
-            <li>AI writing correction & feedback</li>
-            <li>Pronunciation scoring</li>
-            <li>Exclusive access to all lesson replays, exercises & vocab practice</li>
-            <li>Hybrid learning: in-person, online or recorded — all flexible!</li>
-          </ul>
-          <hr>
-          {"<br>".join(reviews)}
-          <div style='font-size:0.98em;margin-top:0.6em'>{extra_notes}</div>
-        </div>
-        """
-
-    st.markdown(html, unsafe_allow_html=True)
-
-    # -------- PDF Generation --------
+    # --- PDF GENERATION ---
     if st.button("Download Brochure as PDF"):
         class PDF(FPDF):
             def header(self):
@@ -567,12 +471,11 @@ with tabs[0]:
                 pdf.multi_cell(0, 7, safe_pdf(rev))
                 pdf.ln(1)
         pdf.ln(2)
-
         pdf_data = pdf.output(dest="S")
         if isinstance(pdf_data, str):
             pdf_bytes = pdf_data.encode("latin-1", "replace")
         else:
-            pdf_bytes = pdf_data
+            pdf_bytes = pdf_data  # already bytes, no need to encode
 
         st.download_button(
             "📄 Download PDF Brochure",
