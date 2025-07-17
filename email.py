@@ -1,18 +1,13 @@
 import os
-import re
 import base64
+import re
+import qrcode
 import tempfile
-import random
-import requests
 from datetime import datetime, date, timedelta
 import pandas as pd
 import streamlit as st
 from fpdf import FPDF
-from PIL import Image
-import qrcode
 import urllib.parse
-
-# For sending emails
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
 
@@ -64,30 +59,9 @@ def send_email_report(to_email, subject, body):
     response = sg.send(email)
     return response
 
-
-def header(self):
-    try:
-        import requests
-        # Download logo file
-        tmp_logo = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-        r = requests.get(logo_url)
-        if r.status_code == 200:
-            tmp_logo.write(r.content)
-            tmp_logo.flush()
-            self.image(tmp_logo.name, x=10, y=8, w=36)
-        tmp_logo.close()
-    except Exception as e:
-        # Logo failed, skip
-        pass
-    self.set_xy(50, 10)
-    self.set_font("Arial", "B", 16)
-    self.cell(0, 10, headline, ln=1, align="L")
-    self.set_font("Arial", "", 12)
-    self.cell(0, 8, school, ln=1, align="L")
-    self.set_font("Arial", "", 10)
-    self.cell(0, 6, f"{contact} | {email}", ln=1, align="L")
-    self.ln(3)
-
+def safe_pdf(text):
+    """Remove/replace any character not in latin-1 for PDF compatibility."""
+    return "".join(c if ord(c) < 256 else "?" for c in str(text))
 
 # -- CONFIGURATION --
 SCHOOL_NAME = "Learn Language Education Academy"
@@ -276,19 +250,17 @@ def send_email_report(pdf_bytes: bytes, to: str, subject: str, html_content: str
         st.error(f"Email send failed: {e}")
 
 
-
-    
 # ==== 5. TABS LAYOUT ====
 tabs = st.tabs([
-    "📝 Brochure",                # 0
+    "📝 Pending",                 # 0
     "👩‍🎓 All Students",            # 1
     "💵 Expenses",                # 2
     "📲 Reminders",               # 3
     "📄 Contract",                # 4
     "📧 Send Email",              # 5 
     "📆 Schedule",                # 6
-    "📝 Marking"                  # 7
-
+    "📝 Marking",                  # 7
+    "📝 Letter of Enrollment Generator" #8
     
 ])
 
@@ -322,7 +294,43 @@ Asadu Felix
 # --- End of Stage 2 ---
 
 with tabs[0]:
-    st.title("🎉 Create Class Brochure / Flyer")
+
+    st.title("🕒 Pending Students")
+
+    # Load Data
+    pending_csv_url = "https://docs.google.com/spreadsheets/d/1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo/export?format=csv"
+    @st.cache_data(ttl=0)
+    def load_pending():
+        df = pd.read_csv(pending_csv_url, dtype=str)
+        df_display = df.copy()
+        df_search = df.copy()
+        df_search.columns = [c.strip().lower().replace(" ", "").replace("_", "") for c in df_search.columns]
+        return df_display, df_search
+    df_display, df_search = load_pending()
+
+    # Universal Search
+    search = st.text_input("🔎 Search any field (name, code, email, etc.)")
+    if search:
+        mask = df_search.apply(lambda row: row.astype(str).str.contains(search, case=False, na=False).any(), axis=1)
+        filt = df_display[mask]
+    else:
+        filt = df_display
+
+    # Column Selector
+    all_cols = list(filt.columns)
+    selected_cols = st.multiselect(
+        "Show columns (for easy viewing):", all_cols, default=all_cols[:6]
+    )
+
+    # Show Table (with scroll bar)
+    st.dataframe(filt[selected_cols], use_container_width=True, height=400)
+
+    # Download Always Includes All Columns
+    st.download_button(
+        "⬇️ Download all columns as CSV",
+        filt.to_csv(index=False),
+        file_name="pending_students.csv"
+    )
 
 
 # ==== 9. ALL STUDENTS TAB ====
@@ -1360,6 +1368,5 @@ with tabs[7]:
         )
     else:
         st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
-
 
 
