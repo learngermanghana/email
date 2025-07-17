@@ -567,23 +567,19 @@ with tabs[0]:
                 pdf.multi_cell(0, 7, safe_pdf(rev))
                 pdf.ln(1)
         pdf.ln(2)
+
         pdf_data = pdf.output(dest="S")
-        if isinstance(pdf_data, bytes):
-            pdf_bytes = pdf_data
-        elif isinstance(pdf_data, str):
-            try:
-                pdf_bytes = pdf_data.encode("latin-1", "replace")
-            except Exception:
-                pdf_bytes = pdf_data.encode("utf-8", "replace")
+        if isinstance(pdf_data, str):
+            pdf_bytes = pdf_data.encode("latin-1", "replace")
         else:
-            pdf_bytes = bytes(pdf_data)
+            pdf_bytes = pdf_data
+
         st.download_button(
             "📄 Download PDF Brochure",
             data=pdf_bytes,
             file_name=f"{title.replace(' ', '_')}_brochure.pdf",
             mime="application/pdf"
         )
-
 
 
 # ==== 9. ALL STUDENTS TAB ====
