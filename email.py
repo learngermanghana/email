@@ -1,18 +1,15 @@
+# ==== 1. IMPORTS ====
 import os
 import base64
 import re
-import qrcode
-import tempfile
 from datetime import datetime, date, timedelta
 import pandas as pd
 import streamlit as st
 from fpdf import FPDF
-import urllib.parse
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
-
-
-
+import sqlite3
+import urllib.parse  
 
 # ==== 1.a. CSV & COLUMN HELPERS ====
 def safe_read_csv(local_path: str, remote_url: str) -> pd.DataFrame:
@@ -37,66 +34,6 @@ def col_lookup(df: pd.DataFrame, name: str) -> str:
 def safe_pdf(text: str) -> str:
     """Ensure strings are PDF-safe (Latin-1)."""
     return text.encode("latin-1", "replace").decode("latin-1")
-
-
-def strip_leading_number(text):
-    # Removes leading digits, dots, and spaces (e.g., "1. C" or "2) D" -> "C" or "D")
-    return re.sub(r"^\s*\d+[\.\)]?\s*", "", text).strip()
-
-import streamlit as st
-import sendgrid
-from sendgrid.helpers.mail import Mail
-
-def send_email_report(to_email, subject, body):
-    sg = sendgrid.SendGridAPIClient(api_key=st.secrets["general"]["sendgrid_api_key"])
-    sender_email = st.secrets["general"]["sender_email"]
-    email = Mail(
-        from_email=sender_email,
-        to_emails=to_email,
-        subject=subject,
-        html_content=body
-    )
-    response = sg.send(email)
-    return response
-
-def safe_pdf(text):
-    """Remove/replace any character not in latin-1 for PDF compatibility."""
-    return "".join(c if ord(c) < 256 else "?" for c in str(text))
-
-# -- CONFIGURATION --
-SCHOOL_NAME = "Learn Language Education Academy"
-SCHOOL_WEBSITE = "https://www.learngermanghana.com"
-SCHOOL_PHONE = "0205706589"
-SCHOOL_ADDRESS = "Accra, Ghana"
-BUSINESS_REG = "BN173410224"
-TUTOR_NAME = "Felix Asadu"
-TUTOR_TITLE = "Director"
-SENDER_EMAIL = st.secrets["general"]["sender_email"]
-SENDGRID_KEY = st.secrets["general"]["sendgrid_api_key"]
-
-# --- Load student data from Google Sheets ---
-students_csv_url = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
-df_students = pd.read_csv(students_csv_url)
-df_students.columns = [c.strip().lower().replace(" ", "_") for c in df_students.columns]
-
-# -- Utility: get student row --
-def get_student_row(name):
-    return df_students[df_students["name"] == name].iloc[0]
-
-# -- QR Code generator --
-def make_qr_code(url):
-    qr = qrcode.QRCode(box_size=3, border=1)
-    qr.add_data(url)
-    qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white")
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
-    img.save(tmp.name)
-    return tmp.name
-
-# -- Safe PDF string --
-def safe_pdf(text):
-    return "".join(c if ord(c) < 256 else "?" for c in str(text))
-
 
 # ==== 2. CONFIG / CONSTANTS ====
 SCHOOL_NAME         = "Learn Language Education Academy"
@@ -249,6 +186,682 @@ def send_email_report(pdf_bytes: bytes, to: str, subject: str, html_content: str
     except Exception as e:
         st.error(f"Email send failed: {e}")
 
+        
+# ==== 8. REFERENCE ANSWERS ====
+#def ref_answers
+ref_answers = {
+    # --- A1 Section ---
+    "A1 0.1": [
+        "1. C) Guten Morgen",
+        "2. D) Guten Tag",
+        "3. B) Guten Abend",
+        "4. B) Gute Nacht",
+        "5. C) Guten Morgen",
+        "6. C) Wie geht es Ihnen",
+        "7. B) Auf Wiedersehen",
+        "8. C) Tschuss",
+        "9. C) Guten Abend",
+        "10. D) Guten Nacht"
+    ],
+    "A1 0.2": [
+        "1. C) 26",
+        "2. A) A, O, U, B",
+        "3. A) Eszett",
+        "4. A) K",
+        "5. A) A-Umlaut",
+        "6. A) A, O, U, B",
+        "7. B 4",
+        "",
+        "Wasser", "Kaffee", "Blume", "Schule", "Tisch"
+    ],
+    "A1 1.1": [
+        "1. C",
+        "2. C",
+        "3. A",
+        "4. B"
+    ],
+    "A1 1.2": [
+        "1. Ich heiße Anna",
+        "2. Du heißt Max",
+        "3. Er heißt Peter",
+        "4. Wir kommen aus Italien",
+        "",
+        "5. Ihr kommt aus Brasilien",
+        "6. Sie kommt/k kommen aus Russland",
+        "7. Ich wohne in Berlin",
+        "",
+        "8. Du wohnst in Madrid",
+        "9. Sie wohnt in Wien",
+        "",
+        "1. A) Anna",
+        "2. C) Aus Italien",
+        "3. D) In Berlin",
+        "4. B) Tom",
+        "5. A) In Berlin"
+    ],
+    "A1 2": [
+        "1. A) sieben",
+        "2. B) Drei",
+        "3. B) Sechs",
+        "4. B) Neun",
+        "5. B) Sieben",
+        "6. C) Fünf",
+        "",
+        "7. B) zweihundertzweiundzwanzig",
+        "8. A) fünfhundertneun",
+        "9. A) zweitausendvierzig",
+        "10. A) fünftausendfünfhundertneun",
+        "",
+        "1. 16 – sechzehn",
+        "2. 98 – achtundneunzig",
+        "3. 555 – fünfhundertfünfundfünfzig",
+        "",
+        "4. 1020 – tausendzwanzig",
+        "5. 8553 – achttausendfünfhundertdreiundfünfzig"
+    ],
+    "A1 4": [
+        "1. C) Neun",
+        "2. B) Polnisch",
+        "3. D) Niederländisch",
+        "4. A) Deutsch",
+        "5. C) Paris",
+        "6. B) Amsterdam",
+        "7. C) In der Schweiz",
+        "",
+        "1. C) In Italien und Frankreich",
+        "2. C) Rom",
+        "3. B) Das Essen",
+        "4. B) Paris",
+        "5. A) Nach Spanien"
+    ],
+    "A1 5": [
+        # Part 1 – Vocabulary Review
+        "Der Tisch – the table",
+        "Die Lampe – the lamp",
+        "Das Buch – the book",
+        "Der Stuhl – the chair",
+        "Die Katze – the cat",
+        "Das Auto – the car",
+        "Der Hund – the dog",
+        "Die Blume – the flower",
+        "Das Fenster – the window",
+        "Der Computer – the computer",
+        "",
+        # Part 2 – Nominative Case
+        "1. Der Tisch ist groß",
+        "2. Die Lampe ist neu",
+        "3. Das Buch ist interessant",
+        "4. Der Stuhl ist bequem",
+        "5. Die Katze ist süß",
+        "6. Das Auto ist schnell",
+        "7. Der Hund ist freundlich",
+        "8. Die Blume ist schön",
+        "9. Das Fenster ist offen",
+        "10. Der Computer ist teuer",
+        "",
+        # Part 3 – Accusative Case
+        "1. Ich sehe den Tisch",
+        "2. Sie kauft die Lampe",
+        "3. Er liest das Buch",
+        "4. Wir brauchen den Stuhl",
+        "5. Du fütterst die Katze",
+        "6. Ich fahre das Auto",
+        "7. Sie streichelt den Hund",
+        "8. Er pflückt die Blume",
+        "9. Wir putzen das Fenster",
+        "10. Sie benutzen den Computer"
+    ],
+    "A1 6": [
+        "Das Wohnzimmer – the living room",
+        "Die Küche – the kitchen",
+        "Das Schlafzimmer – the bedroom",
+        "Das Badezimmer – the bathroom",
+        "Der Balkon – the balcony",
+        "",
+        "Der Flur – the hallway",
+        "Das Bett – the bed",
+        "Der Tisch – the table",
+        "Der Stuhl – the chair",
+        "Der Schrank – the wardrobe",
+        "",
+        "1. B) Vier",
+        "2. A) Ein Sofa und ein Fernseher",
+        "3. B) Einen Herd, einen Kühlschrank und einen Tisch mit vier Stühlen",
+        "4. C) Ein großes Bett",
+        "5. D) Eine Dusche, eine Badewanne und ein Waschbecken",
+        "",
+        "6. D) Klein und schön",
+        "7. C) Blumen und einen kleinen Tisch mit zwei Stühlen",
+        "",
+        "1. B", "2. B", "3. B", "4. C", "5. D", "6. B", "7. C"
+    ],
+    "A1 7": [
+        "1. B) Um sieben Uhr",
+        "2. B) Um acht Uhr",
+        "3. B) Um sechs Uhr",
+        "4. B) Um zehn Uhr",
+        "5. B) Um neun Uhr",
+        "",
+        "6. C) Nachmittags",
+        "7. A) Um sieben Uhr",
+        "8. A) Montag",
+        "9. B) Am Dienstag und Donnerstag",
+        "10. B) Er ruht sich aus",
+        "",
+        "1. B) Um neun Uhr",
+        "2. B) Er geht in die Bibliothek",
+        "3. B) Bis zwei Uhr nachmittags",
+        "4. B) Um drei Uhr nachmittags",
+        "5. A) ",
+        "",
+        "6. B) Um neun Uhr",
+        "7. B) Er geht in die Bibliothek",
+        "8. B) Bis zwei Uhr nachmittags",
+        "9. B) Um drei Uhr nachmittags",
+        "10. B) Um sieben Uhr"
+    ],
+    "A1 8": [
+        "1. B) Zwei Uhr nachmittags",
+        "2. B) 29 Tage",
+        "3. B) April",
+        "4. C) 03.02.2024",
+        "5. C) Mittwoch",
+        "",
+        "1. Falsch", "2. Richtig", "3. Richtig", "4. Falsch", "5. Richtig",
+        "",
+        "1. B) Um Mitternacht", "2. B) Vier Uhr nachmittags", "3. C) 28 Tage", "4. B) Tag. Monat. Jahr", "5. D) Montag"
+    ],
+    "A1 9": [
+        "1. B) Apfel und Karotten", "2. C) Karotten", "3. A) Weil er Vegetarier ist", "4. C) Käse", "5. B) Fleisch",
+        "", "6. B) Kekse", "7. A) Käse", "8. C) Kuchen", "9. C) Schokolade", "10. B) Der Bruder des Autors",
+        "", "1. A) Apfel, Bananen und Karotten", "2. A) Müsli mit Joghurt", "3. D) Karotten", "4. A) Käse", "5. C) Schokoladenkuchen"
+    ],
+    "A1 10": [
+        "1. Falsch", "2. Wahr", "3. Falsch", "4. Wahr", "5. Wahr", "6. Falsch", "Wahr", "7. Falsch", "8. Falsch", "9. Falsch",
+        "1. B) Einmal pro Woche", "2. C) Apfel und Bananen", "3. A) Ein halbes Kilo", "4. B) 10 Euro", "5. B) Einen schönen Tag"
+    ],
+    "A1 11": [
+        "1. B) Entschuldigung, wo ist der Bahnhof?",
+        "2. B) Links abbiegen",
+        "3. B) Auf der rechten Seite, direkt neben dem großen Supermarkt",
+        "4. B) Wie komme ich zur nächsten Apotheke?",
+        "5. C) Gute Reise und einen schönen Tag noch",
+        "",
+        "1. C) Wie komme ich zur nächsten Apotheke?",
+        "2. C) Rechts abbiegen",
+        "3. B) Auf der linken Seite, direkt neben der Bäckerei",
+        "4. A) Gehen Sie geradeaus bis zur Kreuzung, dann links",
+        "5. C) Einen schönen Tag noch",
+        "",
+        "1. Fragen nach dem Weg: 'Entschuldigung, wie komme ich zum Bahnhof'",
+        "2. Die Straße überqueren: 'Überqueren Sie die Straße'",
+        "3. Geradeaus gehen: 'Gehen Sie geradeaus'",
+        "4. Links abbiegen: 'Biegen Sie links ab'",
+        "5. Rechts abbiegen: 'Biegen Sie rechts ab'",
+        "6. On the left side: 'Das Kino ist auf der linken Seite'"
+    ],
+
+    "A1 12.1": [
+        "1. B) Ärztin",
+        "2. A) Weil sie keine Zeit hat",
+        "3. B) Um 8 Uhr",
+        "4. C) Viele verschiedene Fächer",
+        "5. C) Einen Sprachkurs besuchen",
+        "",
+        "1. Der Supermarkt ist nur am Wochenende geöffnet. Antwort: B) Falsch (Der Supermarkt hat jeden Tag von 8 Uhr bis 20 Uhr geöffnet.)",
+        "2. Die Theoriestunden sind jeden Tag. Antwort: B) Falsch (Die Theoriestunden finden dienstags und donnerstags statt.)",
+        "3. Das Büro ist auch am Wochenende geöffnet. Antwort: B) Falsch (Das Büro ist von Montag bis Freitag geöffnet.)",
+        "4. Der Englischkurs ist zweimal pro Woche. Antwort: B) Falsch (Der Englischkurs findet dreimal pro Woche statt.)",
+        "5. Das Fitnessstudio ist nur vormittags geöffnet. Antwort: B) Falsch (Das Fitnessstudio ist jeden Tag von 6 Uhr bis 22 Uhr geöffnet.)",
+        "",
+        "1. A) Richtig",
+        "2. A) Richtig",
+        "3. A) Richtig",
+        "4. A) Richtig",
+        "5. A) Richtig"
+    ],
+
+    "A1 12.2": [
+        "1. In Berlin",
+        "2. Mit seiner Frau und seinen drei Kindern",
+        "3. Mit seinem Auto",
+        "4. Um 7:30 Uhr",
+        "5. a) Barzahlung (cash)",
+        "",
+        "1. B) Um 9:00 Uhr",
+        "2. B) Um 12:00 Uhr",
+        "3. B) Um 18:00 Uhr",
+        "4. B) Um 21:00 Uhr",
+        "5. D) Alles Genannte",
+        "",
+        "1. B) Um 9 Uhr",
+        "2. B) Um 12 Uhr",
+        "3. A) ein Computer und ein Drucker",
+        "4. C) in einer Bar",
+        "5. C) bar"
+    ],
+
+    "A1 13": [
+        "1. A",
+        "2. B",
+        "3. A",
+        "4. A",
+        "5. B",
+        "6. B",
+        "",
+        "1. A",
+        "2. B",
+        "3. B",
+        "",
+        "1. B",
+        "2. B",
+        "3. B"
+    ],
+
+    "A1 14.1": [
+        "Frage 1: Anzeige A",
+        "Frage 2: Anzeige B",
+        "Frage 3: Anzeige B",
+        "Frage 4: Anzeige A",
+        "Frage 5: Anzeige A",
+        "",
+        "1. C) Guten Tag, Herr Doktor",
+        "2. B) Halsschmerzen und Fieber",
+        "3. C) Seit gestern",
+        "4. C) Kopfschmerzen und Müdigkeit",
+        "5. A) Ich verschreibe Ihnen Medikamente",
+        "",
+        "A) Kopf – Head",
+        "B) Arm – Arm",
+        "C) Bein – Leg",
+        "D) Auge – Eye",
+        "E) Nase – Nose",
+        "F) Ohr – Ear",
+        "G) Mund – Mouth",
+        "H) Hand – Hand",
+        "I) Fuß – Foot",
+        "J) Bauch – Stomach"
+    ],
+    # --- A2 Section ---
+    "A2 1.1": [
+        "1. C) In einer Schule",
+        "2. B) Weil sie gerne mit Kindern arbeitet",
+        "3. A) In einem Buro",
+        "4. B) Tennis",
+        "5. B) Es war sonnig und warm",
+        "6. B) Italien und Spanien",
+        "7. C) Weil die Baume so schon bunt sind",
+        "",
+        "1. B) Ins Kino gehen",
+        "2. A) Weil sie spannende Geschichten liebt",
+        "3. A) Tennis",
+        "4. B) Es war sonnig und warm",
+        "5. C) Einen Spaziergang Machen"
+    ],
+    "A2 1.2": [
+        "1. B) Ein Jahr",
+        "2. B) Er ist immer gut gelaunt und organisiert",
+        "3. C) Einen Anzug und eine Brille",
+        "4. B) Er geht geduldig auf ihre Anliegen ein",
+        "5. B) Weil er seine Mitarbeiter regelmaBig lobt",
+        "6. A) Wenn eine Aufgabe nicht rechtzeitig erledigt wird",
+        "7. B) Dass er fair ist und die Leistungen der Mitarbeiter wertschatzt",
+        "",
+        "1. B) Weil er",
+        "2. C) Sprachkurse",
+        "3. A) Jeden tag"
+    ],
+    "A2 1.3": [
+        "1. B) Anna ist 25 Jahre alt",
+        "2. B) In ihrer Freizeit liest Anna Bucher und geht spazieren",
+        "3. C) Anna arbeitet in einem Krankenhaus",
+        "4. C) Anna hat einen Hund",
+        "5. B) Max unterrichtet Mathematik",
+        "6. A) Max spielt oft FuBball mit seinen Freunden",
+        "7. B) Am Wochenende machen Anna und Max Ausfluge oder besuchen Museen",
+        "",
+        "1. B) Julia ist 26 Jahre alt",
+        "2. C) Julia arbeitet als Architektin",
+        "3. B) Tobias lebt in Frankfurt",
+        "4. A) Tobias mochte ein eigenes Restaurant eroffnen",
+        "5. B) Julia und Tobias kochen am Wochenende oft mit Sophie"
+    ],
+    "A2 2.4": [
+        "1. B) faul sein",
+        "2. d) Hockey spielen",
+        "3. a) schwimmen gehen",
+        "4. d) zum See fahren und dort im Zelt übernachten",
+        "5. b) eine Route mit dem Zug durch das ganze Land",
+        "",
+        "1. B) Um 10 Uhr",
+        "2. B) Eine Rucksack",
+        "3. B) Ein Piknik",
+        "4. C) in eienem restaurant",
+        "5. A) Spielen und Spazieren gehen"
+    ],
+    "A2 3.6": [
+        "1. b) Weil ich studiere",
+        "2. b) Wenn es nicht regnet, stürmt oder schneit → Formuliert im Text als:",
+        "3. d) Es ist billig",
+        "4. d) Haustiere",
+        "5. c) Im Zoo",
+        "",
+        "1. A",
+        "2. A",
+        "3. B",
+        "4. B",
+        "5. B"
+    ],
+    "A2 3.7": [
+        "1. b) In Zeitungen und im Internet",
+        "2. c) Eine Person, die bei der Wohnungssuche hilft",
+        "3. c) Kaltmiete und Nebenkosten",
+        "4. b) Ein Betrag, den man beim Auszug zurückbekommt",
+        "5. c) Ein Formular, das Schäden in der Wohnung zeigt",
+        "6. c) Von 22–7 Uhr und 13–15 Uhr",
+        "7. c) Zum Wertstoffcontainer bringen"
+    ],
+    "A2 3.8": [
+        "1. B) Brot, Brotchen, Aufschnitt, Kase und Marmelade",
+        "2. B) Ein Kaltes Abendessen",
+        "3. A) Fischgerichte",
+        "4. B) Oktoberfest",
+        "5. B) Gerichte aus aller Welt",
+        "6. C) Sauerkraut und Bratwurst",
+        "7. A) Eine zentrale Rolle",
+        "",
+        "1. B) Samstag",
+        "2. B) Obst und Gemuse",
+        "3. B) Mozzarella",
+        "4. B) Sie gehen in ein Café",
+        "5. A) Gemuselasagne"
+    ],
+    "A2 4.9": [
+        "1. B) Italien",
+        "2. A) Eine Woche",
+        "3. C) Kolosseum",
+        "4. B) Pasta Carbonara und Tiramisu",
+        "5. B) Amalfikuste",
+        "6. B) Am strand verbracht und geschwommen",
+        "7. C) Wegen des perfekten Urlaubs",
+        "",
+        "1. B) Griechenland",
+        "2. A) Eine woche",
+        "3. B) Der strand von Elafonissi",
+        "4. B) Eine Bootstour",
+        "5. A) Nach Kreta zu reisen"
+    ],
+    "A2 4.10": [
+        "1. C) Barcelona",
+        "2. B) Sagrada Familia und Park Guell",
+        "3. C) Tapas",
+        "4. B) Bunol",
+        "5. C) Tomaten werfen",
+        "6. B) Wiel er die spanische kultur erleben konnte",
+        "7. D) Wieder nach Spanien reisen zu Konnen",
+        "",
+        "1. C) Munchen",
+        "2. B) Zwei Wochen",
+        "3. B) Brezeln. Bratwurst und Schweinebraten",
+        "4. B) Lederhosen und Dirndl",
+        "5. B) Fahrgeschafte und Spiele"
+    ],
+    "A2 4.11": [
+        # Unterwegs: Verkehrsmittel vergleichen
+        "1. b) In Italien",
+        "2. b) Weil sie in der Stadt fahren wird",
+        "3. a) Eine gute Versicherung",
+        "4. b) Führerschein und Personalausweis",
+        "5. b) Der Angestellte der Autovermietung",
+        "6. a) Viele Städte zu besuchen",
+        "7. b) Sehr zufrieden",
+        "",
+        "1. B) in die Berge",
+        "2. B) Ein Mittel..",
+        "3. B) 50 Euro",
+        "4. C) Führerschein und Kreditkarte",
+        "5. B) Das Auto auf mögliche Schäden prüfen"
+    ],
+
+    "A2 5.12": [
+        # Ein Tag im Leben (Übung)
+        "1. C) Eine Behörde prüft, ob das Dokument echt ist",
+        "2. b) Auf der Internetseite „Anerkennung in Deutschland“",
+        "3. b) Die Zeitung",
+        "4. c) Berufsinformationszentrum",
+        "5. b) Ein Praktikum",
+        "6. c) Ein Kochrezept",
+        "7. c) Menschen unter 27 Jahren",
+        "",
+        "1. B) um 6 Uhr beginnt die Visite",
+        "2. B) um 9 Uhr",
+        "3. B) führt wichtige Untersuchungen durch",
+        "4. C) Vor 18 Uhr",
+        "5. C) Vor 18 Uhr"
+    ],
+
+    "A2 5.13": [
+        # Ein Vorstellungsgespräch (Exercise)
+        "1. c) Ein Ort für kleine Kinder bis 3 Jahre",
+        "2. c) Ab 3 Jahren",
+        "3. d) Sie spielen, singen und basteln",
+        "4. d) Sie spielen, singen und basteln",
+        "5. c) Mittagessen",
+        "6. a) Reiche Familien",
+        "7. b) Es bekommt Hilfe beim Deutschlernen",
+        "",
+        "1. B) Um Interesse zu zeigen",
+        "2. B) Pünktlich sein",
+        "3. C) Um Interesse zu zeigen",
+        "4. A) Eine Dankes-E-Mail",
+        "5. B) Klar und deutlich sprechen"
+    ],
+
+    "A2 5.14": [
+        # Beruf und Karriere (Exercise)
+        "1. B) Die Kollegen und die Arbeit",
+        "2. C) Mit „Sie“",
+        "3. C) Eine Arbeitnehmervertretung",
+        "4. C) Arbeitskleidung, Pausen und feste Arbeitszeiten",
+        "5. C) Man kann Arbeitsbeginn und -ende flexibel wählen",
+        "6. C) 38–40 Stunden",
+        "7. B) Den Urlaub eintragen und genehmigen lassen",
+        "8. D) Weiter das Gehalt oder den Lohn",
+        "9. C) Sofort den Arbeitgeber informieren und zum Arzt gehen",
+        "10. C) Auf der Baustelle oder am Flughafen",
+        "11. C) Die Kündigung schriftlich und mit Frist einreichen",
+        "12. C) In der Volkshochschule"
+    ],
+
+    "A2 6.15": [
+        # Mein Lieblingssport
+        "1. A) Yoga und Zumba",
+        "2. B) Fußball, Handball und Volleyball",
+        "3. C) Die Spenden an lokale Wohltätigkeitsorganisationen",
+        "4. B) Im Stadtpark",
+        "5. B) Fitnessprogramme",
+        "6. B) Die Eröffnung eines neuen Kletterparks",
+        "7. B) Eine wichtige Rolle zur Förderung der Lebensqualität",
+        "",
+        "1. B) Pilates- und Aerobic-Kurse",
+        "2. A) Kostenlose Yoga-Kurse",
+        "3. A) Wassergymnastik und Aqua-Zumba",
+        "4. C) Für Anfänger und Fortgeschrittene",
+        "5. B) Volleyball und Basketball"
+    ],
+
+    "A2 6.16": [
+        # Wohlbefinden und Entspannung
+        "1. C) Anzeige",
+        "2. B) Anzeige",
+        "3. E) Anzeige",
+        "4. F) Anzeige",
+        "5. A) Anzeige",
+        "",
+        "1. B) Mehr Obst und Gemüse essen",
+        "2. C) 30 Minuten",
+        "3. A) Der Besuch eines Fitnessstudios",
+        "4. B) Um Krankheiten frühzeitig zu erkennen",
+        "5. A) Yoga und Pilates"
+    ],
+
+    "A2 6.17": [
+        # In die Apotheke gehen
+        "1. B) Weil sie sich krank fühlte",
+        "2. B) Hustensaft",
+        "3. C) Hilfsbereit",
+        "4. B) Broschüren mit Tipps",
+        "5. C) Besser",
+        "6. B) Nach einigen Stunden",
+        "7. A) Sie kann sich auf den Rat der Apotheker verlassen",
+        "",
+        "1. B) Wegen Kopfschmerzen",
+        "2. C) Ibuprofen",
+        "3. B) Trockene Haut",
+        "4. B) Sie war erleichtert",
+        "5. B) Proben von Produkten"
+    ],
+
+    "A2 7.18": [
+        # Die Bank anrufen
+        "1. Sparkasse",
+        "2. ING-DiBa",
+        "3. Sparkasse",
+        "4. Volksbank",
+        "5. Commerzbank",
+        "",
+        "1. B) Reisepass, Meldebescheinigung, Einkommensnachweis",
+        "2. B) Eine Stunde",
+        "3. B) Drei",
+        "4. A) Basiskonto",
+        "5. D) Die Formulare vor dem Termin online ausfüllen"
+    ],
+
+    "A2 7.19": [
+        # Einkaufen – Wo und wie? (Exercise)
+        "1. B) Die Zunahme von Online-Shopping und Werbung",
+        "2. B) Wegen der ständigen Verfügbarkeit und einfachen Bestellung",
+        "3. B) Nachhaltiger Konsum",
+        "4. B) Weniger Plastik verwenden und lokale Produkte kaufen",
+        "5. B) Umweltverschmutzung und schlechte Arbeitsbedingungen",
+        "6. A) Sich gut informieren",
+        "7. B) Als komplexes Thema mit positiven und negativen Auswirkungen",
+        "",
+        "1. B) Bequeme Möglichkeit Produkte nach Hause zu bestellen",
+        "2. B) Hohe Anzahl von Rücksendungen und Umweltbelastung",
+        "3. A) Auf vertrauenswürdige Websites und Schutz persönlicher Daten",
+        "4. A) Aus nachhaltigen Quellen und fairen Bedingungen",
+        "5. B) Es hat den Konsum revolutioniert und neue Möglichkeiten geschaffen"
+    ],
+
+    "A2 7.20": [
+        # Typische Reklamationssituationen üben
+        "1. C) Man sollte seine Qualifikationen und Erfahrungen erwähnen, weil sie die Eignung für die Stelle zeigen",
+        "2. A) Man sollte die Firma recherchieren, um gut informiert zu sein",
+        "B) Man sollte den Arbeitsweg üben, um pünktlich zu sein",
+        "3. A) Die Bezahlung, weil man finanziell abgesichert sein möchte",
+        "B) Die Arbeitszeiten, weil man eine gute Work-Life-Balance haben möchte",
+        "4. A) Frauen haben oft geringere Aufstiegschancen. Eine Lösung wäre eine Frauenquote.",
+        "B) Frauen verdienen häufig weniger als Männer. Transparente Gehaltsstrukturen könnten helfen.",
+        "C) Frauen müssen oft Beruf und Familie vereinbaren. Flexible Arbeitszeiten könnten eine Lösung sein.",
+        "5. A) Es gab weniger technische Geräte im Haushalt",
+        "B) Die Menschen waren weniger mobil und reisten seltener.",
+        "D) Die Arbeitszeiten waren länger und härter",
+        "",
+        "1. B) Die Berufliche",
+        "2. B) Man informiert sich",
+        "3. A) Die Bezahlung",
+        "4. A) Man sammelt",
+        "5. A) Geringere",
+        "6. A) Flexible Arbeitszeiten",
+        "7. A) Es gab weniger",
+        "8. B) Sie arbeiteten mehr und hatten weniger Freizeit"
+    ],
+
+    "A2 8.21": [
+        # Ein Wochenende planen
+        "1. C) Sollen Plätze reservieren",
+        "2. C) Nur ein Restaurant haben",
+        "3. C) Machte er eine lange Reise",
+        "4. A) Eine Fernsehsendung",
+        "5. A) Den Berufsweg eines Kochs"
+    ],
+
+    "A2 8.22": [
+        # Die Woche Planung
+        "1. C) Im Moment ist vieles neu für sie.",
+        "2. B) Für neue Studenten eine Stadtführung gemacht.",
+        "3. C) Kocht jeder einmal für die anderen.",
+        "4. B) Deutsch zu sprechen.",
+        "5. C) Übernachtet Sonja in Marios Zimmer."
+    ],
+
+    "A2 9.23": [
+        # Wie kommst du zur Schule / zur Arbeit?
+        "1. C) An die Nordsee",
+        "2. B) Auf einer Insel",
+        "3. A) Aus der Schweiz",
+        "4. A) Mit der U-Bahn",
+        "5. D) Die Berge und die Natur"
+    ],
+
+    "A2 9.24": [
+        # Einen Urlaub planen
+        "1. Anzeige: f",
+        "2. Anzeige: c",
+        "3. Anzeige: X",
+        "4. Anzeige: b",
+        "5. Anzeige: a"
+    ],
+
+    "A2 9.25": [
+        # Tagesablauf (Exercise)
+        "1. a) kurz vor 7 Uhr",
+        "2. d) Müsli oder Toast mit Marmelade",
+        "3. b) Hausaufgaben",
+        "4. a) am Nachmittag",
+        "5. b) Freunde treffen",
+        "6. c) die Schweiz",
+        "7. d) mit dem Zug",
+        "8. a) an einem kleinen Bahnhof",
+        "9. d) einen Zimmerschlüssel",
+        "10. b) das Zimmer ist zu klein"
+    ],
+
+    "A2 10.26": [
+        # Gefühle in verschiedenen Situationen beschreiben
+        "1. b) Er beantwortet Fragen und kontrolliert die Gesundheit des Kindes.",
+        "2. c) 14 Wochen",
+        "3. c) 14 Monate",
+        "4. a) Man muss einen festen Arbeitsvertrag haben.",
+        "5. a) Impfungen und Vorsorgeuntersuchungen",
+        "6. c) Ab 3 Jahren",
+        "7. b) An speziellen Freizeitangeboten in der Stadt teilnehmen"
+    ],
+
+    "A2 10.27": [
+        # Digitale Kommunikation
+        "1. b) Sie sind oft sehr teuer oder funktionieren nicht.",
+        "2. c) Ein deutsches Bankkonto und einen Ausweis.",
+        "3. C) 1 bis 2 Jahre",
+        "4. c) Drei Monate vor Vertragsende",
+        "5. c) In Supermärkten, Tankstellen oder Kiosken",
+        "6. b) Name, Adresse, Geburtsdatum und ein Ausweisdokument",
+        "7. d) Mit öffentlichem WLAN"
+    ],
+
+    "A2 10.28": [
+        # Über die Zukunft sprechen
+        "1. c) Einen gültigen Reisepass",
+        "2. b) Bei der Deutschen Botschaft im Heimatland",
+        "3. c) Einen Aufenthaltstitel",
+        "4. b) Ein Kurs für Deutsch und Leben in Deutschland",
+        "5. c) Man muss sie übersetzen und anerkennen lassen",
+        "6. c) Die Arbeitsagentur",
+        "7. c) Kranken-, Renten- und Pflegeversicherung"
+    ]
+}  # End of A2 4.11–10.28 update
+
 
 # ==== 5. TABS LAYOUT ====
 tabs = st.tabs([
@@ -259,9 +872,7 @@ tabs = st.tabs([
     "📄 Contract",                # 4
     "📧 Send Email",              # 5 
     "📆 Schedule",                # 6
-    "📝 Marking",                  # 7
-    "📝 Letter of Enrollment Generator" #8
-    
+    "📝 Marking"                  # 7
 ])
 
 # ==== 6. AGREEMENT TEMPLATE (Persisted in Session State) ====
@@ -293,45 +904,98 @@ Asadu Felix
 
 # --- End of Stage 2 ---
 
+# ==== 7. TAB 0: PENDING REGISTRATIONS ====
 with tabs[0]:
+    st.title("📝 Pending Registrations")
 
-    st.title("🕒 Pending Students")
+    # 1. Load registrations from Google Sheets CSV export (change the link as needed)
+    sheet_csv_url = (
+        "https://docs.google.com/spreadsheets/d/"
+        "1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo"
+        "/export?format=csv"
+    )
 
-    # Load Data
-    pending_csv_url = "https://docs.google.com/spreadsheets/d/1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo/export?format=csv"
-    @st.cache_data(ttl=0)
-    def load_pending():
-        df = pd.read_csv(pending_csv_url, dtype=str)
-        df_display = df.copy()
-        df_search = df.copy()
-        df_search.columns = [c.strip().lower().replace(" ", "").replace("_", "") for c in df_search.columns]
-        return df_display, df_search
-    df_display, df_search = load_pending()
+    try:
+        new_students = pd.read_csv(sheet_csv_url)
+        new_students = normalize_columns(new_students)
+        st.success("✅ Loaded columns: " + ", ".join(new_students.columns))
+    except Exception as e:
+        st.error(f"❌ Could not load registration sheet: {e}")
+        new_students = pd.DataFrame()
 
-    # Universal Search
-    search = st.text_input("🔎 Search any field (name, code, email, etc.)")
-    if search:
-        mask = df_search.apply(lambda row: row.astype(str).str.contains(search, case=False, na=False).any(), axis=1)
-        filt = df_display[mask]
+    # 2. Approve & add each new student
+    if new_students.empty:
+        st.info("No new registrations to process.")
     else:
-        filt = df_display
+        for i, row in new_students.iterrows():
+            fullname  = row.get("full_name") or row.get("name") or f"Student {i+1}"
+            phone     = row.get("phone_number") or row.get("phone") or ""
+            email     = str(row.get("email") or row.get("email_address") or "").strip()
+            level     = str(row.get("class") or row.get("level") or "").strip()
+            location  = str(row.get("location") or "").strip()
+            emergency = str(row.get("emergency_contact_phone_number") or row.get("emergency") or "").strip()
 
-    # Column Selector
-    all_cols = list(filt.columns)
-    selected_cols = st.multiselect(
-        "Show columns (for easy viewing):", all_cols, default=all_cols[:6]
-    )
+            with st.expander(f"{fullname} — {phone}"):
+                st.write(f"**Email:** {email or '—'}")
+                student_code    = st.text_input("Assign Student Code", key=f"code_{i}")
+                contract_start  = st.date_input("Contract Start", value=date.today(), key=f"start_{i}")
+                course_length   = st.number_input("Course Length (weeks)", min_value=1, value=12, key=f"length_{i}")
+                contract_end    = st.date_input(
+                    "Contract End",
+                    value=contract_start + timedelta(weeks=course_length),
+                    key=f"end_{i}"
+                )
+                paid            = st.number_input("Amount Paid (GHS)", min_value=0.0, step=1.0, key=f"paid_{i}")
+                balance         = st.number_input("Balance Due (GHS)", min_value=0.0, step=1.0, key=f"bal_{i}")
+                first_instalment= st.number_input("First Instalment (GHS)", min_value=0.0, value=1500.0, key=f"firstinst_{i}")
+                send_email      = st.checkbox("Send Welcome Email?", value=bool(email), key=f"email_{i}")
+                attach_pdf      = st.checkbox("Attach PDF to Email?", value=True, key=f"pdf_{i}")
 
-    # Show Table (with scroll bar)
-    st.dataframe(filt[selected_cols], use_container_width=True, height=400)
+                if st.button("Approve & Add", key=f"approve_{i}"):
+                    if not student_code:
+                        st.warning("❗ Please enter a unique student code.")
+                        continue
 
-    # Download Always Includes All Columns
-    st.download_button(
-        "⬇️ Download all columns as CSV",
-        filt.to_csv(index=False),
-        file_name="pending_students.csv"
-    )
+                    # Load or initialize approved students CSV
+                    student_file = "students.csv"
+                    if os.path.exists(student_file):
+                        approved_df = pd.read_csv(student_file)
+                    else:
+                        approved_df = pd.DataFrame(columns=[
+                            "Name","Phone","Email","Location","Level",
+                            "Paid","Balance","ContractStart","ContractEnd",
+                            "StudentCode","Emergency Contact (Phone Number)"
+                        ])
 
+                    # Prevent duplicate codes
+                    if student_code in approved_df["StudentCode"].astype(str).values:
+                        st.warning("❗ Student code already exists.")
+                        continue
+
+                    # Compose student dict for saving
+                    student_dict = {
+                        "Name": fullname,
+                        "Phone": phone,
+                        "Email": email,
+                        "Location": location,
+                        "Level": level,
+                        "Paid": paid,
+                        "Balance": balance,
+                        "ContractStart": contract_start.isoformat(),
+                        "ContractEnd": contract_end.isoformat(),
+                        "StudentCode": student_code,
+                        "Emergency Contact (Phone Number)": emergency
+                    }
+
+                    # Append to CSV
+                    approved_df = pd.concat([approved_df, pd.DataFrame([student_dict])], ignore_index=True)
+                    approved_df.to_csv(student_file, index=False)
+
+                    # TODO: Add PDF generation and optional email sending if desired
+                    # pdf_file = generate_receipt_and_contract_pdf(...) # Fill in as needed
+
+                    st.success(f"✅ {fullname} approved and saved.")
+                    st.experimental_rerun()  # Update tab to reflect new student
 
 # ==== 9. ALL STUDENTS TAB ====
 with tabs[1]:
@@ -364,34 +1028,23 @@ with tabs[1]:
 
     # --- Show Student Table ---
     st.dataframe(df_students, use_container_width=True)
+
 # ==== 10. TAB 2: EXPENSES AND FINANCIAL SUMMARY ====
 with tabs[2]:
     st.title("💵 Expenses and Financial Summary")
 
-    # ==== LOAD SHEETS ====
-    # Expenses
-    expenses_id = "1I5mGFcWbWdK6YQrJtabTg_g-XBEVaIRK1aMFm72vDEM"
-    expenses_csv = f"https://docs.google.com/spreadsheets/d/{expenses_id}/export?format=csv"
+    # 1. Load expenses from Google Sheets CSV (edit link as needed)
+    sheet_id   = "1I5mGFcWbWdK6YQrJtabTg_g-XBEVaIRK1aMFm72vDEM"
+    sheet_csv  = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
     try:
-        df_expenses = pd.read_csv(expenses_csv)
-        df_expenses.columns = [c.strip().lower() for c in df_expenses.columns]
+        df_expenses = pd.read_csv(sheet_csv)
+        df_expenses = normalize_columns(df_expenses)
         st.success("✅ Loaded expenses from Google Sheets.")
     except Exception as e:
         st.error(f"❌ Could not load expenses sheet: {e}")
         df_expenses = pd.DataFrame(columns=["type", "item", "amount", "date"])
 
-    # Students
-    students_id = "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U"
-    students_csv = f"https://docs.google.com/spreadsheets/d/{students_id}/export?format=csv"
-    try:
-        df_students = pd.read_csv(students_csv)
-        df_students.columns = [c.strip().lower() for c in df_students.columns]
-        st.success("✅ Loaded students from Google Sheets.")
-    except Exception as e:
-        st.error(f"❌ Could not load students sheet: {e}")
-        df_students = pd.DataFrame(columns=["name", "paid", "balance"])
-
-    # ==== ADD NEW EXPENSE ====
+    # 2. Add new expense via form
     with st.form("add_expense_form"):
         exp_type   = st.selectbox("Type", ["Bill","Rent","Salary","Marketing","Other"])
         exp_item   = st.text_input("Expense Item")
@@ -402,43 +1055,11 @@ with tabs[2]:
             new_row = {"type": exp_type, "item": exp_item, "amount": exp_amount, "date": exp_date}
             df_expenses = pd.concat([df_expenses, pd.DataFrame([new_row])], ignore_index=True)
             st.success(f"✅ Recorded: {exp_type} – {exp_item}")
+            # Optionally, save to a local backup file:
             df_expenses.to_csv("expenses_all.csv", index=False)
             st.experimental_rerun()
 
-    # ==== FINANCIAL SUMMARY ====
-    st.write("## 📊 Financial Summary")
-
-    # Total Expenses
-    total_expenses = pd.to_numeric(df_expenses["amount"], errors="coerce").fillna(0).sum() if not df_expenses.empty else 0.0
-
-    # Total Income
-    if "paid" in df_students.columns:
-        total_income = pd.to_numeric(df_students["paid"], errors="coerce").fillna(0).sum()
-    else:
-        total_income = 0.0
-
-    # Net Profit
-    net_profit = total_income - total_expenses
-
-    # Total Outstanding (Balance)
-    if "balance" in df_students.columns:
-        total_balance_due = pd.to_numeric(df_students["balance"], errors="coerce").fillna(0).sum()
-    else:
-        total_balance_due = 0.0
-
-    # Student Count
-    student_count = len(df_students) if not df_students.empty else 0
-
-    # ==== DISPLAY SUMMARY ====
-    col1, col2, col3 = st.columns(3)
-    col1.metric("💰 Total Income (Paid)", f"GHS {total_income:,.2f}")
-    col2.metric("💸 Total Expenses", f"GHS {total_expenses:,.2f}")
-    col3.metric("🟢 Net Profit", f"GHS {net_profit:,.2f}")
-
-    st.info(f"📋 **Students Enrolled:** {student_count}")
-    st.info(f"🧾 **Outstanding Balances:** GHS {total_balance_due:,.2f}")
-
-    # ==== PAGINATED EXPENSE TABLE ====
+    # 3. Display all expenses with pagination
     st.write("### All Expenses")
     ROWS_PER_PAGE = 10
     total_rows    = len(df_expenses)
@@ -450,7 +1071,11 @@ with tabs[2]:
     end   = start + ROWS_PER_PAGE
     st.dataframe(df_expenses.iloc[start:end].reset_index(drop=True), use_container_width=True)
 
-    # ==== EXPORT TO CSV ====
+    # 4. Expense summary
+    total_expenses = pd.to_numeric(df_expenses["amount"], errors="coerce").fillna(0).sum() if not df_expenses.empty else 0.0
+    st.info(f"💸 **Total Expenses:** GHS {total_expenses:,.2f}")
+
+    # 5. Export to CSV
     csv_data = df_expenses.to_csv(index=False)
     st.download_button(
         "📁 Download Expenses CSV",
@@ -459,159 +1084,171 @@ with tabs[2]:
         mime="text/csv"
     )
 
-
+# ==== 11. TAB 3: WHATSAPP REMINDERS FOR DEBTORS ====
 with tabs[3]:
     st.title("📲 WhatsApp Reminders for Debtors")
 
-    # --- 1. LOAD STUDENT DATA FROM GOOGLE SHEET ---
-    students_csv_url = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
-    @st.cache_data(ttl=0)
-    def load_students():
-        df = pd.read_csv(students_csv_url, dtype=str)
-        df.columns = [c.strip().lower().replace(" ", "").replace("_", "") for c in df.columns]
-        return df
-    df = load_students()
-    st.caption("Preview of student data loaded from Google Sheet:")
-    st.dataframe(df)
+    # 1. Load Expenses for financial summary
+    exp_sheet_id = "1I5mGFcWbWdK6YQrJtabTg_g-XBEVaIRK1aMFm72vDEM"
+    exp_csv_url  = f"https://docs.google.com/spreadsheets/d/{exp_sheet_id}/export?format=csv"
+    try:
+        df_exp = pd.read_csv(exp_csv_url)
+        df_exp = normalize_columns(df_exp)
+        total_expenses = pd.to_numeric(df_exp.get("amount", []), errors="coerce").fillna(0).sum()
+    except Exception:
+        total_expenses = 0.0
 
-    def col_lookup(df, name):
-        key = name.lower().replace(" ", "").replace("_", "")
-        for c in df.columns:
-            if c.lower().replace(" ", "").replace("_", "") == key:
-                return c
-        raise KeyError(f"Column '{name}' not found in DataFrame")
+    # 2. Load Students
+    student_file = "students.csv"
+    google_csv   = (
+        "https://docs.google.com/spreadsheets/d/"
+        "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
+    )
+    github_csv   = "https://raw.githubusercontent.com/learngermanghana/email/main/students.csv"
+    df = safe_read_csv(student_file, google_csv or github_csv)
+    df = normalize_columns(df)
+    def getcol(key): return col_lookup(df, key)
 
-    # --- 2. FINANCIAL COLUMN LOOKUPS ---
-    name_col  = col_lookup(df, "name")
-    code_col  = col_lookup(df, "studentcode")
-    phone_col = col_lookup(df, "phone")
-    bal_col   = col_lookup(df, "balance")
-    paid_col  = col_lookup(df, "paid")
-    lvl_col   = col_lookup(df, "level")
-    cs_col    = col_lookup(df, "contractstart")
+    cs  = getcol("contractstart")
+    paid = getcol("paid")
+    bal  = getcol("balance")
 
-    # --- 3. CLEAN DATA TYPES ---
-    df[bal_col] = pd.to_numeric(df[bal_col], errors="coerce").fillna(0)
-    df[paid_col] = pd.to_numeric(df[paid_col], errors="coerce").fillna(0)
-    df[cs_col] = pd.to_datetime(df[cs_col], errors="coerce")
-    df[phone_col] = df[phone_col].astype(str).str.replace(r"[^\d+]", "", regex=True)
+    # Parse dates & amounts
+    df[cs]   = pd.to_datetime(df.get(cs, pd.NaT), errors="coerce").fillna(pd.Timestamp.today())
+    df[paid] = pd.to_numeric(df.get(paid, 0), errors="coerce").fillna(0)
+    df[bal]  = pd.to_numeric(df.get(bal, 0), errors="coerce").fillna(0)
 
-    # --- 4. CALCULATE DUE DATE & DAYS LEFT ---
-    df["due_date"] = df[cs_col] + pd.Timedelta(days=30)
-    df["due_date_str"] = df["due_date"].dt.strftime("%d %b %Y")
-    df["days_left"] = (df["due_date"] - pd.Timestamp.today()).dt.days
+    # 3. Financial Metrics
+    total_collected = df[paid].sum()
+    net_profit      = total_collected - total_expenses
 
-    # --- 5. FINANCIAL SUMMARY ---
-    m1, m2, m3 = st.columns(3)
+    m1, m2, m3, m4 = st.columns(4)
     m1.metric("Total Students", len(df))
-    m2.metric("Total Collected (GHS)", f"{df[paid_col].sum():,.2f}")
-    m3.metric("Total Outstanding (GHS)", f"{df[bal_col].sum():,.2f}")
+    m2.metric("Total Collected (GHS)", f"{total_collected:,.2f}")
+    m3.metric("Total Expenses (GHS)",  f"{total_expenses:,.2f}")
+    m4.metric("Net Profit (GHS)",      f"{net_profit:,.2f}")
 
     st.markdown("---")
 
-    # --- 6. FILTER/SEARCH ---
+    # 4. Toggle for viewing all vs. debtors only
     show_all = st.toggle("Show all students (not just debtors)", value=False)
-    search = st.text_input("Search by name, code, or phone", key="wa_search")
-    selected_level = st.selectbox("Filter by Level", ["All"] + sorted(df[lvl_col].dropna().unique()), key="wa_level")
+    if show_all:
+        filt = df
+    else:
+        filt = df[df[bal] > 0]
 
-    filt = df.copy()
-    if not show_all:
-        filt = filt[filt[bal_col] > 0]
+    # 5. Filters
+    search = st.text_input("Search by name or code", key="wa_search")
+    lvl    = getcol("level")
+    opts   = ["All"] + sorted(df[lvl].dropna().unique().tolist()) if lvl in df.columns else ["All"]
+    selected = st.selectbox("Filter by Level", opts, key="wa_level")
+
+    # 6. Compute Due Dates
+    df["due_date"]  = df[cs] + timedelta(days=30)
+    df["days_left"] = (df["due_date"] - pd.Timestamp.today()).dt.days.astype(int)
+    filt["due_date"]  = df["due_date"]
+    filt["days_left"] = df["days_left"]
+
+    # Apply search & filter
     if search:
-        mask1 = filt[name_col].str.contains(search, case=False, na=False)
-        mask2 = filt[code_col].str.contains(search, case=False, na=False)
-        mask3 = filt[phone_col].str.contains(search, case=False, na=False)
-        filt = filt[mask1 | mask2 | mask3]
-    if selected_level != "All":
-        filt = filt[filt[lvl_col] == selected_level]
+        mask1 = filt[getcol("name")].str.contains(search, case=False, na=False)
+        mask2 = filt[getcol("studentcode")].str.contains(search, case=False, na=False)
+        filt  = filt[mask1 | mask2]
+    if selected != "All":
+        filt = filt[filt[lvl] == selected]
 
     st.markdown("---")
 
-    # --- 7. TABLE PREVIEW ---
-    tbl = filt[[name_col, code_col, phone_col, lvl_col, bal_col, "due_date_str", "days_left"]].rename(columns={
-        name_col: "Name", code_col: "Student Code", phone_col: "Phone",
-        lvl_col: "Level", bal_col: "Balance (GHS)", "due_date_str": "Due Date", "days_left": "Days Left"
-    })
-    st.dataframe(tbl, use_container_width=True)
-
-    # --- 8. PHONE FORMAT FUNCTION ---
-    def clean_phone(phone):
-        phone = str(phone).replace(" ", "").replace("-", "")
-        if phone.startswith("+233"):
-            return phone[1:]
-        if phone.startswith("233"):
-            return phone
-        if phone.startswith("0") and len(phone) == 10:
-            return "233" + phone[1:]
-        # fallback: return as is
-        return phone
-
-    # --- 9. WHATSAPP LINK AND MESSAGE ---
-    wa_template = st.text_area(
-        "Custom WhatsApp Message Template",
-        value="Hi {name}! Friendly reminder: your payment for the {level} class is due by {due}. {msg} Thank you!",
-        help="You can use {name}, {level}, {due}, {bal}, {days}, {msg}"
-    )
-
-    links = []
-    for _, row in filt.iterrows():
-        phone = clean_phone(row[phone_col])
-        # Balance & msg
-        bal = f"GHS {row[bal_col]:,.2f}"
-        due = row["due_date_str"]
-        days = int(row["days_left"])
-        if days >= 0:
-            msg = f"You have {days} {'day' if days == 1 else 'days'} left to settle the {bal} balance."
-        else:
-            msg = f"Your payment is overdue by {abs(days)} {'day' if abs(days)==1 else 'days'}. Please settle as soon as possible."
-        # Format the template
-        text = wa_template.format(
-            name=row[name_col],
-            level=row[lvl_col],
-            due=due,
-            bal=bal,
-            days=days,
-            msg=msg
-        )
-        link = f"https://wa.me/{phone}?text={urllib.parse.quote(text)}" if phone else ""
-        links.append({
-            "Name": row[name_col],
-            "Student Code": row[code_col],
-            "Level": row[lvl_col],
-            "Balance (GHS)": bal,
-            "Due Date": due,
-            "Days Left": days,
-            "Phone": phone,
-            "WhatsApp Link": link
+    if filt.empty:
+        st.success("✅ No students currently owing a balance.")
+    else:
+        st.metric("Number of Records", len(filt))
+        tbl_cols = [getcol("name"), lvl, bal, "due_date", "days_left"]
+        tbl = filt[tbl_cols].rename(columns={
+            getcol("name"): "Name",
+            lvl:            "Level",
+            bal:            "Balance (GHS)",
+            "due_date":     "Due Date",
+            "days_left":    "Days Until Due"
         })
+        st.dataframe(tbl, use_container_width=True)
 
-    df_links = pd.DataFrame(links)
-    st.markdown("---")
-    st.dataframe(df_links[["Name", "Level", "Balance (GHS)", "Due Date", "Days Left", "WhatsApp Link"]], use_container_width=True)
+        # ---- 7. WhatsApp Message Template ----
+        default_template = (
+            "Hi {name}! Friendly reminder: your payment for the {level} class "
+            "is due by {due}. {msg} Thank you!"
+        )
+        wa_template = st.text_area(
+            "Custom WhatsApp Message Template",
+            value=st.session_state.get("wa_msg_template", default_template),
+            help=(
+                "You can use {name}, {level}, {due}, {bal}, {days}, {msg} in your message. "
+                "'{msg}' will be replaced by an auto-generated overdue/remaining message."
+            ),
+        )
+        st.session_state["wa_msg_template"] = wa_template  # persist
 
-    # --- 10. LIST LINKS ---
-    st.markdown("### Send WhatsApp Reminders")
-    for i, row in df_links.iterrows():
-        if row["WhatsApp Link"]:
-            st.markdown(f"- **{row['Name']}** ([Send WhatsApp]({row['WhatsApp Link']}))")
+        # ---- 8. Clean phone numbers robustly ----
+        def clean_phone_series(s):
+            p = s.astype(str).str.replace(r"[+\- ]", "", regex=True)
+            p = p.where(~p.str.startswith("0"), "233" + p.str[1:])
+            p = p.str.extract(r"(\d{9,15})")[0]
+            # Optionally restrict to Ghana numbers:
+            # p = p.where(p.str.startswith("233"), None)
+            return p
 
-    st.download_button(
-        "📁 Download Reminder Links CSV",
-        df_links[["Name", "Student Code", "Phone", "Level", "Balance (GHS)", "Due Date", "Days Left", "WhatsApp Link"]].to_csv(index=False),
-        file_name="debtor_whatsapp_links.csv"
-    )
+        ws = filt.assign(
+            phone    = clean_phone_series(filt[getcol("phone")]),
+            due_str  = filt["due_date"].dt.strftime("%d %b %Y"),
+            bal_str  = filt[bal].map(lambda x: f"GHS {x:.2f}"),
+            days     = filt["days_left"].astype(int)
+        )
 
+        # ---- 9. WhatsApp Link Generator ----
+        def make_link(row):
+            if pd.isnull(row.phone):
+                return ""
+            if row.days >= 0:
+                msg = f"You have {row.days} {'day' if row.days==1 else 'days'} left to settle the {row.bal_str} balance."
+            else:
+                od = abs(row.days)
+                msg = f"Your payment is overdue by {od} {'day' if od==1 else 'days'}. Please settle as soon as possible."
+            text = wa_template.format(
+                name=row[getcol('name')],
+                level=row[lvl],
+                due=row.due_str,
+                bal=row.bal_str,
+                days=row.days,
+                msg=msg
+            )
+            return f"https://wa.me/{row.phone}?text={urllib.parse.quote(text)}"
+
+        ws["link"] = ws.apply(make_link, axis=1)
+        for nm, lk in ws[[getcol("name"), "link"]].itertuples(index=False):
+            if lk:
+                st.markdown(f"- **{nm}**: [Send Reminder]({lk})")
+
+        dl = ws[[getcol("name"), "link"]].rename(columns={
+            getcol("name"): "Name", "link": "WhatsApp URL"
+        })
+        st.download_button(
+            "📁 Download Reminder Links CSV",
+            dl.to_csv(index=False).encode("utf-8"),
+            file_name="debtor_whatsapp_links.csv",
+            mime="text/csv"
+        )
 
 # ==== 12. TAB 5: GENERATE CONTRACT & RECEIPT PDF FOR ANY STUDENT ====
 with tabs[4]:
     st.title("📄 Generate Contract & Receipt PDF for Any Student")
 
-    # --- Google Sheet as the ONLY source ---
-    google_csv = (
+    # 1. Google Sheet as main source, fallback to local file if offline
+    student_file = "students.csv"
+    google_csv   = (
         "https://docs.google.com/spreadsheets/d/"
         "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
     )
-    df = pd.read_csv(google_csv)
+    df = safe_read_csv(student_file, google_csv)
     df = normalize_columns(df)
 
     if df.empty:
@@ -628,28 +1265,10 @@ with tabs[4]:
         phone_col   = getcol("phone")
         level_col   = getcol("level")
 
-        # --- SEARCH BOX at the bottom (shown above dropdown) ---
-        search_val = st.text_input(
-            "Search students by name, code, phone, or level:", value="", key="pdf_tab_search"
-        )
-
-        # Filter students
-        filtered_df = df.copy()
-        if search_val:
-            sv = search_val.strip().lower()
-            filtered_df = df[
-                df[name_col].str.lower().str.contains(sv, na=False)
-                | df[code_col].astype(str).str.lower().str.contains(sv, na=False)
-                | df[phone_col].astype(str).str.lower().str.contains(sv, na=False)
-                | df[level_col].astype(str).str.lower().str.contains(sv, na=False)
-            ]
-
-        student_names = filtered_df[name_col].tolist()
-        if not student_names:
-            st.warning("No students match your search.")
-            st.stop()
+        # 3. Select student (dropdown)
+        student_names = df[name_col].tolist()
         selected_name = st.selectbox("Select Student", student_names)
-        row = filtered_df[filtered_df[name_col] == selected_name].iloc[0]
+        row = df[df[name_col] == selected_name].iloc[0]
 
         # 4. Editable fields before PDF generation
         default_paid    = float(row.get(paid_col, 0))
@@ -772,218 +1391,146 @@ with tabs[4]:
                 mime="application/pdf"
             )
             st.success("✅ PDF generated and ready to download.")
-            
 
+
+# ==== Tab 6: QUICK EMAIL SENDER ====
 with tabs[5]:
-    import tempfile
-    # ---- Helper: Ensure all text in PDF is latin-1 safe ----
-    def safe_pdf(text):
-        """Remove non-latin-1 characters for PDF output."""
-        if not text:
-            return ""
-        return text.encode("latin-1", "replace").decode("latin-1")
+    st.title("📧 Send Email (Quick)")
 
-    # ---- Helper: QR Code generation ----
-    def make_qr_code(url):
-        import qrcode
-        import tempfile
-        qr_img = qrcode.make(url)
-        qr_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-        qr_img.save(qr_tmp)
-        qr_tmp.close()
-        return qr_tmp.name
-
-    # ---- Student Search/Selection ----
-    st.title("📧 Send Email / Letter (Templates, Attachments, PDF, Watermark, QR)")
-    st.subheader("Select Student")
-    search_val = st.text_input(
-        "Search students by name, code, or email", 
-        value="", key="student_search"
+    # 1. Load student list from Google Sheets
+    students_csv_url = (
+        "https://docs.google.com/spreadsheets/d/"
+        "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/"
+        "export?format=csv"
     )
-    # Filter the DataFrame based on search input
-    if search_val:
-        filtered_students = df_students[
-            df_students["name"].str.contains(search_val, case=False, na=False)
-            | df_students.get("studentcode", pd.Series(dtype=str)).astype(str).str.contains(search_val, case=False, na=False)
-            | df_students.get("email", pd.Series(dtype=str)).astype(str).str.contains(search_val, case=False, na=False)
-        ]
-    else:
-        filtered_students = df_students
+    try:
+        df_students = pd.read_csv(students_csv_url)
+    except Exception as e:
+        st.error(f"❌ Could not load student list: {e}")
+        df_students = pd.DataFrame(columns=["name", "email", "level", "contractstart"])
+    df_students = normalize_columns(df_students)
+    name_col  = col_lookup(df_students, "name")
+    email_col = col_lookup(df_students, "email")
+    level_col = col_lookup(df_students, "level")
+    start_col = col_lookup(df_students, "contractstart")
 
-    student_names = filtered_students["name"].dropna().unique().tolist()
-    student_name = st.selectbox("Student Name", student_names)
-    if not student_name:
-        st.stop()
-    # Use the filtered DataFrame to find the selected row
-    student_row = filtered_students[filtered_students["name"] == student_name].iloc[0]
-    student_level = student_row["level"]
-    student_email = student_row.get("email", "")
-    enrollment_start = pd.to_datetime(student_row.get("contractstart", date.today()), errors="coerce").date()
-    enrollment_end = pd.to_datetime(student_row.get("contractend", date.today()), errors="coerce").date()
-    payment = float(student_row.get("paid", 0))
-    balance = float(student_row.get("balance", 0))
-    payment_status = "Full Payment" if balance == 0 else "Installment Plan"
-    student_code = student_row.get("studentcode", "")  # Adjust if your column is named differently
-    student_link = f"https://falowen.streamlit.app/?code={student_code}" if student_code else "https://falowen.streamlit.app/"
+    # 2. Template selector
+    template_opts = ["Custom", "Welcome", "Payment Reminder", "Assignment Results"]
+    selected_template = st.selectbox(
+        "Template", template_opts, key="tab6_template"
+    )
 
-    # ---- 2. Message Type Selection ----
-    st.subheader("Choose Message Type")
-    msg_type = st.selectbox("Type", [
-        "Custom Message",
-        "Welcome Message",
-        "Assignment Results",
-        "Letter of Enrollment"
-    ])
-
-    # ---- 3. Logo/Watermark/Extra Attachment ----
-    st.subheader("Upload Logo and Watermark")
-    logo_file = st.file_uploader("School Logo (PNG/JPG)", type=["png", "jpg", "jpeg"], key="logo_up")
-    watermark_file = st.file_uploader("Watermark Image (faded PNG recommended)", type=["png"], key="watermark_up")
-    extra_attach = st.file_uploader("Additional Attachment (optional)", type=None, key="extra_attach")
-
-    # ---- 4. Compose/Preview Message ----
-    st.subheader("Compose/Preview Message")
-    if msg_type == "Welcome Message":
-        body_default = (
-            f"Hello {student_name},<br><br>"
-            f"Welcome to Learn Language Education Academy! We have helped many students succeed, and we’re excited to support you as well.<br><br>"
-            f"We have attached your letter of enrollment in this document<br><br>"
-            f"<b>Your contract starts on {enrollment_start.strftime('%d %B %Y')}.</b> "
-            f"You can join your <b>{student_level}</b> class in person or online (Zoom link will be shared before class).<br><br>"
-            f"<b>Your payment status: {payment_status}.</b> Paid: GHS {payment:.2f} / Balance: GHS {balance:.2f}<br><br>"
-            f"All your course materials and assignments are on our <a href='{student_link}'>Falowen App</a>.<br><br>"
-            f"We wish you a great start and look forward to your progress!<br><br>"
+    # 3. Defaults per template
+    if selected_template == "Welcome":
+        subj_def = "Welcome to Learn Language Education Academy!"
+        body_def = (
+            "Hello {name},<br><br>"
+            "Your {level} class starts on {start_date}. Welcome aboard!<br><br>"
+            "Best regards,<br>Felix Asadu"
         )
-    elif msg_type == "Letter of Enrollment":
-        body_default = (
-            f"To Whom It May Concern,<br><br>"
-            f"This is to certify that {student_name} is officially enrolled in the {student_level} programme at Learn Language Education Academy.<br>"
-            f"Enrollment valid from {enrollment_start.strftime('%-m/%-d/%Y')} to {enrollment_end.strftime('%-m/%-d/%Y')}.<br><br>"
-            f"Our institution is officially registered with Business Registration Number {BUSINESS_REG},<br>"
-            f"in accordance with the Registration of Business Names Act, 1962 (No.151).<br><br>"
-            f"If you require further confirmation, please contact us.<br><br>"
+    elif selected_template == "Payment Reminder":
+        subj_def = "Friendly Payment Reminder"
+        body_def = (
+            "Hi {name},<br><br>"
+            "Just a reminder: your balance for {level} is due on {due_date}.<br><br>"
+            "Thank you!"
         )
-    elif msg_type == "Assignment Results":
-        # Assignment details placeholder
-        body_default = (
-            f"Hello {student_name},<br><br>"
-            f"Below are your latest assignment results (please check the Falowen App for full details):<br>"
-            f"<ul><li>Assignment 1: 85%</li><li>Assignment 2: 90%</li></ul>"
-            f"Best regards,<br>Learn Language Education Academy"
+    elif selected_template == "Assignment Results":
+        subj_def = "Your Assignment Results"
+        body_def = (
+            "Hello {name},<br><br>"
+            "Attached are your latest assignment scores.<br><br>"
+            "Best,<br>Learn Language Education Academy"
         )
     else:
-        body_default = ""
+        subj_def = ""
+        body_def = ""
 
-    email_subject = st.text_input("Subject", value=f"{msg_type} - {student_name}")
-    email_body = st.text_area("Email Body (HTML supported)", value=body_default, height=220)
-
-    # ---- 4b. Message Preview ----
-    st.markdown("**Preview Message (as student will see):**")
-    st.markdown(email_body, unsafe_allow_html=True)
-
-    # ---- 5. Generate PDF Button (and preview) ----
-    st.subheader("PDF Preview & Download")
-
-    class LetterPDF(FPDF):
-        def header(self):
-            # Logo (if uploaded)
-            if logo_file is not None:
-                ext = logo_file.name.split('.')[-1]
-                logo_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
-                logo_tmp.write(logo_file.read())
-                logo_tmp.close()
-                self.image(logo_tmp.name, x=10, y=8, w=28)
-            # School name, info
-            self.set_font('Arial', 'B', 16)
-            self.cell(0, 9, safe_pdf(SCHOOL_NAME), ln=True, align='C')
-            self.set_font('Arial', '', 11)
-            self.cell(0, 7, safe_pdf(f"{SCHOOL_WEBSITE} | {SCHOOL_PHONE} | {SCHOOL_ADDRESS}"), ln=True, align='C')
-            self.set_font('Arial', 'I', 10)
-            self.cell(0, 7, safe_pdf(f"Business Registration Number: {BUSINESS_REG}"), ln=True, align='C')
-            self.ln(3)
-            # Thin gray line
-            self.set_draw_color(200, 200, 200)
-            self.set_line_width(0.5)
-            self.line(10, self.get_y(), 200, self.get_y())
-            self.ln(6)
-        def watermark(self):
-            if watermark_file is not None:
-                ext = watermark_file.name.split('.')[-1]
-                watermark_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
-                watermark_tmp.write(watermark_file.read())
-                watermark_tmp.close()
-                # Faint watermark in the center (width=110mm)
-                self.image(watermark_tmp.name, x=48, y=75, w=110)
-        def footer(self):
-            # QR Code
-            qr_tmp = make_qr_code(SCHOOL_WEBSITE)
-            self.image(qr_tmp, x=180, y=275, w=18)  # Bottom right
-            self.set_y(-18)
-            self.set_font('Arial', 'I', 8)
-            self.cell(0, 10, safe_pdf("This letter is computer generated and valid without a signature."), 0, 0, 'C')
-
-    pdf = LetterPDF()
-    pdf.add_page()
-    pdf.watermark()
-    pdf.set_font("Arial", size=12)
-    import re
-    pdf.multi_cell(0, 8, safe_pdf(re.sub(r"<br\s*/?>", "\n", email_body)), align="L")
-    pdf.ln(6)
-    if msg_type == "Letter of Enrollment":
-        pdf.set_font("Arial", size=11)
-        pdf.cell(0, 8, "Yours sincerely,", ln=True)
-        pdf.cell(0, 7, "Felix Asadu", ln=True)
-        pdf.cell(0, 7, "Director", ln=True)
-        pdf.cell(0, 7, safe_pdf(SCHOOL_NAME), ln=True)
-    pdf_bytes = pdf.output(dest="S").encode("latin-1", "replace")
-
-    st.download_button(
-        "📄 Download Letter/PDF", 
-        data=pdf_bytes, 
-        file_name=f"{student_name.replace(' ', '_')}_{msg_type.replace(' ','_')}.pdf", 
-        mime="application/pdf"
+    # 4. Pick recipients
+    student_options = [
+        f"{row[name_col]} <{row[email_col]}>"
+        for _, row in df_students.iterrows()
+        if pd.notna(row[email_col]) and row[email_col] != ""
+    ]
+    selected_recipients = st.multiselect(
+        "Recipients", student_options, key="tab6_recipients"
     )
-    st.caption("You can share this PDF on WhatsApp or by email.")
 
-    # ---- 6. Email Option ----
-    st.subheader("Send Email (with or without PDF)")
-    attach_pdf = st.checkbox("Attach the generated PDF?")
-    recipient_email = st.text_input("Recipient Email", value=student_email)
-    if st.button("Send Email Now"):
-        msg = Mail(
-            from_email=SENDER_EMAIL,
-            to_emails=recipient_email,
-            subject=email_subject,
-            html_content=email_body
-        )
-        # Attach PDF if selected
-        if attach_pdf:
-            pdf_attach = Attachment(
-                FileContent(base64.b64encode(pdf_bytes).decode()),
-                FileName(f"{student_name.replace(' ','_')}_{msg_type.replace(' ','_')}.pdf"),
-                FileType("application/pdf"),
-                Disposition("attachment")
-            )
-            msg.attachment = pdf_attach
-        # Attach extra file if any
-        if extra_attach:
-            file_bytes = extra_attach.read()
-            file_attach = Attachment(
-                FileContent(base64.b64encode(file_bytes).decode()),
-                FileName(extra_attach.name),
-                FileType(extra_attach.type or "application/octet-stream"),
-                Disposition("attachment")
-            )
-            msg.attachment = file_attach
-        try:
-            sg = SendGridAPIClient(SENDGRID_KEY)
-            sg.send(msg)
-            st.success(f"Email sent to {recipient_email}!")
-        except Exception as e:
-            st.error(f"Email send failed: {e}")
+    # 5. Compose
+    st.subheader("Email Subject & Body")
+    email_subject = st.text_input(
+        "Email Subject",
+        value=subj_def,
+        key="tab6_email_subject"
+    )
+    email_body = st.text_area(
+        "Email Body (HTML)",
+        value=body_def,
+        key="tab6_email_body",
+        height=200
+    )
 
+    # 6. Attachment
+    st.subheader("Attachment (optional)")
+    attachment_file = st.file_uploader(
+        "Upload file", type=None, key="tab6_attachment"
+    )
 
+    # 7. SendGrid config
+    sendgrid_key = st.secrets["general"]["SENDGRID_API_KEY"]
+    sender_email = st.secrets["general"]["SENDER_EMAIL"]
 
+    # 8. Send button
+    if st.button("Send Emails", key="tab6_send"):
+        if not selected_recipients:
+            st.warning("Select at least one recipient.")
+        elif not email_subject or not email_body:
+            st.warning("Subject and body cannot be empty.")
+        else:
+            from sendgrid import SendGridAPIClient
+            from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
+            import base64
+
+            successes, failures = [], []
+            for pick in selected_recipients:
+                nm, addr = pick.split("<")
+                addr = addr.strip(">")
+                # personalize
+                lvl = df_students.loc[df_students[name_col]==nm.strip(), level_col].iloc[0] if nm.strip() in df_students[name_col].values else ""
+                sd  = df_students.loc[df_students[name_col]==nm.strip(), start_col].iloc[0] if start_col in df_students else ""
+                due = (pd.to_datetime(sd) + pd.Timedelta(days=30)).date() if sd else ""
+                body_filled = email_body.format(name=nm.strip(), level=lvl, start_date=sd, due_date=due)
+
+                try:
+                    msg = Mail(
+                        from_email=sender_email,
+                        to_emails=addr,
+                        subject=email_subject,
+                        html_content=body_filled
+                    )
+                    # attach if present
+                    if attachment_file:
+                        data = attachment_file.read()
+                        enc  = base64.b64encode(data).decode()
+                        ftype = __import__("mimetypes").guess_type(attachment_file.name)[0] or "application/octet-stream"
+                        attach = Attachment(
+                            FileContent(enc),
+                            FileName(attachment_file.name),
+                            FileType(ftype),
+                            Disposition("attachment")
+                        )
+                        msg.attachment = attach
+
+                    sg = SendGridAPIClient(sendgrid_key)
+                    sg.send(msg)
+                    successes.append(addr)
+                except Exception as e:
+                    failures.append(f"{addr}: {e}")
+
+            if successes:
+                st.success(f"Sent to: {', '.join(successes)}")
+            if failures:
+                st.error(f"Failures: {', '.join(failures)}")
 
 # ==== 14. TAB 6: COURSE SCHEDULE GENERATOR ====
 with tabs[6]:
@@ -1169,17 +1716,19 @@ with tabs[6]:
                        data=pdf.output(dest='S').encode('latin-1'),
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
-    
-
-
-# --- 1. URLS ---
-students_csv_url = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
-ref_answers_url = "https://docs.google.com/spreadsheets/d/1CtNlidMfmE836NBh5FmEF5tls9sLmMmkkhewMTQjkBo/export?format=csv"
 
 with tabs[7]:
-    st.title("📝 Reference & Student Work Share")
+    st.title("📝 Assignment Marking & Scores")
 
-    # --- Load Data ---
+    # --- URLs ---
+    students_csv_url = (
+        "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
+    )
+    scores_csv_url = (
+        "https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/export?format=csv"
+    )
+
+    # --- Load Students ---
     @st.cache_data(show_spinner=False)
     def load_students():
         df = pd.read_csv(students_csv_url)
@@ -1189,24 +1738,80 @@ with tabs[7]:
         return df
     df_students = load_students()
 
+    # --- Load Scores (Sheet & SQLite) ---
     @st.cache_data(ttl=0)
-    def load_ref_answers():
-        df = pd.read_csv(ref_answers_url, dtype=str)
+    def load_sheet_scores():
+        df = pd.read_csv(scores_csv_url)
         df.columns = [c.strip().lower().replace(" ", "").replace("_", "") for c in df.columns]
-        if "assignment" not in df.columns:
-            raise Exception("No 'assignment' column found in reference answers sheet.")
+        if "student_code" in df.columns:
+            df = df.rename(columns={"student_code": "studentcode"})
+        if "level" not in df.columns:
+            df["level"] = None
         return df
-    ref_df = load_ref_answers()
+
+    @st.cache_data(ttl=0)
+    def fetch_sqlite_scores():
+        conn = init_sqlite_connection()
+        df = pd.read_sql("SELECT studentcode,assignment,score,comments,date,level FROM scores", conn)
+        df.columns = [c.lower() for c in df.columns]
+        return df
+
+    df_sheet_scores = load_sheet_scores()
+    df_sqlite_scores = fetch_sqlite_scores()
+
+    # --- Harmonize (guarantee "studentcode", "level" in both) ---
+    for df in [df_sheet_scores, df_sqlite_scores]:
+        if "studentcode" not in df.columns:
+            if "student_code" in df.columns:
+                df["studentcode"] = df["student_code"]
+        if "level" not in df.columns:
+            df["level"] = None
+
+    # --- Combine and Deduplicate (most recent by student+assignment) ---
+    df_scores = pd.concat([df_sheet_scores, df_sqlite_scores], ignore_index=True)
+    df_scores["date"] = pd.to_datetime(df_scores["date"], errors="coerce")
+    df_scores = df_scores.sort_values("date").drop_duplicates(["studentcode", "assignment"], keep="last")
+    df_scores = df_scores.reset_index(drop=True)
+
+    # --- Merge in NAME and LEVEL for all rows, fallback to sheet's name if missing ---
+    df_scores_with_name = df_scores.merge(
+        df_students[["studentcode", "name", "level"]],
+        on="studentcode", how="left", suffixes=("", "_student")
+    )
+    # If name missing, fill from name_student
+    if "name_student" in df_scores_with_name.columns:
+        df_scores_with_name["name"] = df_scores_with_name["name"].combine_first(df_scores_with_name["name_student"])
+        df_scores_with_name = df_scores_with_name.drop(columns=["name_student"])
+    # For robustness, fill name from original sheet if also available there (rare edge case)
+    if "name" in df_sheet_scores.columns:
+        df_scores_with_name = df_scores_with_name.merge(
+            df_sheet_scores[["studentcode", "assignment", "name"]],
+            on=["studentcode", "assignment"], how="left", suffixes=("", "_sheet")
+        )
+        df_scores_with_name["name"] = df_scores_with_name["name"].combine_first(df_scores_with_name["name_sheet"])
+        if "name_sheet" in df_scores_with_name.columns:
+            df_scores_with_name = df_scores_with_name.drop(columns=["name_sheet"])
+
+    # --- Clean column order for display/download ---
+    wanted_cols = ['studentcode', 'name', 'assignment', 'score', 'comments', 'date', 'level']
+    for c in wanted_cols:
+        if c not in df_scores_with_name.columns:
+            df_scores_with_name[c] = ""
+    df_scores_with_name = df_scores_with_name[wanted_cols]
+
+    st.markdown("#### 📚 All Score History (Sheet + App)")
+    st.dataframe(df_scores_with_name, use_container_width=True)
+
+    st.download_button(
+        "⬇️ Download All Scores as CSV (with Name & Level)",
+        data=df_scores_with_name.to_csv(index=False),
+        file_name="all_scores_with_name_level.csv"
+    )
+
+
 
     # --- Student search and select ---
-    st.subheader("1. Search & Select Student")
-    def col_lookup(df, name):
-        key = name.lower().replace(" ", "").replace("_", "")
-        for c in df.columns:
-            if c.lower().replace(" ", "").replace("_", "") == key:
-                return c
-        raise KeyError(f"Column '{name}' not found in DataFrame")
-
+    st.subheader("🔎 Search Student")
     name_col, code_col = col_lookup(df_students, "name"), col_lookup(df_students, "studentcode")
     search_student = st.text_input("Type student name or code...")
     students_filtered = df_students[
@@ -1215,7 +1820,7 @@ with tabs[7]:
     ] if search_student else df_students
 
     student_list = students_filtered[name_col] + " (" + students_filtered[code_col].astype(str) + ")"
-    chosen = st.selectbox("Select Student", student_list, key="tab7_single_student")
+    chosen = st.selectbox("Select Student", student_list, key="single_student")
 
     if not chosen or "(" not in chosen:
         st.warning("No student selected or wrong student list format.")
@@ -1226,147 +1831,70 @@ with tabs[7]:
     student_level = student_row['level'] if 'level' in student_row else ""
 
     # --- Assignment search and select ---
-    st.subheader("2. Select Assignment")
-    available_assignments = ref_df['assignment'].dropna().unique().tolist()
-    search_assign = st.text_input("Type assignment title...", key="tab7_search_assign")
-    filtered = [a for a in available_assignments if search_assign.lower() in str(a).lower()]
+    st.subheader("🔎 Search Assignment")
+    search_assign = st.text_input("Type assignment title...", key="search_assign")
+    assignments = sorted(set(df_scores['assignment']).union(ref_answers.keys()))
+    filtered = [a for a in assignments if search_assign.lower() in a.lower()]
     if not filtered:
         st.info("No assignments match your search.")
         st.stop()
-    assignment = st.selectbox("Select Assignment", filtered, key="tab7_assign_select")
+    assignment = st.selectbox("Select Assignment", filtered, key="assign_select")
 
-    # --- REFERENCE ANSWERS (TABS + COMBINED BOX) ---
-    st.subheader("3. Reference Answer (from Google Sheet)")
-    ref_answers = []
-    answer_cols = []
-    if assignment:
-        assignment_row = ref_df[ref_df['assignment'] == assignment]
-        if not assignment_row.empty:
-            answer_cols = [col for col in assignment_row.columns if col.startswith('answer')]
-            answer_cols = [col for col in answer_cols if pd.notnull(assignment_row.iloc[0][col]) and str(assignment_row.iloc[0][col]).strip() != '']
-            ref_answers = [str(assignment_row.iloc[0][col]) for col in answer_cols]
+    # --- Reference Answers (if available) ---
+    st.markdown("**Reference Answers:**")
+    for ans in ref_answers.get(assignment, []):
+        st.write(f"- {ans}")
 
-    # Show dynamic tabs if multiple answers, else single box
-    if ref_answers:
-        if len(ref_answers) == 1:
-            st.markdown("**Reference Answer:**")
-            st.write(ref_answers[0])
-        else:
-            tab_objs = st.tabs([f"Answer {i+1}" for i in range(len(ref_answers))])
-            for i, ans in enumerate(ref_answers):
-                with tab_objs[i]:
-                    st.write(ans)
-        answers_combined_str = "\n".join([f"{i+1}. {ans}" for i, ans in enumerate(ref_answers)])
-        answers_combined_html = "<br>".join([f"{i+1}. {ans}" for i, ans in enumerate(ref_answers)])
-    else:
-        answers_combined_str = "No answer available."
-        answers_combined_html = "No answer available."
-        st.info("No reference answer available.")
+    # --- Score entry form (pre-fills previous score/comment if exists) ---
+    prev = df_scores[
+        (df_scores['studentcode'] == student_code) &
+        (df_scores['assignment'] == assignment)
+    ]
+    default_score   = int(prev['score'].iloc[0]) if not prev.empty else 0
+    default_comment = prev['comments'].iloc[0] if not prev.empty else ""
 
-    # --- STUDENT WORK + AI COPY ZONE ---
-    st.subheader("4. Paste Student Work (for your manual cross-check or ChatGPT use)")
-    student_work = st.text_area("Paste the student's answer here:", height=140, key="tab7_student_work")
+    with st.form(f"form_single_{student_code}_{assignment}"):
+        score   = st.number_input("Score (0–100)", 0, 100, default_score, key="score_single")
+        comment = st.text_area("Comments", value=default_comment, key="comment_single")
+        submitted = st.form_submit_button("Save Score")
 
-    # --- Combined copy box ---
-    st.subheader("5. Copy Zone (Reference + Student Work for AI/manual grading)")
-    combined_text = (
-        "Reference answer:\n" +
-        answers_combined_str +
-        "\n\nStudent answer:\n" +
-        student_work
+    if submitted:
+        save_score_to_sqlite({
+            'studentcode': student_code,
+            'assignment' : assignment,
+            'score'      : float(score),
+            'comments'   : comment,
+            'date'       : datetime.now().strftime("%Y-%m-%d"),
+            'level'      : student_row.get('level', '')
+        })
+        st.success("Score saved! Refreshing...")
+        st.rerun()
+
+    # --- Show Score History for this student ---
+    student_history = df_scores[df_scores['studentcode'] == student_code].sort_values('date', ascending=False)
+    st.markdown(f"### 📋 Score History for {student_row[name_col]} (Level: {student_level})")
+    st.dataframe(student_history[['assignment','score','comments','date','level']], use_container_width=True)
+
+    # --- PDF GENERATION & DOWNLOAD BUTTON ---
+    pdf_bytes = generate_pdf_report(
+        name=student_row[name_col],
+        level=student_row.get('level', ''),
+        history=student_history,
+        assignment=assignment,
+        score_name=assignment,
+        tutor_name="Mr. Felix Asadu",
+        school_name="Learn Language Education Academy",
+        footer_text="Thank you for your hard work! Contact your tutor if you have any questions."
     )
-    st.code(combined_text, language="markdown")
-    st.info("Copy this block and paste into ChatGPT or your AI tool for checking.")
+    pdf_filename = f"{student_row[name_col].replace(' ', '_')}_{assignment.replace(' ', '_')}_report.pdf"
 
-    # --- Copy buttons ---
-    st.write("**Quick Copy:**")
-    st.download_button("📋 Copy Only Reference Answer (txt)", data=answers_combined_str, file_name="reference_answer.txt", mime="text/plain", key="copy_reference")
-    st.download_button("📋 Copy Both (Reference + Student)", data=combined_text, file_name="ref_and_student.txt", mime="text/plain", key="copy_both")
-
-    st.divider()
-
-    # --- EMAIL SECTION ---
-    st.subheader("6. Send Reference Answer to Student by Email")
-    default_email = student_row.get('email', '') if 'email' in student_row else ""
-    to_email = st.text_input("Recipient Email", value=default_email, key="tab7_email")
-    subject = st.text_input("Subject", value=f"{student_row[name_col]} - {assignment} Reference Answer", key="tab7_subject")
-
-    ref_ans_email = f"<b>Reference Answers:</b><br>{answers_combined_html}<br>"
-
-    # Only share reference, not the student work!
-    body = st.text_area(
-        "Message (HTML allowed)",
-        value=(
-            f"Hello {student_row[name_col]},<br><br>"
-            f"Here is the reference answer for your assignment <b>{assignment}</b>.<br><br>"
-            f"{ref_ans_email}"
-            "Thank you<br>Learn Language Education Academy"
-        ),
-        key="tab7_body"
+    st.download_button(
+        "Download Report PDF",
+        data=pdf_bytes,
+        file_name=pdf_filename,
+        mime="application/pdf"
     )
-    send_email = st.button("📧 Email Reference", key="tab7_send_email")
+    
+#EndofTab7
 
-    if send_email:
-        if not to_email or "@" not in to_email:
-            st.error("Please enter a valid recipient email address.")
-        else:
-            try:
-                # Make sure you have your send_email_report function ready!
-                send_email_report(None, to_email, subject, body)  # No PDF attached, just reference
-                st.success(f"Reference sent to {to_email}!")
-            except Exception as e:
-                st.error(f"Failed to send email: {e}")
-
-    # --- WhatsApp Share Section ---
-    st.subheader("7. Share Reference via WhatsApp")
-    # Try to get student's phone automatically from any relevant column
-    wa_phone = ""
-    wa_cols = [c for c in student_row.index if "phone" in c]
-    for c in wa_cols:
-        v = str(student_row[c])
-        if v.startswith("233") or v.startswith("0") or v.isdigit():
-            wa_phone = v
-            break
-    wa_phone = st.text_input("WhatsApp Number (International format, e.g., 233245022743)", value=wa_phone, key="tab7_wa_number")
-
-    ref_ans_wa = "*Reference Answers:*\n" + answers_combined_str + "\n"
-
-    default_wa_msg = (
-        f"Hello {student_row[name_col]},\n\n"
-        f"Here is the reference answer for your assignment: *{assignment}*\n"
-        f"{ref_ans_wa}\n"
-        "Open my results and resources on the Falowen app for scores and full comment.\n"
-        "Don't forget to click refresh for latest results for your new scores to show.\n"
-        "Thank you!\n"
-        "Happy learning!"
-    )
-    wa_message = st.text_area(
-        "WhatsApp Message (edit before sending):",
-        value=default_wa_msg, height=180, key="tab7_wa_message_edit"
-    )
-
-    wa_num_formatted = wa_phone.strip().replace(" ", "").replace("-", "")
-    if wa_num_formatted.startswith("0"):
-        wa_num_formatted = "233" + wa_num_formatted[1:]
-    elif wa_num_formatted.startswith("+"):
-        wa_num_formatted = wa_num_formatted[1:]
-    elif not wa_num_formatted.startswith("233"):
-        wa_num_formatted = "233" + wa_num_formatted[-9:]  # fallback for local numbers
-
-    wa_link = (
-        f"https://wa.me/{wa_num_formatted}?text={urllib.parse.quote(wa_message)}"
-        if wa_num_formatted.isdigit() and len(wa_num_formatted) >= 11 else None
-    )
-
-    if wa_link:
-        st.markdown(
-            f'<a href="{wa_link}" target="_blank">'
-            f'<button style="background-color:#25d366;color:white;border:none;padding:10px 20px;border-radius:5px;font-size:16px;cursor:pointer;">'
-            '📲 Share Reference on WhatsApp'
-            '</button></a>',
-            unsafe_allow_html=True
-        )
-    else:
-        st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
-
-
+#EndofTab1
