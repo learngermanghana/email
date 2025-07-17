@@ -459,15 +459,36 @@ with tabs[0]:
         pdf.add_page()
         pdf.set_font("Arial", size=12)
         pdf.cell(0, 10, safe_pdf(f"{title} ({level})"), ln=True)
-        pdf.cell(0, 8, safe_pdf(f"Dates: {start_dt.strftime('%d %b %Y')} – {end_dt.strftime('%d %b %Y')}"), ln=True)
+        pdf.cell(
+            0,
+            8,
+            safe_pdf(
+                f"Dates: {start_dt.strftime('%d %b %Y')} – {end_dt.strftime('%d %b %Y')}"
+            ),
+            ln=True
+        )
         pdf.cell(0, 8, safe_pdf(f"Times: {times}"), ln=True)
-        pdf.cell(0, 8, safe_pdf(f"School Fee: GHS {fee}"), ln=True)
-        pdf.cell(0, 8, safe_pdf(f"Goethe Exam: {ge_dt} (GHS {ge_fee}, paid to Goethe Institute)"), ln=True)
+        pdf.cell(
+            0,
+            8,
+            safe_pdf(
+                f"School Fee: GHS {fee}"
+            ),
+            ln=True
+        )
+        pdf.cell(
+            0,
+            8,
+            safe_pdf(
+                f"Goethe Exam: {ge_dt} (GHS {ge_fee}, paid to Goethe Institute)"
+            ),
+            ln=True
+        )
         pdf.ln(2)
         pdf.set_font("Arial", "I", 11)
-        pdf.multi_cell(0, 7, safe_pdf(desc))
-        pdf.multi_cell(0, 7, safe_pdf(notes))
-        pdf.multi_cell(0, 7, safe_pdf(extra_notes))
+        safe_multi_cell(pdf, 0, 7, safe_pdf(desc))
+        safe_multi_cell(pdf, 0, 7, safe_pdf(notes))
+        safe_multi_cell(pdf, 0, 7, safe_pdf(extra_notes))
         pdf.ln(3)
         if class_pdf:
             try:
@@ -478,26 +499,29 @@ with tabs[0]:
         pdf.set_font("Arial", "B", 12)
         pdf.cell(0, 8, "Falowen App Features", ln=True)
         pdf.set_font("Arial", size=11)
-        pdf.multi_cell(0, 7, safe_pdf(
-            "• AI-powered writing correction\n"
-            "• Speaking feedback with pronunciation scoring\n"
-            "• Vocabulary & practice tools (exclusive for Falowen students)\n"
-            "• Hybrid learning: attend in-person, online or catch up anytime!"
-        ))
+        safe_multi_cell(
+            pdf,
+            0,
+            7,
+            safe_pdf(
+                "• AI-powered writing correction\n"
+                "• Speaking feedback with pronunciation scoring\n"
+                "• Vocabulary & practice tools (exclusive for Falowen students)\n"
+                "• Hybrid learning: attend in-person, online or catch up anytime!"
+            )
+        )
         pdf.ln(2)
         if reviews:
             pdf.set_font("Arial", "B", 11)
             pdf.cell(0, 8, "Student Reviews:", ln=True)
             pdf.set_font("Arial", size=11)
             for rev in reviews:
-                pdf.multi_cell(0, 7, safe_pdf(rev))
+                safe_multi_cell(pdf, 0, 7, safe_pdf(rev))
                 pdf.ln(1)
         pdf.ln(2)
-        pdf_data = pdf.output(dest="S")
-        if isinstance(pdf_data, str):
-            pdf_bytes = pdf_data.encode("latin-1", "replace")
-        else:
-            pdf_bytes = pdf_data  # already bytes, no need to encode
+
+        # Serialize and encode PDF
+        pdf_bytes = get_pdf_bytes(pdf)
 
         st.download_button(
             "📄 Download PDF Brochure",
