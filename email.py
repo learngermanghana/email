@@ -876,7 +876,6 @@ with tabs[5]:
             self.set_y(-18)
             self.set_font('Arial', 'I', 8)
             self.cell(0, 10, safe_pdf("This letter is computer generated and valid without a signature."), 0, 0, 'C')
-
     pdf = LetterPDF()
     pdf.add_page()
     pdf.watermark()
@@ -884,13 +883,19 @@ with tabs[5]:
     import re
     pdf.multi_cell(0, 8, safe_pdf(re.sub(r"<br\s*/?>", "\n", email_body)), align="L")
     pdf.ln(6)
+
     if msg_type == "Letter of Enrollment":
         pdf.set_font("Arial", size=11)
         pdf.cell(0, 8, "Yours sincerely,", ln=True)
         pdf.cell(0, 7, "Felix Asadu", ln=True)
         pdf.cell(0, 7, "Director", ln=True)
         pdf.cell(0, 7, safe_pdf(SCHOOL_NAME), ln=True)
-    pdf_bytes = pdf.output(dest="S").encode("latin-1", "replace")
+
+    pdf_content = pdf.output(dest="S")
+    if isinstance(pdf_content, str):
+        pdf_bytes = pdf_content.encode("latin-1", "replace")
+    else:
+        pdf_bytes = pdf_content
 
     st.download_button(
         "📄 Download Letter/PDF", 
