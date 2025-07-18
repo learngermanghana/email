@@ -123,22 +123,16 @@ def send_email_report(pdf_bytes: bytes, to_email: str, subject: str, html_conten
         return False
 
 def sanitize_text(text):
-    """Latin-1 only, printable, no non-breaking spaces, no emojis."""
-    text = str(text)
-    # Remove all non-latin-1 chars and control chars
-    text = "".join(
-        c if (32 <= ord(c) <= 126 or 160 <= ord(c) < 255) else " "
-        for c in text
-    )
-    # Remove all emojis and invisible chars
-    text = "".join(c for c in text if unicodedata.category(c)[0] != "C")
-    # Remove tabs, double spaces, weird dashes
-    text = text.replace('\t', ' ').replace('\u00A0', ' ')
-    text = re.sub(r'\s+', ' ', text)
-    return text.strip()
+    """Replace any character not in latin-1 with '?' and collapse whitespace."""
+    # Replace any char > 255 (not latin-1) with '?'
+    cleaned = "".join(c if ord(c) < 256 else "?" for c in str(text))
+    # Replace tabs and double spaces with single space
+    cleaned = cleaned.replace('\t', ' ')
+    cleaned = ' '.join(cleaned.split())
+    return cleaned.strip()
 
 def break_long_words(text, max_len=40):
-    # forcibly split any long word for FPDF
+    # Break up any long word so FPDF never fails
     return re.sub(
         r'(\S{' + str(max_len) + r',})',
         lambda m: ' '.join([m.group(0)[i:i+max_len] for i in range(0, len(m.group(0)), max_len)]),
@@ -501,6 +495,7 @@ with tabs[3]:
         file_name="debtor_whatsapp_links.csv"
     )
 
+
 with tabs[4]:
     st.title("📄 Generate Contract & Receipt PDF for Any Student")
 
@@ -526,7 +521,7 @@ with tabs[4]:
         phone_col   = getcol("phone")
         level_col   = getcol("level")
 
-        # --- SEARCH BOX ---
+        # --- SEARCH BOX at the bottom (shown above dropdown) ---
         search_val = st.text_input(
             "Search students by name, code, phone, or level:", value="", key="pdf_tab_search"
         )
@@ -583,13 +578,12 @@ with tabs[4]:
         # --- Helper: Make text PDF-safe ---
         import re
         def sanitize_text(text):
-            # Remove non-latin-1, replace tabs with space, normalize
             cleaned = "".join(c if ord(c) < 256 else "?" for c in str(text))
-            cleaned = cleaned.replace("\t", " ")
-            return cleaned
+            cleaned = cleaned.replace('\t', ' ')
+            cleaned = ' '.join(cleaned.split())
+            return cleaned.strip()
 
-        def break_long_words(text, max_len=60):
-            # This will break up any word longer than max_len by inserting a space
+        def break_long_words(text, max_len=40):
             return re.sub(
                 r'(\S{' + str(max_len) + r',})',
                 lambda m: ' '.join([m.group(0)[i:i+max_len] for i in range(0, len(m.group(0)), max_len)]),
@@ -609,7 +603,7 @@ with tabs[4]:
 
             # --- Add logo (from web) ---
             try:
-                import requests
+                import requests, os
                 logo_tmp_path = "school_logo.png"
                 if not os.path.exists(logo_tmp_path):
                     img_data = requests.get(logo_url).content
@@ -692,11 +686,10 @@ Signatures:
                 .replace("[SECOND_DUE_DATE]",  str(contract_end))
                 .replace("[COURSE_LENGTH]",    f"{course_length} days")
             )
-            # Only add non-empty, non-whitespace lines, wrap long words!
             for line in filled.split("\n"):
                 safe = sanitize_text(line)
                 if safe.strip():
-                    safe_wrapped = break_long_words(safe, max_len=60)
+                    safe_wrapped = break_long_words(safe, max_len=40)
                     pdf.multi_cell(0, 8, safe_wrapped)
             pdf.ln(10)
 
@@ -712,5 +705,6 @@ Signatures:
                 mime="application/pdf"
             )
             st.success("✅ PDF generated and ready to download.")
+
 
 
