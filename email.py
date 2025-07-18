@@ -210,11 +210,12 @@ STUDENT_CODES = df_students["studentcode"].dropna().unique().tolist() if "studen
 
 # ==== TABS SETUP ====
 tabs = st.tabs([
-    "📝 Pending",                 # 0
-    "👩‍🎓 All Students",            # 1
-    "💵 Expenses",                 # 2
-    "📲 Reminders",               # 3
-    "📄 Contract"                # 4
+    "📝 Pending",                # 0
+    "👩‍🎓 All Students",           # 1
+    "💵 Expenses",               # 2
+    "📲 Reminders",              # 3
+    "📄 Contract",               # 4
+    "📧 Send Email"              # 5 
     
 ])
 
@@ -669,6 +670,201 @@ This Payment Agreement is entered into on [DATE] for [CLASS] students of Learn L
             mime="application/pdf"
         )
         st.success("✅ PDF generated and ready to download.")
+
+with tabs[5]:
+    st.title("📧 Send Email / Letter (Templates, Attachments, PDF, Watermark, QR)")
+
+    # ---- Student Search/Selection ----
+    st.subheader("Select Student")
+    search_val = st.text_input(
+        "Search students by name, code, or email", 
+        value="", key="tab5_student_search"
+    )
+    if search_val:
+        filtered_students = df_students[
+            df_students["name"].str.contains(search_val, case=False, na=False)
+            | df_students.get("studentcode", pd.Series(dtype=str)).astype(str).str.contains(search_val, case=False, na=False)
+            | df_students.get("email", pd.Series(dtype=str)).astype(str).str.contains(search_val, case=False, na=False)
+        ]
+    else:
+        filtered_students = df_students
+
+    student_names = filtered_students["name"].dropna().unique().tolist()
+    student_name = st.selectbox("Student Name", student_names, key="tab5_select_student")
+    if not student_name:
+        st.stop()
+    student_row = filtered_students[filtered_students["name"] == student_name].iloc[0]
+    student_level = student_row["level"]
+    student_email = student_row.get("email", "")
+    enrollment_start = pd.to_datetime(student_row.get("contractstart", date.today()), errors="coerce").date()
+    enrollment_end = pd.to_datetime(student_row.get("contractend", date.today()), errors="coerce").date()
+    payment = float(student_row.get("paid", 0))
+    balance = float(student_row.get("balance", 0))
+    payment_status = "Full Payment" if balance == 0 else "Installment Plan"
+    student_code = student_row.get("studentcode", "")
+    student_link = f"https://falowen.streamlit.app/?code={student_code}" if student_code else "https://falowen.streamlit.app/"
+
+    # ---- 2. Message Type Selection ----
+    st.subheader("Choose Message Type")
+    msg_type = st.selectbox("Type", [
+        "Custom Message",
+        "Welcome Message",
+        "Assignment Results",
+        "Letter of Enrollment"
+    ], key="tab5_msg_type")
+
+    # ---- 3. Logo/Watermark/Extra Attachment ----
+    st.subheader("Upload Logo and Watermark")
+    logo_file = st.file_uploader("School Logo (PNG/JPG)", type=["png", "jpg", "jpeg"], key="tab5_logo_up")
+    watermark_file = st.file_uploader("Watermark Image (faded PNG recommended)", type=["png"], key="tab5_watermark_up")
+    extra_attach = st.file_uploader("Additional Attachment (optional)", key="tab5_extra_attach")
+
+    # ---- 4. Compose/Preview Message ----
+    st.subheader("Compose/Preview Message")
+    if msg_type == "Welcome Message":
+        body_default = (
+            f"Hello {student_name},<br><br>"
+            f"Welcome to Learn Language Education Academy! We have helped many students succeed, and we’re excited to support you as well.<br><br>"
+            f"We have attached your letter of enrollment in this document.<br><br>"
+            f"<b>Your contract starts on {enrollment_start.strftime('%d %B %Y')}.</b> "
+            f"You can join your <b>{student_level}</b> class in person or online (Zoom link will be shared before class).<br><br>"
+            f"<b>Your payment status: {payment_status}.</b> Paid: GHS {payment:.2f} / Balance: GHS {balance:.2f}<br><br>"
+            f"All your course materials and assignments are on our <a href='{student_link}'>Falowen App</a>.<br><br>"
+            f"We wish you a great start and look forward to your progress!<br><br>"
+        )
+    elif msg_type == "Letter of Enrollment":
+        body_default = (
+            f"To Whom It May Concern,<br><br>"
+            f"This is to certify that {student_name} is officially enrolled in the {student_level} programme at Learn Language Education Academy.<br>"
+            f"Enrollment valid from {enrollment_start.strftime('%-m/%-d/%Y')} to {enrollment_end.strftime('%-m/%-d/%Y')}.<br><br>"
+            f"Our institution is officially registered with Business Registration Number {BUSINESS_REG},<br>"
+            f"in accordance with the Registration of Business Names Act, 1962 (No.151).<br><br>"
+            f"If you require further confirmation, please contact us.<br><br>"
+        )
+    elif msg_type == "Assignment Results":
+        body_default = (
+            f"Hello {student_name},<br><br>"
+            f"Below are your latest assignment results (please check the Falowen App for full details):<br>"
+            f"<ul><li>Assignment 1: 85%</li><li>Assignment 2: 90%</li></ul>"
+            f"Best regards,<br>Learn Language Education Academy"
+        )
+    else:
+        body_default = ""
+
+    email_subject = st.text_input("Subject", value=f"{msg_type} - {student_name}", key="tab5_email_subject")
+    email_body = st.text_area("Email Body (HTML supported)", value=body_default, height=220, key="tab5_email_body")
+
+    st.markdown("**Preview Message (as student will see):**")
+    st.markdown(email_body, unsafe_allow_html=True)
+
+    # ---- 5. Generate PDF Button (and preview) ----
+    st.subheader("PDF Preview & Download")
+
+    def safe_pdf(text):
+        if not text:
+            return ""
+        return text.encode("latin-1", "replace").decode("latin-1")
+
+    def make_qr_code(url):
+        qr_img = qrcode.make(url)
+        qr_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        qr_img.save(qr_tmp)
+        qr_tmp.close()
+        return qr_tmp.name
+
+    class LetterPDF(FPDF):
+        def header(self):
+            if logo_file is not None:
+                ext = logo_file.name.split('.')[-1]
+                logo_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
+                logo_tmp.write(logo_file.read())
+                logo_tmp.close()
+                self.image(logo_tmp.name, x=10, y=8, w=28)
+            self.set_font('Arial', 'B', 16)
+            self.cell(0, 9, safe_pdf(SCHOOL_NAME), ln=True, align='C')
+            self.set_font('Arial', '', 11)
+            self.cell(0, 7, safe_pdf(f"{SCHOOL_WEBSITE} | {SCHOOL_PHONE} | {SCHOOL_ADDRESS}"), ln=True, align='C')
+            self.set_font('Arial', 'I', 10)
+            self.cell(0, 7, safe_pdf(f"Business Registration Number: {BUSINESS_REG}"), ln=True, align='C')
+            self.ln(3)
+            self.set_draw_color(200, 200, 200)
+            self.set_line_width(0.5)
+            self.line(10, self.get_y(), 200, self.get_y())
+            self.ln(6)
+        def watermark(self):
+            if watermark_file is not None:
+                ext = watermark_file.name.split('.')[-1]
+                watermark_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
+                watermark_tmp.write(watermark_file.read())
+                watermark_tmp.close()
+                self.image(watermark_tmp.name, x=48, y=75, w=110)
+        def footer(self):
+            qr_tmp = make_qr_code(SCHOOL_WEBSITE)
+            self.image(qr_tmp, x=180, y=275, w=18)
+            self.set_y(-18)
+            self.set_font('Arial', 'I', 8)
+            self.cell(0, 10, safe_pdf("This letter is computer generated and valid without a signature."), 0, 0, 'C')
+
+    pdf = LetterPDF()
+    pdf.add_page()
+    pdf.watermark()
+    pdf.set_font("Arial", size=12)
+    import re
+    pdf.multi_cell(0, 8, safe_pdf(re.sub(r"<br\s*/?>", "\n", email_body)), align="L")
+    pdf.ln(6)
+    if msg_type == "Letter of Enrollment":
+        pdf.set_font("Arial", size=11)
+        pdf.cell(0, 8, "Yours sincerely,", ln=True)
+        pdf.cell(0, 7, "Felix Asadu", ln=True)
+        pdf.cell(0, 7, "Director", ln=True)
+        pdf.cell(0, 7, safe_pdf(SCHOOL_NAME), ln=True)
+    pdf_bytes = pdf.output(dest="S").encode("latin-1", "replace")
+
+    st.download_button(
+        "📄 Download Letter/PDF", 
+        data=pdf_bytes, 
+        file_name=f"{student_name.replace(' ', '_')}_{msg_type.replace(' ','_')}.pdf", 
+        mime="application/pdf"
+    )
+    st.caption("You can share this PDF on WhatsApp or by email.")
+
+    # ---- 6. Email Option ----
+    st.subheader("Send Email (with or without PDF)")
+    attach_pdf = st.checkbox("Attach the generated PDF?", key="tab5_attach_pdf")
+    recipient_email = st.text_input("Recipient Email", value=student_email, key="tab5_recipient_email")
+    if st.button("Send Email Now", key="tab5_send_email_btn"):
+        msg = Mail(
+            from_email=SENDER_EMAIL,
+            to_emails=recipient_email,
+            subject=email_subject,
+            html_content=email_body
+        )
+        # Attach PDF if selected
+        if attach_pdf:
+            pdf_attach = Attachment(
+                FileContent(base64.b64encode(pdf_bytes).decode()),
+                FileName(f"{student_name.replace(' ','_')}_{msg_type.replace(' ','_')}.pdf"),
+                FileType("application/pdf"),
+                Disposition("attachment")
+            )
+            msg.attachment = pdf_attach
+        # Attach extra file if any
+        if extra_attach:
+            file_bytes = extra_attach.read()
+            file_attach = Attachment(
+                FileContent(base64.b64encode(file_bytes).decode()),
+                FileName(extra_attach.name),
+                FileType(extra_attach.type or "application/octet-stream"),
+                Disposition("attachment")
+            )
+            msg.attachment = file_attach
+        try:
+            sg = SendGridAPIClient(SENDGRID_KEY)
+            sg.send(msg)
+            st.success(f"Email sent to {recipient_email}!")
+        except Exception as e:
+            st.error(f"Email send failed: {e}")
+
 
 
 
