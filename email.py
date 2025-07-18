@@ -123,13 +123,11 @@ def send_email_report(pdf_bytes: bytes, to_email: str, subject: str, html_conten
         return False
 
 def sanitize_text(text):
-    """Replace any character not in latin-1 with '?' and collapse whitespace."""
-    # Replace any char > 255 (not latin-1) with '?'
     cleaned = "".join(c if ord(c) < 256 else "?" for c in str(text))
-    # Replace tabs and double spaces with single space
-    cleaned = cleaned.replace('\t', ' ')
+    cleaned = cleaned.replace('\t', ' ').replace('\u00A0', ' ').replace('\u200b', '')
     cleaned = ' '.join(cleaned.split())
     return cleaned.strip()
+
 
 def break_long_words(text, max_len=40):
     # Break up any long word so FPDF never fails
