@@ -492,6 +492,7 @@ with tabs[4]:
         st.warning("No student data available.")
         st.stop()
 
+    # --- Column lookup helper
     def getcol(col): 
         return col_lookup(df, col)
 
@@ -506,7 +507,7 @@ with tabs[4]:
 
     # --- Search/filter UI ---
     search_val = st.text_input(
-        "Search students by name, code, phone, or level:", 
+        "Search students by name, code, phone, or level:",
         value="", key="pdf_tab_search"
     )
     filtered_df = df.copy()
@@ -536,15 +537,15 @@ with tabs[4]:
         default_end = default_start + timedelta(days=30)
 
     st.subheader("Receipt Details")
-    paid_input    = st.number_input("Amount Paid (GHS)", min_value=0.0, value=default_paid, step=1.0)
-    balance_input = st.number_input("Balance Due (GHS)", min_value=0.0, value=default_balance, step=1.0)
+    paid_input    = st.number_input("Amount Paid (GHS)",    min_value=0.0, value=default_paid,    step=1.0)
+    balance_input = st.number_input("Balance Due (GHS)",   min_value=0.0, value=default_balance, step=1.0)
     total_input   = paid_input + balance_input
     receipt_date  = st.date_input("Receipt Date", value=date.today())
     signature     = st.text_input("Signature Text", value="Felix Asadu")
 
     st.subheader("Contract Details")
     contract_start_input = st.date_input("Contract Start Date", value=default_start)
-    contract_end_input   = st.date_input("Contract End Date", value=default_end)
+    contract_end_input   = st.date_input("Contract End Date",   value=default_end)
     course_length        = (contract_end_input - contract_start_input).days
 
     # --- Logo URL ---
@@ -558,8 +559,7 @@ with tabs[4]:
         return " ".join(cleaned.split())
 
     def break_long_words(line, max_len=40):
-        tokens = line.split(" ")
-        out = []
+        tokens, out = line.split(" "), []
         for tok in tokens:
             while len(tok) > max_len:
                 out.append(tok[:max_len])
@@ -569,7 +569,7 @@ with tabs[4]:
 
     def safe_for_fpdf(line):
         txt = line.strip()
-        if len(txt) < 2: return False
+        if len(txt) < 2:                  return False
         if len(txt) == 1 and not txt.isalnum(): return False
         return True
 
@@ -604,7 +604,11 @@ with tabs[4]:
 
         # -- Receipt header --
         pdf.set_font("Arial", size=14)
-        pdf.cell(0, 10, "Learn Language Education Academy Payment Receipt", new_x="LMARGIN", new_y="NEXT", align="C")
+        pdf.cell(
+            0, 10,
+            "Learn Language Education Academy Payment Receipt",
+            new_x="LMARGIN", new_y="NEXT", align="C"
+        )
         pdf.ln(10)
 
         # -- Receipt details --
@@ -628,21 +632,25 @@ with tabs[4]:
         # -- Contract section --
         pdf.ln(15)
         pdf.set_font("Arial", size=14)
-        pdf.cell(0, 10, "Learn Language Education Academy Student Contract", new_x="LMARGIN", new_y="NEXT", align="C")
+        pdf.cell(
+            0, 10,
+            "Learn Language Education Academy Student Contract",
+            new_x="LMARGIN", new_y="NEXT", align="C"
+        )
         pdf.set_font("Arial", size=12)
         pdf.ln(8)
 
         template = st.session_state["agreement_template"]
         filled = (
             template
-            .replace("[STUDENT_NAME]",     selected_name)
-            .replace("[DATE]",             str(receipt_date))
-            .replace("[CLASS]",            row.get(level_col, ""))
-            .replace("[AMOUNT]",           str(total))
+            .replace("[STUDENT_NAME]",      selected_name)
+            .replace("[DATE]",              str(receipt_date))
+            .replace("[CLASS]",             row.get(level_col, ""))
+            .replace("[AMOUNT]",            str(total))
             .replace("[FIRST_INSTALLMENT]", f"{paid:.2f}")
             .replace("[SECOND_INSTALLMENT]",f"{balance:.2f}")
-            .replace("[SECOND_DUE_DATE]",  str(contract_end_input))
-            .replace("[COURSE_LENGTH]",    f"{course_length} days")
+            .replace("[SECOND_DUE_DATE]",   str(contract_end_input))
+            .replace("[COURSE_LENGTH]",     f"{course_length} days")
         )
 
         # -- Write contract safely --
@@ -664,7 +672,6 @@ with tabs[4]:
         if isinstance(output_data, str):
             pdf_bytes = output_data.encode("latin-1")
         else:
-            # covers bytes, bytearray, memoryview
             pdf_bytes = bytes(output_data)
 
         st.download_button(
@@ -674,6 +681,7 @@ with tabs[4]:
             mime="application/pdf"
         )
         st.success("✅ PDF generated and ready to download.")
+
 
 
 
