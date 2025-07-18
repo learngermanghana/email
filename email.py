@@ -1127,7 +1127,8 @@ with tabs[6]:
                        data=pdf.output(dest='S').encode('latin-1'),
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
-    
+
+
 
 
 # --- 1. URLS ---
