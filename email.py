@@ -864,12 +864,16 @@ with tabs[5]:
         pdf.cell(0, 7, safe_pdf("Director"), ln=True)
         pdf.cell(0, 7, safe_pdf(SCHOOL_NAME), ln=True)
 
-    # --- Safe PDF bytes output (no Unicode bug) ---
+    # --- Safe PDF bytes output (no Unicode bug, always bytes) ---
     output_data = pdf.output(dest="S")
-    if isinstance(output_data, str):
+    if output_data is None:
+        pdf_bytes = b""
+    elif isinstance(output_data, bytes):
+        pdf_bytes = output_data
+    elif isinstance(output_data, str):
         pdf_bytes = output_data.encode("latin-1", "replace")
     else:
-        pdf_bytes = output_data
+        raise RuntimeError("Could not get bytes from FPDF output!")
 
     st.download_button(
         "📄 Download Letter/PDF", 
@@ -915,6 +919,7 @@ with tabs[5]:
             st.success(f"Email sent to {recipient_email}!")
         except Exception as e:
             st.error(f"Email send failed: {e}")
+
 
 
 
