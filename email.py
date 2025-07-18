@@ -482,12 +482,17 @@ with tabs[3]:
         df_links[["Name", "Student Code", "Phone", "Level", "Balance (GHS)", "Due Date", "Days Left", "WhatsApp Link"]].to_csv(index=False),
         file_name="debtor_whatsapp_links.csv"
     )
-
-# ==== TAB 4: CONTRACT & RECEIPT PDF FOR ANY STUDENT ====
 with tabs[4]:
     st.title("📄 Generate Contract & Receipt PDF for Any Student")
 
-    df = df_students.copy()
+    # --- Google Sheet as the ONLY source ---
+    google_csv = (
+        "https://docs.google.com/spreadsheets/d/"
+        "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
+    )
+    df = pd.read_csv(google_csv)
+    df = normalize_columns(df)
+
     if df.empty:
         st.warning("No student data available.")
     else:
@@ -502,9 +507,12 @@ with tabs[4]:
         phone_col   = getcol("phone")
         level_col   = getcol("level")
 
+        # --- SEARCH BOX at the bottom (shown above dropdown) ---
         search_val = st.text_input(
             "Search students by name, code, phone, or level:", value="", key="pdf_tab_search"
         )
+
+        # Filter students
         filtered_df = df.copy()
         if search_val:
             sv = search_val.strip().lower()
@@ -522,6 +530,7 @@ with tabs[4]:
         selected_name = st.selectbox("Select Student", student_names)
         row = filtered_df[filtered_df[name_col] == selected_name].iloc[0]
 
+        # 4. Editable fields before PDF generation
         default_paid    = float(row.get(paid_col, 0))
         default_balance = float(row.get(bal_col, 0))
         default_start   = pd.to_datetime(row.get(start_col, ""), errors="coerce").date() \
@@ -549,46 +558,41 @@ with tabs[4]:
         )
         course_length = (contract_end_input - contract_start_input).days
 
-        st.subheader("Logo (optional, default logo used if none uploaded)")
-        logo_file = st.file_uploader(
-            "Upload school logo image", type=["png", "jpg", "jpeg"], key="logo_upload"
-        )
+        # --- LOGO: use your online logo by default ---
+        logo_url = "https://i.imgur.com/iFiehrp.png"
 
         # 5. Generate PDF
         if st.button("Generate & Download PDF"):
+            # Use current inputs
             paid    = paid_input
             balance = balance_input
             total   = total_input
             contract_start = contract_start_input
             contract_end   = contract_end_input
 
+            # Add the helper to break long words (prevents FPDFException)
+            def break_long_words(text, max_len=60):
+                import re
+                def _break(match):
+                    word = match.group(0)
+                    return ' '.join([word[i:i+max_len] for i in range(0, len(word), max_len)])
+                return re.sub(r'\S{' + str(max_len+1) + r',}', _break, text)
+
             pdf = FPDF()
             pdf.add_page()
 
-            # Add logo: uploaded logo OR default logo from URL
-            logo_path = None
-            if logo_file:
-                ext = logo_file.name.split('.')[-1]
-                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
-                tmp.write(logo_file.getbuffer())
-                tmp.close()
-                logo_path = tmp.name
-            else:
-                # Download default logo from your URL
-                logo_url = "https://i.imgur.com/iFiehrp.png"
-                response = requests.get(logo_url)
-                if response.ok:
-                    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-                    tmp.write(response.content)
-                    tmp.close()
-                    logo_path = tmp.name
-
-            if logo_path:
-                try:
-                    pdf.image(logo_path, x=10, y=8, w=33)
-                    pdf.ln(25)
-                except Exception:
-                    pass
+            # --- Add logo (from web) ---
+            try:
+                import requests
+                logo_tmp_path = "school_logo.png"
+                if not os.path.exists(logo_tmp_path):
+                    img_data = requests.get(logo_url).content
+                    with open(logo_tmp_path, "wb") as f:
+                        f.write(img_data)
+                pdf.image(logo_tmp_path, x=10, y=8, w=33)
+                pdf.ln(25)
+            except Exception as e:
+                pdf.ln(2)
 
             # Payment status banner
             status = "FULLY PAID" if balance == 0 else "INSTALLMENT PLAN"
@@ -646,45 +650,42 @@ Miscellaneous Terms:
 2. Communication: Both parties agree to communicate changes promptly.
 3. Termination: Either party may terminate this Agreement with written notice if the other party breaches any material term.
 
-template = st.session_state.get("agreement_template", """
 Signatures:
     [STUDENT_NAME]
     Date: [DATE]
     Asadu Felix
 """)
+            filled = (
+                template
+                .replace("[STUDENT_NAME]",     selected_name)
+                .replace("[DATE]",             str(receipt_date))
+                .replace("[CLASS]",            row.get(level_col, ""))
+                .replace("[AMOUNT]",           str(total))
+                .replace("[FIRST_INSTALLMENT]", f"{paid:.2f}")
+                .replace("[SECOND_INSTALLMENT]",f"{balance:.2f}")
+                .replace("[SECOND_DUE_DATE]",  str(contract_end))
+                .replace("[COURSE_LENGTH]",    f"{course_length} days")
+            )
+            # Only add non-empty, non-whitespace lines, wrap long words!
+            for line in filled.split("\n"):
+                safe = safe_pdf(line)
+                if safe.strip():
+                    safe_wrapped = break_long_words(safe, max_len=60)
+                    pdf.multi_cell(0, 8, safe_wrapped)
+            pdf.ln(10)
 
-    filled = (
-        template
-        .replace("[STUDENT_NAME]",      selected_name)
-        .replace("[DATE]",              str(receipt_date))
-        .replace("[CLASS]",             row.get(level_col, ""))
-        .replace("[AMOUNT]",            str(total))
-        .replace("[FIRST_INSTALLMENT]", f"{paid:.2f}")
-        .replace("[SECOND_INSTALLMENT]",f"{balance:.2f}")
-        .replace("[SECOND_DUE_DATE]",   str(contract_end))
-        .replace("[COURSE_LENGTH]",     f"{course_length} days")
-    )
+            # Signature
+            pdf.cell(0, 8, f"Signed: {signature}", ln=True)
 
-    # Only add non-empty, non-whitespace lines to avoid FPDF error!
-    for line in filled.split("\n"):
-        safe = safe_pdf(line)
-        if safe.strip():
-            pdf.multi_cell(0, 8, safe)
-    pdf.ln(10)
-
-    # Signature
-    pdf.cell(0, 8, f"Signed: {signature}", ln=True)
-
-    # Download
-    pdf_bytes = pdf.output(dest="S").encode("latin-1", "replace")
-    st.download_button(
-        "📄 Download PDF",
-        data=pdf_bytes,
-        file_name=f"{selected_name.replace(' ', '_')}_receipt_contract.pdf",
-        mime="application/pdf"
-    )
-    st.success("✅ PDF generated and ready to download.")
-#
+            # Download
+            pdf_bytes = pdf.output(dest="S").encode("latin-1", "replace")
+            st.download_button(
+                "📄 Download PDF",
+                data=pdf_bytes,
+                file_name=f"{selected_name.replace(' ', '_')}_receipt_contract.pdf",
+                mime="application/pdf"
+            )
+            st.success("✅ PDF generated and ready to download.")
 
 
 
