@@ -477,8 +477,6 @@ with tabs[3]:
         file_name="debtor_whatsapp_links.csv"
     )
 
-
-
 with tabs[4]:
     st.title("📄 Generate Contract & Receipt PDF for Any Student")
 
@@ -494,8 +492,7 @@ with tabs[4]:
         st.warning("No student data available.")
         st.stop()
 
-    # --- Column lookup helper ---
-    def getcol(col):
+    def getcol(col): 
         return col_lookup(df, col)
 
     name_col    = getcol("name")
@@ -539,8 +536,8 @@ with tabs[4]:
         default_end = default_start + timedelta(days=30)
 
     st.subheader("Receipt Details")
-    paid_input    = st.number_input("Amount Paid (GHS)",    min_value=0.0, value=default_paid,    step=1.0)
-    balance_input = st.number_input("Balance Due (GHS)",   min_value=0.0, value=default_balance, step=1.0)
+    paid_input    = st.number_input("Amount Paid (GHS)", min_value=0.0, value=default_paid, step=1.0)
+    balance_input = st.number_input("Balance Due (GHS)", min_value=0.0, value=default_balance, step=1.0)
     total_input   = paid_input + balance_input
     receipt_date  = st.date_input("Receipt Date", value=date.today())
     signature     = st.text_input("Signature Text", value="Felix Asadu")
@@ -553,8 +550,8 @@ with tabs[4]:
     # --- Logo URL ---
     logo_url = "https://i.imgur.com/iFiehrp.png"
 
-    # ==== PDF HELPER FUNCTIONS ====
-    import re
+    # ==== PDF HELPERS ====
+    import re, tempfile, requests
 
     def sanitize_text(text):
         cleaned = "".join(c if ord(c) < 256 else "?" for c in str(text))
@@ -571,7 +568,7 @@ with tabs[4]:
 
     def safe_for_fpdf(line):
         txt = line.strip()
-        if len(txt) < 2:                  return False
+        if len(txt) < 2:                 return False
         if len(txt) == 1 and not txt.isalnum(): return False
         return True
 
@@ -584,15 +581,15 @@ with tabs[4]:
         pdf = FPDF()
         pdf.add_page()
 
-        # -- Add logo from web (always re-download) --
+        # -- Add logo from web into a NamedTemporaryFile --
         try:
-            import requests, os
-            logo_path = "school_logo.png"
             resp = requests.get(logo_url, timeout=5)
             resp.raise_for_status()
-            with open(logo_path, "wb") as f:
-                f.write(resp.content)
-            pdf.image(logo_path, x=10, y=8, w=33)
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+            tmp.write(resp.content)
+            tmp.flush()
+            pdf.image(tmp.name, x=10, y=8, w=33)
+            tmp.close()
             pdf.ln(25)
         except Exception as e:
             print("Logo load failed:", e)
@@ -601,14 +598,18 @@ with tabs[4]:
         # -- Payment banner --
         status = "FULLY PAID" if balance == 0 else "INSTALLMENT PLAN"
         pdf.set_font("Arial", "B", 12)
-        pdf.set_text_color(0, 128, 0)
-        pdf.cell(0, 10, status, new_x="LMARGIN", new_y="NEXT", align="C")
-        pdf.set_text_color(0, 0, 0)
+        pdf.set_text_color(0,128,0)
+        pdf.cell(0,10,status,new_x="LMARGIN", new_y="NEXT", align="C")
+        pdf.set_text_color(0,0,0)
         pdf.ln(5)
 
         # -- Receipt header --
         pdf.set_font("Arial", size=14)
-        pdf.cell(0, 10, "Learn Language Education Academy Payment Receipt", new_x="LMARGIN", new_y="NEXT", align="C")
+        pdf.cell(
+            0,10,
+            "Learn Language Education Academy Payment Receipt",
+            new_x="LMARGIN", new_y="NEXT", align="C"
+        )
         pdf.ln(10)
 
         # -- Receipt details --
@@ -626,13 +627,16 @@ with tabs[4]:
             ("Receipt Date", receipt_date)
         ]:
             text = f"{label}: {sanitize_text(val)}"
-            pdf.cell(0, 8, text, new_x="LMARGIN", new_y="NEXT")
+            pdf.cell(0,8,text,new_x="LMARGIN", new_y="NEXT")
         pdf.ln(10)
 
         # -- Contract section --
         pdf.ln(15)
         pdf.set_font("Arial", size=14)
-        pdf.cell(0, 10, "Learn Language Education Academy Student Contract", new_x="LMARGIN", new_y="NEXT", align="C")
+        pdf.cell(0,10,
+            "Learn Language Education Academy Student Contract",
+            new_x="LMARGIN", new_y="NEXT", align="C"
+        )
         pdf.set_font("Arial", size=12)
         pdf.ln(8)
 
@@ -655,15 +659,15 @@ with tabs[4]:
             wrapped = break_long_words(safe, max_len=40)
             if safe_for_fpdf(wrapped):
                 try:
-                    pdf.multi_cell(0, 8, wrapped)
+                    pdf.multi_cell(0,8,wrapped)
                 except:
                     pass
         pdf.ln(10)
 
         # -- Signature --
-        pdf.cell(0, 8, f"Signed: {signature}", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(0,8,f"Signed: {signature}", new_x="LMARGIN", new_y="NEXT")
 
-        # -- Serve PDF (robust) --
+        # -- Serve PDF --
         output_data = pdf.output(dest="S")
         if isinstance(output_data, str):
             pdf_bytes = output_data.encode("latin-1")
@@ -673,8 +677,9 @@ with tabs[4]:
         st.download_button(
             "📄 Download PDF",
             data=pdf_bytes,
-            file_name=f"{selected_name.replace(' ', '_')}_receipt_contract.pdf",
+            file_name=f"{selected_name.replace(' ','_')}_receipt_contract.pdf",
             mime="application/pdf"
         )
         st.success("✅ PDF generated and ready to download.")
+
 
