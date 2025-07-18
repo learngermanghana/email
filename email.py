@@ -674,11 +674,19 @@ This Payment Agreement is entered into on [DATE] for [CLASS] students of Learn L
 with tabs[5]:
     st.title("📧 Send Email / Letter")
 
-    # ---- PDF-safe helper ----
+    # ---- Helpers ----
     def safe_pdf(text):
-        return "".join(c if ord(c) < 256 else "?" for c in str(text or ""))
+        return "".join(c if ord(c)<256 else "?" for c in str(text or ""))
 
-    # ---- QR code helper ----
+    def break_long_words(line, max_len=40):
+        parts = []
+        for tok in line.split(" "):
+            while len(tok) > max_len:
+                parts.append(tok[:max_len])
+                tok = tok[max_len:]
+            parts.append(tok)
+        return " ".join(parts)
+
     def make_qr_code(url):
         import qrcode, tempfile
         img = qrcode.make(url)
@@ -686,35 +694,31 @@ with tabs[5]:
         img.save(tmp.name)
         return tmp.name
 
-    # ---- Select Student ----
-    email_search = st.text_input(
-        "Search students by name/code/email", key="email_student_search"
-    )
+    # ---- Student Selection ----
+    email_search = st.text_input("Search students by name/code/email", key="tab5_search")
     df = df_students.copy()
     if email_search:
         mask = (
-            df["name"].str.contains(email_search, case=False, na=False) |
-            df["studentcode"].str.contains(email_search, case=False, na=False) |
-            df.get("email", pd.Series(dtype=str)).str.contains(email_search, case=False, na=False)
+            df["name"].str.contains(email_search, case=False, na=False)
+            | df["studentcode"].str.contains(email_search, case=False, na=False)
+            | df.get("email", pd.Series(dtype=str)).str.contains(email_search, case=False, na=False)
         )
         df = df[mask]
     student_list = df["name"].dropna().tolist()
-    student_name = st.selectbox(
-        "Student Name", student_list, key="email_student_select"
-    )
+    student_name = st.selectbox("Student Name", student_list, key="tab5_select")
     if not student_name:
         st.stop()
-    row = df[df["name"] == student_name].iloc[0]
-    level      = row["level"]
-    recipient_email = row.get("email", "")
+    row = df[df["name"]==student_name].iloc[0]
+    level = row["level"]
+    recipient_email = row.get("email","")
     start_date = pd.to_datetime(row.get("contractstart", date.today())).date()
     end_date   = pd.to_datetime(row.get("contractend",   date.today())).date()
-    paid       = float(row.get("paid", 0))
-    bal        = float(row.get("balance", 0))
+    paid  = float(row.get("paid",0))
+    bal   = float(row.get("balance",0))
 
     # ---- Message Type ----
     msg_type = st.selectbox(
-        "Type",
+        "Message Type",
         [
             "Welcome Message",
             "Letter of Enrollment",
@@ -723,73 +727,66 @@ with tabs[5]:
             "Course Completion Letter",
             "Custom Message"
         ],
-        key="email_msg_type"
+        key="tab5_type"
     )
 
     # ---- Default Bodies (plain‑ASCII) ----
-    if msg_type == "Welcome Message":
+    if msg_type=="Welcome Message":
         email_body = (
             f"Dear {student_name},\n\n"
             "Welcome to Learn Language Education Academy! We’re excited to support you.\n"
             f"Your {level} course starts on {start_date:%d %B %Y}.\n"
-            f"Payment status: {'Full Payment' if bal==0 else 'Installment Plan'}. "
             f"Paid: GHS {paid:.2f} / Balance: GHS {bal:.2f}.\n"
-            "Visit the Falowen App: https://falowen.streamlit.app/\n\n"
+            "Visit: https://falowen.streamlit.app/\n\n"
             "Best regards,\nFelix Asadu\nDirector"
         )
-    elif msg_type == "Letter of Enrollment":
+    elif msg_type=="Letter of Enrollment":
         email_body = (
             "To Whom It May Concern,\n\n"
-            f"This certifies that {student_name} is enrolled in the {level} programme.\n"
+            f"{student_name} is enrolled in the {level} programme.\n"
             f"Period: {start_date:%m/%d/%Y} to {end_date:%m/%d/%Y}.\n"
             "Registered under BN173410224.\n\n"
-            "If you require confirmation, please contact us at 0205706589 or office@learngermanghana.com.\n\n"
+            "Contact us at 0205706589 or office@learngermanghana.com.\n\n"
             "Yours sincerely,\nFelix Asadu\nDirector"
         )
-    elif msg_type == "Assignment Results":
+    elif msg_type=="Assignment Results":
         email_body = (
             f"Hello {student_name},\n\n"
-            "Your latest assignment results:\n"
-            " - Assignment 1: 85%\n"
-            " - Assignment 2: 90%\n\n"
-            "Keep up the great work!\n\n"
+            "Assignment results:\n - Assignment 1: 85%\n - Assignment 2: 90%\n\n"
             "Regards,\nLearn Language Education Academy"
         )
-    elif msg_type == "Outstanding Balance Notice":
+    elif msg_type=="Outstanding Balance Notice":
         email_body = (
             f"Dear {student_name},\n\n"
-            f"Our records show an outstanding balance of GHS {bal:.2f}. "
-            "Please settle this at your earliest convenience.\n\n"
+            f"Outstanding balance: GHS {bal:.2f}. Please settle at your earliest.\n\n"
             "Thank you,\nLearn Language Education Academy"
         )
-    elif msg_type == "Course Completion Letter":
+    elif msg_type=="Course Completion Letter":
         email_body = (
             f"Dear {student_name},\n\n"
-            f"Congratulations on completing the {level} course! Your dedication has paid off.\n\n"
-            "If you’re interested in advancing to the next level, please visit:\n"
+            f"Congratulations on completing the {level} course!\n\n"
+            "For next‑level details visit:\n"
             "https://www.learngermanghana.com/upcoming-classes\n\n"
-            "Wishing you continued success!\n\n"
             "Warm regards,\nFelix Asadu\nDirector"
         )
     else:
         email_body = ""
 
-    # ---- Subject & Preview ----
-    subject = st.text_input(
-        "Subject", f"{msg_type} - {student_name}", key="email_subject"
-    )
-    st.subheader("Preview:")
+    subject = st.text_input("Subject", f"{msg_type} - {student_name}", key="tab5_subj")
+    st.subheader("Preview")
     st.code(email_body, language="")
 
     # ---- PDF Generation & Download ----
-    st.subheader("PDF Preview & Download")
+    st.subheader("PDF Download")
     logo_url = "https://drive.google.com/uc?export=download&id=1xLTtiCbEeHJjrASvFjBgfFuGrgVzg6wU"
 
     class LetterPDF(FPDF):
         def header(self):
             try:
                 r = requests.get(logo_url)
-                if r.status_code == 200:
+                if r.status_code==200:
+                    from PIL import Image
+                    from io import BytesIO
                     img = Image.open(BytesIO(r.content)).convert("RGB")
                     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
                     img.save(tmp.name)
@@ -797,39 +794,38 @@ with tabs[5]:
             except:
                 pass
             self.ln(25)
-
         def footer(self):
             qr = make_qr_code(SCHOOL_WEBSITE)
             self.image(qr, x=180, y=275, w=18)
             self.set_y(-18)
-            self.set_font("Arial", "I", 8)
-            self.cell(0, 10, safe_pdf("Valid without signature."), 0, 0, "C")
+            self.set_font("Arial","I",8)
+            self.cell(0,10,safe_pdf("Valid without signature."),0,0,"C")
 
-    if st.button("Generate PDF and Download", key="email_gen_pdf"):
+    if st.button("Generate & Download PDF", key="tab5_pdf"):
         pdf = LetterPDF()
         pdf.add_page()
-        pdf.set_font("Arial", "", 12)
+        pdf.set_font("Arial","",12)
         for line in email_body.split("\n"):
-            pdf.multi_cell(0, 8, safe_pdf(line))
+            safe = safe_pdf(line)
+            wrapped = break_long_words(safe, max_len=40)
+            pdf.multi_cell(0,8, wrapped)
         out = pdf.output(dest="S")
         pdf_bytes = out.encode("latin-1") if isinstance(out, str) else out
         st.download_button(
             "Download PDF",
             pdf_bytes,
-            file_name=f"{student_name.replace(' ', '_')}_{msg_type}.pdf",
+            file_name=f"{student_name.replace(' ','_')}_{msg_type}.pdf",
             mime="application/pdf",
-            key="email_download_pdf"
+            key="tab5_dl"
         )
 
     # ---- Send Email ----
-    attach = st.checkbox("Attach PDF?", key="email_attach_pdf")
-    recipient = st.text_input(
-        "Recipient Email", value=recipient_email, key="email_recipient"
-    )
-    if st.button("Send Email", key="email_send"):
+    attach = st.checkbox("Attach PDF?", key="tab5_attach")
+    recip  = st.text_input("Recipient Email", value=recipient_email, key="tab5_recip")
+    if st.button("Send Email", key="tab5_send"):
         msg = Mail(
             from_email=SENDER_EMAIL,
-            to_emails=recipient,
+            to_emails=recip,
             subject=subject,
             html_content=email_body
         )
