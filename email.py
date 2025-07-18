@@ -122,15 +122,17 @@ def send_email_report(pdf_bytes: bytes, to_email: str, subject: str, html_conten
         st.error(f"Email send failed: {e}")
         return False
 
-def break_long_words(text, max_len=60):
-    import re
-    def _break(match):
-        word = match.group(0)
-        return ' '.join([word[i:i+max_len] for i in range(0, len(word), max_len)])
-    return re.sub(r'\S{' + str(max_len+1) + r',}', _break, text)
 
 def sanitize_text(text):
-    return "".join(c if ord(c) < 256 else "?" for c in str(text))
+    # Remove non-latin-1, replace tabs with space, normalize
+    cleaned = "".join(c if ord(c) < 256 else "?" for c in str(text))
+    cleaned = cleaned.replace("\t", " ")
+    return cleaned
+
+def break_long_words(text, max_len=60):
+    # This will break up any word longer than max_len by inserting a space
+    return re.sub(r'(\S{' + str(max_len) + r',})', lambda m: ' '.join([m.group(0)[i:i+max_len] for i in range(0, len(m.group(0)), max_len)]), text)
+
 
 
 # ==== AGREEMENT TEMPLATE ====
@@ -566,16 +568,20 @@ with tabs[4]:
         logo_url = "https://i.imgur.com/iFiehrp.png"
 
         # --- Helper: Make text PDF-safe ---
+        import re
         def sanitize_text(text):
-            return "".join(c if ord(c) < 256 else "?" for c in str(text))
+            # Remove non-latin-1, replace tabs with space, normalize
+            cleaned = "".join(c if ord(c) < 256 else "?" for c in str(text))
+            cleaned = cleaned.replace("\t", " ")
+            return cleaned
 
-        # --- Helper: break long words for FPDF ---
         def break_long_words(text, max_len=60):
-            import re
-            def _break(match):
-                word = match.group(0)
-                return ' '.join([word[i:i+max_len] for i in range(0, len(word), max_len)])
-            return re.sub(r'\S{' + str(max_len+1) + r',}', _break, text)
+            # This will break up any word longer than max_len by inserting a space
+            return re.sub(
+                r'(\S{' + str(max_len) + r',})',
+                lambda m: ' '.join([m.group(0)[i:i+max_len] for i in range(0, len(m.group(0)), max_len)]),
+                text
+            )
 
         # --- Download Button ---
         if st.button("Generate & Download PDF"):
