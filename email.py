@@ -671,6 +671,7 @@ This Payment Agreement is entered into on [DATE] for [CLASS] students of Learn L
         )
         st.success("✅ PDF generated and ready to download.")
 
+
 with tabs[5]:
     # ---- Helper: Ensure all text in PDF is latin-1 safe ----
     def safe_pdf(text):
@@ -755,46 +756,53 @@ with tabs[5]:
 
     # ---- 4. Compose/Preview Message ----
     st.subheader("Compose/Preview Message")
+    # IMPROVED message templates
     if msg_type == "Welcome Message":
         body_default = (
-            f"Hello {student_name},<br><br>"
-            "Welcome to Learn Language Education Academy! We have helped many students succeed, "
-            "We are delighted to have you join our learning community. At our academy, we are committed to helping you achieve your language goals, just as we have supported many successful students before you.<br><br>"       
-            "Your contract starts on "
-            f"{enrollment_start.strftime('%d %B %Y')}.<br>"
-            f"Your payment status: {payment_status}. Paid: GHS {payment:.2f} / Balance: GHS {balance:.2f}<br><br>"
-            f"All materials are on our <a href='{student_link}'>Falowen App</a>.<br><br>"
-            "If you have any questions, please do not hesitate to contact us. We wish you a wonderful learning journey with us!<br><br>"
-            "Best regards,<br>"
+            f"Dear {student_name},<br><br>"
+            f"Welcome to <b>Learn Language Education Academy</b>! We are delighted to have you join our learning community.<br><br>"
+            f"Your enrollment in the <b>{student_level}</b> course begins on <b>{enrollment_start.strftime('%d %B %Y')}</b>.<br>"
+            f"Your payment status is: <b>{payment_status}</b> (Paid: <b>GHS {payment:.2f}</b> | Balance: <b>GHS {balance:.2f}</b>).<br><br>"
+            f"All your study materials, assignments, and updates will be available on our <a href='{student_link}'>Falowen Student App</a>.<br><br>"
+            f"Our team is committed to supporting your progress. Please feel free to reach out at any time.<br><br>"
+            f"Wishing you a fantastic learning journey!<br><br>"
+            f"Best regards,<br>Felix Asadu<br>Director"
         )
     elif msg_type == "Letter of Enrollment":
         body_default = (
             f"To Whom It May Concern,<br><br>"
-            f"{student_name} is officially enrolled in {student_level} at Learn Language Education Academy.<br>"
-            f"Enrollment valid from {enrollment_start:%m/%d/%Y} to {enrollment_end:%m/%d/%Y}.<br><br>"
-            f"Our institution is registered under Business Registration Number: <b>{BUSINESS_REG}</b>.<br><br>"
-            "Should you require any further confirmation or information, please contact our office.<br><br>"
-            "Sincerely,<br>"
-            "Felix Asadu<br>"
-            "Director"
+            f"This is to certify that <b>{student_name}</b> is officially enrolled in the <b>{student_level}</b> programme at Learn Language Education Academy.<br><br>"
+            f"Enrollment is valid from <b>{enrollment_start:%d %B %Y}</b> to <b>{enrollment_end:%d %B %Y}</b>.<br><br>"
+            f"Our institution is duly registered under the laws of Ghana (Business Registration No: <b>{BUSINESS_REG}</b>).<br><br>"
+            f"Should you require further verification, please contact our office.<br><br>"
+            f"Sincerely,<br>Felix Asadu<br>Director"
         )
     elif msg_type == "Assignment Results":
         body_default = (
             f"Hello {student_name},<br><br>"
-            "Here are your latest assignment results:<br>"
-            "<ul><li>Assignment 1: 85 percent</li><li>Assignment 2: 90 percent</li></ul>"
+            f"Here are your recent assignment results for the <b>{student_level}</b> course:<br>"
+            f"<ul>"
+            f"<li>Assignment 1: <b>85%</b></li>"
+            f"<li>Assignment 2: <b>90%</b></li>"
+            f"</ul>"
+            f"Log in to the <a href='{student_link}'>Falowen App</a> for more details and feedback.<br><br>"
+            f"Keep up the good work!<br>Best regards,<br>Learn Language Education Academy"
         )
     elif msg_type == "Outstanding Balance Notice":
         body_default = (
             f"Dear {student_name},<br><br>"
-            f"You have an outstanding balance of GHS {balance:.2f}. Please settle promptly.<br><br>"
+            f"Our records indicate that you have an outstanding balance of <b>GHS {balance:.2f}</b> for your {student_level} course.<br><br>"
+            f"We kindly ask that you complete your payment as soon as possible to ensure continued access to all learning materials and classes.<br><br>"
+            f"Thank you for your attention to this matter.<br>"
+            f"Best regards,<br>Accounts Office<br>Learn Language Education Academy"
         )
     elif msg_type == "Course Completion Letter":
         body_default = (
             f"Dear {student_name},<br><br>"
             f"Congratulations on successfully completing the <b>{student_level}</b> course at Learn Language Education Academy!<br><br>"
-            "We are proud of your hard work, commitment, and progress.<br><br>"
-            "Best wishes,<br>Felix Asadu<br>Director"
+            f"We are proud of your achievement and wish you continued success in your future endeavors.<br><br>"
+            f"If you need an official certificate or reference letter, please let us know.<br><br>"
+            f"Warm regards,<br>Felix Asadu<br>Director"
         )
     else:
         body_default = ""
