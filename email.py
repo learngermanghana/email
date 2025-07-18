@@ -651,34 +651,36 @@ Signatures:
 Date: [DATE]
 Asadu Felix
 """)
-            filled = (
-                template
-                .replace("[STUDENT_NAME]",     selected_name)
-                .replace("[DATE]",             str(receipt_date))
-                .replace("[CLASS]",            row.get(level_col, ""))
-                .replace("[AMOUNT]",           str(total))
-                .replace("[FIRST_INSTALLMENT]", f"{paid:.2f}")
-                .replace("[SECOND_INSTALLMENT]",f"{balance:.2f}")
-                .replace("[SECOND_DUE_DATE]",  str(contract_end))
-                .replace("[COURSE_LENGTH]",    f"{course_length} days")
-            )
-            # Only add non-empty, non-whitespace lines to avoid FPDF error!
-            for line in filled.split("\n"):
-                safe = safe_pdf(line)
-                if safe.strip():
-                    pdf.multi_cell(0, 8, safe)
-            pdf.ln(10)
+    filled = (
+        template
+        .replace("[STUDENT_NAME]",      selected_name)
+        .replace("[DATE]",              str(receipt_date))
+        .replace("[CLASS]",             row.get(level_col, ""))
+        .replace("[AMOUNT]",            str(total))
+        .replace("[FIRST_INSTALLMENT]", f"{paid:.2f}")
+        .replace("[SECOND_INSTALLMENT]",f"{balance:.2f}")
+        .replace("[SECOND_DUE_DATE]",   str(contract_end))
+        .replace("[COURSE_LENGTH]",     f"{course_length} days")
+    )
 
-            # Signature
-            pdf.cell(0, 8, f"Signed: {signature}", ln=True)
+    # Only add non-empty, non-whitespace lines to avoid FPDF error!
+    for line in filled.split("\n"):
+        safe = safe_pdf(line)
+        if safe.strip():
+            pdf.multi_cell(0, 8, safe)
+    pdf.ln(10)
 
-            # Download
-            pdf_bytes = pdf.output(dest="S").encode("latin-1", "replace")
-            st.download_button(
-                "📄 Download PDF",
-                data=pdf_bytes,
-                file_name=f"{selected_name.replace(' ', '_')}_receipt_contract.pdf",
-                mime="application/pdf"
-            )
-            st.success("✅ PDF generated and ready to download.")
+    # Signature
+    pdf.cell(0, 8, f"Signed: {signature}", ln=True)
+
+    # Download
+    pdf_bytes = pdf.output(dest="S").encode("latin-1", "replace")
+    st.download_button(
+        "📄 Download PDF",
+        data=pdf_bytes,
+        file_name=f"{selected_name.replace(' ', '_')}_receipt_contract.pdf",
+        mime="application/pdf"
+    )
+    st.success("✅ PDF generated and ready to download.")
+
 
