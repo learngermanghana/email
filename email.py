@@ -206,7 +206,9 @@ STUDENT_CODES = df_students["studentcode"].dropna().unique().tolist() if "studen
 tabs = st.tabs([
     "📝 Pending",                 # 0
     "👩‍🎓 All Students",            # 1
-    "💵 Expenses"                # 2    
+    "💵 Expenses",                 # 2
+    "📲 Reminders"               # 3
+    
 ])
 
 # ==== TAB 0: PENDING STUDENTS ====
@@ -356,3 +358,118 @@ with tabs[2]:
         file_name="expenses_data.csv",
         mime="text/csv"
     )
+
+# ==== TAB 3: WHATSAPP REMINDERS ====
+with tabs[3]:
+    st.title("📲 WhatsApp Reminders for Debtors")
+
+    # --- Use cached df_students loaded at the top ---
+    df = df_students.copy()
+
+    # --- Column Lookups ---
+    name_col  = col_lookup(df, "name")
+    code_col  = col_lookup(df, "studentcode")
+    phone_col = col_lookup(df, "phone")
+    bal_col   = col_lookup(df, "balance")
+    paid_col  = col_lookup(df, "paid")
+    lvl_col   = col_lookup(df, "level")
+    cs_col    = col_lookup(df, "contractstart")
+
+    # --- Clean Data Types ---
+    df[bal_col] = pd.to_numeric(df[bal_col], errors="coerce").fillna(0)
+    df[paid_col] = pd.to_numeric(df[paid_col], errors="coerce").fillna(0)
+    df[cs_col] = pd.to_datetime(df[cs_col], errors="coerce")
+    df[phone_col] = df[phone_col].astype(str).str.replace(r"[^\d+]", "", regex=True)
+
+    # --- Calculate Due Date & Days Left ---
+    df["due_date"] = df[cs_col] + pd.Timedelta(days=30)
+    df["due_date_str"] = df["due_date"].dt.strftime("%d %b %Y")
+    df["days_left"] = (df["due_date"] - pd.Timestamp.today()).dt.days
+
+    # --- Financial Summary ---
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Total Students", len(df))
+    m2.metric("Total Collected (GHS)", f"{df[paid_col].sum():,.2f}")
+    m3.metric("Total Outstanding (GHS)", f"{df[bal_col].sum():,.2f}")
+
+    st.markdown("---")
+
+    # --- Filter/Search UI ---
+    show_all = st.toggle("Show all students (not just debtors)", value=False)
+    search = st.text_input("Search by name, code, or phone", key="wa_search")
+    selected_level = st.selectbox("Filter by Level", ["All"] + sorted(df[lvl_col].dropna().unique()), key="wa_level")
+
+    filt = df.copy()
+    if not show_all:
+        filt = filt[filt[bal_col] > 0]
+    if search:
+        mask1 = filt[name_col].str.contains(search, case=False, na=False)
+        mask2 = filt[code_col].astype(str).str.contains(search, case=False, na=False)
+        mask3 = filt[phone_col].str.contains(search, case=False, na=False)
+        filt = filt[mask1 | mask2 | mask3]
+    if selected_level != "All":
+        filt = filt[filt[lvl_col] == selected_level]
+
+    st.markdown("---")
+
+    # --- Table Preview ---
+    tbl = filt[[name_col, code_col, phone_col, lvl_col, bal_col, "due_date_str", "days_left"]].rename(columns={
+        name_col: "Name", code_col: "Student Code", phone_col: "Phone",
+        lvl_col: "Level", bal_col: "Balance (GHS)", "due_date_str": "Due Date", "days_left": "Days Left"
+    })
+    st.dataframe(tbl, use_container_width=True)
+
+    # --- WhatsApp Message Template ---
+    wa_template = st.text_area(
+        "Custom WhatsApp Message Template",
+        value="Hi {name}! Friendly reminder: your payment for the {level} class is due by {due}. {msg} Thank you!",
+        help="You can use {name}, {level}, {due}, {bal}, {days}, {msg}"
+    )
+
+    # --- WhatsApp Links Generation ---
+    links = []
+    for _, row in filt.iterrows():
+        phone = clean_phone(row[phone_col])
+        bal = f"GHS {row[bal_col]:,.2f}"
+        due = row["due_date_str"]
+        days = int(row["days_left"])
+        if days >= 0:
+            msg = f"You have {days} {'day' if days == 1 else 'days'} left to settle the {bal} balance."
+        else:
+            msg = f"Your payment is overdue by {abs(days)} {'day' if abs(days)==1 else 'days'}. Please settle as soon as possible."
+        text = wa_template.format(
+            name=row[name_col],
+            level=row[lvl_col],
+            due=due,
+            bal=bal,
+            days=days,
+            msg=msg
+        )
+        link = f"https://wa.me/{phone}?text={urllib.parse.quote(text)}" if phone else ""
+        links.append({
+            "Name": row[name_col],
+            "Student Code": row[code_col],
+            "Level": row[lvl_col],
+            "Balance (GHS)": bal,
+            "Due Date": due,
+            "Days Left": days,
+            "Phone": phone,
+            "WhatsApp Link": link
+        })
+
+    df_links = pd.DataFrame(links)
+    st.markdown("---")
+    st.dataframe(df_links[["Name", "Level", "Balance (GHS)", "Due Date", "Days Left", "WhatsApp Link"]], use_container_width=True)
+
+    # --- List links for quick access ---
+    st.markdown("### Send WhatsApp Reminders")
+    for i, row in df_links.iterrows():
+        if row["WhatsApp Link"]:
+            st.markdown(f"- **{row['Name']}** ([Send WhatsApp]({row['WhatsApp Link']}))")
+
+    st.download_button(
+        "📁 Download Reminder Links CSV",
+        df_links[["Name", "Student Code", "Phone", "Level", "Balance (GHS)", "Due Date", "Days Left", "WhatsApp Link"]].to_csv(index=False),
+        file_name="debtor_whatsapp_links.csv"
+    )
+
