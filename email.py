@@ -476,11 +476,10 @@ with tabs[3]:
         df_links[["Name", "Student Code", "Phone", "Level", "Balance (GHS)", "Due Date", "Days Left", "WhatsApp Link"]].to_csv(index=False),
         file_name="debtor_whatsapp_links.csv"
     )
-
 with tabs[4]:
-    st.title("📄 Generate Contract & Receipt PDF for Any Student")
+    st.title("Generate Contract & Receipt PDF for Any Student")
 
-    # --- Google Sheet as the ONLY source ---
+    # --- Google Sheet as ONLY source ---
     google_csv = (
         "https://docs.google.com/spreadsheets/d/"
         "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
@@ -567,8 +566,7 @@ with tabs[4]:
 
     import re
     def sanitize_text(text):
-        cleaned = "".join(c if ord(c) < 256 else "?" for c in str(text))
-        return " ".join(cleaned.split())
+        return ''.join([c if ord(c) < 128 else '?' for c in str(text)]).replace('\n', ' ').replace('\r', ' ')
 
     def break_long_words(line, max_len=40):
         tokens, out = line.split(" "), []
@@ -585,7 +583,7 @@ with tabs[4]:
         if len(txt) == 1 and not txt.isalnum(): return False
         return True
 
-    if st.button("Generate & Download PDF"):
+    if st.button("Generate and Download PDF"):
         paid    = paid_input
         balance = balance_input
         total   = total_input
@@ -600,7 +598,6 @@ with tabs[4]:
         except Exception as e:
             pdf.ln(2)
 
-        # -- Payment banner --
         status = "FULLY PAID" if balance == 0 else "INSTALLMENT PLAN"
         pdf.set_font("Arial", "B", 12)
         pdf.set_text_color(0, 128, 0)
@@ -608,39 +605,36 @@ with tabs[4]:
         pdf.set_text_color(0, 0, 0)
         pdf.ln(5)
 
-        # -- Receipt header --
         pdf.set_font("Arial", size=14)
         pdf.cell(0, 10, "Learn Language Education Academy Payment Receipt", new_x="LMARGIN", new_y="NEXT", align="C")
         pdf.ln(10)
 
-        # -- Receipt details --
         pdf.set_font("Arial", size=12)
         for label, val in [
-            ("Name",           selected_name),
-            ("Student Code",   row.get(code_col, "")),
-            ("Phone",          row.get(phone_col, "")),
-            ("Level",          row.get(level_col, "")),
-            ("Contract Start", contract_start_input),
-            ("Contract End",   contract_end_input),
+            ("Name",           sanitize_text(selected_name)),
+            ("Student Code",   sanitize_text(row.get(code_col, ""))),
+            ("Phone",          sanitize_text(row.get(phone_col, ""))),
+            ("Level",          sanitize_text(row.get(level_col, ""))),
+            ("Contract Start", str(contract_start_input)),
+            ("Contract End",   str(contract_end_input)),
             ("Amount Paid",    f"GHS {paid:.2f}"),
             ("Balance Due",    f"GHS {balance:.2f}"),
             ("Total Fee",      f"GHS {total:.2f}"),
-            ("Receipt Date",   receipt_date)
+            ("Receipt Date",   str(receipt_date))
         ]:
             pdf.cell(0, 8, f"{label}: {val}", new_x="LMARGIN", new_y="NEXT")
         pdf.ln(10)
 
-        # -- Contract section --
         pdf.ln(15)
         pdf.set_font("Arial", size=14)
         pdf.cell(0,10,"Learn Language Education Academy Student Contract",new_x="LMARGIN", new_y="NEXT", align="C")
         pdf.set_font("Arial", size=12)
         pdf.ln(8)
 
-        template = st.session_state.get("agreement_template", """
+        template = """
 PAYMENT AGREEMENT
 
-This Payment Agreement is entered into on [DATE] for [CLASS] students of Learn Language Education Academy and Felix Asadu ("Teacher").
+This Payment Agreement is entered into on [DATE] for [CLASS] students of Learn Language Education Academy and Felix Asadu (Teacher).
 
 Terms of Payment:
 1. Payment Amount: The student agrees to pay the teacher a total of [AMOUNT] cedis for the course.
@@ -660,12 +654,12 @@ Signatures:
     [STUDENT_NAME]
     Date: [DATE]
     Asadu Felix
-""")
+"""
         filled = (
             template
-            .replace("[STUDENT_NAME]", selected_name)
+            .replace("[STUDENT_NAME]", sanitize_text(selected_name))
             .replace("[DATE]", str(receipt_date))
-            .replace("[CLASS]", row.get(level_col,""))
+            .replace("[CLASS]", sanitize_text(row.get(level_col,"")))
             .replace("[AMOUNT]", str(total))
             .replace("[FIRST_INSTALLMENT]", f"{paid:.2f}")
             .replace("[SECOND_INSTALLMENT]", f"{balance:.2f}")
@@ -683,16 +677,17 @@ Signatures:
                     pass
         pdf.ln(10)
 
-        pdf.cell(0,8, f"Signed: {signature}", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(0,8, f"Signed: {sanitize_text(signature)}", new_x="LMARGIN", new_y="NEXT")
 
         pdf_bytes = pdf.output(dest="S").encode("latin-1")
         st.download_button(
-            "📄 Download PDF",
+            "Download PDF",
             data=pdf_bytes,
             file_name=f"{selected_name.replace(' ','_')}_receipt_contract.pdf",
             mime="application/pdf"
         )
-        st.success("✅ PDF generated and ready to download.")
+        st.success("PDF generated and ready to download.")
+
 
 
 
