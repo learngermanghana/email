@@ -491,7 +491,7 @@ with tabs[4]:
 
     if df.empty:
         st.warning("No student data available.")
-        return
+        st.stop()   # exit this tab early
 
     # --- Column lookup helper ---
     def getcol(col): return col_lookup(df, col)
@@ -556,11 +556,9 @@ with tabs[4]:
     def sanitize_text(text):
         # Replace non-latin-1 chars with '?'
         cleaned = "".join(c if ord(c) < 256 else "?" for c in str(text))
-        # Collapse whitespace
         return " ".join(cleaned.split())
 
     def break_long_words(line, max_len=40):
-        # Force-break any token longer than max_len
         tokens = line.split(" ")
         out = []
         for tok in tokens:
@@ -650,7 +648,7 @@ with tabs[4]:
             .replace("[COURSE_LENGTH]", f"{course_length} days")
         )
 
-        # -- Write contract body safely --
+        # -- Write contract safely --
         for line in filled.split("\n"):
             safe = sanitize_text(line)
             wrapped = break_long_words(safe, max_len=40)
