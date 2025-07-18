@@ -901,39 +901,11 @@ with tabs[5]:
 
 
 with tabs[6]:
-    import unicodedata
-    import re
+
 
     def safe_pdf(text):
-        """Make string safe for FPDF. Remove Unicode, tabs, illegal whitespace, and long lines."""
-        if not text:
-            return ""
-        # Normalize and convert unicode to closest ASCII
-        text = unicodedata.normalize("NFKD", str(text))
-        # Replace common Unicode punctuation with ASCII
-        text = text.replace("\u2013", "-").replace("\u2014", "-").replace("\u2018", "'").replace("\u2019", "'")
-        text = text.replace("\u201c", '"').replace("\u201d", '"').replace("\xa0", " ")
-        # Remove all non-latin-1 printable characters except \n
-        text = re.sub(r"[^\x20-\x7E\n]", "", text)
-        # Remove tabs and carriage returns
-        text = re.sub(r"[\r\t]", "", text)
-        # Strip each line and limit long lines to 80 chars (avoid FPDF bug)
-        lines = []
-        for line in text.splitlines():
-            sline = line.strip()
-            if sline:
-                while len(sline) > 80:
-                    lines.append(sline[:80])
-                    sline = sline[80:]
-                lines.append(sline)
-        return "\n".join(lines).strip()
-
-    def safe_multi_cell(pdf, w, h, text):
-        """Safe wrapper for FPDF multi_cell to avoid any crash from bad input."""
-        try:
-            pdf.multi_cell(w, h, safe_pdf(text))
-        except Exception:
-            pass  # Ignore and keep going
+        """Ensure all text is safe for FPDF (latin-1 only)."""
+        return "".join(c if ord(c) < 256 else "?" for c in str(text or ""))
 
     st.markdown("""
     <div style='background:#e3f2fd;padding:1.2em 1em 0.8em 1em;border-radius:12px;margin-bottom:1em'>
@@ -1011,21 +983,30 @@ with tabs[6]:
         ("Woche 10", ["10.27. Umweltfreundlich im Alltag", "10.28. Klimafreundlich leben"])
     ]
 
+    # ---- Step 1: Course level ----
     st.markdown("### 1️⃣ **Kursniveau wählen**")
     course_levels = {"A1": raw_schedule_a1, "A2": raw_schedule_a2, "B1": raw_schedule_b1}
     selected_level = st.selectbox("🗂️ **Kursniveau (A1/A2/B1):**", list(course_levels.keys()))
     topic_structure = course_levels[selected_level]
     st.markdown("---")
 
+    # ---- Step 2: Basic info & breaks ----
     st.markdown("### 2️⃣ **Kursdaten, Ferien, Modus**")
     col1, col2 = st.columns([2,1])
     with col1:
         start_date = st.date_input("📅 **Kursstart**", value=date.today())
-        holiday_dates = st.date_input("🔔 Ferien oder Feiertage (Holiday/Break Dates)", [], help="Kein Unterricht an diesen Tagen.")
+        holiday_dates = st.date_input(
+            "🔔 Ferien oder Feiertage (Holiday/Break Dates)",
+            [],
+            help="Kein Unterricht an diesen Tagen."
+        )
+        if not isinstance(holiday_dates, list):
+            holiday_dates = [holiday_dates]
     with col2:
         advanced_mode = st.toggle("⚙️ Erweiterter Wochen-Rhythmus (Custom weekly pattern)", value=False)
     st.markdown("---")
 
+    # ---- Step 3: Weekly pattern ----
     st.markdown("### 3️⃣ **Unterrichtstage festlegen**")
     days_of_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     default_days = ["Monday", "Tuesday", "Wednesday"]
@@ -1033,13 +1014,15 @@ with tabs[6]:
     week_patterns = []
     if not advanced_mode:
         days_per_week = st.multiselect("📌 **Unterrichtstage wählen:**", options=days_of_week, default=default_days)
-        for _ in topic_structure:
-            week_patterns.append((len(_[1]), days_per_week))
+        for week_label, sessions in topic_structure:
+            week_patterns.append((len(sessions), days_per_week))
     else:
         st.info("Für jede Woche individuelle Unterrichtstage einstellen.")
         for i, (week_label, sessions) in enumerate(topic_structure):
             with st.expander(f"{week_label}", expanded=True):
-                week_days = st.multiselect(f"Unterrichtstage {week_label}", options=days_of_week, default=default_days, key=f"week_{i}_days")
+                week_days = st.multiselect(
+                    f"Unterrichtstage {week_label}", options=days_of_week, default=default_days, key=f"week_{i}_days"
+                )
                 week_patterns.append((len(sessions), week_days or default_days))
     st.markdown("---")
 
@@ -1048,8 +1031,6 @@ with tabs[6]:
     session_labels = [(w, s) for w, sess in topic_structure for s in sess]
     dates = []
     cur = start_date
-    if not isinstance(holiday_dates, list):
-        holiday_dates = [holiday_dates]
     for num_classes, week_days in week_patterns:
         week_dates = []
         while len(week_dates) < num_classes:
@@ -1062,8 +1043,15 @@ with tabs[6]:
         st.error("⚠️ **Nicht genug Unterrichtstage!** Passen Sie Ferien/Modus an.")
 
     # ---- Preview ----
-    rows = [{"Week": wl, "Day": f"Day {i+1}", "Date": d.strftime("%A, %d %B %Y"), "Topic": tp}
-            for i, ((wl, tp), d) in enumerate(zip(session_labels, dates))]
+    rows = [
+        {
+            "Week": wl,
+            "Day": f"Day {i+1}",
+            "Date": d.strftime("%A, %d %B %Y"),
+            "Topic": tp
+        }
+        for i, ((wl, tp), d) in enumerate(zip(session_labels, dates))
+    ]
     import pandas as pd
     df = pd.DataFrame(rows)
     st.markdown(f"""
@@ -1073,7 +1061,7 @@ with tabs[6]:
         <li><b>Kurs:</b> {selected_level}</li>
         <li><b>Start:</b> {start_date.strftime('%A, %d %B %Y')}</li>
         <li><b>Sessions:</b> {total_sessions}</li>
-        <li><b>Ferien:</b> {', '.join(d.strftime('%d.%m.%Y') for d in holiday_dates) or '–'}</li>
+        <li><b>Ferien:</b> {', '.join(d.strftime('%d.%m.%Y') for d in holiday_dates) if holiday_dates else '–'}</li>
       </ul>
     </div>
     """, unsafe_allow_html=True)
@@ -1096,32 +1084,38 @@ with tabs[6]:
             self.set_fill_color(21, 101, 192)
             self.set_text_color(255,255,255)
             self.set_font('Arial','B',14)
-            safe_multi_cell(self, 0, 12, "Learn Language Education Academy – Course Schedule")
+            self.cell(0,12,safe_pdf("Learn Language Education Academy – Course Schedule"),ln=1,align='C',fill=True)
             self.ln(2)
             self.set_text_color(0,0,0)
 
     pdf = ColorHeaderPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=11)
-    safe_multi_cell(pdf, 0, 8, f"Schedule: {selected_level}")
-    safe_multi_cell(pdf, 0, 8, f"Start: {start_date.strftime('%Y-%m-%d')}")
+    pdf.multi_cell(0,8, safe_pdf(f"Schedule: {selected_level}"))
+    pdf.multi_cell(0,8, safe_pdf(f"Start: {start_date.strftime('%Y-%m-%d')}"))
     if holiday_dates:
-        safe_multi_cell(pdf, 0, 8, "Holidays: " + ", ".join(d.strftime("%d.%m.%Y") for d in holiday_dates))
+        holidays_text = ", ".join(safe_pdf(d.strftime("%d.%m.%Y")) for d in holiday_dates)
+        pdf.multi_cell(0,8, safe_pdf("Holidays: " + holidays_text))
     pdf.ln(2)
     for r in rows:
-        safe_multi_cell(pdf, 0, 8, f"{r['Day']} ({r['Date']}): {r['Topic']}")
+        line = f"{r['Day']} ({r['Date']}): {r['Topic']}"
+        pdf.multi_cell(0,8, safe_pdf(line))
     pdf.ln(6)
     pdf.set_font("Arial",'I',11)
     pdf.cell(0,10, safe_pdf("Signed: Felix Asadu"), ln=1, align='R')
 
-    pdf_bytes = pdf.output(dest='S')
-    if isinstance(pdf_bytes, str):
-        pdf_bytes = pdf_bytes.encode('latin-1', 'replace')
-    st.download_button("📄 PDF Download",
-                       data=pdf_bytes,
-                       file_name=f"{file_prefix}.pdf",
-                       mime="application/pdf")
+    output_data = pdf.output(dest='S')
+    if isinstance(output_data, bytes):
+        pdf_bytes = output_data
+    else:
+        pdf_bytes = output_data.encode('latin-1', 'replace')
 
+    st.download_button(
+        "📄 PDF Download",
+        data=pdf_bytes,
+        file_name=f"{file_prefix}.pdf",
+        mime="application/pdf"
+    )
 
 
 
