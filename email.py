@@ -491,7 +491,7 @@ with tabs[4]:
 
     if df.empty:
         st.warning("No student data available.")
-        st.stop()   # exit this tab early
+        st.stop()
 
     # --- Column lookup helper ---
     def getcol(col): return col_lookup(df, col)
@@ -554,7 +554,6 @@ with tabs[4]:
     import re
 
     def sanitize_text(text):
-        # Replace non-latin-1 chars with '?'
         cleaned = "".join(c if ord(c) < 256 else "?" for c in str(text))
         return " ".join(cleaned.split())
 
@@ -631,27 +630,21 @@ with tabs[4]:
         # -- Contract section --
         pdf.ln(15)
         pdf.set_font("Arial", size=14)
-        pdf.cell(
-            0, 10,
-            "Learn Language Education Academy Student Contract",
-            new_x="LMARGIN",
-            new_y="NEXT",
-            align="C"
-        )
+        pdf.cell(0,10,"Learn Language Education Academy Student Contract",new_x="LMARGIN", new_y="NEXT", align="C")
         pdf.set_font("Arial", size=12)
         pdf.ln(8)
 
         template = st.session_state["agreement_template"]
         filled = (
             template
-            .replace("[STUDENT_NAME]",      selected_name)
-            .replace("[DATE]",              str(receipt_date))
-            .replace("[CLASS]",             row.get(level_col, ""))
-            .replace("[AMOUNT]",            str(total))
+            .replace("[STUDENT_NAME]", selected_name)
+            .replace("[DATE]", str(receipt_date))
+            .replace("[CLASS]", row.get(level_col,""))
+            .replace("[AMOUNT]", str(total))
             .replace("[FIRST_INSTALLMENT]", f"{paid:.2f}")
             .replace("[SECOND_INSTALLMENT]", f"{balance:.2f}")
-            .replace("[SECOND_DUE_DATE]",   str(contract_end_input))
-            .replace("[COURSE_LENGTH]",     f"{course_length} days")
+            .replace("[SECOND_DUE_DATE]", str(contract_end_input))
+            .replace("[COURSE_LENGTH]", f"{course_length} days")
         )
 
         # -- Write contract safely --
@@ -660,28 +653,29 @@ with tabs[4]:
             wrapped = break_long_words(safe, max_len=40)
             if safe_for_fpdf(wrapped):
                 try:
-                    pdf.multi_cell(0, 8, wrapped)
-                except Exception:
+                    pdf.multi_cell(0,8, wrapped)
+                except:
                     pass
         pdf.ln(10)
 
         # -- Signature --
-        pdf.cell(
-            0, 8,
-            f"Signed: {signature}",
-            new_x="LMARGIN",
-            new_y="NEXT"
-        )
+        pdf.cell(0,8, f"Signed: {signature}", new_x="LMARGIN", new_y="NEXT")
 
-        # -- Serve PDF --
-        pdf_bytes = pdf.output(dest="S").encode("latin-1")
+        # -- Serve PDF (handles str or bytes) --
+        output_data = pdf.output(dest="S")
+        if isinstance(output_data, str):
+            pdf_bytes = output_data.encode("latin-1")
+        else:
+            pdf_bytes = output_data
+
         st.download_button(
             "📄 Download PDF",
             data=pdf_bytes,
-            file_name=f"{selected_name.replace(' ', '_')}_receipt_contract.pdf",
+            file_name=f"{selected_name.replace(' ','_')}_receipt_contract.pdf",
             mime="application/pdf"
         )
         st.success("✅ PDF generated and ready to download.")
+
 
 
 
