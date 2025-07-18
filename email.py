@@ -899,11 +899,9 @@ with tabs[5]:
         except Exception as e:
             st.error(f"Email send failed: {e}")
 
-
 with tabs[6]:
-    # --- Safe PDF Helper ---
     def safe_pdf(text):
-        """Ensure all strings are PDF-safe (latin-1 only, no Unicode bugs)."""
+        """Ensure all strings are PDF-safe (latin-1 only)."""
         return "".join(c if ord(c) < 256 else "?" for c in str(text or ""))
 
     st.markdown("""
@@ -994,19 +992,7 @@ with tabs[6]:
     col1, col2 = st.columns([2,1])
     with col1:
         start_date = st.date_input("📅 **Kursstart**", value=date.today())
-        holiday_dates = st.date_input(
-            "🔔 Ferien oder Feiertage (Holiday/Break Dates)",
-            [],
-            help="Kein Unterricht an diesen Tagen."
-        )
-        # Always get a list of dates
-        if not isinstance(holiday_dates, list):
-            if holiday_dates:
-                holiday_dates = [holiday_dates]
-            else:
-                holiday_dates = []
-        holiday_dates = [d for d in holiday_dates if hasattr(d, "strftime")]
-        holidays_str = ", ".join(d.strftime("%d.%m.%Y") for d in holiday_dates) if holiday_dates else "–"
+        holiday_dates = st.date_input("🔔 Ferien oder Feiertage (Holiday/Break Dates)", [])
     with col2:
         advanced_mode = st.toggle("⚙️ Erweiterter Wochen-Rhythmus (Custom weekly pattern)", value=False)
     st.markdown("---")
@@ -1034,10 +1020,12 @@ with tabs[6]:
     session_labels = [(w, s) for w, sess in topic_structure for s in sess]
     dates = []
     cur = start_date
+    holidays_set = set(holiday_dates if isinstance(holiday_dates, list) else [holiday_dates])
+
     for num_classes, week_days in week_patterns:
         week_dates = []
         while len(week_dates) < num_classes:
-            if cur.strftime("%A") in week_days and cur not in holiday_dates:
+            if cur.strftime("%A") in week_days and cur not in holidays_set:
                 week_dates.append(cur)
             cur += timedelta(days=1)
         dates.extend(week_dates)
@@ -1048,7 +1036,16 @@ with tabs[6]:
     # ---- Preview ----
     rows = [{"Week": wl, "Day": f"Day {i+1}", "Date": d.strftime("%A, %d %B %Y"), "Topic": tp}
             for i, ((wl, tp), d) in enumerate(zip(session_labels, dates))]
+    import pandas as pd
     df = pd.DataFrame(rows)
+    # Convert holidays for display
+    if isinstance(holiday_dates, list):
+        holidays_str = ", ".join(d.strftime("%d.%m.%Y") for d in holiday_dates) if holiday_dates else "–"
+    elif isinstance(holiday_dates, date):
+        holidays_str = holiday_dates.strftime("%d.%m.%Y")
+    else:
+        holidays_str = "–"
+
     st.markdown(f"""
     <div style='background:#fffde7;border:1px solid #ffe082;border-radius:10px;padding:1em;margin:1em 0'>
       <b>📝 Kursüberblick:</b>
@@ -1069,11 +1066,13 @@ with tabs[6]:
 
     # ---- TXT download ----
     txt = f"Learn Language Education Academy\nContact: 0205706589 | www.learngermanghana.com\nSchedule: {selected_level}\nStart: {start_date.strftime('%Y-%m-%d')}\n\n" + \
-          "\n".join(f"- {safe_pdf(r['Day'])} ({safe_pdf(r['Date'])}): {safe_pdf(r['Topic'])}" for r in rows)
+          "\n".join(f"- {r['Day']} ({r['Date']}): {r['Topic']}" for r in rows)
     st.download_button("📁 TXT Download", txt, file_name=f"{file_prefix}.txt")
 
     # ---- PDF download ----
     from fpdf import FPDF
+    import tempfile
+
     class ColorHeaderPDF(FPDF):
         def header(self):
             self.set_fill_color(21, 101, 192)
@@ -1091,13 +1090,29 @@ with tabs[6]:
     pdf.multi_cell(0,8, safe_pdf(f"Holidays: {holidays_str}"))
     pdf.ln(2)
     for r in rows:
-        pdf.multi_cell(0,8, safe_pdf(f"{r['Day']} ({r['Date']}): {r['Topic']}"))
+        line = f"{r['Day']} ({r['Date']}): {r['Topic']}"
+        line = safe_pdf(line)
+        if not line.strip():
+            line = "N/A"
+        pdf.multi_cell(0,8, line)
     pdf.ln(6)
     pdf.set_font("Arial",'I',11)
     pdf.cell(0,10, safe_pdf("Signed: Felix Asadu"), ln=1, align='R')
 
+    # --- PDF bytes output ---
+    output_data = pdf.output(dest="S")
+    if isinstance(output_data, bytes):
+        pdf_bytes = output_data
+    elif isinstance(output_data, str):
+        pdf_bytes = output_data.encode("latin-1", "replace")
+    else:
+        tmpf = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+        pdf.output(tmpf.name); tmpf.close()
+        with open(tmpf.name, "rb") as f: pdf_bytes = f.read()
+        os.remove(tmpf.name)
+
     st.download_button("📄 PDF Download",
-                       data=pdf.output(dest='S').encode('latin-1', 'replace'),
+                       data=pdf_bytes,
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
 
