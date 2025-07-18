@@ -148,3 +148,56 @@ Asadu Felix
 """
 
 # ==== END OF STAGE 1 ====
+
+# ==== DATA LOADING HELPERS & CACHING ====
+
+@st.cache_data(ttl=300, show_spinner="Loading student data...")
+def load_students():
+    df = pd.read_csv(STUDENTS_CSV_URL, dtype=str)
+    df = normalize_columns(df)
+    # Standardize any known column name variants
+    if "student_code" in df.columns:
+        df = df.rename(columns={"student_code": "studentcode"})
+    return df
+
+@st.cache_data(ttl=300, show_spinner="Loading expenses...")
+def load_expenses():
+    try:
+        df = pd.read_csv(EXPENSES_CSV_URL, dtype=str)
+        df = normalize_columns(df)
+    except Exception as e:
+        st.error(f"Could not load expenses: {e}")
+        df = pd.DataFrame(columns=["type", "item", "amount", "date"])
+    return df
+
+@st.cache_data(ttl=300, show_spinner="Loading reference answers...")
+def load_ref_answers():
+    df = pd.read_csv(REF_ANSWERS_CSV_URL, dtype=str)
+    df = normalize_columns(df)
+    if "assignment" not in df.columns:
+        raise Exception("No 'assignment' column found in reference answers sheet.")
+    return df
+
+# Optional: SQLite or other local storage helpers here (for local persistence if desired)
+# @st.cache_resource
+# def init_sqlite_connection():
+#     import sqlite3
+#     conn = sqlite3.connect('students_scores.db', check_same_thread=False)
+#     # ...table creation logic
+#     return conn
+
+# ==== SESSION STATE INITIALIZATION ====
+if "tabs_loaded" not in st.session_state:
+    st.session_state["tabs_loaded"] = False
+
+# ==== LOAD MAIN DATAFRAMES ONCE ====
+df_students = load_students()
+df_expenses = load_expenses()
+df_ref_answers = load_ref_answers()
+
+# ==== UNIVERSAL VARIABLES (for later use) ====
+LEVELS = sorted(df_students["level"].dropna().unique().tolist()) if "level" in df_students.columns else []
+STUDENT_CODES = df_students["studentcode"].dropna().unique().tolist() if "studentcode" in df_students.columns else []
+
+# ==== END OF STAGE 2 ====
+
