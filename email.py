@@ -899,6 +899,7 @@ with tabs[5]:
         except Exception as e:
             st.error(f"Email send failed: {e}")
 
+
 # ==== 14. TAB 6: COURSE SCHEDULE GENERATOR ====
 with tabs[6]:
     st.markdown("""
@@ -1056,6 +1057,10 @@ with tabs[6]:
     st.download_button("📁 TXT Download", txt, file_name=f"{file_prefix}.txt")
 
     # ---- PDF download ----
+    def safe_pdf(text):
+        return "".join(c if ord(c) < 256 else "?" for c in str(text or ""))
+
+    from fpdf import FPDF
     class ColorHeaderPDF(FPDF):
         def header(self):
             self.set_fill_color(21, 101, 192)
@@ -1079,11 +1084,11 @@ with tabs[6]:
     pdf.set_font("Arial",'I',11)
     pdf.cell(0,10, safe_pdf("Signed: Felix Asadu"), ln=1, align='R')
 
+    pdf_bytes = pdf.output(dest='S').encode('latin-1', 'replace')
     st.download_button("📄 PDF Download",
-                       data=pdf.output(dest='S').encode('latin-1'),
+                       data=pdf_bytes,
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
-
 
 
 
