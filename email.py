@@ -671,14 +671,28 @@ This Payment Agreement is entered into on [DATE] for [CLASS] students of Learn L
         )
         st.success("✅ PDF generated and ready to download.")
 
-with tabs[5]:
-    st.title("📧 Send Email / Letter (Templates, Attachments, PDF, Watermark, QR)")
 
-    # ---- Student Search/Selection ----
+
+with tabs[5]:
+    def safe_pdf(text):
+        if not text:
+            return ""
+        return text.encode("latin-1", "replace").decode("latin-1")
+
+    def make_qr_code(url):
+        import qrcode
+        import tempfile
+        qr_img = qrcode.make(url)
+        qr_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        qr_img.save(qr_tmp)
+        qr_tmp.close()
+        return qr_tmp.name
+
+    st.title("📧 Send Email / Letter (Templates, Attachments, PDF, Watermark, QR)")
     st.subheader("Select Student")
     search_val = st.text_input(
         "Search students by name, code, or email", 
-        value="", key="tab5_student_search"
+        value="", key="student_search"
     )
     if search_val:
         filtered_students = df_students[
@@ -690,7 +704,7 @@ with tabs[5]:
         filtered_students = df_students
 
     student_names = filtered_students["name"].dropna().unique().tolist()
-    student_name = st.selectbox("Student Name", student_names, key="tab5_select_student")
+    student_name = st.selectbox("Student Name", student_names)
     if not student_name:
         st.stop()
     student_row = filtered_students[filtered_students["name"] == student_name].iloc[0]
@@ -704,28 +718,28 @@ with tabs[5]:
     student_code = student_row.get("studentcode", "")
     student_link = f"https://falowen.streamlit.app/?code={student_code}" if student_code else "https://falowen.streamlit.app/"
 
-    # ---- 2. Message Type Selection ----
+    # 1. Add Certificate to selectbox
     st.subheader("Choose Message Type")
     msg_type = st.selectbox("Type", [
         "Custom Message",
         "Welcome Message",
         "Assignment Results",
-        "Letter of Enrollment"
-    ], key="tab5_msg_type")
+        "Letter of Enrollment",
+        "Certificate of Completion"
+    ])
 
-    # ---- 3. Logo/Watermark/Extra Attachment ----
+    # 2. Add Certificate template logic
     st.subheader("Upload Logo and Watermark")
-    logo_file = st.file_uploader("School Logo (PNG/JPG)", type=["png", "jpg", "jpeg"], key="tab5_logo_up")
-    watermark_file = st.file_uploader("Watermark Image (faded PNG recommended)", type=["png"], key="tab5_watermark_up")
-    extra_attach = st.file_uploader("Additional Attachment (optional)", key="tab5_extra_attach")
+    logo_file = st.file_uploader("School Logo (PNG/JPG)", type=["png", "jpg", "jpeg"], key="logo_up")
+    watermark_file = st.file_uploader("Watermark Image (faded PNG recommended)", type=["png"], key="watermark_up")
+    extra_attach = st.file_uploader("Additional Attachment (optional)", type=None, key="extra_attach")
 
-    # ---- 4. Compose/Preview Message ----
     st.subheader("Compose/Preview Message")
     if msg_type == "Welcome Message":
         body_default = (
             f"Hello {student_name},<br><br>"
             f"Welcome to Learn Language Education Academy! We have helped many students succeed, and we’re excited to support you as well.<br><br>"
-            f"We have attached your letter of enrollment in this document.<br><br>"
+            f"We have attached your letter of enrollment in this document<br><br>"
             f"<b>Your contract starts on {enrollment_start.strftime('%d %B %Y')}.</b> "
             f"You can join your <b>{student_level}</b> class in person or online (Zoom link will be shared before class).<br><br>"
             f"<b>Your payment status: {payment_status}.</b> Paid: GHS {payment:.2f} / Balance: GHS {balance:.2f}<br><br>"
@@ -748,29 +762,27 @@ with tabs[5]:
             f"<ul><li>Assignment 1: 85%</li><li>Assignment 2: 90%</li></ul>"
             f"Best regards,<br>Learn Language Education Academy"
         )
+    elif msg_type == "Certificate of Completion":
+        completion_date = date.today().strftime("%-d %B %Y")
+        body_default = (
+            f"<h2 style='text-align:center;'>Certificate of Completion</h2>"
+            f"<br>"
+            f"This is to certify that <b>{student_name}</b><br>"
+            f"has successfully completed the <b>{student_level}</b> course<br>"
+            f"at Learn Language Education Academy.<br><br>"
+            f"Completion Date: <b>{completion_date}</b><br><br>"
+            f"Congratulations on your achievement!"
+        )
     else:
         body_default = ""
 
-    email_subject = st.text_input("Subject", value=f"{msg_type} - {student_name}", key="tab5_email_subject")
-    email_body = st.text_area("Email Body (HTML supported)", value=body_default, height=220, key="tab5_email_body")
+    email_subject = st.text_input("Subject", value=f"{msg_type} - {student_name}")
+    email_body = st.text_area("Email Body (HTML supported)", value=body_default, height=220)
 
     st.markdown("**Preview Message (as student will see):**")
     st.markdown(email_body, unsafe_allow_html=True)
 
-    # ---- 5. Generate PDF Button (and preview) ----
     st.subheader("PDF Preview & Download")
-
-    def safe_pdf(text):
-        if not text:
-            return ""
-        return text.encode("latin-1", "replace").decode("latin-1")
-
-    def make_qr_code(url):
-        qr_img = qrcode.make(url)
-        qr_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-        qr_img.save(qr_tmp)
-        qr_tmp.close()
-        return qr_tmp.name
 
     class LetterPDF(FPDF):
         def header(self):
@@ -812,7 +824,8 @@ with tabs[5]:
     import re
     pdf.multi_cell(0, 8, safe_pdf(re.sub(r"<br\s*/?>", "\n", email_body)), align="L")
     pdf.ln(6)
-    if msg_type == "Letter of Enrollment":
+    # 3. Signature block for Letter and Certificate
+    if msg_type in ("Letter of Enrollment", "Certificate of Completion"):
         pdf.set_font("Arial", size=11)
         pdf.cell(0, 8, "Yours sincerely,", ln=True)
         pdf.cell(0, 7, "Felix Asadu", ln=True)
@@ -828,18 +841,16 @@ with tabs[5]:
     )
     st.caption("You can share this PDF on WhatsApp or by email.")
 
-    # ---- 6. Email Option ----
     st.subheader("Send Email (with or without PDF)")
-    attach_pdf = st.checkbox("Attach the generated PDF?", key="tab5_attach_pdf")
-    recipient_email = st.text_input("Recipient Email", value=student_email, key="tab5_recipient_email")
-    if st.button("Send Email Now", key="tab5_send_email_btn"):
+    attach_pdf = st.checkbox("Attach the generated PDF?")
+    recipient_email = st.text_input("Recipient Email", value=student_email)
+    if st.button("Send Email Now"):
         msg = Mail(
             from_email=SENDER_EMAIL,
             to_emails=recipient_email,
             subject=email_subject,
             html_content=email_body
         )
-        # Attach PDF if selected
         if attach_pdf:
             pdf_attach = Attachment(
                 FileContent(base64.b64encode(pdf_bytes).decode()),
@@ -848,7 +859,6 @@ with tabs[5]:
                 Disposition("attachment")
             )
             msg.attachment = pdf_attach
-        # Attach extra file if any
         if extra_attach:
             file_bytes = extra_attach.read()
             file_attach = Attachment(
@@ -864,6 +874,7 @@ with tabs[5]:
             st.success(f"Email sent to {recipient_email}!")
         except Exception as e:
             st.error(f"Email send failed: {e}")
+
 
 
 
