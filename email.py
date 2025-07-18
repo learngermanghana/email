@@ -672,7 +672,11 @@ This Payment Agreement is entered into on [DATE] for [CLASS] students of Learn L
         )
         st.success("✅ PDF generated and ready to download.")
 
-with tabs[5]:
+with tabs[6]:
+    from datetime import date, timedelta
+    from fpdf import FPDF
+    import tempfile, os
+
     # ---- Helper: Ensure all text in PDF is latin-1 safe ----
     def safe_pdf(text):
         if not text:
