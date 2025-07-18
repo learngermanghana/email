@@ -11,6 +11,7 @@ import streamlit as st
 from fpdf import FPDF
 import qrcode
 
+
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
 
@@ -790,6 +791,8 @@ with tabs[5]:
         pdf.cell(0, 7, "Felix Asadu", ln=True)
         pdf.cell(0, 7, "Director", ln=True)
         pdf.cell(0, 7, safe_pdf(SCHOOL_NAME), ln=True)
+
+    # FIX: fpdf2 returns bytes directly; no encode needed!
     pdf_bytes = pdf.output(dest="S")
 
     st.download_button(
@@ -823,6 +826,7 @@ with tabs[5]:
         )
         if success:
             st.success(f"Email sent to {recipient_email}!")
+            
 # ==== TAB 6: COURSE SCHEDULE GENERATOR ====
 with tabs[6]:
     st.markdown("""
@@ -1007,6 +1011,8 @@ with tabs[6]:
                        data=pdf.output(dest='S').encode('latin-1'),
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
+
+#
     
 # ==== TAB 7: REFERENCE & STUDENT WORK SHARE ====
 with tabs[7]:
