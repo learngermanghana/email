@@ -1098,39 +1098,6 @@ with tabs[6]:
 
     st.download_button("📁 TXT Download", txt, file_name=f"{file_prefix}.txt")
 
-    # ---- PDF download ----
-    class SchedulePDF(FPDF):
-        def header(self):
-            self.set_font('Arial', 'B', 14)
-            self.cell(0, 12, safe_pdf("Learn Language Education Academy – Course Schedule"), ln=1, align='C')
-            self.set_font('Arial', '', 11)
-            self.ln(1)
-
-    pdf = SchedulePDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=11)
-    pdf.multi_cell(0, 8, safe_pdf(f"Schedule: {selected_level}"))
-    pdf.multi_cell(0, 8, safe_pdf(f"Start: {start_date.strftime('%Y-%m-%d')}"))
-    if holiday_dates:
-        pdf.multi_cell(0, 8, safe_pdf("Holidays: " + ", ".join(d.strftime("%d.%m.%Y") for d in holiday_dates)))
-    pdf.ln(2)
-    for row in rows:
-        topic_lines = wrap_lines(safe_pdf(f"{row['Day']} ({row['Date']}): {row['Topic']}"), width=80)
-        for line in topic_lines:
-            pdf.multi_cell(0, 8, line)
-    pdf.ln(6)
-    pdf.set_font("Arial", 'I', 11)
-    pdf.cell(0, 10, safe_pdf("Signed: Felix Asadu"), ln=1, align='R')
-
-    pdf_bytes = pdf.output(dest="S").encode("latin-1", "replace")
-    st.download_button(
-        "📄 Download Schedule PDF",
-        data=pdf_bytes,
-        file_name=f"{file_prefix}.pdf",
-        mime="application/pdf"
-    )
-
-
 
 
 
