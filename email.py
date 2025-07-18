@@ -898,8 +898,19 @@ with tabs[5]:
             st.success(f"Email sent to {recipient_email}!")
         except Exception as e:
             st.error(f"Email send failed: {e}")
+
+
 with tabs[6]:
 
+
+    def safe_pdf(text):
+        """Return only printable Latin-1; fallback to '?' for anything else; never empty."""
+        text = str(text or "")
+        # Remove control/non-printing characters and keep only valid Latin-1
+        out = "".join(c if 32 <= ord(c) <= 126 or 160 <= ord(c) < 256 else "?" for c in text)
+        if not out.strip():
+            return "N/A"
+        return out
 
     st.markdown("""
     <div style='background:#e3f2fd;padding:1.2em 1em 0.8em 1em;border-radius:12px;margin-bottom:1em'>
