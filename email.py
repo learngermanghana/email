@@ -899,6 +899,7 @@ with tabs[5]:
         except Exception as e:
             st.error(f"Email send failed: {e}")
 
+
 with tabs[6]:
     def safe_pdf(text):
         """Ensure all strings are PDF-safe (latin-1 only)."""
@@ -1115,8 +1116,6 @@ with tabs[6]:
                        data=pdf_bytes,
                        file_name=f"{file_prefix}.pdf",
                        mime="application/pdf")
-
-
 
 
 
