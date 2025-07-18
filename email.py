@@ -216,7 +216,8 @@ tabs = st.tabs([
     "📲 Reminders",              # 3
     "📄 Contract",               # 4
     "📧 Send Email",              # 5 
-    "📧 Course"              # 6
+    "📧 Course",               # 6
+    "📝 Marking"                # 7
     
 ])
 
