@@ -207,7 +207,8 @@ tabs = st.tabs([
     "📝 Pending",                 # 0
     "👩‍🎓 All Students",            # 1
     "💵 Expenses",                 # 2
-    "📲 Reminders"               # 3
+    "📲 Reminders",               # 3
+    "📄 Contract"                # 4
     
 ])
 
@@ -473,3 +474,192 @@ with tabs[3]:
         file_name="debtor_whatsapp_links.csv"
     )
 
+
+# ==== TAB 4: CONTRACT & RECEIPT PDF FOR ANY STUDENT ====
+with tabs[4]:
+    st.title("📄 Generate Contract & Receipt PDF for Any Student")
+
+    # --- Google Sheet as the ONLY source ---
+    df = df_students.copy()
+
+    if df.empty:
+        st.warning("No student data available.")
+    else:
+        def getcol(col): return col_lookup(df, col)
+
+        name_col    = getcol("name")
+        start_col   = getcol("contractstart")
+        end_col     = getcol("contractend")
+        paid_col    = getcol("paid")
+        bal_col     = getcol("balance")
+        code_col    = getcol("studentcode")
+        phone_col   = getcol("phone")
+        level_col   = getcol("level")
+
+        # --- SEARCH BOX at the bottom (shown above dropdown) ---
+        search_val = st.text_input(
+            "Search students by name, code, phone, or level:", value="", key="pdf_tab_search"
+        )
+
+        # Filter students
+        filtered_df = df.copy()
+        if search_val:
+            sv = search_val.strip().lower()
+            filtered_df = df[
+                df[name_col].str.lower().str.contains(sv, na=False)
+                | df[code_col].astype(str).str.lower().str.contains(sv, na=False)
+                | df[phone_col].astype(str).str.lower().str.contains(sv, na=False)
+                | df[level_col].astype(str).str.lower().str.contains(sv, na=False)
+            ]
+
+        student_names = filtered_df[name_col].tolist()
+        if not student_names:
+            st.warning("No students match your search.")
+            st.stop()
+        selected_name = st.selectbox("Select Student", student_names)
+        row = filtered_df[filtered_df[name_col] == selected_name].iloc[0]
+
+        # 4. Editable fields before PDF generation
+        default_paid    = float(row.get(paid_col, 0))
+        default_balance = float(row.get(bal_col, 0))
+        default_start   = pd.to_datetime(row.get(start_col, ""), errors="coerce").date() \
+            if not pd.isnull(pd.to_datetime(row.get(start_col, ""), errors="coerce")) else date.today()
+        default_end     = pd.to_datetime(row.get(end_col,   ""), errors="coerce").date() \
+            if not pd.isnull(pd.to_datetime(row.get(end_col,   ""), errors="coerce")) else default_start + timedelta(days=30)
+
+        st.subheader("Receipt Details")
+        paid_input = st.number_input(
+            "Amount Paid (GHS)", min_value=0.0, value=default_paid, step=1.0, key="paid_input"
+        )
+        balance_input = st.number_input(
+            "Balance Due (GHS)", min_value=0.0, value=default_balance, step=1.0, key="balance_input"
+        )
+        total_input = paid_input + balance_input
+        receipt_date = st.date_input("Receipt Date", value=date.today(), key="receipt_date")
+        signature = st.text_input("Signature Text", value="Felix Asadu", key="receipt_signature")
+
+        st.subheader("Contract Details")
+        contract_start_input = st.date_input(
+            "Contract Start Date", value=default_start, key="contract_start_input"
+        )
+        contract_end_input = st.date_input(
+            "Contract End Date", value=default_end, key="contract_end_input"
+        )
+        course_length = (contract_end_input - contract_start_input).days
+
+        st.subheader("Logo (optional)")
+        logo_file = st.file_uploader(
+            "Upload logo image", type=["png", "jpg", "jpeg"], key="logo_upload"
+        )
+
+        # 5. Generate PDF
+        if st.button("Generate & Download PDF"):
+            # Use current inputs
+            paid    = paid_input
+            balance = balance_input
+            total   = total_input
+            contract_start = contract_start_input
+            contract_end   = contract_end_input
+
+            pdf = FPDF()
+            pdf.add_page()
+
+            # Add logo if uploaded
+            if logo_file:
+                import tempfile
+                ext = logo_file.name.split('.')[-1]
+                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
+                tmp.write(logo_file.getbuffer())
+                tmp.close()
+                pdf.image(tmp.name, x=10, y=8, w=33)
+                pdf.ln(25)
+
+            # Payment status banner
+            status = "FULLY PAID" if balance == 0 else "INSTALLMENT PLAN"
+            pdf.set_font("Arial", "B", 12)
+            pdf.set_text_color(0, 128, 0)
+            pdf.cell(0, 10, status, ln=True, align="C")
+            pdf.set_text_color(0, 0, 0)
+            pdf.ln(5)
+
+            # Receipt header
+            pdf.set_font("Arial", size=14)
+            pdf.cell(0, 10, f"{SCHOOL_NAME} Payment Receipt", ln=True, align="C")
+            pdf.ln(10)
+
+            # Receipt details
+            pdf.set_font("Arial", size=12)
+            for label, val in [
+                ("Name",           selected_name),
+                ("Student Code",   row.get(code_col, "")),
+                ("Phone",          row.get(phone_col, "")),
+                ("Level",          row.get(level_col, "")),
+                ("Contract Start", contract_start),
+                ("Contract End",   contract_end),
+                ("Amount Paid",    f"GHS {paid:.2f}"),
+                ("Balance Due",    f"GHS {balance:.2f}"),
+                ("Total Fee",      f"GHS {total:.2f}"),
+                ("Receipt Date",   receipt_date)
+            ]:
+                pdf.cell(0, 8, f"{label}: {val}", ln=True)
+            pdf.ln(10)
+
+            # Contract section
+            pdf.ln(15)
+            pdf.set_font("Arial", size=14)
+            pdf.cell(0, 10, f"{SCHOOL_NAME} Student Contract", ln=True, align="C")
+            pdf.set_font("Arial", size=12)
+            pdf.ln(8)
+
+            template = st.session_state.get("agreement_template", """
+PAYMENT AGREEMENT
+
+This Payment Agreement is entered into on [DATE] for [CLASS] students of Learn Language Education Academy and Felix Asadu ("Teacher").
+
+Terms of Payment:
+1. Payment Amount: The student agrees to pay the teacher a total of [AMOUNT] cedis for the course.
+2. Payment Schedule: The payment can be made in full or in two installments: GHS [FIRST_INSTALLMENT] for the first installment, and the remaining balance for the second installment after one month of payment. 
+3. Late Payments: In the event of late payment, the school may revoke access to all learning platforms. No refund will be made.
+4. Refunds: Once a deposit is made and a receipt is issued, no refunds will be provided.
+
+Cancellation and Refund Policy:
+1. If the teacher cancels a lesson, it will be rescheduled.
+
+Miscellaneous Terms:
+1. Attendance: The student agrees to attend lessons punctually.
+2. Communication: Both parties agree to communicate changes promptly.
+3. Termination: Either party may terminate this Agreement with written notice if the other party breaches any material term.
+
+Signatures:
+[STUDENT_NAME]
+Date: [DATE]
+Asadu Felix
+""")
+            filled = (
+                template
+                .replace("[STUDENT_NAME]",     selected_name)
+                .replace("[DATE]",             str(receipt_date))
+                .replace("[CLASS]",            row.get(level_col, ""))
+                .replace("[AMOUNT]",           str(total))
+                .replace("[FIRST_INSTALLMENT]", f"{paid:.2f}")
+                .replace("[SECOND_INSTALLMENT]",f"{balance:.2f}")
+                .replace("[SECOND_DUE_DATE]",  str(contract_end))
+                .replace("[COURSE_LENGTH]",    f"{course_length} days")
+            )
+            for line in filled.split("\n"):
+                safe = safe_pdf(line)
+                pdf.multi_cell(0, 8, safe)
+            pdf.ln(10)
+
+            # Signature
+            pdf.cell(0, 8, f"Signed: {signature}", ln=True)
+
+            # Download
+            pdf_bytes = pdf.output(dest="S").encode("latin-1", "replace")
+            st.download_button(
+                "📄 Download PDF",
+                data=pdf_bytes,
+                file_name=f"{selected_name.replace(' ', '_')}_receipt_contract.pdf",
+                mime="application/pdf"
+            )
+            st.success("✅ PDF generated and ready to download.")
