@@ -477,6 +477,8 @@ with tabs[3]:
         file_name="debtor_whatsapp_links.csv"
     )
 
+
+
 with tabs[4]:
     st.title("📄 Generate Contract & Receipt PDF for Any Student")
 
@@ -492,8 +494,8 @@ with tabs[4]:
         st.warning("No student data available.")
         st.stop()
 
-    # --- Column lookup helper
-    def getcol(col): 
+    # --- Column lookup helper ---
+    def getcol(col):
         return col_lookup(df, col)
 
     name_col    = getcol("name")
@@ -582,16 +584,18 @@ with tabs[4]:
         pdf = FPDF()
         pdf.add_page()
 
-        # -- Add logo from web --
+        # -- Add logo from web (always re-download) --
         try:
             import requests, os
             logo_path = "school_logo.png"
-            if not os.path.exists(logo_path):
-                with open(logo_path, "wb") as f:
-                    f.write(requests.get(logo_url).content)
+            resp = requests.get(logo_url, timeout=5)
+            resp.raise_for_status()
+            with open(logo_path, "wb") as f:
+                f.write(resp.content)
             pdf.image(logo_path, x=10, y=8, w=33)
             pdf.ln(25)
-        except:
+        except Exception as e:
+            print("Logo load failed:", e)
             pdf.ln(2)
 
         # -- Payment banner --
@@ -604,11 +608,7 @@ with tabs[4]:
 
         # -- Receipt header --
         pdf.set_font("Arial", size=14)
-        pdf.cell(
-            0, 10,
-            "Learn Language Education Academy Payment Receipt",
-            new_x="LMARGIN", new_y="NEXT", align="C"
-        )
+        pdf.cell(0, 10, "Learn Language Education Academy Payment Receipt", new_x="LMARGIN", new_y="NEXT", align="C")
         pdf.ln(10)
 
         # -- Receipt details --
@@ -632,11 +632,7 @@ with tabs[4]:
         # -- Contract section --
         pdf.ln(15)
         pdf.set_font("Arial", size=14)
-        pdf.cell(
-            0, 10,
-            "Learn Language Education Academy Student Contract",
-            new_x="LMARGIN", new_y="NEXT", align="C"
-        )
+        pdf.cell(0, 10, "Learn Language Education Academy Student Contract", new_x="LMARGIN", new_y="NEXT", align="C")
         pdf.set_font("Arial", size=12)
         pdf.ln(8)
 
@@ -681,11 +677,4 @@ with tabs[4]:
             mime="application/pdf"
         )
         st.success("✅ PDF generated and ready to download.")
-
-
-
-
-
-
-
 
