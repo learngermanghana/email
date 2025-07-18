@@ -274,13 +274,23 @@ with tabs[1]:
 
     # --- Optional: Search/Filter ---
     search = st.text_input("🔍 Search students by name, code, or email...")
+
     if search:
         search = search.lower().strip()
         filt = df_students[
             df_students.apply(lambda row: search in str(row).lower(), axis=1)
         ]
     else:
-        filt = df_students
+        filt = df_students.copy()
+
+    # --- Add "Days Since Expiry" Column ---
+    if "contractend" in filt.columns:
+        filt = filt.copy()  # Avoid SettingWithCopyWarning
+        filt["contractend_dt"] = pd.to_datetime(filt["contractend"], errors="coerce")
+        today = pd.Timestamp.today().normalize()
+        filt["days_since_expiry"] = (today - filt["contractend_dt"]).dt.days
+    else:
+        filt["days_since_expiry"] = None
 
     # --- Show Student Table ---
     st.dataframe(filt, use_container_width=True)
@@ -291,6 +301,17 @@ with tabs[1]:
         filt.to_csv(index=False),
         file_name="all_students.csv"
     )
+
+    # --- Optionally: Filter students whose contract has ended (expired only) ---
+    expired_only = st.checkbox("Show only students with expired contracts")
+    if expired_only:
+        expired_filt = filt[filt["days_since_expiry"] > 0]
+        st.dataframe(expired_filt, use_container_width=True)
+        st.download_button(
+            "⬇️ Download Expired Students CSV",
+            expired_filt.to_csv(index=False),
+            file_name="expired_students.csv"
+        )
 
 # ==== TAB 2: EXPENSES AND FINANCIAL SUMMARY ====
 with tabs[2]:
