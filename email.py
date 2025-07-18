@@ -201,3 +201,63 @@ STUDENT_CODES = df_students["studentcode"].dropna().unique().tolist() if "studen
 
 # ==== END OF STAGE 2 ====
 
+# ==== TABS SETUP ====
+tabs = st.tabs([
+    "📝 Pending",                 # 0
+    "👩‍🎓 All Students",          # 1
+    "💵 Expenses",                # 2
+    "📲 Reminders",               # 3
+    "📄 Contract",                # 4
+    "📧 Send Email",              # 5 
+    "📆 Schedule",                # 6
+    "📝 Reference & Student Work" # 7
+])
+
+# ==== TAB 0: PENDING STUDENTS ====
+with tabs[0]:
+    st.title("🕒 Pending Students")
+
+    # -- Define/Load Pending Students Google Sheet URL --
+    PENDING_SHEET_ID = "1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo"
+    PENDING_CSV_URL = f"https://docs.google.com/spreadsheets/d/{PENDING_SHEET_ID}/export?format=csv"
+
+    @st.cache_data(ttl=0)
+    def load_pending():
+        df = pd.read_csv(PENDING_CSV_URL, dtype=str)
+        df = normalize_columns(df)
+        df_display = df.copy()
+        df_search = df.copy()
+        return df_display, df_search
+
+    df_display, df_search = load_pending()
+
+    # --- Universal Search ---
+    search = st.text_input("🔎 Search any field (name, code, email, etc.)")
+    if search:
+        mask = df_search.apply(
+            lambda row: row.astype(str).str.contains(search, case=False, na=False).any(),
+            axis=1
+        )
+        filt = df_display[mask]
+    else:
+        filt = df_display
+
+    # --- Column Selector ---
+    all_cols = list(filt.columns)
+    selected_cols = st.multiselect(
+        "Show columns (for easy viewing):", all_cols, default=all_cols[:6]
+    )
+
+    # --- Show Table (with scroll bar) ---
+    st.dataframe(filt[selected_cols], use_container_width=True, height=400)
+
+    # --- Download Button (all columns always) ---
+    st.download_button(
+        "⬇️ Download all columns as CSV",
+        filt.to_csv(index=False),
+        file_name="pending_students.csv"
+    )
+
+# ==== END OF STAGE 3 (TAB 0) ====
+
+
