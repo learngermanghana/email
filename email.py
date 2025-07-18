@@ -982,34 +982,38 @@ with tabs[6]:
     ]
 
 
-    # ---- Step 1: Course level ----
-    course_levels = {"A1": raw_schedule_a1, "A2": raw_schedule_a2, "B1": raw_schedule_b1}
-    selected_level = st.selectbox("🗂️ Kursniveau (A1/A2/B1):", list(course_levels.keys()))
-    topic_structure = course_levels[selected_level]
+    # ---- 1️⃣ Level ----
+    course_levels  = {"A1": raw_schedule_a1, "A2": raw_schedule_a2, "B1": raw_schedule_b1}
+    selected_level = st.selectbox("🗂️ Kursniveau:", list(course_levels.keys()))
+    topic_structure= course_levels[selected_level]
 
-    # ---- Step 2: Dates & holidays ----
+    # ---- 2️⃣ Dates & holidays ----
     col1, col2 = st.columns([2,1])
     with col1:
         start_date    = st.date_input("📅 Kursstart", value=date.today())
-        holiday_dates = st.multiselect("🔔 Ferien/Feiertage", options=[], format_func=lambda d: d.strftime("%d.%m.%Y"))  # allow multiple
+        holiday_dates = st.multiselect(
+            "🔔 Ferien/Feiertage",
+            options=[],
+            format_func=lambda d: d.strftime("%d.%m.%Y")
+        )
     with col2:
         advanced_mode = st.toggle("⚙️ Erweiterter Wochen‑Rhythmus", value=False)
 
-    # ---- Step 3: Weekly pattern ----
-    days_of_week = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
-    default_days = ["Monday","Tuesday","Wednesday"]
+    # ---- 3️⃣ Weekly pattern ----
+    days_of_week  = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
+    default_days  = ["Monday","Tuesday","Wednesday"]
     week_patterns = []
     if not advanced_mode:
         days = st.multiselect("📌 Unterrichtstage", options=days_of_week, default=default_days)
-        for week_label, sessions in topic_structure:
+        for _, sessions in topic_structure:
             week_patterns.append((len(sessions), days))
     else:
-        for i, (week_label, sessions) in enumerate(topic_structure):
+        for i,(week_label,sessions) in enumerate(topic_structure):
             with st.expander(week_label, expanded=True):
                 wd = st.multiselect(f"Tage {week_label}", options=days_of_week, default=default_days, key=f"wp_{i}")
                 week_patterns.append((len(sessions), wd or default_days))
 
-    # ---- Build schedule dates ----
+    # ---- build dates ----
     session_labels = [(w, s) for w, sess in topic_structure for s in sess]
     dates = []
     cur = start_date
@@ -1021,29 +1025,23 @@ with tabs[6]:
             cur += timedelta(days=1)
         dates.extend(week_dates)
 
-    # ---- Preview table ----
+    # ---- preview table ----
     rows = [{
         "Week": wl,
-        "Day": f"Day {i+1}",
+        "Day":  f"Day {i+1}",
         "Date": d.strftime("%A, %d %B %Y"),
         "Topic": tp
-    } for i, ((wl, tp), d) in enumerate(zip(session_labels, dates))]
+    } for i, ((wl,tp), d) in enumerate(zip(session_labels, dates))]
     st.dataframe(pd.DataFrame(rows), use_container_width=True)
 
-    # ---- Filenames ----
+    # ---- downloads prefixes ----
     prefix = f"{selected_level}_{start_date.strftime('%Y-%m-%d')}_schedule"
 
-    # ---- TXT Download ----
-    txt = ("Learn Language Education Academy\n"
-           f"Schedule: {selected_level}  Start: {start_date}\n\n") + \
-          "\n".join(f"- {r['Day']} ({r['Date']}): {r['Topic']}" for r in rows)
-    st.download_button("📁 TXT Download", txt, file_name=f"{prefix}.txt")
-
-    # ==== PDF HELPERS ====
+    # ==== helpers for PDF ====
     def safe_pdf(text: str) -> str:
-        return "".join(c if ord(c) < 256 else "?" for c in text)
+        return "".join(c if ord(c)<256 else "?" for c in text)
 
-    def break_long_words(line: str, max_len: int = 40) -> str:
+    def break_long_words(line: str, max_len: int=40) -> str:
         out = []
         for tok in line.split(" "):
             while len(tok) > max_len:
@@ -1052,34 +1050,62 @@ with tabs[6]:
             out.append(tok)
         return " ".join(out)
 
-    # ==== PDF Download ====
+    def safe_for_fpdf(line: str) -> bool:
+        txt = line.strip()
+        if len(txt) < 2: return False
+        if len(txt)==1 and not txt.isalnum(): return False
+        return True
+
+    # ---- TXT download ----
+    txt = (
+        "Learn Language Education Academy\n"
+        f"Schedule: {selected_level}  Start: {start_date}\n\n"
+    ) + "\n".join(f"- {r['Day']} ({r['Date']}): {r['Topic']}" for r in rows)
+    st.download_button("📁 TXT Download", txt, file_name=f"{prefix}.txt")
+
+    # ---- PDF download ----
     if st.button("📄 PDF Download"):
         pdf = FPDF()
         pdf.add_page()
-        pdf.set_font("Arial", "B", 14)
-        pdf.cell(0,12, safe_pdf(f"Learn Language Education Academy – {selected_level} Schedule"), ln=1, align="C")
+        pdf.set_font("Arial","B",14)
+        header = f"Learn Language Education Academy – {selected_level} Schedule"
+        pdf.cell(0,12,safe_pdf(header),ln=1,align="C")
         pdf.ln(4)
-        pdf.set_font("Arial", size=11)
+        pdf.set_font("Arial",size=11)
 
-        # Header info
-        pdf.multi_cell(0, 8, break_long_words(safe_pdf(f"Start: {start_date}")))
-        if holiday_dates:
-            hd = ", ".join(d.strftime("%d.%m.%Y") for d in holiday_dates)
-            pdf.multi_cell(0, 8, break_long_words(safe_pdf(f"Holidays: {hd}")))
+        # header lines
+        for line in [f"Start: {start_date}"] + (
+            [f"Holidays: {', '.join(d.strftime('%d.%m.%Y') for d in holiday_dates)}"] if holiday_dates else []
+        ):
+            wrapped = break_long_words(safe_pdf(line))
+            if safe_for_fpdf(wrapped):
+                try: pdf.multi_cell(0,8, wrapped)
+                except: pass
         pdf.ln(2)
 
-        # Sessions
+        # session lines
         for r in rows:
-            line = f"{r['Day']} ({r['Date']}): {r['Topic']}"
-            pdf.multi_cell(0, 8, break_long_words(safe_pdf(line)))
+            raw = f"{r['Day']} ({r['Date']}): {r['Topic']}"
+            wrapped = break_long_words(safe_pdf(raw))
+            if safe_for_fpdf(wrapped):
+                try: pdf.multi_cell(0,8, wrapped)
+                except: pass
+
         pdf.ln(6)
-        pdf.set_font("Arial", "I", 11)
-        pdf.cell(0, 10, safe_pdf("Signed: Felix Asadu"), ln=1, align="R")
+        pdf.set_font("Arial","I",11)
+        sig = "Signed: Felix Asadu"
+        wrapped = break_long_words(safe_pdf(sig))
+        if safe_for_fpdf(wrapped):
+            pdf.cell(0,10, wrapped, ln=1, align="R")
 
         out = pdf.output(dest="S")
-        pdf_bytes = out.encode("latin-1") if isinstance(out, str) else out
-        st.download_button("Download Schedule PDF", data=pdf_bytes,
-                           file_name=f"{prefix}.pdf", mime="application/pdf")
+        pdf_bytes = out.encode("latin-1") if isinstance(out,str) else out
+        st.download_button(
+            "Download Schedule PDF",
+            data=pdf_bytes,
+            file_name=f"{prefix}.pdf",
+            mime="application/pdf"
+        )
 
 
 
