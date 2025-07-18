@@ -484,7 +484,6 @@ with tabs[3]:
 with tabs[4]:
     st.title("📄 Generate Contract & Receipt PDF for Any Student")
 
-    # --- Google Sheet as the ONLY source ---
     google_csv = (
         "https://docs.google.com/spreadsheets/d/"
         "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
@@ -508,7 +507,6 @@ with tabs[4]:
     phone_col   = getcol("phone")
     level_col   = getcol("level")
 
-    # --- Search/filter UI (unique key to avoid duplicate errors) ---
     search_val = st.text_input(
         "Search students by name, code, phone, or level:", 
         value="", key="pdf_tab_search_contract"
@@ -529,7 +527,6 @@ with tabs[4]:
     selected_name = st.selectbox("Select Student", student_names)
     row = filtered_df[filtered_df[name_col] == selected_name].iloc[0]
 
-    # --- Editable fields before PDF generation ---
     default_paid    = float(row.get(paid_col, 0))
     default_balance = float(row.get(bal_col, 0))
     default_start = pd.to_datetime(row.get(start_col, ""), errors="coerce").date()
@@ -551,10 +548,8 @@ with tabs[4]:
     contract_end_input   = st.date_input("Contract End Date", value=default_end, key="pdf_contract_end")
     course_length        = (contract_end_input - contract_start_input).days
 
-    # --- Logo URL ---
     logo_url = "https://drive.google.com/uc?export=download&id=1xLTtiCbEeHJjrASvFjBgfFuGrgVzg6wU"
 
-    # ==== PDF HELPER FUNCTIONS ====
     def sanitize_text(text):
         cleaned = "".join(c if ord(c) < 256 else "?" for c in str(text))
         return " ".join(cleaned.split())
@@ -575,7 +570,6 @@ with tabs[4]:
         if len(txt) == 1 and not txt.isalnum(): return False
         return True
 
-    # ==== PDF GENERATION ====
     if st.button("Generate & Download PDF"):
         paid    = paid_input
         balance = balance_input
@@ -584,7 +578,6 @@ with tabs[4]:
         pdf = FPDF()
         pdf.add_page()
 
-        # -- Add logo from web, always works --
         try:
             response = requests.get(logo_url)
             if response.status_code == 200:
@@ -600,7 +593,6 @@ with tabs[4]:
             st.warning(f"Logo insertion failed: {e}")
             pdf.ln(2)
 
-        # -- Payment banner --
         status = "FULLY PAID" if balance == 0 else "INSTALLMENT PLAN"
         pdf.set_font("Arial", "B", 12)
         pdf.set_text_color(0, 128, 0)
@@ -608,12 +600,10 @@ with tabs[4]:
         pdf.set_text_color(0, 0, 0)
         pdf.ln(5)
 
-        # -- Receipt header --
         pdf.set_font("Arial", size=14)
         pdf.cell(0, 10, "Learn Language Education Academy Payment Receipt", new_x="LMARGIN", new_y="NEXT", align="C")
         pdf.ln(10)
 
-        # -- Receipt details --
         pdf.set_font("Arial", size=12)
         for label, val in [
             ("Name", selected_name),
@@ -631,7 +621,6 @@ with tabs[4]:
             pdf.cell(0, 8, text, new_x="LMARGIN", new_y="NEXT")
         pdf.ln(10)
 
-        # -- Contract section --
         pdf.ln(15)
         pdf.set_font("Arial", size=14)
         pdf.cell(0, 10, "Learn Language Education Academy Student Contract", new_x="LMARGIN", new_y="NEXT", align="C")
@@ -642,25 +631,7 @@ with tabs[4]:
 PAYMENT AGREEMENT
 
 This Payment Agreement is entered into on [DATE] for [CLASS] students of Learn Language Education Academy and Felix Asadu ("Teacher").
-
-Terms of Payment:
-1. Payment Amount: The student agrees to pay the teacher a total of [AMOUNT] cedis for the course.
-2. Payment Schedule: The payment can be made in full or in two installments: GHS [FIRST_INSTALLMENT] for the first installment, and the remaining balance for the second installment after one month of payment. 
-3. Late Payments: In the event of late payment, the school may revoke access to all learning platforms. No refund will be made.
-4. Refunds: Once a deposit is made and a receipt is issued, no refunds will be provided.
-
-Cancellation and Refund Policy:
-1. If the teacher cancels a lesson, it will be rescheduled.
-
-Miscellaneous Terms:
-1. Attendance: The student agrees to attend lessons punctually.
-2. Communication: Both parties agree to communicate changes promptly.
-3. Termination: Either party may terminate this Agreement with written notice if the other party breaches any material term.
-
-Signatures:
-    [STUDENT_NAME]
-    Date: [DATE]
-    Asadu Felix
+...
 """)
         filled = (
             template
@@ -674,7 +645,6 @@ Signatures:
             .replace("[COURSE_LENGTH]",    f"{course_length} days")
         )
 
-        # -- Write contract safely --
         for line in filled.split("\n"):
             safe    = sanitize_text(line)
             wrapped = break_long_words(safe, max_len=40)
@@ -684,11 +654,8 @@ Signatures:
                 except:
                     pass
         pdf.ln(10)
-
-        # -- Signature --
         pdf.cell(0, 8, f"Signed: {signature}", new_x="LMARGIN", new_y="NEXT")
 
-        # -- Serve PDF (robust) --
         output_data = pdf.output(dest="S")
         if isinstance(output_data, str):
             pdf_bytes = output_data.encode("latin-1")
@@ -702,6 +669,7 @@ Signatures:
             mime="application/pdf"
         )
         st.success("✅ PDF generated and ready to download.")
+
 
 
 
