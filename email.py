@@ -552,7 +552,7 @@ with tabs[4]:
     course_length        = (contract_end_input - contract_start_input).days
 
     # --- Logo URL ---
-    logo_url = "https://i.imgur.com/iFiehrp.png"
+    logo_url = "https://drive.google.com/uc?export=download&id=1xLTtiCbEeHJjrASvFjBgfFuGrgVzg6wU"
 
     # ==== PDF HELPER FUNCTIONS ====
     def sanitize_text(text):
