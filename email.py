@@ -204,7 +204,8 @@ STUDENT_CODES = df_students["studentcode"].dropna().unique().tolist() if "studen
 
 # ==== TABS SETUP ====
 tabs = st.tabs([
-    "📝 Pending"                 # 0
+    "📝 Pending",                 # 0
+    "👩‍🎓 All Students"          # 1
 ])
 
 # ==== TAB 0: PENDING STUDENTS ====
@@ -253,4 +254,28 @@ with tabs[0]:
     )
 
 # ==== END OF STAGE 3 (TAB 0) ====
+
+# ==== TAB 1: ALL STUDENTS ====
+with tabs[1]:
+    st.title("👩‍🎓 All Students")
+
+    # --- Optional: Search/Filter ---
+    search = st.text_input("🔍 Search students by name, code, or email...")
+    if search:
+        search = search.lower().strip()
+        filt = df_students[
+            df_students.apply(lambda row: search in str(row).lower(), axis=1)
+        ]
+    else:
+        filt = df_students
+
+    # --- Show Student Table ---
+    st.dataframe(filt, use_container_width=True)
+
+    # --- Download Button ---
+    st.download_button(
+        "⬇️ Download All Students CSV",
+        filt.to_csv(index=False),
+        file_name="all_students.csv"
+    )
 
