@@ -338,7 +338,7 @@ with tabs[2]:
             st.success(f"✅ Recorded: {exp_type} – {exp_item}")
             # Save locally so that session users can download the updated file
             df_exp.to_csv("expenses_all.csv", index=False)
-            st.experimental_rerun()
+            st.rerun()
 
     # --- Financial Summary ---
     st.write("## 📊 Financial Summary")
