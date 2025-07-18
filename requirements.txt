@@ -4,4 +4,3 @@ fpdf2>=1.7.2
 numpy>=1.24.0
 sendgrid>=6.9.1
 qrcode[pil]>=7.4.2
-
