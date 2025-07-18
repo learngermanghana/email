@@ -129,6 +129,9 @@ def break_long_words(text, max_len=60):
         return ' '.join([word[i:i+max_len] for i in range(0, len(word), max_len)])
     return re.sub(r'\S{' + str(max_len+1) + r',}', _break, text)
 
+def sanitize_text(text):
+    return "".join(c if ord(c) < 256 else "?" for c in str(text))
+
 
 # ==== AGREEMENT TEMPLATE ====
 if "agreement_template" not in st.session_state:
