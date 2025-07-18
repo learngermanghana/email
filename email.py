@@ -122,16 +122,29 @@ def send_email_report(pdf_bytes: bytes, to_email: str, subject: str, html_conten
         st.error(f"Email send failed: {e}")
         return False
 
-
 def sanitize_text(text):
-    # Remove non-latin-1, replace tabs with space, normalize
-    cleaned = "".join(c if ord(c) < 256 else "?" for c in str(text))
-    cleaned = cleaned.replace("\t", " ")
-    return cleaned
+    """Latin-1 only, printable, no non-breaking spaces, no emojis."""
+    text = str(text)
+    # Remove all non-latin-1 chars and control chars
+    text = "".join(
+        c if (32 <= ord(c) <= 126 or 160 <= ord(c) < 255) else " "
+        for c in text
+    )
+    # Remove all emojis and invisible chars
+    text = "".join(c for c in text if unicodedata.category(c)[0] != "C")
+    # Remove tabs, double spaces, weird dashes
+    text = text.replace('\t', ' ').replace('\u00A0', ' ')
+    text = re.sub(r'\s+', ' ', text)
+    return text.strip()
 
-def break_long_words(text, max_len=60):
-    # This will break up any word longer than max_len by inserting a space
-    return re.sub(r'(\S{' + str(max_len) + r',})', lambda m: ' '.join([m.group(0)[i:i+max_len] for i in range(0, len(m.group(0)), max_len)]), text)
+def break_long_words(text, max_len=40):
+    # forcibly split any long word for FPDF
+    return re.sub(
+        r'(\S{' + str(max_len) + r',})',
+        lambda m: ' '.join([m.group(0)[i:i+max_len] for i in range(0, len(m.group(0)), max_len)]),
+        text
+    )
+
 
 
 
