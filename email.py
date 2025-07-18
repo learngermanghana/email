@@ -11,6 +11,9 @@ import pandas as pd
 import streamlit as st
 from fpdf import FPDF
 import qrcode
+from PIL import Image  # For logo image handling
+from io import BytesIO
+
 
 
 from sendgrid import SendGridAPIClient
@@ -552,8 +555,6 @@ with tabs[4]:
     logo_url = "https://i.imgur.com/iFiehrp.png"
 
     # ==== PDF HELPER FUNCTIONS ====
-    import re
-
     def sanitize_text(text):
         cleaned = "".join(c if ord(c) < 256 else "?" for c in str(text))
         return " ".join(cleaned.split())
@@ -583,16 +584,20 @@ with tabs[4]:
         pdf = FPDF()
         pdf.add_page()
 
-        # -- Add logo from web --
+        # -- Add logo from web, always works --
         try:
-            import requests, os
-            logo_path = "school_logo.png"
-            if not os.path.exists(logo_path):
-                with open(logo_path, "wb") as f:
-                    f.write(requests.get(logo_url).content)
-            pdf.image(logo_path, x=10, y=8, w=33)
-            pdf.ln(25)
+            response = requests.get(logo_url)
+            if response.status_code == 200:
+                img = Image.open(BytesIO(response.content)).convert("RGB")
+                img_path = "/tmp/school_logo.png"
+                img.save(img_path)
+                pdf.image(img_path, x=10, y=8, w=33)
+                pdf.ln(25)
+            else:
+                st.warning("Could not download logo image from the URL.")
+                pdf.ln(2)
         except Exception as e:
+            st.warning(f"Logo insertion failed: {e}")
             pdf.ln(2)
 
         # -- Payment banner --
@@ -633,7 +638,6 @@ with tabs[4]:
         pdf.set_font("Arial", size=12)
         pdf.ln(8)
 
-        # If not in session state, provide fallback contract template
         template = st.session_state.get("agreement_template", """
 PAYMENT AGREEMENT
 
