@@ -205,9 +205,8 @@ STUDENT_CODES = df_students["studentcode"].dropna().unique().tolist() if "studen
 # ==== TABS SETUP ====
 tabs = st.tabs([
     "📝 Pending",                 # 0
-    "👩‍🎓 All Students"          # 1
-    "💵 Expenses"                # 2
-    
+    "👩‍🎓 All Students"             # 1
+    "💵 Expenses",                # 2    
 ])
 
 # ==== TAB 0: PENDING STUDENTS ====
