@@ -671,7 +671,6 @@ This Payment Agreement is entered into on [DATE] for [CLASS] students of Learn L
         )
         st.success("✅ PDF generated and ready to download.")
 
-
 with tabs[5]:
     import re
 
@@ -742,7 +741,6 @@ with tabs[5]:
     extra_attach = st.file_uploader("Additional Attachment (optional)", type=None, key="extra_attach")
 
     # ---- Download school logo from Google Drive (if not uploaded) ----
-    # https://drive.google.com/file/d/1xLTtiCbEeHJjrASvFjBgfFuGrgVzg6wU/view?usp=drive_link
     school_logo_url = "https://drive.google.com/uc?export=download&id=1xLTtiCbEeHJjrASvFjBgfFuGrgVzg6wU"
     school_logo_path = None
     if logo_file is None:
@@ -769,9 +767,11 @@ with tabs[5]:
     watermark_file_path = None
     if msg_type == "Letter of Enrollment" and watermark_file is None:
         try:
+            import requests
+            from PIL import Image
+            from io import BytesIO
             wm_resp = requests.get(watermark_gdrive_url)
             if wm_resp.status_code == 200:
-                from PIL import Image
                 wm_img = Image.open(BytesIO(wm_resp.content)).convert("RGBA")
                 watermark_file_path = "/tmp/watermark_lett_enroll.png"
                 wm_img.save(watermark_file_path)
@@ -899,14 +899,16 @@ with tabs[5]:
         pdf.cell(0, 7, safe_pdf("Director"), ln=True)
         pdf.cell(0, 7, safe_pdf(SCHOOL_NAME), ln=True)
 
-    # --- Safe PDF bytes output (no Unicode bug) ---
+    # --- Safe PDF bytes output (NO RUNTIME ERROR) ---
+    pdf_bytes = None
     output_data = pdf.output(dest="S")
     if isinstance(output_data, str):
         pdf_bytes = output_data.encode("latin-1", "replace")
     elif isinstance(output_data, bytes):
         pdf_bytes = output_data
     else:
-        raise RuntimeError("Could not get bytes from FPDF output!")
+        st.error("Could not generate PDF. Please try again.")
+        pdf_bytes = b""
 
     st.download_button(
         "📄 Download Letter/PDF", 
@@ -928,7 +930,7 @@ with tabs[5]:
             html_content=email_body
         )
         # Attach PDF if selected
-        if attach_pdf:
+        if attach_pdf and pdf_bytes:
             pdf_attach = Attachment(
                 FileContent(base64.b64encode(pdf_bytes).decode()),
                 FileName(f"{student_name.replace(' ','_')}_{msg_type.replace(' ','_')}.pdf"),
@@ -952,7 +954,6 @@ with tabs[5]:
             st.success(f"Email sent to {recipient_email}!")
         except Exception as e:
             st.error(f"Email send failed: {e}")
-
 
 
 
