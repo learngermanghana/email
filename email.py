@@ -646,10 +646,11 @@ Miscellaneous Terms:
 2. Communication: Both parties agree to communicate changes promptly.
 3. Termination: Either party may terminate this Agreement with written notice if the other party breaches any material term.
 
+    template = st.session_state.get("agreement_template", """
 Signatures:
-[STUDENT_NAME]
-Date: [DATE]
-Asadu Felix
+    [STUDENT_NAME]
+    Date: [DATE]
+    Asadu Felix
 """)
     filled = (
         template
