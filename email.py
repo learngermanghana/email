@@ -898,6 +898,171 @@ with tabs[5]:
         except Exception as e:
             st.error(f"Email send failed: {e}")
 
+with tabs[5]:
+    # ---- PDF-safe helper ----
+    def safe_pdf(text):
+        return "".join(c if ord(c)<256 else "?" for c in str(text or ""))
+
+    # ---- QR code helper ----
+    def make_qr_code(url):
+        import qrcode, tempfile
+        img = qrcode.make(url)
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        img.save(tmp.name)
+        return tmp.name
+
+    st.title("📧 Send Email / Letter")
+    # --- Select Student ---
+    search_val = st.text_input("Search students by name/code/email", key="student_search")
+    df = df_students.copy()
+    if search_val:
+        mask = (
+            df["name"].str.contains(search_val, case=False, na=False) |
+            df["studentcode"].str.contains(search_val, case=False, na=False) |
+            df.get("email", pd.Series(dtype=str)).str.contains(search_val, case=False, na=False)
+        )
+        df = df[mask]
+    student_list = df["name"].dropna().tolist()
+    student_name = st.selectbox("Student Name", student_list, key="student_select")
+    if not student_name:
+        st.stop()
+    row = df[df["name"]==student_name].iloc[0]
+    level      = row["level"]
+    email      = row.get("email","")
+    start_date = pd.to_datetime(row.get("contractstart", date.today())).date()
+    end_date   = pd.to_datetime(row.get("contractend",   date.today())).date()
+    paid       = float(row.get("paid",0))
+    bal        = float(row.get("balance",0))
+
+    # --- Message Type ---
+    msg_type = st.selectbox("Type", [
+        "Welcome Message",
+        "Letter of Enrollment",
+        "Assignment Results",
+        "Outstanding Balance Notice",
+        "Course Completion Letter",
+        "Custom Message"
+    ], key="msg_type")
+
+    # --- Default Bodies (plain‑ASCII) ---
+    if msg_type=="Welcome Message":
+        email_body = (
+            f"Dear {student_name},\n\n"
+            "Welcome to Learn Language Education Academy! We’re excited to support you.\n"
+            f"Your {level} course starts on {start_date:%d %B %Y}.\n"
+            f"Payment status: {'Full Payment' if bal==0 else 'Installment Plan'}. "
+            f"Paid: GHS {paid:.2f} / Balance: GHS {bal:.2f}.\n"
+            "Visit the Falowen App: https://falowen.streamlit.app/\n\n"
+            "Best regards,\n"
+            "Felix Asadu\n"
+            "Director"
+        )
+    elif msg_type=="Letter of Enrollment":
+        email_body = (
+            "To Whom It May Concern,\n\n"
+            f"This certifies that {student_name} is enrolled in the {level} programme.\n"
+            f"Period: {start_date:%m/%d/%Y} to {end_date:%m/%d/%Y}.\n"
+            f"Registered under BN173410224.\n\n"
+            "If you require confirmation, please contact us at 0205706589 or office@learngermanghana.com.\n\n"
+            "Yours sincerely,\n"
+            "Felix Asadu\n"
+            "Director"
+        )
+    elif msg_type=="Assignment Results":
+        email_body = (
+            f"Hello {student_name},\n\n"
+            "Your latest assignment results:\n"
+            " - Assignment 1: 85%\n"
+            " - Assignment 2: 90%\n\n"
+            "Keep up the great work!\n\n"
+            "Regards,\n"
+            "Learn Language Education Academy"
+        )
+    elif msg_type=="Outstanding Balance Notice":
+        email_body = (
+            f"Dear {student_name},\n\n"
+            f"Our records show an outstanding balance of GHS {bal:.2f}. "
+            "Please settle this at your earliest convenience.\n\n"
+            "Thank you,\n"
+            "Learn Language Education Academy"
+        )
+    elif msg_type=="Course Completion Letter":
+        email_body = (
+            f"Dear {student_name},\n\n"
+            f"Congratulations on completing the {level} course! Your dedication has paid off.\n\n"
+            "If you’re interested in advancing to the next level, "
+            "please visit our upcoming classes page for the latest details and registration dates:\n"
+            "https://www.learngermanghana.com/upcoming-classes\n\n"
+            "Wishing you continued success!\n\n"
+            "Warm regards,\n"
+            "Felix Asadu\n"
+            "Director"
+        )
+    else:
+        email_body = ""
+
+    # --- Subject & Preview ---
+    subject = st.text_input("Subject", f"{msg_type} - {student_name}", key="email_subj")
+    st.subheader("Preview:")
+    st.code(email_body)
+
+    # ---- PDF Generation & Download ----
+    st.subheader("PDF Preview & Download")
+    logo_url = "https://drive.google.com/uc?export=download&id=1xLTtiCbEeHJjrASvFjBgfFuGrgVzg6wU"
+    class LetterPDF(FPDF):
+        def header(self):
+            # Logo from Drive
+            try:
+                r = requests.get(logo_url)
+                if r.status_code==200:
+                    img = Image.open(BytesIO(r.content)).convert("RGB")
+                    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+                    img.save(tmp.name)
+                    self.image(tmp.name, x=10, y=8, w=28)
+            except:
+                pass
+            self.ln(25)
+        def footer(self):
+            qr = make_qr_code(SCHOOL_WEBSITE)
+            self.image(qr, x=180, y=275, w=18)
+            self.set_y(-18)
+            self.set_font("Arial","I",8)
+            self.cell(0,10,safe_pdf("Valid without signature."),0,0,"C")
+
+    if st.button("Generate PDF and Download", key="gen_pdf"):
+        pdf = LetterPDF()
+        pdf.add_page()
+        pdf.set_font("Arial","",12)
+        for line in email_body.split("\n"):
+            pdf.multi_cell(0,8, safe_pdf(line))
+        out = pdf.output(dest="S")
+        pdf_bytes = out.encode("latin-1") if isinstance(out,str) else out
+        st.download_button("Download PDF", pdf_bytes,
+                           file_name=f"{student_name.replace(' ','_')}_{msg_type}.pdf",
+                           mime="application/pdf")
+
+    # ---- Send Email ----
+    attach_pdf = st.checkbox("Attach PDF?", key="attach_pdf")
+    recipient  = st.text_input("Recipient Email", value=email, key="recip")
+    if st.button("Send Email", key="send_email"):
+        msg = Mail(from_email=SENDER_EMAIL, to_emails=recipient,
+                   subject=subject, html_content=email_body)
+        if attach_pdf:
+            msg.add_attachment(
+                Attachment(
+                    FileContent(base64.b64encode(pdf_bytes).decode()),
+                    FileName(f"{student_name}_{msg_type}.pdf"),
+                    FileType("application/pdf"),
+                    Disposition("attachment")
+                )
+            )
+        try:
+            SendGridAPIClient(SENDGRID_KEY).send(msg)
+            st.success("Email sent!")
+        except Exception as e:
+            st.error(f"Email send failed: {e}")
+
+
 
 
 
