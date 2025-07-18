@@ -573,21 +573,6 @@ with tabs[4]:
         # --- LOGO: use your online logo by default ---
         logo_url = "https://i.imgur.com/iFiehrp.png"
 
-        # --- Helper: Make text PDF-safe ---
-        import re
-        def sanitize_text(text):
-            cleaned = "".join(c if ord(c) < 256 else "?" for c in str(text))
-            cleaned = cleaned.replace('\t', ' ')
-            cleaned = ' '.join(cleaned.split())
-            return cleaned.strip()
-
-        def break_long_words(text, max_len=40):
-            return re.sub(
-                r'(\S{' + str(max_len) + r',})',
-                lambda m: ' '.join([m.group(0)[i:i+max_len] for i in range(0, len(m.group(0)), max_len)]),
-                text
-            )
-
         # --- Download Button ---
         if st.button("Generate & Download PDF"):
             paid    = paid_input
