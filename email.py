@@ -475,14 +475,11 @@ with tabs[3]:
         file_name="debtor_whatsapp_links.csv"
     )
 
-
 # ==== TAB 4: CONTRACT & RECEIPT PDF FOR ANY STUDENT ====
 with tabs[4]:
     st.title("📄 Generate Contract & Receipt PDF for Any Student")
 
-    # --- Google Sheet as the ONLY source ---
     df = df_students.copy()
-
     if df.empty:
         st.warning("No student data available.")
     else:
@@ -497,12 +494,9 @@ with tabs[4]:
         phone_col   = getcol("phone")
         level_col   = getcol("level")
 
-        # --- SEARCH BOX at the bottom (shown above dropdown) ---
         search_val = st.text_input(
             "Search students by name, code, phone, or level:", value="", key="pdf_tab_search"
         )
-
-        # Filter students
         filtered_df = df.copy()
         if search_val:
             sv = search_val.strip().lower()
@@ -520,7 +514,6 @@ with tabs[4]:
         selected_name = st.selectbox("Select Student", student_names)
         row = filtered_df[filtered_df[name_col] == selected_name].iloc[0]
 
-        # 4. Editable fields before PDF generation
         default_paid    = float(row.get(paid_col, 0))
         default_balance = float(row.get(bal_col, 0))
         default_start   = pd.to_datetime(row.get(start_col, ""), errors="coerce").date() \
@@ -548,14 +541,13 @@ with tabs[4]:
         )
         course_length = (contract_end_input - contract_start_input).days
 
-        st.subheader("Logo (optional)")
+        st.subheader("Logo (optional, default logo used if none uploaded)")
         logo_file = st.file_uploader(
-            "Upload logo image", type=["png", "jpg", "jpeg"], key="logo_upload"
+            "Upload school logo image", type=["png", "jpg", "jpeg"], key="logo_upload"
         )
 
         # 5. Generate PDF
         if st.button("Generate & Download PDF"):
-            # Use current inputs
             paid    = paid_input
             balance = balance_input
             total   = total_input
@@ -565,15 +557,30 @@ with tabs[4]:
             pdf = FPDF()
             pdf.add_page()
 
-            # Add logo if uploaded
+            # Add logo: uploaded logo OR default logo from URL
+            logo_path = None
             if logo_file:
-                import tempfile
                 ext = logo_file.name.split('.')[-1]
                 tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
                 tmp.write(logo_file.getbuffer())
                 tmp.close()
-                pdf.image(tmp.name, x=10, y=8, w=33)
-                pdf.ln(25)
+                logo_path = tmp.name
+            else:
+                # Download default logo from your URL
+                logo_url = "https://i.imgur.com/iFiehrp.png"
+                response = requests.get(logo_url)
+                if response.ok:
+                    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+                    tmp.write(response.content)
+                    tmp.close()
+                    logo_path = tmp.name
+
+            if logo_path:
+                try:
+                    pdf.image(logo_path, x=10, y=8, w=33)
+                    pdf.ln(25)
+                except Exception:
+                    pass
 
             # Payment status banner
             status = "FULLY PAID" if balance == 0 else "INSTALLMENT PLAN"
@@ -647,9 +654,11 @@ Asadu Felix
                 .replace("[SECOND_DUE_DATE]",  str(contract_end))
                 .replace("[COURSE_LENGTH]",    f"{course_length} days")
             )
+            # Only add non-empty, non-whitespace lines to avoid FPDF error!
             for line in filled.split("\n"):
                 safe = safe_pdf(line)
-                pdf.multi_cell(0, 8, safe)
+                if safe.strip():
+                    pdf.multi_cell(0, 8, safe)
             pdf.ln(10)
 
             # Signature
@@ -664,3 +673,4 @@ Asadu Felix
                 mime="application/pdf"
             )
             st.success("✅ PDF generated and ready to download.")
+
