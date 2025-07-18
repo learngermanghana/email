@@ -137,7 +137,17 @@ def break_long_words(text, max_len=40):
         text
     )
 
-
+def safe_for_fpdf(line):
+    content = line.strip()
+    # Ignore if line is empty or only 1 character and not a-z/0-9
+    if len(content) == 0:
+        return False
+    if len(content) == 1 and not content.isalnum():
+        return False
+    # Ignore if line is only punctuation or only spaces
+    if all(not c.isalnum() for c in content):
+        return False
+    return True
 
 
 # ==== AGREEMENT TEMPLATE ====
