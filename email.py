@@ -557,7 +557,9 @@ with tabs[4]:
     import re, tempfile, requests
 
     def sanitize_text(text):
-        return " ".join("?" if ord(c) >= 256 else c for c in str(text)).split()
+        # Replace non-latin-1 characters with '?' and collapse whitespace
+        cleaned = "".join("?" if ord(c) >= 256 else c for c in str(text))
+        return " ".join(cleaned.split())
 
     def break_long_words(line, max_len=40):
         words, out = line.split(), []
