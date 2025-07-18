@@ -903,6 +903,7 @@ with tabs[6]:
         except Exception as e:
             st.error(f"Email send failed: {e}")
 
+
 # ==== TAB 6: COURSE SCHEDULE GENERATOR ====
 with tabs[6]:
     from datetime import date, timedelta
@@ -954,32 +955,32 @@ with tabs[6]:
     ]
     raw_schedule_a2 = [
         ("Woche 1", ["1.1. Small Talk (Exercise)", "1.2. Personen Beschreiben (Exercise)", "1.3. Dinge und Personen vergleichen"]),
-        ("Woche 2", ["2.4. Wo möchten wir uns treffen?", "2.5. Was machst du in deiner Freizeit?"]),
-        ("Woche 3", ["3.6. Möbel und Räume kennenlernen", "3.7. Eine Wohnung suchen (Übung)", "3.8. Rezepte und Essen (Exercise)"]),
+        ("Woche 2", ["2.4. Wo moechten wir uns treffen?", "2.5. Was machst du in deiner Freizeit?"]),
+        ("Woche 3", ["3.6. Moebel und Raeume kennenlernen", "3.7. Eine Wohnung suchen (Uebung)", "3.8. Rezepte und Essen (Exercise)"]),
         ("Woche 4", ["4.9. Urlaub", "4.10. Tourismus und Traditionelle Feste", "4.11. Unterwegs: Verkehrsmittel vergleichen"]),
-        ("Woche 5", ["5.12. Ein Tag im Leben (Übung)", "5.13. Ein Vorstellungsgesprach (Exercise)", "5.14. Beruf und Karriere (Exercise)"]),
+        ("Woche 5", ["5.12. Ein Tag im Leben (Uebung)", "5.13. Ein Vorstellungsgespraech (Exercise)", "5.14. Beruf und Karriere (Exercise)"]),
         ("Woche 6", ["6.15. Mein Lieblingssport", "6.16. Wohlbefinden und Entspannung", "6.17. In die Apotheke gehen"]),
-        ("Woche 7", ["7.18. Die Bank Anrufen", "7.19. Einkaufen – Wo und wie? (Exercise)", "7.20. Typische Reklamationssituationen üben"]),
+        ("Woche 7", ["7.18. Die Bank Anrufen", "7.19. Einkaufen - Wo und wie? (Exercise)", "7.20. Typische Reklamationssituationen ueben"]),
         ("Woche 8", ["8.21. Ein Wochenende planen", "8.22. Die Woche Planung"]),
         ("Woche 9", ["9.23. Wie kommst du zur Schule / zur Arbeit?", "9.24. Einen Urlaub planen", "9.25. Tagesablauf (Exercise)"]),
-        ("Woche 10", ["10.26. Gefühle in verschiedenen Situationen beschreiben", "10.27. Digitale Kommunikation", "10.28. Über die Zukunft sprechen"])
+        ("Woche 10", ["10.26. Gefuehle in verschiedenen Situationen beschreiben", "10.27. Digitale Kommunikation", "10.28. Ueber die Zukunft sprechen"])
     ]
     raw_schedule_b1 = [
-        ("Woche 1", ["1.1. Traumwelten (Übung)", "1.2. Freundes für Leben (Übung)", "1.3. Erfolgsgeschichten (Übung)"]),
-        ("Woche 2", ["2.4. Wohnung suchen (Übung)", "2.5. Der Besichtigungstermin (Übung)", "2.6. Leben in der Stadt oder auf dem Land?"]),
-        ("Woche 3", ["3.7. Fast Food vs. Hausmannskost", "3.8. Alles für die Gesundheit", "3.9. Work‑Life‑Balance im modernen Arbeitsumfeld"]),
-        ("Woche 4", ["4.10. Digitale Auszeit und Selbstfürsorge", "4.11. Teamspiele und Kooperative Aktivitäten", "4.12. Abenteuer in der Natur", "4.13. Eigene Filmkritik schreiben"]),
-        ("Woche 5", ["5.14. Traditionelles vs. digitales Lernen", "5.15. Medien und Arbeiten im Homeoffice", "5.16. Prüfungsangst und Stressbewältigung", "5.17. Wie lernt man am besten?"]),
-        ("Woche 6", ["6.18. Wege zum Wunschberuf", "6.19. Das Vorstellungsgespräch", "6.20. Wie wird man …? (Ausbildung und Qualifikation)"]),
-        ("Woche 7", ["7.21. Lebensformen heute – Familie & Wohnen", "7.22. Was ist dir in einer Beziehung wichtig?", "7.23. Erstes Date – Typische Situationen"]),
-        ("Woche 8", ["8.24. Konsum & Nachhaltigkeit", "8.25. Online einkaufen – Rechte & Risiken"]),
-        ("Woche 9", ["9.26. Reiseprobleme & Lösungen"]),
+        ("Woche 1", ["1.1. Traumwelten (Uebung)", "1.2. Freundes fuer Leben (Uebung)", "1.3. Erfolgsgeschichten (Uebung)"]),
+        ("Woche 2", ["2.4. Wohnung suchen (Uebung)", "2.5. Der Besichtigungstermin (Uebung)", "2.6. Leben in der Stadt oder auf dem Land?"]),
+        ("Woche 3", ["3.7. Fast Food vs. Hausmannskost", "3.8. Alles fuer die Gesundheit", "3.9. Work-Life-Balance im modernen Arbeitsumfeld"]),
+        ("Woche 4", ["4.10. Digitale Auszeit und Selbstfuersorge", "4.11. Teamspiele und Kooperative Aktivitaeten", "4.12. Abenteuer in der Natur", "4.13. Eigene Filmkritik schreiben"]),
+        ("Woche 5", ["5.14. Traditionelles vs. digitales Lernen", "5.15. Medien und Arbeiten im Homeoffice", "5.16. Pruefungsangst und Stressbewaeltigung", "5.17. Wie lernt man am besten?"]),
+        ("Woche 6", ["6.18. Wege zum Wunschberuf", "6.19. Das Vorstellungsgespraech", "6.20. Wie wird man...? (Ausbildung und Qualifikation)"]),
+        ("Woche 7", ["7.21. Lebensformen heute - Familie & Wohnen", "7.22. Was ist dir in einer Beziehung wichtig?", "7.23. Erstes Date - Typische Situationen"]),
+        ("Woche 8", ["8.24. Konsum & Nachhaltigkeit", "8.25. Online einkaufen - Rechte & Risiken"]),
+        ("Woche 9", ["9.26. Reiseprobleme & Loesungen"]),
         ("Woche 10", ["10.27. Umweltfreundlich im Alltag", "10.28. Klimafreundlich leben"])
     ]
 
     # ---- Helpers ----
     def safe_pdf(text):
-        return "".join(c if ord(c) < 256 else "?" for c in str(text))
+        return "".join(c if ord(c) < 256 else "?" for c in str(text or ""))
 
     def break_long_words(line, max_len=40):
         tokens, out = line.split(" "), []
@@ -996,81 +997,78 @@ with tabs[6]:
         if len(txt) == 1 and not txt.isalnum(): return False
         return True
 
-    # ---- UI: Level, Dates, Holidays, Pattern ----
-    st.markdown("### 1️⃣ Kursniveau wählen")
-    course_levels = {"A1": raw_schedule_a1, "A2": raw_schedule_a2, "B1": raw_schedule_b1}
-    selected = st.selectbox("Kursniveau:", list(course_levels.keys()))
-    structure = course_levels[selected]
+    # ---- UI Steps ----
+    st.markdown("### 1️⃣ Kursniveau")
+    levels = {"A1": raw_schedule_a1, "A2": raw_schedule_a2, "B1": raw_schedule_b1}
+    lvl = st.selectbox("Wählen Sie Niveau:", list(levels.keys()), key="sched_level")
+    structure = levels[lvl]
     st.markdown("---")
 
-    st.markdown("### 2️⃣ Kursstart & Ferien")
+    st.markdown("### 2️⃣ Startdatum & Ferien")
     c1, c2 = st.columns([2,1])
     with c1:
-        start_date = st.date_input("Kursstart", date.today())
-        holiday_dates = st.date_input("Ferien/Feiertage", [], help="Mehrfachauswahl möglich")
+        start_date = st.date_input("Startdatum", date.today(), key="sched_start")
+        holiday_dates = st.date_input("Ferien/Feiertage", [], key="sched_holidays")
     with c2:
-        adv = st.toggle("Erweiterter Wochenrhythmus", value=False)
+        advanced = st.toggle("Erweiterter Rhythmus", value=False, key="sched_adv")
     st.markdown("---")
 
-    st.markdown("### 3️⃣ Unterrichtstage pro Woche")
-    days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
+    st.markdown("### 3️⃣ Wochentage")
+    weekdays = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
     default_days = ["Monday","Tuesday","Wednesday"]
     patterns = []
-
-    if not adv:
-        sel = st.multiselect("Unterrichtstage:", days, default_days)
+    if not advanced:
+        sel = st.multiselect("Unterrichtstage:", weekdays, default_days, key="sched_days")
         if not sel:
-            st.error("Mindestens einen Wochentag wählen.")
+            st.error("Mindestens einen Tag wählen.")
             st.stop()
         for _, sess in structure:
             patterns.append((len(sess), sel))
     else:
-        for i, (lbl, sess) in enumerate(structure):
-            with st.expander(lbl, expanded=True):
-                sel = st.multiselect(f"{lbl} - Tage", days, default_days, key=f"wp{i}")
+        for i, (wk, sess) in enumerate(structure):
+            with st.expander(wk, expanded=True):
+                sel = st.multiselect(f"{wk} Tage", weekdays, default_days, key=f"sched_days_{i}")
                 if not sel:
-                    st.error(f"Mindestens einen Tag für {lbl} wählen.")
+                    st.error(f"Tage für {wk} wählen.")
                     st.stop()
                 patterns.append((len(sess), sel))
     st.markdown("---")
 
-    # Normalize holidays
-    holidays = list(holiday_dates) if isinstance(holiday_dates, (list,tuple)) else ([] if not holiday_dates else [holiday_dates])
+    holidays = list(holiday_dates) if isinstance(holiday_dates, (list,tuple)) else ([holiday_dates] if holiday_dates else [])
 
-    # ---- Generate Dates ----
-    flat = [(lbl, top) for lbl, tops in structure for top in tops]
-    dates, cur = [], start_date
-    for needed, weekdays in patterns:
-        got = []
-        limit = start_date + timedelta(days=365)
-        while len(got) < needed and cur <= limit:
-            if cur.strftime("%A") in weekdays and cur not in holidays:
-                got.append(cur)
-            cur += timedelta(days=1)
-        if len(got) < needed:
-            st.error("Nicht genug Termine – passen Sie Ferien oder Tage an.")
-            st.stop()
-        dates.extend(got)
+    # ---- Date Generation ----
+    flat_list = [(wk, topic) for wk, topics in structure for topic in topics]
+    dates = []
+    current = start_date
+    for needed, days_sel in patterns:
+        week_dates = []
+        while len(week_dates) < needed:
+            if current.strftime("%A") in days_sel and current not in holidays:
+                week_dates.append(current)
+            current += timedelta(days=1)
+        dates.extend(week_dates)
 
-    # ---- Build rows ----
     rows = []
-    for i, ((week, topic), dt) in enumerate(zip(flat, dates)):
+    for idx, ((wk, tp), dt) in enumerate(zip(flat_list, dates)):
         rows.append({
-            "Week": week,
-            "Day": f"Day {i+1}",
+            "Week": wk,
+            "Day": f"Day {idx+1}",
             "Weekday": dt.strftime("%A"),
             "Date": dt.strftime("%d %b %Y"),
-            "Topic": topic
+            "Topic": tp
         })
+
+    import pandas as pd
     df_sched = pd.DataFrame(rows)
     st.dataframe(df_sched, use_container_width=True)
+    st.markdown("---")
 
     # ---- Overview ----
-    hol_str = ", ".join(d.strftime("%d.%m.%Y") for d in holidays) or "–"
+    hol_str = ", ".join(d.strftime("%d.%m.%Y") for d in holidays) or "-"
     st.markdown(f"""
       <div style='background:#fffde7;border:1px solid #ffe082;padding:1em;border-radius:8px'>
         <ul style='margin:0;padding-left:1.2em'>
-          <li><b>Kurs:</b> {safe_pdf(selected)}</li>
+          <li><b>Niveau:</b> {safe_pdf(lvl)}</li>
           <li><b>Start:</b> {safe_pdf(start_date.strftime('%Y-%m-%d'))}</li>
           <li><b>Sitzungen:</b> {safe_pdf(str(len(rows)))}</li>
           <li><b>Ferien:</b> {safe_pdf(hol_str)}</li>
@@ -1079,7 +1077,7 @@ with tabs[6]:
     """, unsafe_allow_html=True)
 
     # ---- Downloads ----
-    prefix = f"{selected}_{start_date:%Y-%m-%d}_schedule"
+    prefix = f"{lvl}_{start_date:%Y-%m-%d}_schedule"
 
     # TXT
     txt = "\n".join(f"{r['Day']} ({r['Weekday']}, {r['Date']}): {r['Topic']}" for r in rows)
@@ -1098,24 +1096,25 @@ with tabs[6]:
     pdf = SchedulePDF()
     pdf.add_page()
     pdf.set_font("Arial", size=11)
-    w = pdf.w - pdf.l_margin - pdf.r_margin
-
-    pdf.multi_cell(w, 8, safe_pdf(f"Schedule: {selected}"))
-    pdf.multi_cell(w, 8, safe_pdf(f"Start: {start_date:%Y-%m-%d}"))
-    pdf.multi_cell(w, 8, safe_pdf(f"Holidays: {hol_str}"))
-    pdf.ln(2)
+    width = pdf.w - pdf.l_margin - pdf.r_margin
 
     for r in rows:
         line = f"{r['Day']} ({r['Weekday']}, {r['Date']}): {r['Topic']}"
         wrapped = break_long_words(safe_pdf(line), max_len=80)
         if safe_for_fpdf(wrapped):
-            pdf.multi_cell(w, 8, wrapped)
+            pdf.multi_cell(width, 8, wrapped)
+
     pdf.ln(6)
     pdf.set_font("Arial","I",11)
     pdf.cell(0,10, safe_pdf("Signed: Felix Asadu"), ln=1, align='R')
 
     out = pdf.output(dest="S")
-    pdf_bytes = out if isinstance(out, bytes) else out.encode("latin-1","replace")
+    if isinstance(out, bytes):
+        pdf_bytes = out
+    elif isinstance(out, str):
+        pdf_bytes = out.encode("latin-1","replace")
+    else:
+        pdf_bytes = bytes(out)
 
     st.download_button(
         "📄 PDF Download",
