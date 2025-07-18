@@ -675,6 +675,7 @@ with tabs[4]:
         )
         st.success("✅ PDF generated and ready to download.")
 
+
 with tabs[4]:
     st.title("📄 Generate Contract & Receipt PDF for Any Student")
 
@@ -702,10 +703,10 @@ with tabs[4]:
     phone_col   = getcol("phone")
     level_col   = getcol("level")
 
-    # --- Search/filter UI ---
+    # --- Search/filter UI (unique key to avoid duplicate errors) ---
     search_val = st.text_input(
         "Search students by name, code, phone, or level:", 
-        value="", key="pdf_tab_search"
+        value="", key="pdf_tab_search_contract"
     )
     filtered_df = df.copy()
     if search_val:
@@ -738,11 +739,11 @@ with tabs[4]:
     balance_input = st.number_input("Balance Due (GHS)", min_value=0.0, value=default_balance, step=1.0)
     total_input   = paid_input + balance_input
     receipt_date  = st.date_input("Receipt Date", value=date.today())
-    signature     = st.text_input("Signature Text", value="Felix Asadu")
+    signature     = st.text_input("Signature Text", value="Felix Asadu", key="pdf_signature_contract")
 
     st.subheader("Contract Details")
-    contract_start_input = st.date_input("Contract Start Date", value=default_start)
-    contract_end_input   = st.date_input("Contract End Date", value=default_end)
+    contract_start_input = st.date_input("Contract Start Date", value=default_start, key="pdf_contract_start")
+    contract_end_input   = st.date_input("Contract End Date", value=default_end, key="pdf_contract_end")
     course_length        = (contract_end_input - contract_start_input).days
 
     # --- Logo URL ---
@@ -777,18 +778,16 @@ with tabs[4]:
         balance = balance_input
         total   = total_input
 
-        from fpdf import FPDF
-        import requests, os
-
         pdf = FPDF()
         pdf.add_page()
 
-        # -- Always re-download logo from web --
-        logo_path = "school_logo.png"
+        # -- Add logo from web --
         try:
-            img_data = requests.get(logo_url).content
-            with open(logo_path, "wb") as f:
-                f.write(img_data)
+            import requests, os
+            logo_path = "school_logo.png"
+            if not os.path.exists(logo_path):
+                with open(logo_path, "wb") as f:
+                    f.write(requests.get(logo_url).content)
             pdf.image(logo_path, x=10, y=8, w=33)
             pdf.ln(25)
         except Exception as e:
@@ -832,7 +831,31 @@ with tabs[4]:
         pdf.set_font("Arial", size=12)
         pdf.ln(8)
 
-        template = st.session_state["agreement_template"]
+        # If not in session state, provide fallback contract template
+        template = st.session_state.get("agreement_template", """
+PAYMENT AGREEMENT
+
+This Payment Agreement is entered into on [DATE] for [CLASS] students of Learn Language Education Academy and Felix Asadu ("Teacher").
+
+Terms of Payment:
+1. Payment Amount: The student agrees to pay the teacher a total of [AMOUNT] cedis for the course.
+2. Payment Schedule: The payment can be made in full or in two installments: GHS [FIRST_INSTALLMENT] for the first installment, and the remaining balance for the second installment after one month of payment. 
+3. Late Payments: In the event of late payment, the school may revoke access to all learning platforms. No refund will be made.
+4. Refunds: Once a deposit is made and a receipt is issued, no refunds will be provided.
+
+Cancellation and Refund Policy:
+1. If the teacher cancels a lesson, it will be rescheduled.
+
+Miscellaneous Terms:
+1. Attendance: The student agrees to attend lessons punctually.
+2. Communication: Both parties agree to communicate changes promptly.
+3. Termination: Either party may terminate this Agreement with written notice if the other party breaches any material term.
+
+Signatures:
+    [STUDENT_NAME]
+    Date: [DATE]
+    Asadu Felix
+""")
         filled = (
             template
             .replace("[STUDENT_NAME]",     selected_name)
@@ -845,6 +868,7 @@ with tabs[4]:
             .replace("[COURSE_LENGTH]",    f"{course_length} days")
         )
 
+        # -- Write contract safely --
         for line in filled.split("\n"):
             safe    = sanitize_text(line)
             wrapped = break_long_words(safe, max_len=40)
@@ -872,13 +896,6 @@ with tabs[4]:
             mime="application/pdf"
         )
         st.success("✅ PDF generated and ready to download.")
-
-        # --- Remove logo after use
-        if os.path.exists(logo_path):
-            try:
-                os.remove(logo_path)
-            except:
-                pass
 
 
 
