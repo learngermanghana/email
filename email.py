@@ -790,7 +790,7 @@ with tabs[5]:
         pdf.cell(0, 7, "Felix Asadu", ln=True)
         pdf.cell(0, 7, "Director", ln=True)
         pdf.cell(0, 7, safe_pdf(SCHOOL_NAME), ln=True)
-    pdf_bytes = pdf.output(dest="S").encode("latin-1", "replace")
+    pdf_bytes = pdf.output(dest="S")
 
     st.download_button(
         "📄 Download Letter/PDF", 
