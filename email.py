@@ -669,11 +669,15 @@ Signatures:
                 .replace("[SECOND_DUE_DATE]",  str(contract_end))
                 .replace("[COURSE_LENGTH]",    f"{course_length} days")
             )
+
             for line in filled.split("\n"):
                 safe = sanitize_text(line)
-                if safe.strip():
-                    safe_wrapped = break_long_words(safe, max_len=40)
-                    pdf.multi_cell(0, 8, safe_wrapped)
+                safe_wrapped = break_long_words(safe, max_len=40)
+                content = safe_wrapped.strip()
+                # Skip lines that are too short or single non-alphanumeric character (FPDF bug prevention)
+                if len(content) < 2 or (len(content) == 1 and not content.isalnum()):
+                    continue
+                pdf.multi_cell(0, 8, safe_wrapped)
             pdf.ln(10)
 
             # Signature
@@ -688,6 +692,7 @@ Signatures:
                 mime="application/pdf"
             )
             st.success("✅ PDF generated and ready to download.")
+
 
 
 
