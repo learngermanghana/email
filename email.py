@@ -485,6 +485,7 @@ with tabs[3]:
         df_links[["Name", "Student Code", "Phone", "Level", "Balance (GHS)", "Due Date", "Days Left", "WhatsApp Link"]].to_csv(index=False),
         file_name="debtor_whatsapp_links.csv"
     )
+
 with tabs[4]:
     st.title("📄 Generate Contract & Receipt PDF for Any Student")
 
@@ -510,7 +511,7 @@ with tabs[4]:
         phone_col   = getcol("phone")
         level_col   = getcol("level")
 
-        # --- SEARCH BOX at the bottom (shown above dropdown) ---
+        # --- SEARCH BOX ---
         search_val = st.text_input(
             "Search students by name, code, phone, or level:", value="", key="pdf_tab_search"
         )
@@ -564,22 +565,25 @@ with tabs[4]:
         # --- LOGO: use your online logo by default ---
         logo_url = "https://i.imgur.com/iFiehrp.png"
 
-        # 5. Generate PDF
+        # --- Helper: Make text PDF-safe ---
+        def sanitize_text(text):
+            return "".join(c if ord(c) < 256 else "?" for c in str(text))
+
+        # --- Helper: break long words for FPDF ---
+        def break_long_words(text, max_len=60):
+            import re
+            def _break(match):
+                word = match.group(0)
+                return ' '.join([word[i:i+max_len] for i in range(0, len(word), max_len)])
+            return re.sub(r'\S{' + str(max_len+1) + r',}', _break, text)
+
+        # --- Download Button ---
         if st.button("Generate & Download PDF"):
-            # Use current inputs
             paid    = paid_input
             balance = balance_input
             total   = total_input
             contract_start = contract_start_input
             contract_end   = contract_end_input
-
-            # Add the helper to break long words (prevents FPDFException)
-            def break_long_words(text, max_len=60):
-                import re
-                def _break(match):
-                    word = match.group(0)
-                    return ' '.join([word[i:i+max_len] for i in range(0, len(word), max_len)])
-                return re.sub(r'\S{' + str(max_len+1) + r',}', _break, text)
 
             pdf = FPDF()
             pdf.add_page()
@@ -607,7 +611,7 @@ with tabs[4]:
 
             # Receipt header
             pdf.set_font("Arial", size=14)
-            pdf.cell(0, 10, f"{SCHOOL_NAME} Payment Receipt", ln=True, align="C")
+            pdf.cell(0, 10, "Learn Language Education Academy Payment Receipt", ln=True, align="C")
             pdf.ln(10)
 
             # Receipt details
@@ -630,7 +634,7 @@ with tabs[4]:
             # Contract section
             pdf.ln(15)
             pdf.set_font("Arial", size=14)
-            pdf.cell(0, 10, f"{SCHOOL_NAME} Student Contract", ln=True, align="C")
+            pdf.cell(0, 10, "Learn Language Education Academy Student Contract", ln=True, align="C")
             pdf.set_font("Arial", size=12)
             pdf.ln(8)
 
@@ -671,7 +675,7 @@ Signatures:
             )
             # Only add non-empty, non-whitespace lines, wrap long words!
             for line in filled.split("\n"):
-                safe = safe_pdf(line)
+                safe = sanitize_text(line)
                 if safe.strip():
                     safe_wrapped = break_long_words(safe, max_len=60)
                     pdf.multi_cell(0, 8, safe_wrapped)
@@ -680,8 +684,8 @@ Signatures:
             # Signature
             pdf.cell(0, 8, f"Signed: {signature}", ln=True)
 
-            # Download
-            pdf_bytes = pdf.output(dest="S").encode("latin-1", "replace")
+            # Download as PDF, in-memory, no temp file on disk!
+            pdf_bytes = pdf.output(dest='S').encode('latin-1')
             st.download_button(
                 "📄 Download PDF",
                 data=pdf_bytes,
@@ -689,6 +693,5 @@ Signatures:
                 mime="application/pdf"
             )
             st.success("✅ PDF generated and ready to download.")
-
 
 
