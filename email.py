@@ -122,6 +122,14 @@ def send_email_report(pdf_bytes: bytes, to_email: str, subject: str, html_conten
         st.error(f"Email send failed: {e}")
         return False
 
+def break_long_words(text, max_len=60):
+    import re
+    def _break(match):
+        word = match.group(0)
+        return ' '.join([word[i:i+max_len] for i in range(0, len(word), max_len)])
+    return re.sub(r'\S{' + str(max_len+1) + r',}', _break, text)
+
+
 # ==== AGREEMENT TEMPLATE ====
 if "agreement_template" not in st.session_state:
     st.session_state["agreement_template"] = """
