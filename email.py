@@ -652,6 +652,7 @@ Signatures:
     Date: [DATE]
     Asadu Felix
 """)
+
     filled = (
         template
         .replace("[STUDENT_NAME]",      selected_name)
@@ -683,5 +684,7 @@ Signatures:
         mime="application/pdf"
     )
     st.success("✅ PDF generated and ready to download.")
+#
+
 
 
