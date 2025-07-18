@@ -898,12 +898,8 @@ with tabs[5]:
             st.success(f"Email sent to {recipient_email}!")
         except Exception as e:
             st.error(f"Email send failed: {e}")
-
-
 with tabs[6]:
-    def safe_pdf(text):
-        """Ensure all strings are PDF-safe (latin-1 only)."""
-        return "".join(c if ord(c) < 256 else "?" for c in str(text or ""))
+
 
     st.markdown("""
     <div style='background:#e3f2fd;padding:1.2em 1em 0.8em 1em;border-radius:12px;margin-bottom:1em'>
@@ -1021,8 +1017,8 @@ with tabs[6]:
     session_labels = [(w, s) for w, sess in topic_structure for s in sess]
     dates = []
     cur = start_date
-    holidays_set = set(holiday_dates if isinstance(holiday_dates, list) else [holiday_dates])
-
+    # Convert holiday_dates to set of dates
+    holidays_set = set(holiday_dates if isinstance(holiday_dates, list) else [holiday_dates] if holiday_dates else [])
     for num_classes, week_days in week_patterns:
         week_dates = []
         while len(week_dates) < num_classes:
@@ -1037,9 +1033,8 @@ with tabs[6]:
     # ---- Preview ----
     rows = [{"Week": wl, "Day": f"Day {i+1}", "Date": d.strftime("%A, %d %B %Y"), "Topic": tp}
             for i, ((wl, tp), d) in enumerate(zip(session_labels, dates))]
-    import pandas as pd
     df = pd.DataFrame(rows)
-    # Convert holidays for display
+    # Display holidays as string
     if isinstance(holiday_dates, list):
         holidays_str = ", ".join(d.strftime("%d.%m.%Y") for d in holiday_dates) if holiday_dates else "–"
     elif isinstance(holiday_dates, date):
@@ -1051,10 +1046,10 @@ with tabs[6]:
     <div style='background:#fffde7;border:1px solid #ffe082;border-radius:10px;padding:1em;margin:1em 0'>
       <b>📝 Kursüberblick:</b>
       <ul>
-        <li><b>Kurs:</b> {selected_level}</li>
-        <li><b>Start:</b> {start_date.strftime('%A, %d %B %Y')}</li>
-        <li><b>Sessions:</b> {total_sessions}</li>
-        <li><b>Ferien:</b> {holidays_str}</li>
+        <li><b>Kurs:</b> {safe_pdf(selected_level)}</li>
+        <li><b>Start:</b> {safe_pdf(start_date.strftime('%A, %d %B %Y'))}</li>
+        <li><b>Sessions:</b> {safe_pdf(total_sessions)}</li>
+        <li><b>Ferien:</b> {safe_pdf(holidays_str)}</li>
       </ul>
     </div>
     """, unsafe_allow_html=True)
@@ -1066,14 +1061,11 @@ with tabs[6]:
     file_prefix = f"{selected_level}_{file_date}_course_schedule"
 
     # ---- TXT download ----
-    txt = f"Learn Language Education Academy\nContact: 0205706589 | www.learngermanghana.com\nSchedule: {selected_level}\nStart: {start_date.strftime('%Y-%m-%d')}\n\n" + \
-          "\n".join(f"- {r['Day']} ({r['Date']}): {r['Topic']}" for r in rows)
+    txt = f"Learn Language Education Academy\nContact: 0205706589 | www.learngermanghana.com\nSchedule: {safe_pdf(selected_level)}\nStart: {safe_pdf(start_date.strftime('%Y-%m-%d'))}\n\n" + \
+          "\n".join(f"- {safe_pdf(r['Day'])} ({safe_pdf(r['Date'])}): {safe_pdf(r['Topic'])}" for r in rows)
     st.download_button("📁 TXT Download", txt, file_name=f"{file_prefix}.txt")
 
     # ---- PDF download ----
-    from fpdf import FPDF
-    import tempfile
-
     class ColorHeaderPDF(FPDF):
         def header(self):
             self.set_fill_color(21, 101, 192)
