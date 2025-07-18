@@ -1099,6 +1099,37 @@ with tabs[6]:
 
     st.download_button("📁 TXT Download", txt, file_name=f"{file_prefix}.txt")
 
+    # ---- PDF download ----
+    class ColorHeaderPDF(FPDF):
+        def header(self):
+            self.set_fill_color(21, 101, 192)
+            self.set_text_color(255,255,255)
+            self.set_font('Arial','B',14)
+            self.cell(0,12,safe_pdf("Learn Language Education Academy – Course Schedule"),ln=1,align='C',fill=True)
+            self.ln(2)
+            self.set_text_color(0,0,0)
+
+    pdf = ColorHeaderPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=11)
+    pdf.multi_cell(0,8, safe_pdf(f"Schedule: {selected_level}"))
+    pdf.multi_cell(0,8, safe_pdf(f"Start: {start_date.strftime('%Y-%m-%d')}"))
+    if holiday_dates:
+        pdf.multi_cell(0,8, safe_pdf("Holidays: " + ", ".join(d.strftime("%d.%m.%Y") for d in holiday_dates)))
+    pdf.ln(2)
+    for r in rows:
+        pdf.multi_cell(0,8, safe_pdf(f"{r['Day']} ({r['Date']}): {r['Topic']}"))
+    pdf.ln(6)
+    pdf.set_font("Arial",'I',11)
+    pdf.cell(0,10, safe_pdf("Signed: Felix Asadu"), ln=1, align='R')
+
+    st.download_button("📄 PDF Download",
+                       data=pdf.output(dest='S').encode('latin-1'),
+                       file_name=f"{file_prefix}.pdf",
+                       mime="application/pdf")
+    
+
+
 # --- 1. URLS ---
 students_csv_url = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
 ref_answers_url = "https://docs.google.com/spreadsheets/d/1CtNlidMfmE836NBh5FmEF5tls9sLmMmkkhewMTQjkBo/export?format=csv"
