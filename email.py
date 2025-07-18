@@ -122,32 +122,6 @@ def send_email_report(pdf_bytes: bytes, to_email: str, subject: str, html_conten
         st.error(f"Email send failed: {e}")
         return False
 
-def sanitize_text(text):
-    cleaned = "".join(c if ord(c) < 256 else "?" for c in str(text))
-    cleaned = cleaned.replace('\t', ' ').replace('\u00A0', ' ').replace('\u200b', '')
-    cleaned = ' '.join(cleaned.split())
-    return cleaned.strip()
-
-
-def break_long_words(text, max_len=40):
-    # Break up any long word so FPDF never fails
-    return re.sub(
-        r'(\S{' + str(max_len) + r',})',
-        lambda m: ' '.join([m.group(0)[i:i+max_len] for i in range(0, len(m.group(0)), max_len)]),
-        text
-    )
-
-def safe_for_fpdf(line):
-    content = line.strip()
-    # Ignore if line is empty or only 1 character and not a-z/0-9
-    if len(content) == 0:
-        return False
-    if len(content) == 1 and not content.isalnum():
-        return False
-    # Ignore if line is only punctuation or only spaces
-    if all(not c.isalnum() for c in content):
-        return False
-    return True
 
 
 # ==== AGREEMENT TEMPLATE ====
