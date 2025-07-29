@@ -1011,6 +1011,58 @@ RAW_SCHEDULE_B1 = [
     ("Woche 9", ["9.26. Reiseprobleme und Lösungen"]),
     ("Woche 10", ["10.27. Umweltfreundlich im Alltag", "10.28. Klimafreundlich leben"])
 ]
+RAW_SCHEDULE_B1 = [
+    # ... (unchanged, as above)
+]
+
+RAW_SCHEDULE_B2 = [
+    ("Woche 1", [
+        "1. Persönliche Identität und Selbstverständnis",
+        "2. Beziehungen und Kommunikation",
+        "3. Öffentliches vs. Privates Leben"
+    ]),
+    ("Woche 2", [
+        "4. Beruf und Karriere",
+        "5. Bildung und Lernen",
+        "6. Kultur und Gesellschaft"
+    ]),
+    ("Woche 3", [
+        "7. Medien und digitale Welt",
+        "8. Wissenschaft und Technologie",
+        "9. Politik und Gesellschaft"
+    ]),
+    ("Woche 4", [
+        "10. Wirtschaft und Finanzen",
+        "11. Umwelt und Nachhaltigkeit",
+        "12. Gesundheit und Wohlbefinden"
+    ]),
+    ("Woche 5", [
+        "13. Ernährung und Lebensstil",
+        "14. Reisen und Mobilität",
+        "15. Wohnen und Lebensräume"
+    ]),
+    ("Woche 6", [
+        "16. Freizeit, Hobbys und Interessen",
+        "17. Feste und Traditionen",
+        "18. Werte und Normen"
+    ]),
+    ("Woche 7", [
+        "19. Migration und Integration",
+        "20. Diskriminierung und Gleichstellung",
+        "21. Recht und Ordnung"
+    ]),
+    ("Woche 8", [
+        "22. Konfliktmanagement",
+        "23. Globalisierung",
+        "24. Zukunft und Innovation"
+    ]),
+    ("Woche 9", [
+        "25. Kommunikation im Berufsleben",
+        "26. Wissenschaftliches Arbeiten",
+        "27. Zeitmanagement und Organisation",
+        "28. Zusammenfassung & Prüfungsvorbereitung"
+    ]),
+]
 
 # ====== TAB 6 CODE ======
 with tabs[6]:
@@ -1028,8 +1080,8 @@ with tabs[6]:
 
     # Step 1: Choose course level
     st.markdown("### 1️⃣ **Kursniveau wählen**")
-    course_levels = {"A1": RAW_SCHEDULE_A1, "A2": RAW_SCHEDULE_A2, "B1": RAW_SCHEDULE_B1}
-    selected_level = st.selectbox("🗂️ **Kursniveau (A1/A2/B1):**", list(course_levels.keys()))
+    course_levels = {"A1": RAW_SCHEDULE_A1, "A2": RAW_SCHEDULE_A2, "B1": RAW_SCHEDULE_B1, "B2": RAW_SCHEDULE_B2}
+    selected_level = st.selectbox("🗂️ **Kursniveau (A1/A2/B1/B2):**", list(course_levels.keys()))
     topic_structure = course_levels[selected_level]
     st.markdown("---")
 
