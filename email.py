@@ -41,7 +41,7 @@ REF_ANSWERS_CSV_URL = f"https://docs.google.com/spreadsheets/d/{REF_ANSWERS_SHEE
 SENDER_EMAIL = st.secrets["general"].get("sender_email", "Learngermanghana@gmail.com")
 SENDGRID_KEY = st.secrets["general"].get("sendgrid_api_key", "")
 
-import streamlit as st
+
 
 # ==== SIMPLE PASSWORD GATE ====
 def password_gate(correct_password: str, key="app_pw"):
@@ -53,7 +53,7 @@ def password_gate(correct_password: str, key="app_pw"):
         pw = st.text_input("Password", type="password", key=key)
         if pw and pw == correct_password:
             st.session_state["pw_ok"] = True
-            st.experimental_rerun()
+            st.rerun()
         elif pw:
             st.error("Incorrect password.")
         st.stop()
@@ -1457,6 +1457,7 @@ with tabs[7]:
         )
     else:
         st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
+
 
 
 
