@@ -41,6 +41,27 @@ REF_ANSWERS_CSV_URL = f"https://docs.google.com/spreadsheets/d/{REF_ANSWERS_SHEE
 SENDER_EMAIL = st.secrets["general"].get("sender_email", "Learngermanghana@gmail.com")
 SENDGRID_KEY = st.secrets["general"].get("sendgrid_api_key", "")
 
+import streamlit as st
+
+# ==== SIMPLE PASSWORD GATE ====
+def password_gate(correct_password: str, key="app_pw"):
+    """Show a password input. Returns True if correct, else stops the app."""
+    if "pw_ok" not in st.session_state:
+        st.session_state["pw_ok"] = False
+    if not st.session_state["pw_ok"]:
+        st.title("🔒 Enter Password")
+        pw = st.text_input("Password", type="password", key=key)
+        if pw and pw == correct_password:
+            st.session_state["pw_ok"] = True
+            st.experimental_rerun()
+        elif pw:
+            st.error("Incorrect password.")
+        st.stop()
+
+# ==== PUT THIS NEAR THE VERY TOP OF YOUR MAIN SCRIPT! ====
+password_gate("Xenomexpress7727/")  # Change to your desired password!
+
+
 # ==== UNIVERSAL HELPERS ====
 
 def safe_pdf(text):
@@ -1436,6 +1457,7 @@ with tabs[7]:
         )
     else:
         st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
+
 
 
 
