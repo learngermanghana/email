@@ -246,7 +246,14 @@ tabs = st.tabs([
 # ==== TAB 0: PROSPECTUS ====
 with tabs[0]:
     st.title("📘 Course Prospectus")
-    st.caption("A clear, printable guide for students: goals, expectations, grading, schedule, and how to succeed.")
+    st.caption("A clear, printable guide for students: goals, fees, access, schedule, and how to succeed.")
+
+    # --- Branding images ---
+    logo_url = "https://i.imgur.com/iFiehrp.png"
+    session_img_url = "https://i.imgur.com/Q9mpvRY.jpeg"
+    c1, c2, c3 = st.columns([1,2,1])
+    with c2:
+        st.image(logo_url, caption="Learn Language Education Academy", width=180)
 
     # --- Level selection & weekly outline source ---
     level = st.selectbox("Course Level", ["A1", "A2", "B1", "B2"], key="prospectus_level")
@@ -257,16 +264,22 @@ with tabs[0]:
         "B2": RAW_SCHEDULE_B2,
     }
 
-    # --- Prospectus fields (with sensible defaults you can edit quickly) ---
+    # --- Fees by level (requested) ---
+    FEE_MAP = {"A1": 2800, "A2": 3000, "B1": 3000, "B2": 4500}
+    fee = FEE_MAP.get(level, 0)
+    # Installment details (as provided)
+    upfront = 1800
+    second_payment = 1000
+    remaining = max(fee - (upfront + second_payment), 0)
+
+    # --- Dates & meta ---
     colA, colB = st.columns(2)
     with colA:
         course_title = st.text_input("Course Title", value=f"German {level} – Learn Language Education Academy")
-        duration_weeks = st.number_input("Duration (weeks)", min_value=4, max_value=40, value=10)
-        contact_hours = st.text_input("Contact Hours / Week", value="3 sessions (Mon–Wed) · 1.5h each")
+        start_date = st.date_input("Course Start Date")
     with colB:
-        start_when = st.text_input("Typical Start Month", value="Rolling cohorts (Monthly)")
-        location = st.text_input("Location / Mode", value="Accra (in-person) + Online support")
-        teacher = st.text_input("Instructor", value="Felix Asadu (Director)")
+        end_date = st.date_input("Course End Date")
+        contact_hours = st.text_input("Contact Hours / Week", value="3 sessions (Mon–Wed) · 1.5h each")
 
     description = st.text_area(
         "Course Description",
@@ -281,10 +294,14 @@ with tabs[0]:
     outcomes = st.text_area(
         "Learning Outcomes (one per line)",
         value=(
-            "Understand and participate in common conversations.\n"
-            "Read short texts and extract key information.\n"
-            "Write simple, clear messages and letters.\n"
-            "Use core grammar structures accurately in context.\n"
+            "Understand and participate in common conversations.
+"
+            "Read short texts and extract key information.
+"
+            "Write simple, clear messages and letters.
+"
+            "Use core grammar structures accurately in context.
+"
             "Build exam skills and confident speaking."
         ),
         height=120,
@@ -293,10 +310,14 @@ with tabs[0]:
     assessment = st.text_area(
         "Assessment & Grading (one per line)",
         value=(
-            "Attendance & Participation – 10%\n"
-            "Homework & Classwork – 20%\n"
-            "Quizzes – 20%\n"
-            "Midterm – 20%\n"
+            "Attendance & Participation – 10%
+"
+            "Homework & Classwork – 20%
+"
+            "Quizzes – 20%
+"
+            "Midterm – 20%
+"
             "Final Exam (written + oral) – 30%"
         ),
         height=120,
@@ -305,9 +326,12 @@ with tabs[0]:
     policies = st.text_area(
         "Attendance & Policies",
         value=(
-            "Please arrive on time. Notify the instructor in advance if you will miss a session.\n"
-            "Missed assessments may be rescheduled at the instructor's discretion.\n"
-            "Academic integrity is required. Copying or plagiarism may result in a zero.\n"
+            "Please arrive on time. Notify the instructor in advance if you will miss a session.
+"
+            "Missed assessments may be rescheduled at the instructor's discretion.
+"
+            "Academic integrity is required. Copying or plagiarism may result in a zero.
+"
             "Payments are non‑refundable once receipts are issued. Access may be revoked for non‑payment."
         ),
         height=120,
@@ -316,10 +340,13 @@ with tabs[0]:
     materials = st.text_area(
         "Required Materials (one per line)",
         value=(
-            "Notebook and pen\n"
-            "Mobile device for Falowen app\n"
-            "Headphones for listening tasks\n"
-            "Printed handouts (provided)"
+            "Notebook and pen
+"
+            "Mobile device for Falowen app (www.falowen.app)
+"
+            "Headphones for listening tasks
+"
+            "Printed handouts (provided); Course book available on request"
         ),
         height=110,
     )
@@ -327,10 +354,14 @@ with tabs[0]:
     contact = st.text_area(
         "Contact & Communication",
         value=(
-            "Learn Language Education Academy – Accra, Ghana\n"
-            "Website: https://www.learngermanghana.com\n"
-            "Phone: 0205706589\n"
-            "Email: Learngermanghana@gmail.com\n"
+            "Learn Language Education Academy – Accra, Ghana
+"
+            "Website: https://www.learngermanghana.com
+"
+            "Phone: 0205706589
+"
+            "Email: Learngermanghana@gmail.com
+"
             "Primary platform: Falowen App (assignments, results, resources)."
         ),
         height=110,
@@ -349,29 +380,138 @@ with tabs[0]:
         outline_df = pd.DataFrame(rows)
         st.subheader("Weekly Outline")
         st.dataframe(outline_df, use_container_width=True)
+        st.subheader("📸 Class Session")
+        st.image(session_img_url, caption="Class Session", use_container_width=True)
 
     st.markdown("---")
 
+    # --- Goethe Exam Countdown & Fees (per level) ---
+    from datetime import date
+    GOETHE_EXAM_DATES = {
+        "A1": (date(2025, 10, 13), 2850, None),
+        "A2": (date(2025, 10, 14), 2400, None),
+        "B1": (date(2025, 10, 15), 2750, 880),
+        "B2": (date(2025, 10, 16), 2500, 840),
+    }
+    exam_info = GOETHE_EXAM_DATES.get(level)
+
+    st.subheader("⏳ Upcoming Goethe Exam")
+    exam_md_text = ""
+    if exam_info:
+        exam_date, fee_exam, module_fee = exam_info
+        days_to_exam = (exam_date - date.today()).days
+        fee_text = f"Exam fee (paid to Goethe‑Institut, not the school): ₵{fee_exam:,}"
+        if module_fee:
+            fee_text += f"  |  Per module: ₵{module_fee:,}"
+        if days_to_exam > 0:
+            st.info(
+                f"Your {level} exam is in {days_to_exam} days ({exam_date:%d %b %Y}).  
+"
+                f"**{fee_text}**  
+"
+                f"[Register online here](https://www.goethe.de/ins/gh/en/spr/prf.html)"
+            )
+        elif days_to_exam == 0:
+            st.success("🚀 Exam is today! Good luck!")
+        else:
+            st.warning(
+                f"The last scheduled {level} exam was on {exam_date:%d %b %Y} (−{abs(days_to_exam)} days).  
+"
+                f"**{fee_text}**"
+            )
+        exam_md_text = (
+            f"**Date:** {exam_date:%d %b %Y}  
+" +
+            f"**{fee_text}**  
+" +
+            "*(Exam fees are paid directly to the Goethe‑Institut — not to the school.)*  
+" +
+            "Register: https://www.goethe.de/ins/gh/en/spr/prf.html"
+        )
+    else:
+        st.caption("Exam date not set for this level yet. Check the Goethe‑Institut site for updates.")
+        exam_md_text = "Exam date to be announced by the Goethe‑Institut."
+
+    st.subheader("📸 Class Session")
+    st.image(session_img_url, caption="Class Session", use_container_width=True)
+
+    st.markdown("---")
+
+    # --- Falowen Access & How-To ---
+    falowen_features = [
+        "Dashboard with learning streaks",
+        "Vocab of the Day",
+        "Course Book (your study materials)",
+        "Results & Resources – your saved scores and feedback",
+        "Vocabulary practice tab",
+        "Exam Mode",
+        "Custom Chat – Sprechen & Schreiben trainer (incl. letter practice)"
+    ]
+
+    submit_steps = [
+        "Open the Course Book (materials).",
+        "Scroll down to find the answer form.",
+        "Paste your answers for: Schreiben, Lesen, Hören.",
+        "Click Submit.",
+        "Then click Send Assignment – WhatsApp opens and sends your work directly to your tutor.",
+        "Once sent, it means your tutor has received it."
+    ]
+
+    def bullets(lines):
+        return "
+".join([f"- {l}" for l in lines])
+
+    # --- Workbook-based grading (assignments) ---
+    workbook_grading_lines = [
+        "You will be graded using a **Workbook** that includes **Lesen**, **Hören**, **Schreiben**, and **Sprechen** tasks.",
+        "Each workbook is marked **out of 100 points**.",
+        "Your score is distributed evenly by the **number of tasks** in that workbook (e.g., 10 tasks → 10 points each)."
+    ]
+
     # --- Build Markdown prospectus for preview/download ---
     def md_section(title: str, body: str) -> str:
-        return f"## {title}\n\n{body.strip()}\n\n"
+        return f"## {title}
 
-    def bullets_from_text(text: str) -> str:
-        lines = [l.strip() for l in text.splitlines() if l.strip()]
-        return "\n".join([f"- {l}" for l in lines])
+{body.strip()}
 
-    md = f"# {course_title}\n\n"
-    md += f"**Level:** {level}  |  **Duration:** {duration_weeks} weeks  |  **Schedule:** {contact_hours}\n\n"
-    md += f"**Start:** {start_when}  |  **Mode:** {location}  |  **Instructor:** {teacher}\n\n"
+"
+
+    fee_lines = [
+        f"Tuition Fee: **GHS {fee:,.0f}** (level: {level})",
+        "Installment Option: **GHS 1,800 now** + **GHS 1,000 after one month**.",
+    ]
+    if remaining > 0:
+        fee_lines.append(f"Remaining balance after the two payments: **GHS {remaining:,.0f}** (please confirm the due date with admin).")
+
+    access_lines = [
+        "All students automatically receive access to **Falowen**: https://www.falowen.app",
+        "Course book can be provided on request (print or digital).",
+        "**Letter of Enrollment** is issued **only after full payment**."
+    ]
+
+    md = f"# {course_title}
+
+"
+    when_str = f"**Dates:** {start_date.strftime('%d %b %Y')} – {end_date.strftime('%d %b %Y')}  |  **Schedule:** {contact_hours}"
+    md += when_str + "
+
+"
     md += md_section("Course Description", description)
-    md += md_section("Learning Outcomes", bullets_from_text(outcomes))
-    md += md_section("Assessment & Grading", bullets_from_text(assessment))
-    md += md_section("Attendance & Policies", bullets_from_text(policies))
-    md += md_section("Required Materials", bullets_from_text(materials))
+    md += md_section("Fees & Access", bullets(fee_lines + access_lines))
+    md += md_section("Upcoming Goethe Exam", exam_md_text)
+    md += md_section("Learning Outcomes", bullets(outcomes.splitlines()))
+    md += md_section("Assessment & Grading", bullets(assessment.splitlines()))
+    md += md_section("Workbook Assessment", bullets(workbook_grading_lines))
+    md += md_section("Attendance & Policies", bullets(policies.splitlines()))
+    md += md_section("Required Materials", bullets(materials.splitlines()))
+    md += md_section("Using the Falowen App", bullets(falowen_features))
+    md += md_section("How to Submit Your Workbook Assignments", "
+".join([f"{i+1}. {s}" for i, s in enumerate(submit_steps)]))
     if include_outline and outline_df is not None and not outline_df.empty:
-        table = "\n".join([f"- **{r['Week']}**: {r['Topics']}" for _, r in outline_df.iterrows()])
+        table = "
+".join([f"- **{r['Week']}**: {r['Topics']}" for _, r in outline_df.iterrows()])
         md += md_section("Weekly Outline", table)
-    md += md_section("Contact & Communication", bullets_from_text(contact))
+    md += md_section("Contact & Communication", bullets(contact.splitlines()))
 
     st.subheader("Prospectus Preview")
     st.markdown(md)
@@ -405,10 +545,21 @@ with tabs[0]:
                 self.font_ready = False
 
         def header(self):
+            # Try to place logo
+            try:
+                import requests, tempfile
+                resp = requests.get(logo_url, timeout=8)
+                if resp.status_code == 200:
+                    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+                    tmp.write(resp.content); tmp.close()
+                    self.image(tmp.name, x=10, y=8, w=22)
+            except Exception:
+                pass
+            # Title block
             self.set_font(self.font_name, 'B', 16)
             self.cell(0, 9, safe_pdf(course_title if not self.font_ready else course_title), ln=True, align='C')
             self.set_font(self.font_name, '', 11)
-            sub = f"Level: {level} | Duration: {duration_weeks} weeks | Schedule: {contact_hours}"
+            sub = f"Level: {level} | Dates: {start_date:%d %b %Y} – {end_date:%d %b %Y} | Schedule: {contact_hours}"
             self.cell(0, 7, safe_pdf(sub if not self.font_ready else sub), ln=True, align='C')
             self.ln(3)
             self.set_draw_color(200,200,200); self.set_line_width(0.5)
@@ -430,16 +581,34 @@ with tabs[0]:
 
         # Sections
         add_h2("Course Description"); add_text(description)
-        add_h2("Learning Outcomes"); add_text(bullets_from_text(outcomes))
-        add_h2("Assessment & Grading"); add_text(bullets_from_text(assessment))
-        add_h2("Attendance & Policies"); add_text(bullets_from_text(policies))
-        add_h2("Required Materials"); add_text(bullets_from_text(materials))
+        add_h2("Fees & Access"); add_text("
+".join(bullets(fee_lines + access_lines).splitlines()))
+        add_h2("Upcoming Goethe Exam"); add_text(exam_md_text)
+        add_h2("Learning Outcomes"); add_text(bullets(outcomes.splitlines()))
+        add_h2("Assessment & Grading"); add_text(bullets(assessment.splitlines()))
+        add_h2("Workbook Assessment"); add_text(bullets(workbook_grading_lines))
+        add_h2("Attendance & Policies"); add_text(bullets(policies.splitlines()))
+        add_h2("Required Materials"); add_text(bullets(materials.splitlines()))
+        add_h2("Using the Falowen App"); add_text(bullets(falowen_features))
+        # Class Session image in PDF
+        add_h2("Class Session")
+        try:
+            import requests, tempfile
+            resp = requests.get(session_img_url, timeout=8)
+            if resp.status_code == 200:
+                tmpi = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+                tmpi.write(resp.content); tmpi.close()
+                pdf.image(tmpi.name, x=15, w=180)
+                pdf.ln(4)
+        except Exception:
+            pass
+        add_h2("How to Submit Your Workbook Assignments"); add_text("
+".join([f"{i+1}. {s}" for i, s in enumerate(submit_steps)]))
         if include_outline and outline_df is not None and not outline_df.empty:
             add_h2("Weekly Outline")
             for _, r in outline_df.iterrows():
-                line = f"• {r['Week']}: {r['Topics']}"
-                add_text(line)
-        add_h2("Contact & Communication"); add_text(bullets_from_text(contact))
+                add_text(f"• {r['Week']}: {r['Topics']}")
+        add_h2("Contact & Communication"); add_text(bullets(contact.splitlines()))
 
         # Output bytes (robust)
         out = pdf.output(dest="S")
@@ -452,6 +621,7 @@ with tabs[0]:
             mime="application/pdf",
             key="dl_prospectus_pdf",
         )
+
 
 
 # ==== TAB 1: ALL STUDENTS ====
@@ -1653,6 +1823,7 @@ with tabs[7]:
         )
     else:
         st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
+
 
 
 
