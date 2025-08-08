@@ -483,41 +483,15 @@ _Only class registration fees are paid to the school._"""
     st.subheader("Prospectus Preview")
     st.markdown(md)
 
-    # --- Download prospects as Markdown ---
-    st.download_button(
-        "⬇️ Download Prospectus (Markdown)",
-        data=md.encode("utf-8"),
-        file_name=f"Prospectus_{level}.md",
-        mime="text/markdown",
-        key="dl_prospectus_md",
-    )
-
-    # --- PDF generation (organized layout + Unicode font) ---
+    # --- PDF generation (organized layout + safe widths) ---
     from fpdf import FPDF
     import os
     import tempfile
     import requests
 
-    # Try to fetch DejaVuSans if not available locally (cached across runs)
-    @st.cache_resource(show_spinner=False)
-    def get_dejavu_font_path() -> str | None:
-        local_path = "assets/DejaVuSans.ttf"
-        if os.path.exists(local_path):
-            return local_path
-        try:
-            url = "https://github.com/dejavu-fonts/dejavu-fonts/raw/version_2_37/ttf/DejaVuSans.ttf"
-            r = requests.get(url, timeout=10)
-            if r.status_code == 200:
-                os.makedirs("assets", exist_ok=True)
-                with open(local_path, "wb") as f:
-                    f.write(r.content)
-                return local_path
-        except Exception:
-            pass
-        return None
-
-    def safe_pdf(text: str) -> str:
-        return "".join(c if ord(c) < 256 else "?" for c in str(text or ""))
+    if "safe_pdf" not in globals():
+        def safe_pdf(text: str) -> str:
+            return "".join(c if ord(c) < 256 else "?" for c in str(text or ""))
 
     class ProspectusPDF(FPDF):
         def __init__(self):
@@ -525,20 +499,18 @@ _Only class registration fees are paid to the school._"""
             self.font_ready = False
             self.font_name = "Arial"
             self.set_auto_page_break(auto=True, margin=15)
-            # Margins
             self.set_margins(15, 16, 15)
-            # Font setup
-            font_path = get_dejavu_font_path()
-            if font_path:
-                try:
+            # Try optional DejaVu if you have it locally
+            try:
+                font_path = "assets/DejaVuSans.ttf"
+                if os.path.exists(font_path):
                     self.add_font("DejaVu", "", font_path, uni=True)
                     self.font_name = "DejaVu"
                     self.font_ready = True
-                except Exception:
-                    self.font_ready = False
+            except Exception:
+                self.font_ready = False
 
         def header(self):
-            # Slim header: logo + small school line
             try:
                 resp = requests.get(logo_url, timeout=8)
                 if resp.status_code == 200:
@@ -554,23 +526,23 @@ _Only class registration fees are paid to the school._"""
             self.set_font(self.font_name, "", 9)
             sub = f"Level: {level} | Dates: {start_date:%d %b %Y} – {end_date:%d %b %Y} | Schedule: {contact_hours}"
             self.cell(0, 5, (sub if self.font_ready else safe_pdf(sub)), ln=1)
-            # Divider
-            self.set_draw_color(210, 210, 210)
-            self.set_line_width(0.3)
+            self.set_draw_color(210, 210, 210); self.set_line_width(0.3)
             self.line(15, 22, 195, 22)
             self.ln(4)
 
-        # --- helpers
+        # Helpers
         def add_h2(self, title: str):
             self.set_font(self.font_name, "B", 13)
             self.ln(1.5)
             self.cell(0, 7, (title if self.font_ready else safe_pdf(title)), ln=1)
 
-        def add_para(self, text: str, lh: float = 6.5):
+        def add_text(self, text: str, lh: float = 6.5, align="J"):
             self.set_font(self.font_name, "", 11)
             t = text if self.font_ready else safe_pdf(text)
             t = t.replace("\t", " ")
-            self.multi_cell(0, lh, t, align="J")
+            # full-width within margins
+            self.set_x(self.l_margin)
+            self.multi_cell(self.w - self.l_margin - self.r_margin, lh, t, align=align)
             self.ln(0.5)
 
         def add_list(self, items, bullet="•", indent=4.0, lh: float = 6.2):
@@ -578,32 +550,48 @@ _Only class registration fees are paid to the school._"""
             b = bullet if self.font_ready else "-"
             for item in items:
                 t = item if self.font_ready else safe_pdf(item)
-                # bullet cell
-                x0 = self.get_x()
-                self.cell(indent, lh, b, align="R")
-                # text cell
-                self.multi_cell(0, lh, t, align="L")
+                x0 = self.l_margin  # start at left margin each line
                 self.set_x(x0)
+                # bullet cell
+                self.cell(indent, lh, b, align="R")
+                # text cell (remaining width)
+                val_w = self.w - self.l_margin - self.r_margin - indent
+                if val_w < 10:
+                    # pathological case: fallback to single line
+                    self.multi_cell(self.w - self.l_margin - self.r_margin, lh, f"{b} {t}", align="L")
+                else:
+                    self.multi_cell(val_w, lh, t, align="L")
 
         def add_key_values(self, rows, lh: float = 6.2, key_w=45):
-            """rows: list of (label, value) tuples"""
+            """rows: list of (label, value) tuples printed in two columns."""
             self.set_font(self.font_name, "", 11)
+            full_w = self.w - self.l_margin - self.r_margin
+            # Clamp key width and compute value width safely
+            key_w = float(key_w)
+            key_w = max(25.0, min(key_w, full_w * 0.6))  # between 25mm and 60% of content width
+            val_w = full_w - key_w
             for k, v in rows:
                 k2 = k if self.font_ready else safe_pdf(k)
                 v2 = v if self.font_ready else safe_pdf(v)
-                self.cell(key_w, lh, k2 + ":", align="L")
-                self.multi_cell(0, lh, v2, align="L")
+                # Always reset X to left margin before each row
+                self.set_x(self.l_margin)
+                if val_w < 20:
+                    # Not enough room: stack on one line
+                    self.multi_cell(full_w, lh, f"{k2}: {v2}", align="L")
+                else:
+                    # Key cell (fixed width), then value cell (wraps)
+                    self.cell(key_w, lh, k2 + ":", align="L")
+                    self.multi_cell(val_w, lh, v2, align="L")
 
     if st.button("📄 Generate Prospectus PDF"):
         pdf = ProspectusPDF()
         pdf.add_page()
 
-        # --- CONTENT ---
         # 1) Course Description
         pdf.add_h2("Course Description")
-        pdf.add_para(description)
+        pdf.add_text(description)
 
-        # 2) Fees & Access (make fees tidy with key/value, then bullets for access)
+        # 2) Fees & Access
         pdf.add_h2("Fees & Access")
         fees_rows = [
             ("Tuition Fee", f"GHS {fee:,.0f}  (level: {level})"),
@@ -612,6 +600,7 @@ _Only class registration fees are paid to the school._"""
         if remaining > 0:
             fees_rows.append(("Remaining Balance", f"GHS {remaining:,.0f} (confirm due date with admin)"))
         pdf.add_key_values(fees_rows)
+
         access_lines = [
             "All students automatically receive access to Falowen: https://www.falowen.app",
             "Course book can be provided on request (print or digital).",
@@ -622,7 +611,7 @@ _Only class registration fees are paid to the school._"""
 
         # 3) Upcoming Goethe Exam
         pdf.add_h2("Upcoming Goethe Exam")
-        pdf.add_para(exam_md_text.replace("**", ""))  # simple cleanup from markdown emphasis
+        pdf.add_text(exam_md_text.replace("**", ""), align="L")
 
         # 4) Learning Outcomes
         pdf.add_h2("Learning Outcomes")
@@ -634,12 +623,11 @@ _Only class registration fees are paid to the school._"""
 
         # 6) Workbook Assessment
         pdf.add_h2("Workbook Assessment")
-        workbook_lines = [
+        pdf.add_list([
             "You will be graded using a Workbook that includes Lesen, Hören, Schreiben, and Sprechen tasks.",
             "Each workbook is marked out of 100 points.",
             "Your score is distributed evenly by the number of tasks in that workbook (e.g., 10 tasks → 10 points each).",
-        ]
-        pdf.add_list(workbook_lines)
+        ])
 
         # 7) Attendance & Policies
         pdf.add_h2("Attendance & Policies")
@@ -649,7 +637,7 @@ _Only class registration fees are paid to the school._"""
         pdf.add_h2("Required Materials")
         pdf.add_list(materials.splitlines())
 
-        # Add a soft page break before the next big block if we're low on space
+        # Soft page break
         if pdf.get_y() > 220:
             pdf.add_page()
 
@@ -671,7 +659,6 @@ _Only class registration fees are paid to the school._"""
             if resp.status_code == 200:
                 tmpi = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
                 tmpi.write(resp.content); tmpi.close()
-                # Keep image inside margins
                 pdf.image(tmpi.name, x=15, w=180)
                 pdf.ln(2)
         except Exception:
@@ -679,19 +666,17 @@ _Only class registration fees are paid to the school._"""
 
         # 11) How to Submit
         pdf.add_h2("How to Submit Your Workbook Assignments")
-        submit_list = [
+        pdf.add_list([
             "Open the Course Book (materials).",
             "Scroll down to find the answer form.",
             "Paste your answers for: Schreiben, Lesen, Hören.",
             "Click Submit.",
             "Then click Send Assignment – WhatsApp opens and sends your work directly to your tutor.",
             "Once sent, it means your tutor has received it.",
-        ]
-        pdf.add_list(submit_list, bullet="◦", indent=5.0)
+        ], bullet="◦", indent=5.0)
 
         # 12) Weekly Outline (if any)
         if include_outline and outline_df is not None and not outline_df.empty:
-            # Add page if needed
             if pdf.get_y() > 230:
                 pdf.add_page()
             pdf.add_h2("Weekly Outline")
@@ -725,6 +710,7 @@ _Only class registration fees are paid to the school._"""
             key="dl_prospectus_pdf",
         )
 # 
+
 
 
 # ==== TAB 1: ALL STUDENTS ====
@@ -1926,6 +1912,7 @@ with tabs[7]:
         )
     else:
         st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
+
 
 
 
