@@ -494,10 +494,11 @@ _Only class registration fees are paid to the school._"""
 
     # --- PDF generation (DejaVu if available; fallback to safe_pdf) ---
     from fpdf import FPDF
-    import os, tempfile
+    import os
+    import tempfile
 
     if "safe_pdf" not in globals():
-        def safe_pdf(text):
+        def safe_pdf(text: str) -> str:
             return "".join(c if ord(c) < 256 else "?" for c in str(text or ""))
 
     class ProspectusPDF(FPDF):
@@ -520,7 +521,8 @@ _Only class registration fees are paid to the school._"""
                 resp = requests.get(logo_url, timeout=8)
                 if resp.status_code == 200:
                     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-                    tmp.write(resp.content); tmp.close()
+                    tmp.write(resp.content)
+                    tmp.close()
                     self.image(tmp.name, x=10, y=8, w=22)
             except Exception:
                 pass
@@ -540,26 +542,27 @@ _Only class registration fees are paid to the school._"""
         pdf.add_page()
         pdf.set_auto_page_break(auto=True, margin=15)
 
-        def add_h2(title):
-            pdf.set_font(pdf.font_name, "B", 13); pdf.ln(2)
-            pdf.cell(0, 8, safe_pdf(title if not pdf.font_ready else title), ln=True)
+        def add_h2(title: str) -> None:
+            pdf.set_font(pdf.font_name, "B", 13)
+            pdf.ln(2)
+            pdf.cell(0, 8, safe_pdf(title if pdf.font_ready else title), ln=True)
 
-        def add_text(text):
+        def add_text(text: str) -> None:
             pdf.set_font(pdf.font_name, "", 12)
-            t = text if getattr(pdf, "font_ready", False) else safe_pdf(text)
+            t = text if pdf.font_ready else safe_pdf(text)
             t = t.replace("•", "-").replace("\t", " ")
             pdf.multi_cell(0, 7, t)
 
         # Sections
-        add_h2("Course Description"); add_text(description)
-        add_h2("Fees & Access"); add_text(bullets(fee_lines + access_lines))
-        add_h2("Upcoming Goethe Exam"); add_text(exam_md_text)
-        add_h2("Learning Outcomes"); add_text(bullets(outcomes.splitlines()))
-        add_h2("Assessment & Grading"); add_text(bullets(assessment.splitlines()))
-        add_h2("Workbook Assessment"); add_text(bullets(workbook_grading_lines))
-        add_h2("Attendance & Policies"); add_text(bullets(policies.splitlines()))
-        add_h2("Required Materials"); add_text(bullets(materials.splitlines()))
-        add_h2("Falowen Dashboard"); add_text(bullets(falowen_dashboard))
+        add_h2("Course Description");            add_text(description)
+        add_h2("Fees & Access");                 add_text(bullets(fee_lines + access_lines))
+        add_h2("Upcoming Goethe Exam");          add_text(exam_md_text)
+        add_h2("Learning Outcomes");             add_text(bullets(outcomes.splitlines()))
+        add_h2("Assessment & Grading");          add_text(bullets(assessment.splitlines()))
+        add_h2("Workbook Assessment");           add_text(bullets(workbook_grading_lines))
+        add_h2("Attendance & Policies");         add_text(bullets(policies.splitlines()))
+        add_h2("Required Materials");            add_text(bullets(materials.splitlines()))
+        add_h2("Falowen Dashboard");             add_text(bullets(falowen_dashboard))
 
         # Class Session image in PDF
         add_h2("Class Session")
@@ -568,22 +571,39 @@ _Only class registration fees are paid to the school._"""
             resp = requests.get(session_img_url, timeout=8)
             if resp.status_code == 200:
                 tmpi = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
-                tmpi.write(resp.content); tmpi.close()
-                pdf.image(tmpi.name, x=15, w=180); pdf.ln(4)
+                tmpi.write(resp.content)
+                tmpi.close()
+                pdf.image(tmpi.name, x=15, w=180)
+                pdf.ln(4)
         except Exception:
             pass
 
-        add_h2("How to Submit Your Workbook Assignments"); add_text(
-            "\n".join([f"{i+1}. {s}" for i, s in enumerate(submit_steps)])
-        )
+        add_h2("How to Submit Your Workbook Assignments")
+        add_text("\n".join([f"{i+1}. {s}" for i, s in enumerate(submit_steps)]))
+
         if include_outline and outline_df is not None and not outline_df.empty:
             add_h2("Weekly Outline")
             for _, r in outline_df.iterrows():
                 add_text(f"- {r['Week']}: {r['Topics']}")
-        add_h2("Contact & Communication"); add_text(bullets(contact.splitlines()))
 
+        add_h2("Contact & Communication")
+        add_text(bullets(contact.splitlines()))
+
+        # Output bytes (robust)
         out = pdf.output(dest="S")
-        pdf_bytes = out if isinstance(out, (bytes, bytearray)) else out.encode("latin-1", "replace")
+        if isinstance(out, (bytearray, memoryview)):
+            pdf_bytes = bytes(out)
+        elif isinstance(out, bytes):
+            pdf_bytes = out
+        elif isinstance(out, str):
+            pdf_bytes = out.encode("latin-1", "replace")
+        else:
+            tmpf = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+            pdf.output(tmpf.name)
+            tmpf.close()
+            with open(tmpf.name, "rb") as f:
+                pdf_bytes = f.read()
+            os.remove(tmpf.name)
 
         st.download_button(
             "⬇️ Download Prospectus (PDF)",
@@ -1793,6 +1813,7 @@ with tabs[7]:
         )
     else:
         st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
+
 
 
 
