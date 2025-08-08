@@ -492,104 +492,217 @@ _Only class registration fees are paid to the school._"""
         key="dl_prospectus_md",
     )
 
-    # --- PDF generation (DejaVu if available; fallback to safe_pdf) ---
+    # --- PDF generation (organized layout + Unicode font) ---
     from fpdf import FPDF
     import os
     import tempfile
+    import requests
 
-    if "safe_pdf" not in globals():
-        def safe_pdf(text: str) -> str:
-            return "".join(c if ord(c) < 256 else "?" for c in str(text or ""))
+    # Try to fetch DejaVuSans if not available locally (cached across runs)
+    @st.cache_resource(show_spinner=False)
+    def get_dejavu_font_path() -> str | None:
+        local_path = "assets/DejaVuSans.ttf"
+        if os.path.exists(local_path):
+            return local_path
+        try:
+            url = "https://github.com/dejavu-fonts/dejavu-fonts/raw/version_2_37/ttf/DejaVuSans.ttf"
+            r = requests.get(url, timeout=10)
+            if r.status_code == 200:
+                os.makedirs("assets", exist_ok=True)
+                with open(local_path, "wb") as f:
+                    f.write(r.content)
+                return local_path
+        except Exception:
+            pass
+        return None
+
+    def safe_pdf(text: str) -> str:
+        return "".join(c if ord(c) < 256 else "?" for c in str(text or ""))
 
     class ProspectusPDF(FPDF):
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
+        def __init__(self):
+            super().__init__(orientation="P", unit="mm", format="A4")
             self.font_ready = False
             self.font_name = "Arial"
-            try:
-                font_path = "assets/DejaVuSans.ttf"
-                if os.path.exists(font_path):
+            self.set_auto_page_break(auto=True, margin=15)
+            # Margins
+            self.set_margins(15, 16, 15)
+            # Font setup
+            font_path = get_dejavu_font_path()
+            if font_path:
+                try:
                     self.add_font("DejaVu", "", font_path, uni=True)
                     self.font_name = "DejaVu"
                     self.font_ready = True
-            except Exception:
-                self.font_ready = False
+                except Exception:
+                    self.font_ready = False
 
         def header(self):
+            # Slim header: logo + small school line
             try:
-                import requests
                 resp = requests.get(logo_url, timeout=8)
                 if resp.status_code == 200:
                     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-                    tmp.write(resp.content)
-                    tmp.close()
-                    self.image(tmp.name, x=10, y=8, w=22)
+                    tmp.write(resp.content); tmp.close()
+                    self.image(tmp.name, x=15, y=8, w=18)
             except Exception:
                 pass
-            self.set_font(self.font_name, "B", 16)
-            self.cell(0, 9, safe_pdf(course_title if not self.font_ready else course_title), ln=True, align="C")
-            self.set_font(self.font_name, "", 11)
+            self.set_xy(36, 10)
+            self.set_font(self.font_name, "B", 12)
+            self.cell(0, 6, (course_title if self.font_ready else safe_pdf(course_title)), ln=1)
+            self.set_x(36)
+            self.set_font(self.font_name, "", 9)
             sub = f"Level: {level} | Dates: {start_date:%d %b %Y} – {end_date:%d %b %Y} | Schedule: {contact_hours}"
-            self.cell(0, 7, safe_pdf(sub if not self.font_ready else sub), ln=True, align="C")
-            self.ln(3)
-            self.set_draw_color(200, 200, 200)
-            self.set_line_width(0.5)
-            self.line(10, self.get_y(), 200, self.get_y())
+            self.cell(0, 5, (sub if self.font_ready else safe_pdf(sub)), ln=1)
+            # Divider
+            self.set_draw_color(210, 210, 210)
+            self.set_line_width(0.3)
+            self.line(15, 22, 195, 22)
             self.ln(4)
+
+        # --- helpers
+        def add_h2(self, title: str):
+            self.set_font(self.font_name, "B", 13)
+            self.ln(1.5)
+            self.cell(0, 7, (title if self.font_ready else safe_pdf(title)), ln=1)
+
+        def add_para(self, text: str, lh: float = 6.5):
+            self.set_font(self.font_name, "", 11)
+            t = text if self.font_ready else safe_pdf(text)
+            t = t.replace("\t", " ")
+            self.multi_cell(0, lh, t, align="J")
+            self.ln(0.5)
+
+        def add_list(self, items, bullet="•", indent=4.0, lh: float = 6.2):
+            self.set_font(self.font_name, "", 11)
+            b = bullet if self.font_ready else "-"
+            for item in items:
+                t = item if self.font_ready else safe_pdf(item)
+                # bullet cell
+                x0 = self.get_x()
+                self.cell(indent, lh, b, align="R")
+                # text cell
+                self.multi_cell(0, lh, t, align="L")
+                self.set_x(x0)
+
+        def add_key_values(self, rows, lh: float = 6.2, key_w=45):
+            """rows: list of (label, value) tuples"""
+            self.set_font(self.font_name, "", 11)
+            for k, v in rows:
+                k2 = k if self.font_ready else safe_pdf(k)
+                v2 = v if self.font_ready else safe_pdf(v)
+                self.cell(key_w, lh, k2 + ":", align="L")
+                self.multi_cell(0, lh, v2, align="L")
 
     if st.button("📄 Generate Prospectus PDF"):
         pdf = ProspectusPDF()
         pdf.add_page()
-        pdf.set_auto_page_break(auto=True, margin=15)
 
-        def add_h2(title: str) -> None:
-            pdf.set_font(pdf.font_name, "B", 13)
-            pdf.ln(2)
-            pdf.cell(0, 8, safe_pdf(title if pdf.font_ready else title), ln=True)
+        # --- CONTENT ---
+        # 1) Course Description
+        pdf.add_h2("Course Description")
+        pdf.add_para(description)
 
-        def add_text(text: str) -> None:
-            pdf.set_font(pdf.font_name, "", 12)
-            t = text if pdf.font_ready else safe_pdf(text)
-            t = t.replace("•", "-").replace("\t", " ")
-            pdf.multi_cell(0, 7, t)
+        # 2) Fees & Access (make fees tidy with key/value, then bullets for access)
+        pdf.add_h2("Fees & Access")
+        fees_rows = [
+            ("Tuition Fee", f"GHS {fee:,.0f}  (level: {level})"),
+            ("Installment Option", "GHS 1,800 now + GHS 1,000 after one month"),
+        ]
+        if remaining > 0:
+            fees_rows.append(("Remaining Balance", f"GHS {remaining:,.0f} (confirm due date with admin)"))
+        pdf.add_key_values(fees_rows)
+        access_lines = [
+            "All students automatically receive access to Falowen: https://www.falowen.app",
+            "Course book can be provided on request (print or digital).",
+            "Letter of Enrollment is issued only after full payment.",
+            "Only class registration fees are paid to the school (exam fees are paid directly to the Goethe-Institut).",
+        ]
+        pdf.add_list(access_lines)
 
-        # Sections
-        add_h2("Course Description");            add_text(description)
-        add_h2("Fees & Access");                 add_text(bullets(fee_lines + access_lines))
-        add_h2("Upcoming Goethe Exam");          add_text(exam_md_text)
-        add_h2("Learning Outcomes");             add_text(bullets(outcomes.splitlines()))
-        add_h2("Assessment & Grading");          add_text(bullets(assessment.splitlines()))
-        add_h2("Workbook Assessment");           add_text(bullets(workbook_grading_lines))
-        add_h2("Attendance & Policies");         add_text(bullets(policies.splitlines()))
-        add_h2("Required Materials");            add_text(bullets(materials.splitlines()))
-        add_h2("Falowen Dashboard");             add_text(bullets(falowen_dashboard))
+        # 3) Upcoming Goethe Exam
+        pdf.add_h2("Upcoming Goethe Exam")
+        pdf.add_para(exam_md_text.replace("**", ""))  # simple cleanup from markdown emphasis
 
-        # Class Session image in PDF
-        add_h2("Class Session")
+        # 4) Learning Outcomes
+        pdf.add_h2("Learning Outcomes")
+        pdf.add_list(outcomes.splitlines())
+
+        # 5) Assessment & Grading
+        pdf.add_h2("Assessment & Grading")
+        pdf.add_list(assessment.splitlines())
+
+        # 6) Workbook Assessment
+        pdf.add_h2("Workbook Assessment")
+        workbook_lines = [
+            "You will be graded using a Workbook that includes Lesen, Hören, Schreiben, and Sprechen tasks.",
+            "Each workbook is marked out of 100 points.",
+            "Your score is distributed evenly by the number of tasks in that workbook (e.g., 10 tasks → 10 points each).",
+        ]
+        pdf.add_list(workbook_lines)
+
+        # 7) Attendance & Policies
+        pdf.add_h2("Attendance & Policies")
+        pdf.add_list(policies.splitlines())
+
+        # 8) Required Materials
+        pdf.add_h2("Required Materials")
+        pdf.add_list(materials.splitlines())
+
+        # Add a soft page break before the next big block if we're low on space
+        if pdf.get_y() > 220:
+            pdf.add_page()
+
+        # 9) Falowen Dashboard
+        pdf.add_h2("Falowen Dashboard")
+        pdf.add_list([
+            "Dashboard",
+            "Course Book",
+            "My Results and Resources",
+            "Exams Mode & Custom Chat",
+            "Vocab Trainer",
+            "Schreiben Trainer",
+        ])
+
+        # 10) Class Session (image)
+        pdf.add_h2("Class Session")
         try:
-            import requests
             resp = requests.get(session_img_url, timeout=8)
             if resp.status_code == 200:
                 tmpi = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
-                tmpi.write(resp.content)
-                tmpi.close()
+                tmpi.write(resp.content); tmpi.close()
+                # Keep image inside margins
                 pdf.image(tmpi.name, x=15, w=180)
-                pdf.ln(4)
+                pdf.ln(2)
         except Exception:
             pass
 
-        add_h2("How to Submit Your Workbook Assignments")
-        add_text("\n".join([f"{i+1}. {s}" for i, s in enumerate(submit_steps)]))
+        # 11) How to Submit
+        pdf.add_h2("How to Submit Your Workbook Assignments")
+        submit_list = [
+            "Open the Course Book (materials).",
+            "Scroll down to find the answer form.",
+            "Paste your answers for: Schreiben, Lesen, Hören.",
+            "Click Submit.",
+            "Then click Send Assignment – WhatsApp opens and sends your work directly to your tutor.",
+            "Once sent, it means your tutor has received it.",
+        ]
+        pdf.add_list(submit_list, bullet="◦", indent=5.0)
 
+        # 12) Weekly Outline (if any)
         if include_outline and outline_df is not None and not outline_df.empty:
-            add_h2("Weekly Outline")
+            # Add page if needed
+            if pdf.get_y() > 230:
+                pdf.add_page()
+            pdf.add_h2("Weekly Outline")
             for _, r in outline_df.iterrows():
-                add_text(f"- {r['Week']}: {r['Topics']}")
+                pdf.add_list([f"{r['Week']}: {r['Topics']}"], bullet="–", indent=5.0)
 
-        add_h2("Contact & Communication")
-        add_text(bullets(contact.splitlines()))
+        # 13) Contact
+        pdf.add_h2("Contact & Communication")
+        pdf.add_list(contact.splitlines())
 
-        # Output bytes (robust)
+        # --- Output bytes (robust) ---
         out = pdf.output(dest="S")
         if isinstance(out, (bytearray, memoryview)):
             pdf_bytes = bytes(out)
@@ -599,8 +712,7 @@ _Only class registration fees are paid to the school._"""
             pdf_bytes = out.encode("latin-1", "replace")
         else:
             tmpf = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-            pdf.output(tmpf.name)
-            tmpf.close()
+            pdf.output(tmpf.name); tmpf.close()
             with open(tmpf.name, "rb") as f:
                 pdf_bytes = f.read()
             os.remove(tmpf.name)
@@ -612,6 +724,7 @@ _Only class registration fees are paid to the school._"""
             mime="application/pdf",
             key="dl_prospectus_pdf",
         )
+# 
 
 
 # ==== TAB 1: ALL STUDENTS ====
@@ -1813,6 +1926,7 @@ with tabs[7]:
         )
     else:
         st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
+
 
 
 
