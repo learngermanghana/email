@@ -232,7 +232,7 @@ STUDENT_CODES = df_students["studentcode"].dropna().unique().tolist() if "studen
 
 # ==== TABS SETUP ====
 tabs = st.tabs([
-    "📝 Pending",                # 0
+    "📝 📘 Prospectus",                # 0
     "👩‍🎓 All Students",           # 1
     "💵 Expenses",               # 2
     "📲 Reminders",              # 3
@@ -243,52 +243,216 @@ tabs = st.tabs([
     
 ])
 
-# ==== TAB 0: PENDING STUDENTS ====
+# ==== TAB 0: PROSPECTUS ====
 with tabs[0]:
-    st.title("🕒 Pending Students")
+    st.title("📘 Course Prospectus")
+    st.caption("A clear, printable guide for students: goals, expectations, grading, schedule, and how to succeed.")
 
-    # -- Define/Load Pending Students Google Sheet URL --
-    PENDING_SHEET_ID = "1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo"
-    PENDING_CSV_URL = f"https://docs.google.com/spreadsheets/d/{PENDING_SHEET_ID}/export?format=csv"
+    # --- Level selection & weekly outline source ---
+    level = st.selectbox("Course Level", ["A1", "A2", "B1", "B2"], key="prospectus_level")
+    schedule_map = {
+        "A1": RAW_SCHEDULE_A1,
+        "A2": RAW_SCHEDULE_A2,
+        "B1": RAW_SCHEDULE_B1,
+        "B2": RAW_SCHEDULE_B2,
+    }
 
-    @st.cache_data(ttl=0)
-    def load_pending():
-        df = pd.read_csv(PENDING_CSV_URL, dtype=str)
-        df = normalize_columns(df)
-        df_display = df.copy()
-        df_search = df.copy()
-        return df_display, df_search
+    # --- Prospectus fields (with sensible defaults you can edit quickly) ---
+    colA, colB = st.columns(2)
+    with colA:
+        course_title = st.text_input("Course Title", value=f"German {level} – Learn Language Education Academy")
+        duration_weeks = st.number_input("Duration (weeks)", min_value=4, max_value=40, value=10)
+        contact_hours = st.text_input("Contact Hours / Week", value="3 sessions (Mon–Wed) · 1.5h each")
+    with colB:
+        start_when = st.text_input("Typical Start Month", value="Rolling cohorts (Monthly)")
+        location = st.text_input("Location / Mode", value="Accra (in-person) + Online support")
+        teacher = st.text_input("Instructor", value="Felix Asadu (Director)")
 
-    df_display, df_search = load_pending()
-
-    # --- Universal Search ---
-    search = st.text_input("🔎 Search any field (name, code, email, etc.)")
-    if search:
-        mask = df_search.apply(
-            lambda row: row.astype(str).str.contains(search, case=False, na=False).any(),
-            axis=1
-        )
-        filt = df_display[mask]
-    else:
-        filt = df_display
-
-    # --- Column Selector ---
-    all_cols = list(filt.columns)
-    selected_cols = st.multiselect(
-        "Show columns (for easy viewing):", all_cols, default=all_cols[:6]
+    description = st.text_area(
+        "Course Description",
+        value=(
+            "This course develops practical communication for everyday situations, focusing on listening, "
+            "speaking, reading, and writing. Students learn vocabulary and grammar in context, with regular "
+            "practice, feedback, and real-life tasks."
+        ),
+        height=100,
     )
 
-    # --- Show Table (with scroll bar) ---
-    st.dataframe(filt[selected_cols], use_container_width=True, height=400)
+    outcomes = st.text_area(
+        "Learning Outcomes (one per line)",
+        value=(
+            "Understand and participate in common conversations.\n"
+            "Read short texts and extract key information.\n"
+            "Write simple, clear messages and letters.\n"
+            "Use core grammar structures accurately in context.\n"
+            "Build exam skills and confident speaking."
+        ),
+        height=120,
+    )
 
-    # --- Download Button (all columns always) ---
+    assessment = st.text_area(
+        "Assessment & Grading (one per line)",
+        value=(
+            "Attendance & Participation – 10%\n"
+            "Homework & Classwork – 20%\n"
+            "Quizzes – 20%\n"
+            "Midterm – 20%\n"
+            "Final Exam (written + oral) – 30%"
+        ),
+        height=120,
+    )
+
+    policies = st.text_area(
+        "Attendance & Policies",
+        value=(
+            "Please arrive on time. Notify the instructor in advance if you will miss a session.\n"
+            "Missed assessments may be rescheduled at the instructor's discretion.\n"
+            "Academic integrity is required. Copying or plagiarism may result in a zero.\n"
+            "Payments are non‑refundable once receipts are issued. Access may be revoked for non‑payment."
+        ),
+        height=120,
+    )
+
+    materials = st.text_area(
+        "Required Materials (one per line)",
+        value=(
+            "Notebook and pen\n"
+            "Mobile device for Falowen app\n"
+            "Headphones for listening tasks\n"
+            "Printed handouts (provided)"
+        ),
+        height=110,
+    )
+
+    contact = st.text_area(
+        "Contact & Communication",
+        value=(
+            "Learn Language Education Academy – Accra, Ghana\n"
+            "Website: https://www.learngermanghana.com\n"
+            "Phone: 0205706589\n"
+            "Email: Learngermanghana@gmail.com\n"
+            "Primary platform: Falowen App (assignments, results, resources)."
+        ),
+        height=110,
+    )
+
+    st.markdown("---")
+
+    # --- Optional weekly outline (from your level schedules) ---
+    include_outline = st.checkbox("Include Weekly Outline", value=True)
+    outline_df = None
+    if include_outline:
+        rows = []
+        for week_label, topics in schedule_map[level]:
+            rows.append({"Week": week_label, "Topics": "; ".join(topics)})
+        import pandas as pd
+        outline_df = pd.DataFrame(rows)
+        st.subheader("Weekly Outline")
+        st.dataframe(outline_df, use_container_width=True)
+
+    st.markdown("---")
+
+    # --- Build Markdown prospectus for preview/download ---
+    def md_section(title: str, body: str) -> str:
+        return f"## {title}\n\n{body.strip()}\n\n"
+
+    def bullets_from_text(text: str) -> str:
+        lines = [l.strip() for l in text.splitlines() if l.strip()]
+        return "\n".join([f"- {l}" for l in lines])
+
+    md = f"# {course_title}\n\n"
+    md += f"**Level:** {level}  |  **Duration:** {duration_weeks} weeks  |  **Schedule:** {contact_hours}\n\n"
+    md += f"**Start:** {start_when}  |  **Mode:** {location}  |  **Instructor:** {teacher}\n\n"
+    md += md_section("Course Description", description)
+    md += md_section("Learning Outcomes", bullets_from_text(outcomes))
+    md += md_section("Assessment & Grading", bullets_from_text(assessment))
+    md += md_section("Attendance & Policies", bullets_from_text(policies))
+    md += md_section("Required Materials", bullets_from_text(materials))
+    if include_outline and outline_df is not None and not outline_df.empty:
+        table = "\n".join([f"- **{r['Week']}**: {r['Topics']}" for _, r in outline_df.iterrows()])
+        md += md_section("Weekly Outline", table)
+    md += md_section("Contact & Communication", bullets_from_text(contact))
+
+    st.subheader("Prospectus Preview")
+    st.markdown(md)
+
+    # --- Download prospects as Markdown ---
     st.download_button(
-        "⬇️ Download all columns as CSV",
-        filt.to_csv(index=False),
-        file_name="pending_students.csv"
+        "⬇️ Download Prospectus (Markdown)",
+        data=md.encode("utf-8"),
+        file_name=f"Prospectus_{level}.md",
+        mime="text/markdown",
+        key="dl_prospectus_md",
     )
 
-# ==== END OF STAGE 3 (TAB 0) ====
+    # --- PDF generation (DejaVu if available; fallback to safe_pdf) ---
+    from fpdf import FPDF
+    import os, tempfile
+
+    class ProspectusPDF(FPDF):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.font_ready = False
+            self.font_name = "Arial"
+            # Try to register DejaVuSans for full Unicode (ö/ä/ü/ß)
+            try:
+                font_path = "assets/DejaVuSans.ttf"
+                if os.path.exists(font_path):
+                    self.add_font('DejaVu', '', font_path, uni=True)
+                    self.font_name = 'DejaVu'
+                    self.font_ready = True
+            except Exception:
+                self.font_ready = False
+
+        def header(self):
+            self.set_font(self.font_name, 'B', 16)
+            self.cell(0, 9, safe_pdf(course_title if not self.font_ready else course_title), ln=True, align='C')
+            self.set_font(self.font_name, '', 11)
+            sub = f"Level: {level} | Duration: {duration_weeks} weeks | Schedule: {contact_hours}"
+            self.cell(0, 7, safe_pdf(sub if not self.font_ready else sub), ln=True, align='C')
+            self.ln(3)
+            self.set_draw_color(200,200,200); self.set_line_width(0.5)
+            self.line(10, self.get_y(), 200, self.get_y()); self.ln(4)
+
+    if st.button("📄 Generate Prospectus PDF"):
+        pdf = ProspectusPDF()
+        pdf.add_page()
+        pdf.set_auto_page_break(auto=True, margin=15)
+
+        def add_h2(title):
+            pdf.set_font(pdf.font_name, 'B', 13)
+            pdf.ln(2)
+            pdf.cell(0, 8, safe_pdf(title if not pdf.font_ready else title), ln=True)
+
+        def add_text(text):
+            pdf.set_font(pdf.font_name, '', 12)
+            pdf.multi_cell(0, 7, safe_pdf(text if not pdf.font_ready else text))
+
+        # Sections
+        add_h2("Course Description"); add_text(description)
+        add_h2("Learning Outcomes"); add_text(bullets_from_text(outcomes))
+        add_h2("Assessment & Grading"); add_text(bullets_from_text(assessment))
+        add_h2("Attendance & Policies"); add_text(bullets_from_text(policies))
+        add_h2("Required Materials"); add_text(bullets_from_text(materials))
+        if include_outline and outline_df is not None and not outline_df.empty:
+            add_h2("Weekly Outline")
+            for _, r in outline_df.iterrows():
+                line = f"• {r['Week']}: {r['Topics']}"
+                add_text(line)
+        add_h2("Contact & Communication"); add_text(bullets_from_text(contact))
+
+        # Output bytes (robust)
+        out = pdf.output(dest="S")
+        pdf_bytes = out if isinstance(out, (bytes, bytearray)) else out.encode("latin-1", "replace")
+
+        st.download_button(
+            "⬇️ Download Prospectus (PDF)",
+            data=pdf_bytes,
+            file_name=f"Prospectus_{level}.pdf",
+            mime="application/pdf",
+            key="dl_prospectus_pdf",
+        )
+
 
 # ==== TAB 1: ALL STUDENTS ====
 with tabs[1]:
@@ -1489,6 +1653,7 @@ with tabs[7]:
         )
     else:
         st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
+
 
 
 
