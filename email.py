@@ -1297,94 +1297,150 @@ with tabs[6]:
 
 # --- 1. URLS ---
 students_csv_url = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
-ref_answers_url = "https://docs.google.com/spreadsheets/d/1CtNlidMfmE836NBh5FmEF5tls9sLmMmkkhewMTQjkBo/export?format=csv"
+ref_answers_url  = "https://docs.google.com/spreadsheets/d/1CtNlidMfmE836NBh5FmEF5tls9sLmMmkkhewMTQjkBo/export?format=csv"
 
-with tabs[7]:
+def render_marking_tab():
     st.title("📝 Reference & Student Work Share")
 
-    # --- Load Data ---
+    # --- Load Data (unique cache funcs to avoid collisions with other tabs) ---
     @st.cache_data(show_spinner=False)
-    def load_students():
-        df = pd.read_csv(students_csv_url)
+    def load_marking_students(url: str):
+        df = pd.read_csv(url, dtype=str)
         df.columns = [c.strip().lower().replace(" ", "").replace("_", "") for c in df.columns]
         if "student_code" in df.columns:
             df = df.rename(columns={"student_code": "studentcode"})
         return df
-    df_students = load_students()
 
-    @st.cache_data(ttl=0)
-    def load_ref_answers():
-        df = pd.read_csv(ref_answers_url, dtype=str)
+    @st.cache_data(ttl=300, show_spinner=False)
+    def load_marking_ref_answers(url: str):
+        df = pd.read_csv(url, dtype=str)
         df.columns = [c.strip().lower().replace(" ", "").replace("_", "") for c in df.columns]
-        if "assignment" not in df.columns:
-            raise Exception("No 'assignment' column found in reference answers sheet.")
         return df
-    ref_df = load_ref_answers()
 
-    # --- Student search and select ---
-    st.subheader("1. Search & Select Student")
+    try:
+        df_students = load_marking_students(students_csv_url)
+    except Exception as e:
+        st.error(f"Could not load students: {e}")
+        return
+
+    try:
+        ref_df = load_marking_ref_answers(ref_answers_url)
+        if "assignment" not in ref_df.columns:
+            st.warning("No 'assignment' column found in reference answers sheet.")
+            return
+    except Exception as e:
+        st.error(f"Could not load reference answers: {e}")
+        return
+
+    # --- Helpers ---
     def col_lookup(df, name):
         key = name.lower().replace(" ", "").replace("_", "")
         for c in df.columns:
             if c.lower().replace(" ", "").replace("_", "") == key:
                 return c
-        raise KeyError(f"Column '{name}' not found in DataFrame")
+        return None
 
-    name_col, code_col = col_lookup(df_students, "name"), col_lookup(df_students, "studentcode")
-    search_student = st.text_input("Type student name or code...")
-    students_filtered = df_students[
-        df_students[name_col].str.contains(search_student, case=False, na=False) |
-        df_students[code_col].astype(str).str.contains(search_student, case=False, na=False)
-    ] if search_student else df_students
+    name_col = col_lookup(df_students, "name")
+    code_col = col_lookup(df_students, "studentcode")
+    if not name_col or not code_col:
+        st.error("Required columns 'name' or 'studentcode' not found in students sheet.")
+        return
 
-    student_list = students_filtered[name_col] + " (" + students_filtered[code_col].astype(str) + ")"
+    # --- Student search and select (no st.stop; we just return early if needed) ---
+    st.subheader("1. Search & Select Student")
+
+    with st.form("marking_student_form"):
+        search_student = st.text_input("Type student name or code...", key="tab7_search_student")
+        submitted_student = st.form_submit_button("Apply")
+
+    if submitted_student and search_student:
+        mask = (
+            df_students[name_col].astype(str).str.contains(search_student, case=False, na=False) |
+            df_students[code_col].astype(str).str.contains(search_student, case=False, na=False)
+        )
+        students_filtered = df_students[mask].copy()
+    else:
+        students_filtered = df_students.copy()
+
+    if students_filtered.empty:
+        st.info("No students match your search. Try a different query.")
+        return
+
+    # Build display list safely
+    display_name = students_filtered[name_col].fillna("").astype(str)
+    display_code = students_filtered[code_col].fillna("").astype(str)
+    student_list = (display_name + " (" + display_code + ")").tolist()
+
     chosen = st.selectbox("Select Student", student_list, key="tab7_single_student")
 
     if not chosen or "(" not in chosen:
-        st.warning("No student selected or wrong student list format.")
-        st.stop()
+        st.warning("Select a student to continue.")
+        return
+
     student_code = chosen.split("(")[-1].replace(")", "").strip()
-    student_row = students_filtered[students_filtered[code_col] == student_code].iloc[0]
-    st.markdown(f"**Selected:** {student_row[name_col]} ({student_code})")
-    student_level = student_row['level'] if 'level' in student_row else ""
+    sel_rows = students_filtered[students_filtered[code_col] == student_code]
+    if sel_rows.empty:
+        st.warning("Selected student not found.")
+        return
+    student_row = sel_rows.iloc[0]
+
+    st.markdown(f"**Selected:** {student_row.get(name_col, '')} ({student_code})")
+    student_level = student_row.get('level', "")
 
     # --- Assignment search and select ---
     st.subheader("2. Select Assignment")
-    available_assignments = ref_df['assignment'].dropna().unique().tolist()
-    search_assign = st.text_input("Type assignment title...", key="tab7_search_assign")
-    filtered = [a for a in available_assignments if search_assign.lower() in str(a).lower()]
+
+    available_assignments = (
+        ref_df['assignment'].dropna().astype(str).unique().tolist()
+        if 'assignment' in ref_df.columns else []
+    )
+
+    with st.form("marking_assignment_form"):
+        search_assign = st.text_input("Type assignment title...", key="tab7_search_assign")
+        submitted_assign = st.form_submit_button("Filter assignments")
+
+    if submitted_assign and search_assign:
+        filtered = [a for a in available_assignments if search_assign.lower() in a.lower()]
+    else:
+        filtered = available_assignments
+
     if not filtered:
         st.info("No assignments match your search.")
-        st.stop()
+        return
+
     assignment = st.selectbox("Select Assignment", filtered, key="tab7_assign_select")
+    if not assignment:
+        st.info("Select an assignment to continue.")
+        return
 
     # --- REFERENCE ANSWERS (TABS + COMBINED BOX) ---
     st.subheader("3. Reference Answer (from Google Sheet)")
     ref_answers = []
-    answer_cols = []
     if assignment:
-        assignment_row = ref_df[ref_df['assignment'] == assignment]
+        assignment_row = ref_df[ref_df['assignment'].astype(str) == assignment]
         if not assignment_row.empty:
-            answer_cols = [col for col in assignment_row.columns if col.startswith('answer')]
-            answer_cols = [col for col in answer_cols if pd.notnull(assignment_row.iloc[0][col]) and str(assignment_row.iloc[0][col]).strip() != '']
-            ref_answers = [str(assignment_row.iloc[0][col]) for col in answer_cols]
+            all_cols = assignment_row.columns.tolist()
+            answer_cols = [c for c in all_cols if str(c).startswith("answer")]
+            answer_cols = [c for c in answer_cols
+                           if pd.notnull(assignment_row.iloc[0][c])
+                           and str(assignment_row.iloc[0][c]).strip() != ""]
+            ref_answers = [str(assignment_row.iloc[0][c]) for c in answer_cols]
 
-    # Show dynamic tabs if multiple answers, else single box
     if ref_answers:
         if len(ref_answers) == 1:
             st.markdown("**Reference Answer:**")
             st.write(ref_answers[0])
         else:
-            tab_objs = st.tabs([f"Answer {i+1}" for i in range(len(ref_answers))])
+            ans_tabs = st.tabs([f"Answer {i+1}" for i in range(len(ref_answers))])
             for i, ans in enumerate(ref_answers):
-                with tab_objs[i]:
+                with ans_tabs[i]:
                     st.write(ans)
-        answers_combined_str = "\n".join([f"{i+1}. {ans}" for i, ans in enumerate(ref_answers)])
+        answers_combined_str  = "\n".join([f"{i+1}. {ans}" for i, ans in enumerate(ref_answers)])
         answers_combined_html = "<br>".join([f"{i+1}. {ans}" for i, ans in enumerate(ref_answers)])
     else:
-        answers_combined_str = "No answer available."
+        answers_combined_str  = "No answer available."
         answers_combined_html = "No answer available."
-        st.info("No reference answer available.")
+        st.info("No reference answer available for this assignment.")
 
     # --- STUDENT WORK + AI COPY ZONE ---
     st.subheader("4. Paste Student Work (for your manual cross-check or ChatGPT use)")
@@ -1393,18 +1449,30 @@ with tabs[7]:
     # --- Combined copy box ---
     st.subheader("5. Copy Zone (Reference + Student Work for AI/manual grading)")
     combined_text = (
-        "Reference answer:\n" +
-        answers_combined_str +
-        "\n\nStudent answer:\n" +
-        student_work
+        "Reference answer:\n"
+        + answers_combined_str
+        + "\n\nStudent answer:\n"
+        + (student_work or "")
     )
     st.code(combined_text, language="markdown")
     st.info("Copy this block and paste into ChatGPT or your AI tool for checking.")
 
     # --- Copy buttons ---
     st.write("**Quick Copy:**")
-    st.download_button("📋 Copy Only Reference Answer (txt)", data=answers_combined_str, file_name="reference_answer.txt", mime="text/plain", key="copy_reference")
-    st.download_button("📋 Copy Both (Reference + Student)", data=combined_text, file_name="ref_and_student.txt", mime="text/plain", key="copy_both")
+    st.download_button(
+        "📋 Copy Only Reference Answer (txt)",
+        data=answers_combined_str,
+        file_name="reference_answer.txt",
+        mime="text/plain",
+        key="tab7_copy_reference",
+    )
+    st.download_button(
+        "📋 Copy Both (Reference + Student)",
+        data=combined_text,
+        file_name="ref_and_student.txt",
+        mime="text/plain",
+        key="tab7_copy_both",
+    )
 
     st.divider()
 
@@ -1412,29 +1480,25 @@ with tabs[7]:
     st.subheader("6. Send Reference Answer to Student by Email")
     default_email = student_row.get('email', '') if 'email' in student_row else ""
     to_email = st.text_input("Recipient Email", value=default_email, key="tab7_email")
-    subject = st.text_input("Subject", value=f"{student_row[name_col]} - {assignment} Reference Answer", key="tab7_subject")
+    subject  = st.text_input("Subject", value=f"{student_row.get(name_col, '')} - {assignment} Reference Answer", key="tab7_subject")
 
     ref_ans_email = f"<b>Reference Answers:</b><br>{answers_combined_html}<br>"
 
-    # Only share reference, not the student work!
     body = st.text_area(
         "Message (HTML allowed)",
         value=(
-            f"Hello {student_row[name_col]},<br><br>"
+            f"Hello {student_row.get(name_col, '')},<br><br>"
             f"Here is the reference answer for your assignment <b>{assignment}</b>.<br><br>"
             f"{ref_ans_email}"
             "Thank you<br>Learn Language Education Academy"
         ),
         key="tab7_body"
     )
-    send_email = st.button("📧 Email Reference", key="tab7_send_email")
-
-    if send_email:
+    if st.button("📧 Email Reference", key="tab7_send_email"):
         if not to_email or "@" not in to_email:
             st.error("Please enter a valid recipient email address.")
         else:
             try:
-                # Make sure you have your send_email_report function ready!
                 send_email_report(None, to_email, subject, body)  # No PDF attached, just reference
                 st.success(f"Reference sent to {to_email}!")
             except Exception as e:
@@ -1450,12 +1514,15 @@ with tabs[7]:
         if v.startswith("233") or v.startswith("0") or v.isdigit():
             wa_phone = v
             break
-    wa_phone = st.text_input("WhatsApp Number (International format, e.g., 233245022743)", value=wa_phone, key="tab7_wa_number")
+    wa_phone = st.text_input(
+        "WhatsApp Number (International format, e.g., 233245022743)",
+        value=wa_phone,
+        key="tab7_wa_number"
+    )
 
     ref_ans_wa = "*Reference Answers:*\n" + answers_combined_str + "\n"
-
     default_wa_msg = (
-        f"Hello {student_row[name_col]},\n\n"
+        f"Hello {student_row.get(name_col, '')},\n\n"
         f"Here is the reference answer for your assignment: *{assignment}*\n"
         f"{ref_ans_wa}\n"
         "Open my results and resources on the Falowen app for scores and full comment.\n"
@@ -1468,20 +1535,16 @@ with tabs[7]:
         value=default_wa_msg, height=180, key="tab7_wa_message_edit"
     )
 
-    wa_num_formatted = wa_phone.strip().replace(" ", "").replace("-", "")
+    wa_num_formatted = (wa_phone or "").strip().replace(" ", "").replace("-", "")
     if wa_num_formatted.startswith("0"):
         wa_num_formatted = "233" + wa_num_formatted[1:]
     elif wa_num_formatted.startswith("+"):
         wa_num_formatted = wa_num_formatted[1:]
-    elif not wa_num_formatted.startswith("233"):
-        wa_num_formatted = "233" + wa_num_formatted[-9:]  # fallback for local numbers
+    elif not wa_num_formatted.startswith("233") and wa_num_formatted.isdigit() and len(wa_num_formatted) >= 9:
+        wa_num_formatted = "233" + wa_num_formatted[-9:]
 
-    wa_link = (
-        f"https://wa.me/{wa_num_formatted}?text={urllib.parse.quote(wa_message)}"
-        if wa_num_formatted.isdigit() and len(wa_num_formatted) >= 11 else None
-    )
-
-    if wa_link:
+    if wa_num_formatted.isdigit() and len(wa_num_formatted) >= 11:
+        wa_link = f"https://wa.me/{wa_num_formatted}?text={urllib.parse.quote(wa_message)}"
         st.markdown(
             f'<a href="{wa_link}" target="_blank">'
             f'<button style="background-color:#25d366;color:white;border:none;padding:10px 20px;border-radius:5px;font-size:16px;cursor:pointer;">'
@@ -1492,25 +1555,9 @@ with tabs[7]:
     else:
         st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# Call it inside your tabs container
+with tabs[7]:
+    render_marking_tab()
 
 
 
