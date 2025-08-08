@@ -4,6 +4,7 @@ import re
 import base64
 import requests
 import tempfile
+import textwrap
 import urllib.parse
 from datetime import datetime, date, timedelta
 
@@ -719,9 +720,6 @@ This Payment Agreement is entered into on [DATE] for [CLASS] students of Learn L
         st.success("✅ PDF generated and ready to download.")
 
 with tabs[5]:
-    from datetime import date, timedelta
-    from fpdf import FPDF
-    import tempfile, os
 
     # ---- Helper: Ensure all text in PDF is latin-1 safe ----
     def safe_pdf(text):
@@ -950,8 +948,6 @@ with tabs[5]:
             st.error(f"Email send failed: {e}")
 
 
-import textwrap
-
 # ====== HELPERS ======
 def safe_pdf(text):
     """Ensure all strings are PDF-safe (latin-1 only)."""
@@ -1008,6 +1004,7 @@ RAW_SCHEDULE_A1 = [
         "Exam tips - Schreiben & Sprechen recap"
     ])
 ]
+
 RAW_SCHEDULE_A2 = [
     ("Woche 1", ["1.1. Small Talk (Exercise)", "1.2. Personen Beschreiben (Exercise)", "1.3. Dinge und Personen vergleichen"]),
     ("Woche 2", ["2.4. Wo möchten wir uns treffen?", "2.5. Was machst du in deiner Freizeit?"]),
@@ -1020,6 +1017,8 @@ RAW_SCHEDULE_A2 = [
     ("Woche 9", ["9.23. Wie kommst du zur Schule / zur Arbeit?", "9.24. Einen Urlaub planen", "9.25. Tagesablauf (Exercise)"]),
     ("Woche 10", ["10.26. Gefühle in verschiedenen Situationen beschr", "10.27. Digitale Kommunikation", "10.28. Über die Zukunft sprechen"])
 ]
+
+# ——— FIXED: keep only this B1 definition (removed accidental overwrite) ———
 RAW_SCHEDULE_B1 = [
     ("Woche 1", ["1.1. Traumwelten (Übung)", "1.2. Freundes für Leben (Übung)", "1.3. Erfolgsgeschichten (Übung)"]),
     ("Woche 2", ["2.4. Wohnung suchen (Übung)", "2.5. Der Besichtigungsg termin (Übung)", "2.6. Leben in der Stadt oder auf dem Land?"]),
@@ -1031,9 +1030,6 @@ RAW_SCHEDULE_B1 = [
     ("Woche 8", ["8.24. Konsum und Nachhaltigkeit", "8.25. Online einkaufen – Rechte und Risiken"]),
     ("Woche 9", ["9.26. Reiseprobleme und Lösungen"]),
     ("Woche 10", ["10.27. Umweltfreundlich im Alltag", "10.28. Klimafreundlich leben"])
-]
-RAW_SCHEDULE_B1 = [
-    # ... (unchanged, as above)
 ]
 
 RAW_SCHEDULE_B2 = [
@@ -1087,14 +1083,10 @@ RAW_SCHEDULE_B2 = [
 
 # ====== TAB 6 CODE ======
 with tabs[6]:
-    import pandas as pd
-    import textwrap
-    from datetime import date, timedelta
-    from fpdf import FPDF
 
     st.markdown("""
     <div style='background:#e3f2fd;padding:1.2em 1em 0.8em 1em;border-radius:12px;margin-bottom:1em'>
-      <h2 style='color:#1565c0;'>📆 <b>Intelligenter Kursplan-Generator (A1, A2, B1)</b></h2>
+      <h2 style='color:#1565c0;'>📆 <b>Intelligenter Kursplan-Generator (A1, A2, B1, B2)</b></h2>
       <p style='font-size:1.08em;color:#333'>Erstellen Sie einen vollständigen, individuell angepassten Kursplan zum Download (TXT oder PDF) – <b>mit Ferien und flexiblem Wochenrhythmus!</b></p>
     </div>
     """, unsafe_allow_html=True)
@@ -1103,8 +1095,12 @@ with tabs[6]:
     st.markdown("### 1️⃣ **Kursniveau wählen**")
     course_levels = {"A1": RAW_SCHEDULE_A1, "A2": RAW_SCHEDULE_A2, "B1": RAW_SCHEDULE_B1, "B2": RAW_SCHEDULE_B2}
     selected_level = st.selectbox("🗂️ **Kursniveau (A1/A2/B1/B2):**", list(course_levels.keys()))
-    topic_structure = course_levels[selected_level]
+    topic_structure = course_levels.get(selected_level, [])
     st.markdown("---")
+
+    if not topic_structure or sum(len(sess) for _, sess in topic_structure) == 0:
+        st.error(f"Für {selected_level} sind keine Themen vorhanden. Bitte prüfen Sie RAW_SCHEDULE_{selected_level}.")
+        st.stop()
 
     # Step 2: Basic info & breaks
     st.markdown("### 2️⃣ **Kursdaten, Ferien, Modus**")
@@ -1113,7 +1109,7 @@ with tabs[6]:
         start_date = st.date_input("📅 **Kursstart**", value=date.today())
         holiday_dates = st.multiselect(
             "🔔 Ferien oder Feiertage (Holiday/Break Dates)",
-            options=[start_date + timedelta(days=i) for i in range(120)],
+            options=[start_date + timedelta(days=i) for i in range(180)],
             format_func=lambda d: d.strftime("%A, %d %B %Y"),
             help="Kein Unterricht an diesen Tagen."
         )
@@ -1129,7 +1125,10 @@ with tabs[6]:
     week_patterns = []
     if not advanced_mode:
         days_per_week = st.multiselect("📌 **Unterrichtstage wählen:**", options=days_of_week, default=default_days)
-        for week_label, sessions in topic_structure:
+        if not days_per_week:
+            st.warning("Keine Wochentage ausgewählt – verwende Standard: Mo–Mi.")
+            days_per_week = default_days
+        for _, sessions in topic_structure:
             week_patterns.append((len(sessions), days_per_week))
     else:
         st.info("Für jede Woche individuelle Unterrichtstage einstellen.")
@@ -1166,6 +1165,11 @@ with tabs[6]:
             "Date": d.strftime("%A, %d %B %Y"),
             "Topic": topic
         })
+
+    if not rows:
+        st.warning("Es konnten keine Termine erzeugt werden. Prüfen Sie die Wochentage, Ferien und den Starttermin.")
+        st.stop()
+
     df = pd.DataFrame(rows)
     st.markdown(f"""
     <div style='background:#fffde7;border:1px solid #ffe082;border-radius:10px;padding:1em;margin:1em 0'>
@@ -1200,7 +1204,7 @@ with tabs[6]:
         file_name=f"{file_prefix}.txt"
     )
 
-    # ---- PDF download (reliable logic, like Send Email tab) ----
+    # ---- PDF download (reliable logic) ----
     class SchedulePDF(FPDF):
         def header(self):
             self.set_font('Arial', 'B', 16)
@@ -1254,10 +1258,6 @@ with tabs[6]:
         file_name=f"{file_prefix}.pdf",
         mime="application/pdf"
     )
-
-
-
-
 
 
 
@@ -1457,6 +1457,7 @@ with tabs[7]:
         )
     else:
         st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
+
 
 
 
