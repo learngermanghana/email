@@ -342,51 +342,77 @@ with tabs[1]:
 with tabs[2]:
     st.title("💵 Expenses and Financial Summary")
 
-    # --- Use cached data loaded at top ---
-    df_exp = df_expenses.copy()
+    # --- Init session-state store for expenses (load local CSV if present, else from cache) ---
+    LOCAL_EXP_PATH = "expenses_all.csv"
+    if "expenses_df" not in st.session_state:
+        if os.path.exists(LOCAL_EXP_PATH):
+            _df = pd.read_csv(LOCAL_EXP_PATH, dtype=str)
+            _df = normalize_columns(_df)
+        else:
+            _df = df_expenses.copy()  # from your cached loader at the top of the app
+        # Ensure required columns exist
+        for col in ["type", "item", "amount", "date"]:
+            if col not in _df.columns:
+                _df[col] = ""
+        st.session_state["expenses_df"] = _df
+
+    # Work on the live session copy
+    df_exp = st.session_state["expenses_df"].copy()
     df_stu = df_students.copy()
 
-    # --- Add New Expense Form ---
-    with st.form("add_expense_form"):
-        exp_type   = st.selectbox("Type", ["Bill","Rent","Salary","Marketing","Other"])
-        exp_item   = st.text_input("Expense Item")
-        exp_amount = st.number_input("Amount (GHS)", min_value=0.0, step=1.0)
-        exp_date   = st.date_input("Date", value=date.today())
+    # --- Add New Expense Form (no st.rerun; form clears itself) ---
+    with st.form("add_expense_form", clear_on_submit=True):
+        exp_type   = st.selectbox("Type", ["Bill", "Rent", "Salary", "Marketing", "Other"], key="exp_type")
+        exp_item   = st.text_input("Expense Item", key="exp_item")
+        exp_amount = st.number_input("Amount (GHS)", min_value=0.0, step=1.0, key="exp_amount")
+        exp_date   = st.date_input("Date", value=date.today(), key="exp_date")
         submit     = st.form_submit_button("Add Expense")
-        if submit and exp_item and exp_amount > 0:
-            # Append new row to the expenses dataframe (local, not Google Sheet)
-            new_row = {"type": exp_type, "item": exp_item, "amount": exp_amount, "date": exp_date}
-            df_exp = pd.concat([df_exp, pd.DataFrame([new_row])], ignore_index=True)
-            st.success(f"✅ Recorded: {exp_type} – {exp_item}")
-            # Save locally so that session users can download the updated file
-            df_exp.to_csv("expenses_all.csv", index=False)
-            st.rerun()
+
+        if submit:
+            if not exp_item or exp_amount <= 0:
+                st.warning("Please enter an item and an amount greater than 0.")
+            else:
+                new_row = {
+                    "type":   exp_type,
+                    "item":   exp_item.strip(),
+                    "amount": float(exp_amount),
+                    "date":   exp_date.strftime("%Y-%m-%d"),
+                }
+                st.session_state["expenses_df"] = pd.concat(
+                    [st.session_state["expenses_df"], pd.DataFrame([new_row])],
+                    ignore_index=True
+                )
+                # Persist to local CSV so it survives refreshes / new sessions
+                st.session_state["expenses_df"].to_csv(LOCAL_EXP_PATH, index=False)
+                st.success(f"✅ Recorded: {exp_type} – {exp_item}")
+
+                # Update working copy for immediate display without rerun
+                df_exp = st.session_state["expenses_df"].copy()
+
+    # --- Clean types & sort for display ---
+    df_exp["amount"] = pd.to_numeric(df_exp["amount"], errors="coerce").fillna(0.0)
+    df_exp["date"] = pd.to_datetime(df_exp["date"], errors="coerce")
+    df_exp = df_exp.sort_values("date", ascending=False)
 
     # --- Financial Summary ---
     st.write("## 📊 Financial Summary")
 
-    # Total Expenses
-    total_expenses = pd.to_numeric(df_exp["amount"], errors="coerce").fillna(0).sum() if not df_exp.empty else 0.0
+    total_expenses = df_exp["amount"].sum() if not df_exp.empty else 0.0
 
-    # Total Income
     if "paid" in df_stu.columns:
         total_income = pd.to_numeric(df_stu["paid"], errors="coerce").fillna(0).sum()
     else:
         total_income = 0.0
 
-    # Net Profit
-    net_profit = total_income - total_expenses
+    net_profit = float(total_income) - float(total_expenses)
 
-    # Total Outstanding (Balance)
     if "balance" in df_stu.columns:
         total_balance_due = pd.to_numeric(df_stu["balance"], errors="coerce").fillna(0).sum()
     else:
         total_balance_due = 0.0
 
-    # Student Count
     student_count = len(df_stu) if not df_stu.empty else 0
 
-    # --- Display Summary Metrics ---
     col1, col2, col3 = st.columns(3)
     col1.metric("💰 Total Income (Paid)", f"GHS {total_income:,.2f}")
     col2.metric("💸 Total Expenses", f"GHS {total_expenses:,.2f}")
@@ -399,21 +425,27 @@ with tabs[2]:
     st.write("### All Expenses")
     ROWS_PER_PAGE = 10
     total_rows    = len(df_exp)
-    total_pages   = (total_rows - 1) // ROWS_PER_PAGE + 1
+    total_pages   = (total_rows - 1) // ROWS_PER_PAGE + 1 if total_rows else 1
     page = st.number_input(
         f"Page (1-{total_pages})", min_value=1, max_value=total_pages, value=1, step=1, key="exp_page"
     ) if total_pages > 1 else 1
+
     start = (page - 1) * ROWS_PER_PAGE
     end   = start + ROWS_PER_PAGE
-    st.dataframe(df_exp.iloc[start:end].reset_index(drop=True), use_container_width=True)
 
-    # --- Export to CSV ---
+    # Nicer view
+    show = df_exp.iloc[start:end].reset_index(drop=True).copy()
+    show["date"] = show["date"].dt.strftime("%Y-%m-%d")
+    st.dataframe(show, use_container_width=True)
+
+    # --- Export to CSV (current in-memory data) ---
     st.download_button(
         "📁 Download Expenses CSV",
-        data=df_exp.to_csv(index=False),
+        data=st.session_state["expenses_df"].to_csv(index=False),
         file_name="expenses_data.csv",
         mime="text/csv"
     )
+
 
 # ==== TAB 3: WHATSAPP REMINDERS ====
 with tabs[3]:
@@ -1457,6 +1489,7 @@ with tabs[7]:
         )
     else:
         st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
+
 
 
 
