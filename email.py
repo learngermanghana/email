@@ -257,22 +257,22 @@ with tabs[0]:
     # --- Level selection ---
     level = st.selectbox("Course Level", ["A1", "A2", "B1", "B2"], key="prospectus_level")
 
-    # --- Get schedule map from Course tab if available; otherwise fallback to RAW_SCHEDULE_* ---
-    def _get_schedule_map():
-        # Reuse dict from Course Generator tab if it exists
-        if "course_levels" in globals() and isinstance(course_levels, dict) and all(k in course_levels for k in ["A1", "A2", "B1", "B2"]):
-            return course_levels
-        # Build from RAW_* if present
-        levels = {}
-        for lvl, varname in [("A1", "RAW_SCHEDULE_A1"), ("A2", "RAW_SCHEDULE_A2"), ("B1", "RAW_SCHEDULE_B1"), ("B2", "RAW_SCHEDULE_B2")]:
-            if varname in globals():
-                levels[lvl] = globals()[varname]
-        return levels
+    # --- Resolve schedules robustly (no NameError if Course tab runs later) ---
+    def _resolve_schedules():
+        m = {}
+        # Prefer Course tab's dict if it saved it
+        cl = st.session_state.get("course_levels")
+        if isinstance(cl, dict):
+            m.update(cl)
+        # Overlay any RAW_SCHEDULE_* defined globally
+        for lvl in ("A1", "A2", "B1", "B2"):
+            gl = globals().get(f"RAW_SCHEDULE_{lvl}")
+            if gl:
+                m[lvl] = gl
+        return m
 
-    schedule_map = _get_schedule_map()
-    if level not in schedule_map:
-        st.error("Course schedules not loaded. Move this Prospectus tab below the Course tab, or define RAW_SCHEDULE_* above.")
-        st.stop()
+    schedule_map = _resolve_schedules()
+    level_topics = schedule_map.get(level, [])
 
     # --- Fees by level ---
     FEE_MAP = {"A1": 2800, "A2": 3000, "B1": 3000, "B2": 4500}
@@ -360,15 +360,17 @@ with tabs[0]:
 
     st.markdown("---")
 
-    # --- Optional weekly outline (from your level schedules) ---
+    # --- Optional weekly outline (from resolved schedules) ---
     include_outline = st.checkbox("Include Weekly Outline", value=True)
     outline_df = None
-    if include_outline:
-        rows = [{"Week": w, "Topics": "; ".join(t)} for w, t in schedule_map[level]]
+    if include_outline and level_topics:
+        rows = [{"Week": w, "Topics": "; ".join(t)} for w, t in level_topics]
         import pandas as pd
         outline_df = pd.DataFrame(rows)
         st.subheader("Weekly Outline")
         st.dataframe(outline_df, use_container_width=True)
+    elif include_outline:
+        st.info("No weekly outline available yet for this level.")
 
     st.markdown("---")
 
@@ -544,7 +546,7 @@ _Only class registration fees are paid to the school._"""
 
         def add_text(text):
             pdf.set_font(pdf.font_name, "", 12)
-            t = text if pdf.font_ready else safe_pdf(text)
+            t = text if getattr(pdf, "font_ready", False) else safe_pdf(text)
             t = t.replace("•", "-").replace("\t", " ")
             pdf.multi_cell(0, 7, t)
 
@@ -1791,6 +1793,7 @@ with tabs[7]:
         )
     else:
         st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
+
 
 
 
