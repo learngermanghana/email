@@ -243,6 +243,7 @@ tabs = st.tabs([
     
 ])
 
+
 # ==== TAB 0: PROSPECTUS ====
 with tabs[0]:
     st.title("📘 Course Prospectus")
@@ -251,7 +252,7 @@ with tabs[0]:
     # --- Branding images ---
     logo_url = "https://i.imgur.com/iFiehrp.png"
     session_img_url = "https://i.imgur.com/Q9mpvRY.jpeg"
-    c1, c2, c3 = st.columns([1,2,1])
+    c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
         st.image(logo_url, caption="Learn Language Education Academy", width=180)
 
@@ -267,7 +268,7 @@ with tabs[0]:
     # --- Fees by level (requested) ---
     FEE_MAP = {"A1": 2800, "A2": 3000, "B1": 3000, "B2": 4500}
     fee = FEE_MAP.get(level, 0)
-    # Installment details (as provided)
+    # Installment details
     upfront = 1800
     second_payment = 1000
     remaining = max(fee - (upfront + second_payment), 0)
@@ -294,14 +295,10 @@ with tabs[0]:
     outcomes = st.text_area(
         "Learning Outcomes (one per line)",
         value=(
-            "Understand and participate in common conversations.
-"
-            "Read short texts and extract key information.
-"
-            "Write simple, clear messages and letters.
-"
-            "Use core grammar structures accurately in context.
-"
+            "Understand and participate in common conversations.\n"
+            "Read short texts and extract key information.\n"
+            "Write simple, clear messages and letters.\n"
+            "Use core grammar structures accurately in context.\n"
             "Build exam skills and confident speaking."
         ),
         height=120,
@@ -310,14 +307,10 @@ with tabs[0]:
     assessment = st.text_area(
         "Assessment & Grading (one per line)",
         value=(
-            "Attendance & Participation – 10%
-"
-            "Homework & Classwork – 20%
-"
-            "Quizzes – 20%
-"
-            "Midterm – 20%
-"
+            "Attendance & Participation – 10%\n"
+            "Homework & Classwork – 20%\n"
+            "Quizzes – 20%\n"
+            "Midterm – 20%\n"
             "Final Exam (written + oral) – 30%"
         ),
         height=120,
@@ -326,13 +319,10 @@ with tabs[0]:
     policies = st.text_area(
         "Attendance & Policies",
         value=(
-            "Please arrive on time. Notify the instructor in advance if you will miss a session.
-"
-            "Missed assessments may be rescheduled at the instructor's discretion.
-"
-            "Academic integrity is required. Copying or plagiarism may result in a zero.
-"
-            "Payments are non‑refundable once receipts are issued. Access may be revoked for non‑payment."
+            "Please arrive on time. Notify the instructor in advance if you will miss a session.\n"
+            "Missed assessments may be rescheduled at the instructor's discretion.\n"
+            "Academic integrity is required. Copying or plagiarism may result in a zero.\n"
+            "Payments are non-refundable once receipts are issued. Access may be revoked for non-payment."
         ),
         height=120,
     )
@@ -340,12 +330,9 @@ with tabs[0]:
     materials = st.text_area(
         "Required Materials (one per line)",
         value=(
-            "Notebook and pen
-"
-            "Mobile device for Falowen app (www.falowen.app)
-"
-            "Headphones for listening tasks
-"
+            "Notebook and pen\n"
+            "Mobile device for Falowen app (www.falowen.app)\n"
+            "Headphones for listening tasks\n"
             "Printed handouts (provided); Course book available on request"
         ),
         height=110,
@@ -354,14 +341,10 @@ with tabs[0]:
     contact = st.text_area(
         "Contact & Communication",
         value=(
-            "Learn Language Education Academy – Accra, Ghana
-"
-            "Website: https://www.learngermanghana.com
-"
-            "Phone: 0205706589
-"
-            "Email: Learngermanghana@gmail.com
-"
+            "Learn Language Education Academy – Accra, Ghana\n"
+            "Website: https://www.learngermanghana.com\n"
+            "Phone: 0205706589\n"
+            "Email: Learngermanghana@gmail.com\n"
             "Primary platform: Falowen App (assignments, results, resources)."
         ),
         height=110,
@@ -380,12 +363,10 @@ with tabs[0]:
         outline_df = pd.DataFrame(rows)
         st.subheader("Weekly Outline")
         st.dataframe(outline_df, use_container_width=True)
-        st.subheader("📸 Class Session")
-        st.image(session_img_url, caption="Class Session", use_container_width=True)
 
     st.markdown("---")
 
-    # --- Goethe Exam Countdown & Fees (per level) ---
+    # --- Goethe Exam (External listing only) ---
     from datetime import date
     GOETHE_EXAM_DATES = {
         "A1": (date(2025, 10, 13), 2850, None),
@@ -395,57 +376,47 @@ with tabs[0]:
     }
     exam_info = GOETHE_EXAM_DATES.get(level)
 
-    st.subheader("⏳ Upcoming Goethe Exam")
-    exam_md_text = ""
+    st.subheader("📅 Goethe Exam (External)")
+    exam_md_text = "Exam date to be announced by the Goethe-Institut."
     if exam_info:
         exam_date, fee_exam, module_fee = exam_info
-        days_to_exam = (exam_date - date.today()).days
-        fee_text = f"Exam fee (paid to Goethe‑Institut, not the school): ₵{fee_exam:,}"
+        fee_text = f"**Fee (paid directly to the Goethe-Institut):** ₵{fee_exam:,}"
         if module_fee:
-            fee_text += f"  |  Per module: ₵{module_fee:,}"
-        if days_to_exam > 0:
-            st.info(
-                f"Your {level} exam is in {days_to_exam} days ({exam_date:%d %b %Y}).  
-"
-                f"**{fee_text}**  
-"
-                f"[Register online here](https://www.goethe.de/ins/gh/en/spr/prf.html)"
-            )
-        elif days_to_exam == 0:
-            st.success("🚀 Exam is today! Good luck!")
-        else:
-            st.warning(
-                f"The last scheduled {level} exam was on {exam_date:%d %b %Y} (−{abs(days_to_exam)} days).  
-"
-                f"**{fee_text}**"
-            )
+            fee_text += f" — **Per module:** ₵{module_fee:,}"
+        st.markdown(
+            f"""**Date:** {exam_date:%d %b %Y}
+
+{fee_text}
+
+[Register online at Goethe-Institut](https://www.goethe.de/ins/gh/en/spr/prf.html)
+
+_Only class registration fees are paid to the school._"""
+        )
         exam_md_text = (
-            f"**Date:** {exam_date:%d %b %Y}  
-" +
-            f"**{fee_text}**  
-" +
-            "*(Exam fees are paid directly to the Goethe‑Institut — not to the school.)*  
-" +
-            "Register: https://www.goethe.de/ins/gh/en/spr/prf.html"
+            f"""**Date:** {exam_date:%d %b %Y}
+
+{fee_text}
+
+Register: https://www.goethe.de/ins/gh/en/spr/prf.html
+
+_Only class registration fees are paid to the school._"""
         )
     else:
-        st.caption("Exam date not set for this level yet. Check the Goethe‑Institut site for updates.")
-        exam_md_text = "Exam date to be announced by the Goethe‑Institut."
+        st.caption("Exam date not set for this level yet. Check the Goethe-Institut site for updates.")
 
     st.subheader("📸 Class Session")
     st.image(session_img_url, caption="Class Session", use_container_width=True)
 
     st.markdown("---")
 
-    # --- Falowen Access & How-To ---
-    falowen_features = [
-        "Dashboard with learning streaks",
-        "Vocab of the Day",
-        "Course Book (your study materials)",
-        "Results & Resources – your saved scores and feedback",
-        "Vocabulary practice tab",
-        "Exam Mode",
-        "Custom Chat – Sprechen & Schreiben trainer (incl. letter practice)"
+    # --- Falowen Dashboard structure ---
+    falowen_dashboard = [
+        "Dashboard",
+        "Course Book",
+        "My Results and Resources",
+        "Exams Mode & Custom Chat",
+        "Vocab Trainer",
+        "Schreiben Trainer",
     ]
 
     submit_steps = [
@@ -454,48 +425,44 @@ with tabs[0]:
         "Paste your answers for: Schreiben, Lesen, Hören.",
         "Click Submit.",
         "Then click Send Assignment – WhatsApp opens and sends your work directly to your tutor.",
-        "Once sent, it means your tutor has received it."
+        "Once sent, it means your tutor has received it.",
     ]
 
     def bullets(lines):
-        return "
-".join([f"- {l}" for l in lines])
+        return "\n".join([f"- {l}" for l in lines])
 
     # --- Workbook-based grading (assignments) ---
     workbook_grading_lines = [
         "You will be graded using a **Workbook** that includes **Lesen**, **Hören**, **Schreiben**, and **Sprechen** tasks.",
         "Each workbook is marked **out of 100 points**.",
-        "Your score is distributed evenly by the **number of tasks** in that workbook (e.g., 10 tasks → 10 points each)."
+        "Your score is distributed evenly by the **number of tasks** in that workbook (e.g., 10 tasks → 10 points each).",
     ]
 
     # --- Build Markdown prospectus for preview/download ---
     def md_section(title: str, body: str) -> str:
-        return f"## {title}
-
-{body.strip()}
-
-"
+        return f"## {title}\n\n{body.strip()}\n\n"
 
     fee_lines = [
         f"Tuition Fee: **GHS {fee:,.0f}** (level: {level})",
         "Installment Option: **GHS 1,800 now** + **GHS 1,000 after one month**.",
     ]
     if remaining > 0:
-        fee_lines.append(f"Remaining balance after the two payments: **GHS {remaining:,.0f}** (please confirm the due date with admin).")
+        fee_lines.append(
+            f"Remaining balance after the two payments: **GHS {remaining:,.0f}** (please confirm the due date with admin)."
+        )
 
     access_lines = [
         "All students automatically receive access to **Falowen**: https://www.falowen.app",
         "Course book can be provided on request (print or digital).",
-        "**Letter of Enrollment** is issued **only after full payment**."
+        "**Letter of Enrollment** is issued **only after full payment**.",
+        "**Only class registration fees are paid to the school** (exam fees are paid directly to the Goethe-Institut).",
     ]
 
-    md = f"# {course_title}
-
-"
-    when_str = f"**Dates:** {start_date.strftime('%d %b %Y')} – {end_date.strftime('%d %b %Y')}  |  **Schedule:** {contact_hours}"
-    md += when_str + "
-
-"
+    md = f"# {course_title}\n\n"
+    when_str = (
+        f"**Dates:** {start_date.strftime('%d %b %Y')} – {end_date.strftime('%d %b %Y')}  |  **Schedule:** {contact_hours}"
+    )
+    md += when_str + "\n\n"
     md += md_section("Course Description", description)
     md += md_section("Fees & Access", bullets(fee_lines + access_lines))
     md += md_section("Upcoming Goethe Exam", exam_md_text)
@@ -504,12 +471,13 @@ with tabs[0]:
     md += md_section("Workbook Assessment", bullets(workbook_grading_lines))
     md += md_section("Attendance & Policies", bullets(policies.splitlines()))
     md += md_section("Required Materials", bullets(materials.splitlines()))
-    md += md_section("Using the Falowen App", bullets(falowen_features))
-    md += md_section("How to Submit Your Workbook Assignments", "
-".join([f"{i+1}. {s}" for i, s in enumerate(submit_steps)]))
+    md += md_section("Falowen Dashboard", bullets(falowen_dashboard))
+    md += md_section(
+        "How to Submit Your Workbook Assignments",
+        "\n".join([f"{i+1}. {s}" for i, s in enumerate(submit_steps)]),
+    )
     if include_outline and outline_df is not None and not outline_df.empty:
-        table = "
-".join([f"- **{r['Week']}**: {r['Topics']}" for _, r in outline_df.iterrows()])
+        table = "\n".join([f"- **{r['Week']}**: {r['Topics']}" for _, r in outline_df.iterrows()])
         md += md_section("Weekly Outline", table)
     md += md_section("Contact & Communication", bullets(contact.splitlines()))
 
@@ -527,7 +495,13 @@ with tabs[0]:
 
     # --- PDF generation (DejaVu if available; fallback to safe_pdf) ---
     from fpdf import FPDF
-    import os, tempfile
+    import os
+    import tempfile
+
+    # Fallback if safe_pdf is not already defined elsewhere in your script
+    if "safe_pdf" not in globals():
+        def safe_pdf(text):
+            return "".join(c if ord(c) < 256 else "?" for c in str(text or ""))
 
     class ProspectusPDF(FPDF):
         def __init__(self, *args, **kwargs):
@@ -538,8 +512,8 @@ with tabs[0]:
             try:
                 font_path = "assets/DejaVuSans.ttf"
                 if os.path.exists(font_path):
-                    self.add_font('DejaVu', '', font_path, uni=True)
-                    self.font_name = 'DejaVu'
+                    self.add_font("DejaVu", "", font_path, uni=True)
+                    self.font_name = "DejaVu"
                     self.font_ready = True
             except Exception:
                 self.font_ready = False
@@ -547,23 +521,26 @@ with tabs[0]:
         def header(self):
             # Try to place logo
             try:
-                import requests, tempfile
+                import requests
                 resp = requests.get(logo_url, timeout=8)
                 if resp.status_code == 200:
                     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-                    tmp.write(resp.content); tmp.close()
+                    tmp.write(resp.content)
+                    tmp.close()
                     self.image(tmp.name, x=10, y=8, w=22)
             except Exception:
                 pass
             # Title block
-            self.set_font(self.font_name, 'B', 16)
-            self.cell(0, 9, safe_pdf(course_title if not self.font_ready else course_title), ln=True, align='C')
-            self.set_font(self.font_name, '', 11)
+            self.set_font(self.font_name, "B", 16)
+            self.cell(0, 9, safe_pdf(course_title if not self.font_ready else course_title), ln=True, align="C")
+            self.set_font(self.font_name, "", 11)
             sub = f"Level: {level} | Dates: {start_date:%d %b %Y} – {end_date:%d %b %Y} | Schedule: {contact_hours}"
-            self.cell(0, 7, safe_pdf(sub if not self.font_ready else sub), ln=True, align='C')
+            self.cell(0, 7, safe_pdf(sub if not self.font_ready else sub), ln=True, align="C")
             self.ln(3)
-            self.set_draw_color(200,200,200); self.set_line_width(0.5)
-            self.line(10, self.get_y(), 200, self.get_y()); self.ln(4)
+            self.set_draw_color(200, 200, 200)
+            self.set_line_width(0.5)
+            self.line(10, self.get_y(), 200, self.get_y())
+            self.ln(4)
 
     if st.button("📄 Generate Prospectus PDF"):
         pdf = ProspectusPDF()
@@ -571,39 +548,40 @@ with tabs[0]:
         pdf.set_auto_page_break(auto=True, margin=15)
 
         def add_h2(title):
-            pdf.set_font(pdf.font_name, 'B', 13)
+            pdf.set_font(pdf.font_name, "B", 13)
             pdf.ln(2)
             pdf.cell(0, 8, safe_pdf(title if not pdf.font_ready else title), ln=True)
 
         def add_text(text):
-            pdf.set_font(pdf.font_name, '', 12)
+            pdf.set_font(pdf.font_name, "", 12)
             pdf.multi_cell(0, 7, safe_pdf(text if not pdf.font_ready else text))
 
         # Sections
         add_h2("Course Description"); add_text(description)
-        add_h2("Fees & Access"); add_text("
-".join(bullets(fee_lines + access_lines).splitlines()))
+        add_h2("Fees & Access"); add_text(bullets(fee_lines + access_lines))
         add_h2("Upcoming Goethe Exam"); add_text(exam_md_text)
         add_h2("Learning Outcomes"); add_text(bullets(outcomes.splitlines()))
         add_h2("Assessment & Grading"); add_text(bullets(assessment.splitlines()))
         add_h2("Workbook Assessment"); add_text(bullets(workbook_grading_lines))
         add_h2("Attendance & Policies"); add_text(bullets(policies.splitlines()))
         add_h2("Required Materials"); add_text(bullets(materials.splitlines()))
-        add_h2("Using the Falowen App"); add_text(bullets(falowen_features))
+        add_h2("Falowen Dashboard"); add_text(bullets(falowen_dashboard))
         # Class Session image in PDF
         add_h2("Class Session")
         try:
-            import requests, tempfile
+            import requests
             resp = requests.get(session_img_url, timeout=8)
             if resp.status_code == 200:
                 tmpi = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
-                tmpi.write(resp.content); tmpi.close()
+                tmpi.write(resp.content)
+                tmpi.close()
                 pdf.image(tmpi.name, x=15, w=180)
                 pdf.ln(4)
         except Exception:
             pass
-        add_h2("How to Submit Your Workbook Assignments"); add_text("
-".join([f"{i+1}. {s}" for i, s in enumerate(submit_steps)]))
+        add_h2("How to Submit Your Workbook Assignments"); add_text(
+            "\n".join([f"{i+1}. {s}" for i, s in enumerate(submit_steps)])
+        )
         if include_outline and outline_df is not None and not outline_df.empty:
             add_h2("Weekly Outline")
             for _, r in outline_df.iterrows():
@@ -621,7 +599,6 @@ with tabs[0]:
             mime="application/pdf",
             key="dl_prospectus_pdf",
         )
-
 
 
 # ==== TAB 1: ALL STUDENTS ====
@@ -1823,6 +1800,7 @@ with tabs[7]:
         )
     else:
         st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
+
 
 
 
