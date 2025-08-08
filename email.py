@@ -252,7 +252,7 @@ with tabs[0]:
     # --- Branding images ---
     logo_url = "https://i.imgur.com/iFiehrp.png"
     session_img_url = "https://i.imgur.com/Q9mpvRY.jpeg"
-    c1, c2, c3 = st.columns([1, 2, 1])
+    _, c2, _ = st.columns([1, 2, 1])
     with c2:
         st.image(logo_url, caption="Learn Language Education Academy", width=180)
 
@@ -268,7 +268,6 @@ with tabs[0]:
     # --- Fees by level (requested) ---
     FEE_MAP = {"A1": 2800, "A2": 3000, "B1": 3000, "B2": 4500}
     fee = FEE_MAP.get(level, 0)
-    # Installment details
     upfront = 1800
     second_payment = 1000
     remaining = max(fee - (upfront + second_payment), 0)
@@ -356,9 +355,7 @@ with tabs[0]:
     include_outline = st.checkbox("Include Weekly Outline", value=True)
     outline_df = None
     if include_outline:
-        rows = []
-        for week_label, topics in schedule_map[level]:
-            rows.append({"Week": week_label, "Topics": "; ".join(topics)})
+        rows = [{"Week": w, "Topics": "; ".join(t)} for w, t in schedule_map[level]]
         import pandas as pd
         outline_df = pd.DataFrame(rows)
         st.subheader("Weekly Outline")
@@ -392,17 +389,13 @@ with tabs[0]:
 
 _Only class registration fees are paid to the school._"""
         )
-        exam_md_text = (
-            f"""**Date:** {exam_date:%d %b %Y}
+        exam_md_text = f"""**Date:** {exam_date:%d %b %Y}
 
 {fee_text}
 
 Register: https://www.goethe.de/ins/gh/en/spr/prf.html
 
 _Only class registration fees are paid to the school._"""
-        )
-    else:
-        st.caption("Exam date not set for this level yet. Check the Goethe-Institut site for updates.")
 
     st.subheader("📸 Class Session")
     st.image(session_img_url, caption="Class Session", use_container_width=True)
@@ -459,9 +452,7 @@ _Only class registration fees are paid to the school._"""
     ]
 
     md = f"# {course_title}\n\n"
-    when_str = (
-        f"**Dates:** {start_date.strftime('%d %b %Y')} – {end_date.strftime('%d %b %Y')}  |  **Schedule:** {contact_hours}"
-    )
+    when_str = f"**Dates:** {start_date.strftime('%d %b %Y')} – {end_date.strftime('%d %b %Y')}  |  **Schedule:** {contact_hours}"
     md += when_str + "\n\n"
     md += md_section("Course Description", description)
     md += md_section("Fees & Access", bullets(fee_lines + access_lines))
@@ -472,10 +463,7 @@ _Only class registration fees are paid to the school._"""
     md += md_section("Attendance & Policies", bullets(policies.splitlines()))
     md += md_section("Required Materials", bullets(materials.splitlines()))
     md += md_section("Falowen Dashboard", bullets(falowen_dashboard))
-    md += md_section(
-        "How to Submit Your Workbook Assignments",
-        "\n".join([f"{i+1}. {s}" for i, s in enumerate(submit_steps)]),
-    )
+    md += md_section("How to Submit Your Workbook Assignments", "\n".join([f"{i+1}. {s}" for i, s in enumerate(submit_steps)]))
     if include_outline and outline_df is not None and not outline_df.empty:
         table = "\n".join([f"- **{r['Week']}**: {r['Topics']}" for _, r in outline_df.iterrows()])
         md += md_section("Weekly Outline", table)
@@ -495,10 +483,8 @@ _Only class registration fees are paid to the school._"""
 
     # --- PDF generation (DejaVu if available; fallback to safe_pdf) ---
     from fpdf import FPDF
-    import os
-    import tempfile
+    import os, tempfile
 
-    # Fallback if safe_pdf is not already defined elsewhere in your script
     if "safe_pdf" not in globals():
         def safe_pdf(text):
             return "".join(c if ord(c) < 256 else "?" for c in str(text or ""))
@@ -508,7 +494,6 @@ _Only class registration fees are paid to the school._"""
             super().__init__(*args, **kwargs)
             self.font_ready = False
             self.font_name = "Arial"
-            # Try to register DejaVuSans for full Unicode (ö/ä/ü/ß)
             try:
                 font_path = "assets/DejaVuSans.ttf"
                 if os.path.exists(font_path):
@@ -519,18 +504,15 @@ _Only class registration fees are paid to the school._"""
                 self.font_ready = False
 
         def header(self):
-            # Try to place logo
             try:
                 import requests
                 resp = requests.get(logo_url, timeout=8)
                 if resp.status_code == 200:
                     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-                    tmp.write(resp.content)
-                    tmp.close()
+                    tmp.write(resp.content); tmp.close()
                     self.image(tmp.name, x=10, y=8, w=22)
             except Exception:
                 pass
-            # Title block
             self.set_font(self.font_name, "B", 16)
             self.cell(0, 9, safe_pdf(course_title if not self.font_ready else course_title), ln=True, align="C")
             self.set_font(self.font_name, "", 11)
@@ -548,15 +530,13 @@ _Only class registration fees are paid to the school._"""
         pdf.set_auto_page_break(auto=True, margin=15)
 
         def add_h2(title):
-            pdf.set_font(pdf.font_name, "B", 13)
-            pdf.ln(2)
+            pdf.set_font(pdf.font_name, "B", 13); pdf.ln(2)
             pdf.cell(0, 8, safe_pdf(title if not pdf.font_ready else title), ln=True)
 
         def add_text(text):
             pdf.set_font(pdf.font_name, "", 12)
             pdf.multi_cell(0, 7, safe_pdf(text if not pdf.font_ready else text))
 
-        # Sections
         add_h2("Course Description"); add_text(description)
         add_h2("Fees & Access"); add_text(bullets(fee_lines + access_lines))
         add_h2("Upcoming Goethe Exam"); add_text(exam_md_text)
@@ -566,6 +546,7 @@ _Only class registration fees are paid to the school._"""
         add_h2("Attendance & Policies"); add_text(bullets(policies.splitlines()))
         add_h2("Required Materials"); add_text(bullets(materials.splitlines()))
         add_h2("Falowen Dashboard"); add_text(bullets(falowen_dashboard))
+
         # Class Session image in PDF
         add_h2("Class Session")
         try:
@@ -573,12 +554,11 @@ _Only class registration fees are paid to the school._"""
             resp = requests.get(session_img_url, timeout=8)
             if resp.status_code == 200:
                 tmpi = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
-                tmpi.write(resp.content)
-                tmpi.close()
-                pdf.image(tmpi.name, x=15, w=180)
-                pdf.ln(4)
+                tmpi.write(resp.content); tmpi.close()
+                pdf.image(tmpi.name, x=15, w=180); pdf.ln(4)
         except Exception:
             pass
+
         add_h2("How to Submit Your Workbook Assignments"); add_text(
             "\n".join([f"{i+1}. {s}" for i, s in enumerate(submit_steps)])
         )
@@ -588,7 +568,6 @@ _Only class registration fees are paid to the school._"""
                 add_text(f"• {r['Week']}: {r['Topics']}")
         add_h2("Contact & Communication"); add_text(bullets(contact.splitlines()))
 
-        # Output bytes (robust)
         out = pdf.output(dest="S")
         pdf_bytes = out if isinstance(out, (bytes, bytearray)) else out.encode("latin-1", "replace")
 
@@ -599,6 +578,7 @@ _Only class registration fees are paid to the school._"""
             mime="application/pdf",
             key="dl_prospectus_pdf",
         )
+
 
 
 # ==== TAB 1: ALL STUDENTS ====
@@ -1800,6 +1780,7 @@ with tabs[7]:
         )
     else:
         st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
+
 
 
 
