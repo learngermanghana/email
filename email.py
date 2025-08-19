@@ -229,66 +229,210 @@ STUDENT_CODES = df_students["studentcode"].dropna().unique().tolist() if "studen
 
 # ==== END OF STAGE 2 ====
 
-# ==== TABS SETUP ====
+# === UPDATE YOUR TABS LIST SO THE FIRST LABEL IS '🏆 Leaderboard' ===
 tabs = st.tabs([
-    "📝 📘 PENDING ",             # 0
-    "👩‍🎓 All Students",           # 1
-    "💵 Expenses",               # 2
-    "📲 Reminders",              # 3
-    "📄 Contract",               # 4
-    "📧 Send Email",              # 5 
-    "📧 Course",               # 6
+    "🏆 Leaderboard",           # 0  (replaces "📝 📘 PENDING ")
+    "👩‍🎓 All Students",        # 1
+    "💵 Expenses",              # 2
+    "📲 Reminders",             # 3
+    "📄 Contract",              # 4
+    "📧 Send Email",            # 5 
+    "📧 Course",                # 6
     "📝 Marking"                # 7
-    
 ])
 
 
-# ==== TAB 0: PENDING STUDENTS ====
+# ==== TAB 0: LEADERBOARD (A1–C1) ====
 with tabs[0]:
-    st.title("🕒 Pending Students")
+    st.title("🏆 Leaderboard (A1–C1)")
 
-    # -- Define/Load Pending Students Google Sheet URL --
-    PENDING_SHEET_ID = "1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo"
-    PENDING_CSV_URL = f"https://docs.google.com/spreadsheets/d/{PENDING_SHEET_ID}/export?format=csv"
+    # ---------- Loaders ----------
+    @st.cache_data(ttl=300, show_spinner="Loading assignment scores…")
+    def load_assignment_scores():
+        """
+        Reads the assignment scores used by the student dashboard leaderboard.
+        Expected columns (case-insensitive; spaces allowed): studentcode, name, level, assignment, score, date.
+        """
+        SHEET_ID = "1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ"  # same as student app
+        url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet1"
+        try:
+            df = pd.read_csv(url, dtype=str)
+        except Exception as e:
+            st.error(f"Could not load assignment scores: {e}")
+            return pd.DataFrame(columns=["studentcode","name","level","assignment","score","date"])
 
-    @st.cache_data(ttl=0)
-    def load_pending():
-        df = pd.read_csv(PENDING_CSV_URL, dtype=str)
-        df = normalize_columns(df)
-        df_display = df.copy()
-        df_search = df.copy()
-        return df_display, df_search
+        # Normalize
+        df.columns = df.columns.str.strip().str.lower().str.replace(" ", "_")
+        for c in df.columns:
+            df[c] = df[c].astype(str).strip()
 
-    df_display, df_search = load_pending()
+        # Soft rename common variants
+        rename_map = {
+            "student_code": "studentcode",
+            "student": "studentcode",
+        }
+        df = df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns})
 
-    # --- Universal Search ---
-    search = st.text_input("🔎 Search any field (name, code, email, etc.)")
-    if search:
-        mask = df_search.apply(
-            lambda row: row.astype(str).str.contains(search, case=False, na=False).any(),
-            axis=1
+        # Keep only useful columns if present
+        keep = [c for c in ["studentcode","name","level","assignment","score","date"] if c in df.columns]
+        return df[keep] if keep else df
+
+    # Fallback students loader if df_students isn't already in your script's scope
+    def _ensure_students_df():
+        # If your script already loaded df_students via load_students(), reuse it
+        if "df_students" in globals() and isinstance(globals()["df_students"], pd.DataFrame) and not globals()["df_students"].empty:
+            return globals()["df_students"]
+
+        # Else try your existing loader if present
+        if "load_students" in globals():
+            try:
+                return globals()["load_students"]()
+            except Exception:
+                pass
+
+        # Final fallback: fetch the main students sheet directly
+        try:
+            STUDENTS_SHEET_ID = "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U"
+            url = f"https://docs.google.com/spreadsheets/d/{STUDENTS_SHEET_ID}/export?format=csv"
+            df = pd.read_csv(url, dtype=str)
+            df.columns = df.columns.str.strip().str.lower().str.replace(" ", "_")
+            if "student_code" in df.columns:
+                df = df.rename(columns={"student_code": "studentcode"})
+            return df
+        except Exception:
+            return pd.DataFrame(columns=["studentcode","name","level"])
+
+    # ---------- Helpers ----------
+    def _norm_level(x: str) -> str:
+        return (x or "").upper().replace(" ", "").strip()
+
+    def build_leaderboard(df_assign: pd.DataFrame, df_students: pd.DataFrame, level: str, min_completed: int = 3) -> pd.DataFrame:
+        """
+        Build a leaderboard for one CEFR level.
+        Ranking: total_score (desc) then completed unique assignments (desc).
+        Only include students with >= min_completed unique assignments.
+        """
+        empty_cols = ["Rank","studentcode","name","level","completed","total_score","avg_score","last_submission"]
+        if df_assign is None or df_assign.empty:
+            return pd.DataFrame(columns=empty_cols)
+
+        df = df_assign.copy()
+
+        # Ensure required cols exist
+        for col in ["studentcode","assignment","score"]:
+            if col not in df.columns:
+                df[col] = ""
+
+        # If 'level' missing/empty in assignments, merge from students list
+        need_merge = (
+            "level" not in df.columns
+            or df["level"].isna().all()
+            or (df["level"].astype(str).str.len() == 0).all()
         )
-        filt = df_display[mask]
-    else:
-        filt = df_display
+        if need_merge and not df_students.empty:
+            s = df_students.copy()
+            s.columns = s.columns.str.strip().str.lower().str.replace(" ", "_")
+            # Keep only the needed columns
+            keep = [c for c in ["studentcode","level","name"] if c in s.columns]
+            if keep:
+                df = df.merge(s[keep], on="studentcode", how="left", suffixes=("","_from_students"))
+                # Prefer assignment-provided values if present; otherwise take merged ones
+                if "name_from_students" in df.columns:
+                    df["name"] = df["name"].where(df["name"].astype(str).str.len() > 0, df["name_from_students"]).fillna("")
+                if "level_from_students" in df.columns:
+                    df["level"] = df["level"].where(df["level"].astype(str).str.len() > 0, df["level_from_students"]).fillna("")
 
-    # --- Column Selector ---
-    all_cols = list(filt.columns)
-    selected_cols = st.multiselect(
-        "Show columns (for easy viewing):", all_cols, default=all_cols[:6]
+        # Normalize
+        df["studentcode"] = df["studentcode"].astype(str).str.strip().str.lower()
+        if "name" in df.columns:
+            df["name"] = df["name"].astype(str).str.strip()
+        if "level" in df.columns:
+            df["level"] = df["level"].astype(str).map(_norm_level)
+        if "date" in df.columns:
+            df["date"] = pd.to_datetime(df["date"], errors="coerce")
+
+        # Score numeric
+        df["score"] = pd.to_numeric(df["score"], errors="coerce").fillna(0.0)
+
+        # Filter level
+        lvl = _norm_level(level)
+        if "level" not in df.columns:
+            return pd.DataFrame(columns=empty_cols)
+        df = df[df["level"] == lvl]
+        if df.empty:
+            return pd.DataFrame(columns=empty_cols)
+
+        # Aggregate
+        g = (
+            df.groupby(["studentcode","name"], dropna=False)
+              .agg(
+                  total_score=("score","sum"),
+                  completed=("assignment","nunique"),
+                  avg_score=("score","mean"),
+                  last_submission=("date","max") if "date" in df.columns else ("score","size")
+              )
+              .reset_index()
+        )
+
+        # Minimum unique assignments
+        g = g[g["completed"] >= int(min_completed)]
+        if g.empty:
+            return pd.DataFrame(columns=empty_cols)
+
+        # Sort & rank
+        g = g.sort_values(["total_score","completed"], ascending=[False, False]).reset_index(drop=True)
+        g.insert(0, "Rank", g.index + 1)
+        g["level"] = lvl
+
+        # Friendly formatting
+        if "last_submission" in g.columns and pd.api.types.is_datetime64_any_dtype(g["last_submission"]):
+            g["last_submission"] = g["last_submission"].dt.strftime("%Y-%m-%d")
+        g["avg_score"] = g["avg_score"].round(2)
+        g["total_score"] = g["total_score"].round(2)
+
+        cols = ["Rank","studentcode","name","level","completed","total_score","avg_score","last_submission"]
+        for c in cols:
+            if c not in g.columns:
+                g[c] = ""
+        return g[cols]
+
+    # ---------- Data & Controls ----------
+    df_assign = load_assignment_scores()
+    df_students_safe = _ensure_students_df()
+
+    st.markdown(
+        "Ranking per level uses **Total Score** (sum of scores). "
+        "Tie-breaker is **Completed** (count of **unique** assignments). "
+        "Students need a minimum number of unique assignments to qualify."
     )
 
-    # --- Show Table (with scroll bar) ---
-    st.dataframe(filt[selected_cols], use_container_width=True, height=400)
+    ca, cb, cc = st.columns([1,1,2])
+    with ca:
+        min_required = st.number_input("Minimum unique assignments", min_value=1, value=3, step=1)
+    with cb:
+        rows_to_show = st.number_input("Rows to show per table", min_value=5, value=20, step=5)
+    with cc:
+        st.caption("Tip: Download each table as CSV using the buttons below.")
 
-    # --- Download Button (all columns always) ---
-    st.download_button(
-        "⬇️ Download all columns as CSV",
-        filt.to_csv(index=False),
-        file_name="pending_students.csv"
-    )
+    # ---------- Sub-tabs for each level ----------
+    level_list = ["A1","A2","B1","B2","C1"]
+    sub_tabs = st.tabs(level_list)
 
-# ==== END OF STAGE 3 (TAB 0) ====
+    for lvl, pane in zip(level_list, sub_tabs):
+        with pane:
+            lb = build_leaderboard(df_assign, df_students_safe, lvl, min_required)
+            if lb.empty:
+                st.info(f"No qualifying records for {lvl} yet (need ≥ {min_required} unique assignments).")
+            else:
+                st.dataframe(lb.head(int(rows_to_show)), use_container_width=True, hide_index=True)
+                st.download_button(
+                    f"⬇️ Download {lvl} leaderboard (CSV)",
+                    lb.to_csv(index=False),
+                    file_name=f"leaderboard_{lvl.lower()}.csv",
+                    mime="text/csv",
+                    key=f"dl_{lvl}"
+                )
+
 
 
 
@@ -1558,6 +1702,7 @@ def render_marking_tab():
 # Call it inside your tabs container
 with tabs[7]:
     render_marking_tab()
+
 
 
 
