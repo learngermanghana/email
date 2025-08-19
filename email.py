@@ -264,7 +264,7 @@ with tabs[0]:
         # Normalize
         df.columns = df.columns.str.strip().str.lower().str.replace(" ", "_")
         for c in df.columns:
-            df[c] = df[c].astype(str).strip()
+            df[c] = df[c].astype(str).str.strip()  # <-- FIX: use .str.strip()
 
         # Soft rename common variants
         rename_map = {
@@ -424,7 +424,8 @@ with tabs[0]:
             if lb.empty:
                 st.info(f"No qualifying records for {lvl} yet (need ≥ {min_required} unique assignments).")
             else:
-                st.dataframe(lb.head(int(rows_to_show)), use_container_width=True, hide_index=True)
+                # Avoid older Streamlit 'hide_index' kw—just show Rank as index.
+                st.dataframe(lb.head(int(rows_to_show)).set_index("Rank"), use_container_width=True)
                 st.download_button(
                     f"⬇️ Download {lvl} leaderboard (CSV)",
                     lb.to_csv(index=False),
@@ -1702,6 +1703,7 @@ def render_marking_tab():
 # Call it inside your tabs container
 with tabs[7]:
     render_marking_tab()
+
 
 
 
