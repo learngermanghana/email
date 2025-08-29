@@ -1017,11 +1017,19 @@ with tabs[4]:
         with open(tmpf.name, "rb") as f: pdf_bytes = f.read()
         os.remove(tmpf.name)
 
+    import base64
+    b64 = base64.b64encode(pdf_bytes).decode()
+
+    filename = f"{student_name.replace(' ', '_')}_{msg_type.replace(' ','_')}.pdf"
     st.download_button(
         "📄 Download Letter/PDF",
         data=pdf_bytes,
-        file_name=f"{student_name.replace(' ', '_')}_{msg_type.replace(' ','_')}.pdf",
-        mime="application/pdf"
+        file_name=filename,
+        mime="application/pdf",
+    )
+    st.markdown(
+        f'<a download="{filename}" href="data:application/pdf;base64,{b64}">Manual Download</a>',
+        unsafe_allow_html=True,
     )
     st.caption("You can share this PDF on WhatsApp or by email.")
 
