@@ -31,11 +31,9 @@ TUTOR_TITLE = "Director"
 
 # --- Sheet IDs & URLs ---
 STUDENTS_SHEET_ID = "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U"
-EXPENSES_SHEET_ID = "1Svm5cF6hjRjyZgFhtZ56hm9nEqA31YvF"
 REF_ANSWERS_SHEET_ID = "1CtNlidMfmE836NBh5FmEF5tls9sLmMmkkhewMTQjkBo"
 
 STUDENTS_CSV_URL = f"https://docs.google.com/spreadsheets/d/{STUDENTS_SHEET_ID}/export?format=csv"
-EXPENSES_CSV_URL = f"https://docs.google.com/spreadsheets/d/{EXPENSES_SHEET_ID}/export?format=csv"
 REF_ANSWERS_CSV_URL = f"https://docs.google.com/spreadsheets/d/{REF_ANSWERS_SHEET_ID}/export?format=csv"
 
 # ==== STREAMLIT SECRETS ====
@@ -188,16 +186,6 @@ def load_students():
         df = df.rename(columns={"student_code": "studentcode"})
     return df
 
-@st.cache_data(ttl=300, show_spinner="Loading expenses...")
-def load_expenses():
-    try:
-        df = pd.read_csv(EXPENSES_CSV_URL, dtype=str)
-        df = normalize_columns(df)
-    except Exception as e:
-        st.error(f"Could not load expenses: {e}")
-        df = pd.DataFrame(columns=["type", "item", "amount", "date"])
-    return df
-
 @st.cache_data(ttl=300, show_spinner="Loading reference answers...")
 def load_ref_answers():
     df = pd.read_csv(REF_ANSWERS_CSV_URL, dtype=str)
@@ -220,7 +208,6 @@ if "tabs_loaded" not in st.session_state:
 
 # ==== LOAD MAIN DATAFRAMES ONCE ====
 df_students = load_students()
-df_expenses = load_expenses()
 df_ref_answers = load_ref_answers()
 
 # ==== UNIVERSAL VARIABLES (for later use) ====
@@ -233,12 +220,11 @@ STUDENT_CODES = df_students["studentcode"].dropna().unique().tolist() if "studen
 tabs = st.tabs([
     "🏆 Leaderboard",           # 0  (replaces "📝 📘 PENDING ")
     "👩‍🎓 All Students",        # 1
-    "💵 Expenses",              # 2
-    "📲 Reminders",             # 3
-    "📄 Contract",              # 4
-    "📧 Send Email",            # 5 
-    "📧 Course",                # 6
-    "📝 Marking"                # 7
+    "📲 Reminders",             # 2
+    "📄 Contract",              # 3
+    "📧 Send Email",            # 4
+    "📧 Course",                # 5
+    "📝 Marking"                # 6
 ])
 
 
@@ -485,117 +471,8 @@ with tabs[1]:
         st.info("No expired contracts found.")
 
 
-# ==== TAB 2: EXPENSES AND FINANCIAL SUMMARY ====
+# ==== TAB 2: WHATSAPP REMINDERS ====
 with tabs[2]:
-    st.title("💵 Expenses and Financial Summary")
-
-    # --- Init session-state store for expenses (load local CSV if present, else from cache) ---
-    LOCAL_EXP_PATH = "expenses_all.csv"
-    if "expenses_df" not in st.session_state:
-        if os.path.exists(LOCAL_EXP_PATH):
-            _df = pd.read_csv(LOCAL_EXP_PATH, dtype=str)
-            _df = normalize_columns(_df)
-        else:
-            _df = df_expenses.copy()  # from your cached loader at the top of the app
-        # Ensure required columns exist
-        for col in ["type", "item", "amount", "date"]:
-            if col not in _df.columns:
-                _df[col] = ""
-        st.session_state["expenses_df"] = _df
-
-    # Work on the live session copy
-    df_exp = st.session_state["expenses_df"].copy()
-    df_stu = df_students.copy()
-
-    # --- Add New Expense Form (no st.rerun; form clears itself) ---
-    with st.form("add_expense_form", clear_on_submit=True):
-        exp_type   = st.selectbox("Type", ["Bill", "Rent", "Salary", "Marketing", "Other"], key="exp_type")
-        exp_item   = st.text_input("Expense Item", key="exp_item")
-        exp_amount = st.number_input("Amount (GHS)", min_value=0.0, step=1.0, key="exp_amount")
-        exp_date   = st.date_input("Date", value=date.today(), key="exp_date")
-        submit     = st.form_submit_button("Add Expense")
-
-        if submit:
-            if not exp_item or exp_amount <= 0:
-                st.warning("Please enter an item and an amount greater than 0.")
-            else:
-                new_row = {
-                    "type":   exp_type,
-                    "item":   exp_item.strip(),
-                    "amount": float(exp_amount),
-                    "date":   exp_date.strftime("%Y-%m-%d"),
-                }
-                st.session_state["expenses_df"] = pd.concat(
-                    [st.session_state["expenses_df"], pd.DataFrame([new_row])],
-                    ignore_index=True
-                )
-                # Persist to local CSV so it survives refreshes / new sessions
-                st.session_state["expenses_df"].to_csv(LOCAL_EXP_PATH, index=False)
-                st.success(f"✅ Recorded: {exp_type} – {exp_item}")
-
-                # Update working copy for immediate display without rerun
-                df_exp = st.session_state["expenses_df"].copy()
-
-    # --- Clean types & sort for display ---
-    df_exp["amount"] = pd.to_numeric(df_exp["amount"], errors="coerce").fillna(0.0)
-    df_exp["date"] = pd.to_datetime(df_exp["date"], errors="coerce")
-    df_exp = df_exp.sort_values("date", ascending=False)
-
-    # --- Financial Summary ---
-    st.write("## 📊 Financial Summary")
-
-    total_expenses = df_exp["amount"].sum() if not df_exp.empty else 0.0
-
-    if "paid" in df_stu.columns:
-        total_income = pd.to_numeric(df_stu["paid"], errors="coerce").fillna(0).sum()
-    else:
-        total_income = 0.0
-
-    net_profit = float(total_income) - float(total_expenses)
-
-    if "balance" in df_stu.columns:
-        total_balance_due = pd.to_numeric(df_stu["balance"], errors="coerce").fillna(0).sum()
-    else:
-        total_balance_due = 0.0
-
-    student_count = len(df_stu) if not df_stu.empty else 0
-
-    col1, col2, col3 = st.columns(3)
-    col1.metric("💰 Total Income (Paid)", f"GHS {total_income:,.2f}")
-    col2.metric("💸 Total Expenses", f"GHS {total_expenses:,.2f}")
-    col3.metric("🟢 Net Profit", f"GHS {net_profit:,.2f}")
-
-    st.info(f"📋 **Students Enrolled:** {student_count}")
-    st.info(f"🧾 **Outstanding Balances:** GHS {total_balance_due:,.2f}")
-
-    # --- Paginated Expense Table ---
-    st.write("### All Expenses")
-    ROWS_PER_PAGE = 10
-    total_rows    = len(df_exp)
-    total_pages   = (total_rows - 1) // ROWS_PER_PAGE + 1 if total_rows else 1
-    page = st.number_input(
-        f"Page (1-{total_pages})", min_value=1, max_value=total_pages, value=1, step=1, key="exp_page"
-    ) if total_pages > 1 else 1
-
-    start = (page - 1) * ROWS_PER_PAGE
-    end   = start + ROWS_PER_PAGE
-
-    # Nicer view
-    show = df_exp.iloc[start:end].reset_index(drop=True).copy()
-    show["date"] = show["date"].dt.strftime("%Y-%m-%d")
-    st.dataframe(show, use_container_width=True)
-
-    # --- Export to CSV (current in-memory data) ---
-    st.download_button(
-        "📁 Download Expenses CSV",
-        data=st.session_state["expenses_df"].to_csv(index=False),
-        file_name="expenses_data.csv",
-        mime="text/csv"
-    )
-
-
-# ==== TAB 3: WHATSAPP REMINDERS ====
-with tabs[3]:
     st.title("📲 WhatsApp Reminders for Debtors")
 
     # --- Use cached df_students loaded at the top ---
@@ -709,7 +586,7 @@ with tabs[3]:
     )
 
 
-with tabs[4]:
+with tabs[3]:
     st.title("📄 Generate Contract & Receipt PDF for Any Student")
 
     google_csv = (
@@ -898,7 +775,7 @@ This Payment Agreement is entered into on [DATE] for [CLASS] students of Learn L
         )
         st.success("✅ PDF generated and ready to download.")
 
-with tabs[5]:
+with tabs[4]:
 
     # ---- Helper: Ensure all text in PDF is latin-1 safe ----
     def safe_pdf(text):
@@ -1261,7 +1138,7 @@ RAW_SCHEDULE_B2 = [
 ]
 
 # ====== TAB 6 CODE ======
-with tabs[6]:
+with tabs[5]:
 
     st.markdown("""
     <div style='background:#e3f2fd;padding:1.2em 1em 0.8em 1em;border-radius:12px;margin-bottom:1em'>
@@ -1701,7 +1578,7 @@ def render_marking_tab():
         st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
 
 # Call it inside your tabs container
-with tabs[7]:
+with tabs[6]:
     render_marking_tab()
 
 
