@@ -36,6 +36,7 @@ REF_ANSWERS_SHEET_ID = "1CtNlidMfmE836NBh5FmEF5tls9sLmMmkkhewMTQjkBo"
 STUDENTS_CSV_URL = f"https://docs.google.com/spreadsheets/d/{STUDENTS_SHEET_ID}/export?format=csv"
 REF_ANSWERS_CSV_URL = f"https://docs.google.com/spreadsheets/d/{REF_ANSWERS_SHEET_ID}/export?format=csv"
 
+
 # ==== STREAMLIT SECRETS ====
 SENDER_EMAIL = st.secrets["general"].get("sender_email", "Learngermanghana@gmail.com")
 SENDGRID_KEY = st.secrets["general"].get("sendgrid_api_key", "")
@@ -43,6 +44,8 @@ SENDGRID_KEY = st.secrets["general"].get("sendgrid_api_key", "")
 
 
 # ==== SIMPLE PASSWORD GATE ====
+
+
 def password_gate(correct_password: str, key="app_pw"):
     """Show a password input. Returns True if correct, else stops the app."""
     if "pw_ok" not in st.session_state:
@@ -51,14 +54,15 @@ def password_gate(correct_password: str, key="app_pw"):
         st.title("🔒 Enter Password")
         with st.form("pw_form"):
             pw = st.text_input("Password", type="password", key=key)
-            submitted = st.form_submit_button("Submit")
-        if submitted:
+            
+            submit_pw = st.form_submit_button("Submit")
+        if submit_pw:
             if pw == correct_password:
                 st.session_state["pw_ok"] = True
+                st.rerun()
             else:
                 st.error("Incorrect password.")
-        if not st.session_state["pw_ok"]:
-            st.stop()
+        st.stop()
 
 # ==== PUT THIS NEAR THE VERY TOP OF YOUR MAIN SCRIPT! ====
 password_gate("Xenomexpress7727/")  # Change to your desired password!
@@ -431,12 +435,22 @@ with tabs[1]:
     st.title("👩‍🎓 All Students")
 
     # --- Optional: Search/Filter ---
-    search = st.text_input("🔍 Search students by name, code, or email...")
+    if "all_students_search" not in st.session_state:
+        st.session_state["all_students_search"] = ""
+    with st.form("all_students_search_form"):
+        search_input = st.text_input(
+            "🔍 Search students by name, code, or email...",
+            value=st.session_state["all_students_search"],
+        )
+        search_submit = st.form_submit_button("Search")
+    if search_submit:
+        st.session_state["all_students_search"] = search_input
+    search = st.session_state["all_students_search"]
 
     if search:
-        search = search.lower().strip()
+        search_lc = search.lower().strip()
         filt = df_students[
-            df_students.apply(lambda row: search in str(row).lower(), axis=1)
+            df_students.apply(lambda row: search_lc in str(row).lower(), axis=1)
         ]
     else:
         filt = df_students.copy()
@@ -510,9 +524,37 @@ with tabs[2]:
     st.markdown("---")
 
     # --- Filter/Search UI ---
-    show_all = st.toggle("Show all students (not just debtors)", value=False)
-    search = st.text_input("Search by name, code, or phone", key="wa_search")
-    selected_level = st.selectbox("Filter by Level", ["All"] + sorted(df[lvl_col].dropna().unique()), key="wa_level")
+    if "wa_show_all" not in st.session_state:
+        st.session_state["wa_show_all"] = False
+    if "wa_search" not in st.session_state:
+        st.session_state["wa_search"] = ""
+    if "wa_level" not in st.session_state:
+        st.session_state["wa_level"] = "All"
+    level_options = ["All"] + sorted(df[lvl_col].dropna().unique())
+    with st.form("wa_filter_form"):
+        show_all_input = st.checkbox(
+            "Show all students (not just debtors)",
+            value=st.session_state["wa_show_all"],
+        )
+        search_input = st.text_input(
+            "Search by name, code, or phone",
+            value=st.session_state["wa_search"],
+        )
+        selected_level_input = st.selectbox(
+            "Filter by Level",
+            level_options,
+            index=level_options.index(st.session_state["wa_level"])
+            if st.session_state["wa_level"] in level_options
+            else 0,
+        )
+        filter_submit = st.form_submit_button("Apply Filters")
+    if filter_submit:
+        st.session_state["wa_show_all"] = show_all_input
+        st.session_state["wa_search"] = search_input
+        st.session_state["wa_level"] = selected_level_input
+    show_all = st.session_state["wa_show_all"]
+    search = st.session_state["wa_search"]
+    selected_level = st.session_state["wa_level"]
 
     filt = df.copy()
     if not show_all:
@@ -535,11 +577,20 @@ with tabs[2]:
     st.dataframe(tbl, use_container_width=True)
 
     # --- WhatsApp Message Template ---
-    wa_template = st.text_area(
-        "Custom WhatsApp Message Template",
-        value="Hi {name}! Friendly reminder: your payment for the {level} class is due by {due}. {msg} Thank you!",
-        help="You can use {name}, {level}, {due}, {bal}, {days}, {msg}"
-    )
+    if "wa_template" not in st.session_state:
+        st.session_state["wa_template"] = (
+            "Hi {name}! Friendly reminder: your payment for the {level} class is due by {due}. {msg} Thank you!"
+        )
+    with st.form("wa_template_form"):
+        wa_template_input = st.text_area(
+            "Custom WhatsApp Message Template",
+            value=st.session_state["wa_template"],
+            help="You can use {name}, {level}, {due}, {bal}, {days}, {msg}",
+        )
+        template_submit = st.form_submit_button("Update Template")
+    if template_submit:
+        st.session_state["wa_template"] = wa_template_input
+    wa_template = st.session_state["wa_template"]
 
     # --- WhatsApp Links Generation ---
     links = []
@@ -615,10 +666,17 @@ with tabs[3]:
     phone_col   = getcol("phone")
     level_col   = getcol("level")
 
-    search_val = st.text_input(
-        "Search students by name, code, phone, or level:", 
-        value="", key="pdf_tab_search_contract"
-    )
+    if "pdf_search_contract" not in st.session_state:
+        st.session_state["pdf_search_contract"] = ""
+    with st.form("pdf_search_contract_form"):
+        search_input = st.text_input(
+            "Search students by name, code, phone, or level:",
+            value=st.session_state["pdf_search_contract"],
+        )
+        search_submit = st.form_submit_button("Search")
+    if search_submit:
+        st.session_state["pdf_search_contract"] = search_input
+    search_val = st.session_state["pdf_search_contract"]
     filtered_df = df.copy()
     if search_val:
         sv = search_val.strip().lower()
@@ -800,10 +858,17 @@ with tabs[4]:
 
     st.title("📧 Send Email / Letter (Templates, Attachments, PDF, Watermark, QR)")
     st.subheader("Select Student")
-    search_val = st.text_input(
-        "Search students by name, code, or email",
-        value="", key="student_search"
-    )
+    if "student_search" not in st.session_state:
+        st.session_state["student_search"] = ""
+    with st.form("student_search_form"):
+        search_input = st.text_input(
+            "Search students by name, code, or email",
+            value=st.session_state["student_search"],
+        )
+        search_submit = st.form_submit_button("Search")
+    if search_submit:
+        st.session_state["student_search"] = search_input
+    search_val = st.session_state["student_search"]
     if search_val:
         filtered_students = df_students[
             df_students["name"].str.contains(search_val, case=False, na=False)
@@ -900,8 +965,45 @@ with tabs[4]:
     else:
         body_default = ""
 
-    email_subject = st.text_input("Subject", value=f"{msg_type} - {student_name}", key="email_subject")
-    email_body    = st.text_area("Email Body (HTML supported)", value=body_default, key="email_body", height=220)
+    if "email_subject" not in st.session_state:
+        st.session_state["email_subject"] = f"{msg_type} - {student_name}"
+    if "email_body" not in st.session_state:
+        st.session_state["email_body"] = body_default
+    if "recipient_email" not in st.session_state:
+        st.session_state["recipient_email"] = student_email
+    if "attach_pdf" not in st.session_state:
+        st.session_state["attach_pdf"] = False
+
+    st.subheader("Compose/Preview Message")
+    with st.form("email_compose_form"):
+        email_subject_input = st.text_input(
+            "Subject",
+            value=st.session_state["email_subject"],
+        )
+        email_body_input = st.text_area(
+            "Email Body (HTML supported)",
+            value=st.session_state["email_body"],
+            height=220,
+        )
+        attach_pdf_input = st.checkbox(
+            "Attach the generated PDF?",
+            value=st.session_state["attach_pdf"],
+        )
+        recipient_email_input = st.text_input(
+            "Recipient Email",
+            value=st.session_state["recipient_email"],
+        )
+        preview_submit = st.form_submit_button("Update Preview")
+        send_email_submit = st.form_submit_button("Send Email Now")
+    if preview_submit or send_email_submit:
+        st.session_state["email_subject"] = email_subject_input
+        st.session_state["email_body"] = email_body_input
+        st.session_state["attach_pdf"] = attach_pdf_input
+        st.session_state["recipient_email"] = recipient_email_input
+    email_subject = st.session_state["email_subject"]
+    email_body = st.session_state["email_body"]
+    attach_pdf = st.session_state["attach_pdf"]
+    recipient_email = st.session_state["recipient_email"]
 
     st.markdown("**Preview Message:**")
     st.markdown(email_body, unsafe_allow_html=True)
@@ -970,16 +1072,12 @@ with tabs[4]:
     )
     st.caption("You can share this PDF on WhatsApp or by email.")
 
-    # ---- 6. Email Option ----
-    st.subheader("Send Email (with or without PDF)")
-    attach_pdf     = st.checkbox("Attach the generated PDF?", key="attach_pdf")
-    recipient_email = st.text_input("Recipient Email", value=student_email, key="recipient_email")
-    if st.button("Send Email Now", key="send_email"):
+    if send_email_submit:
         msg = Mail(
             from_email=SENDER_EMAIL,
             to_emails=recipient_email,
             subject=email_subject,
-            html_content=email_body
+            html_content=email_body,
         )
         if attach_pdf:
             msg.add_attachment(
@@ -987,7 +1085,7 @@ with tabs[4]:
                     FileContent(base64.b64encode(pdf_bytes).decode()),
                     FileName(f"{student_name.replace(' ','_')}_{msg_type.replace(' ','_')}.pdf"),
                     FileType("application/pdf"),
-                    Disposition("attachment")
+                    Disposition("attachment"),
                 )
             )
         if extra_attach:
@@ -997,7 +1095,7 @@ with tabs[4]:
                     FileContent(base64.b64encode(fb).decode()),
                     FileName(extra_attach.name),
                     FileType(extra_attach.type or "application/octet-stream"),
-                    Disposition("attachment")
+                    Disposition("attachment"),
                 )
             )
         try:
@@ -1504,34 +1602,36 @@ def render_marking_tab():
     # --- EMAIL SECTION ---
     st.subheader("6. Send Reference Answer to Student by Email")
     default_email = student_row.get('email', '') if 'email' in student_row else ""
-    to_email = st.text_input("Recipient Email", value=default_email, key="tab7_email")
-    subject  = st.text_input("Subject", value=f"{student_row.get(name_col, '')} - {assignment} Reference Answer", key="tab7_subject")
-
     ref_ans_email = f"<b>Reference Answers:</b><br>{answers_combined_html}<br>"
-
-    body = st.text_area(
-        "Message (HTML allowed)",
-        value=(
-            f"Hello {student_row.get(name_col, '')},<br><br>"
-            f"Here is the reference answer for your assignment <b>{assignment}</b>.<br><br>"
-            f"{ref_ans_email}"
-            "Thank you<br>Learn Language Education Academy"
-        ),
-        key="tab7_body"
-    )
-    if st.button("📧 Email Reference", key="tab7_send_email"):
-        if not to_email or "@" not in to_email:
+    with st.form("tab7_email_form"):
+        to_email_input = st.text_input("Recipient Email", value=default_email)
+        subject_input = st.text_input(
+            "Subject",
+            value=f"{student_row.get(name_col, '')} - {assignment} Reference Answer",
+        )
+        body_input = st.text_area(
+            "Message (HTML allowed)",
+            value=(
+                f"Hello {student_row.get(name_col, '')},<br><br>"
+                f"Here is the reference answer for your assignment <b>{assignment}</b>.<br><br>"
+                f"{ref_ans_email}"
+                "Thank you<br>Learn Language Education Academy"
+            ),
+            key="tab7_body",
+        )
+        email_submit = st.form_submit_button("📧 Email Reference")
+    if email_submit:
+        if not to_email_input or "@" not in to_email_input:
             st.error("Please enter a valid recipient email address.")
         else:
             try:
-                send_email_report(None, to_email, subject, body)  # No PDF attached, just reference
-                st.success(f"Reference sent to {to_email}!")
+                send_email_report(None, to_email_input, subject_input, body_input)
+                st.success(f"Reference sent to {to_email_input}!")
             except Exception as e:
                 st.error(f"Failed to send email: {e}")
 
     # --- WhatsApp Share Section ---
     st.subheader("7. Share Reference via WhatsApp")
-    # Try to get student's phone automatically from any relevant column
     wa_phone = ""
     wa_cols = [c for c in student_row.index if "phone" in c]
     for c in wa_cols:
@@ -1539,12 +1639,6 @@ def render_marking_tab():
         if v.startswith("233") or v.startswith("0") or v.isdigit():
             wa_phone = v
             break
-    wa_phone = st.text_input(
-        "WhatsApp Number (International format, e.g., 233245022743)",
-        value=wa_phone,
-        key="tab7_wa_number"
-    )
-
     ref_ans_wa = "*Reference Answers:*\n" + answers_combined_str + "\n"
     default_wa_msg = (
         f"Hello {student_row.get(name_col, '')},\n\n"
@@ -1555,30 +1649,38 @@ def render_marking_tab():
         "Thank you!\n"
         "Happy learning!"
     )
-    wa_message = st.text_area(
-        "WhatsApp Message (edit before sending):",
-        value=default_wa_msg, height=180, key="tab7_wa_message_edit"
-    )
-
-    wa_num_formatted = (wa_phone or "").strip().replace(" ", "").replace("-", "")
-    if wa_num_formatted.startswith("0"):
-        wa_num_formatted = "233" + wa_num_formatted[1:]
-    elif wa_num_formatted.startswith("+"):
-        wa_num_formatted = wa_num_formatted[1:]
-    elif not wa_num_formatted.startswith("233") and wa_num_formatted.isdigit() and len(wa_num_formatted) >= 9:
-        wa_num_formatted = "233" + wa_num_formatted[-9:]
-
-    if wa_num_formatted.isdigit() and len(wa_num_formatted) >= 11:
-        wa_link = f"https://wa.me/{wa_num_formatted}?text={urllib.parse.quote(wa_message)}"
-        st.markdown(
-            f'<a href="{wa_link}" target="_blank">'
-            f'<button style="background-color:#25d366;color:white;border:none;padding:10px 20px;border-radius:5px;font-size:16px;cursor:pointer;">'
-            '📲 Share Reference on WhatsApp'
-            '</button></a>',
-            unsafe_allow_html=True
+    with st.form("tab7_whatsapp_form"):
+        wa_phone_input = st.text_input(
+            "WhatsApp Number (International format, e.g., 233245022743)",
+            value=wa_phone,
         )
-    else:
-        st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
+        wa_message_input = st.text_area(
+            "WhatsApp Message (edit before sending):",
+            value=default_wa_msg,
+            height=180,
+            key="tab7_wa_message_edit",
+        )
+        wa_submit = st.form_submit_button("Generate WhatsApp Link")
+    if wa_submit:
+        wa_num_formatted = (wa_phone_input or "").strip().replace(" ", "").replace("-", "")
+        if wa_num_formatted.startswith("0"):
+            wa_num_formatted = "233" + wa_num_formatted[1:]
+        elif wa_num_formatted.startswith("+"):
+            wa_num_formatted = wa_num_formatted[1:]
+        elif not wa_num_formatted.startswith("233") and wa_num_formatted.isdigit() and len(wa_num_formatted) >= 9:
+            wa_num_formatted = "233" + wa_num_formatted[-9:]
+
+        if wa_num_formatted.isdigit() and len(wa_num_formatted) >= 11:
+            wa_link = f"https://wa.me/{wa_num_formatted}?text={urllib.parse.quote(wa_message_input)}"
+            st.markdown(
+                f'<a href="{wa_link}" target="_blank">'
+                f'<button style="background-color:#25d366;color:white;border:none;padding:10px 20px;border-radius:5px;font-size:16px;cursor:pointer;">'
+                '📲 Share Reference on WhatsApp'
+                '</button></a>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.info("Enter a valid WhatsApp number (233XXXXXXXXX or 0XXXXXXXXX).")
 
 # Call it inside your tabs container
 with tabs[6]:
