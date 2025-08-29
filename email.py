@@ -36,6 +36,7 @@ REF_ANSWERS_SHEET_ID = "1CtNlidMfmE836NBh5FmEF5tls9sLmMmkkhewMTQjkBo"
 STUDENTS_CSV_URL = f"https://docs.google.com/spreadsheets/d/{STUDENTS_SHEET_ID}/export?format=csv"
 REF_ANSWERS_CSV_URL = f"https://docs.google.com/spreadsheets/d/{REF_ANSWERS_SHEET_ID}/export?format=csv"
 
+
 # ==== STREAMLIT SECRETS ====
 SENDER_EMAIL = st.secrets["general"].get("sender_email", "Learngermanghana@gmail.com")
 SENDGRID_KEY = st.secrets["general"].get("sendgrid_api_key", "")
@@ -43,6 +44,8 @@ SENDGRID_KEY = st.secrets["general"].get("sendgrid_api_key", "")
 
 
 # ==== SIMPLE PASSWORD GATE ====
+
+
 def password_gate(correct_password: str, key="app_pw"):
     """Show a password input. Returns True if correct, else stops the app."""
     if "pw_ok" not in st.session_state:
@@ -51,6 +54,7 @@ def password_gate(correct_password: str, key="app_pw"):
         st.title("🔒 Enter Password")
         with st.form("pw_form"):
             pw = st.text_input("Password", type="password", key=key)
+            
             submit_pw = st.form_submit_button("Submit")
         if submit_pw:
             if pw == correct_password:
