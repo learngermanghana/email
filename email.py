@@ -1037,6 +1037,9 @@ with tabs[4]:
         if not recipient_email or "@" not in recipient_email:
             st.error("Please enter a valid recipient email.")
         else:
+            # Compose a Gmail link with recipient, subject, and body prefilled.
+            # Gmail does not support pre-attaching files, so the user must
+            # attach the downloaded PDF manually after the compose window opens.
             gmail_url = (
                 "https://mail.google.com/mail/?view=cm&fs=1"
                 f"&to={urllib.parse.quote(recipient_email)}"
@@ -1047,7 +1050,7 @@ with tabs[4]:
                 f'<a href="{gmail_url}" target="_blank">Compose in Gmail</a>',
                 unsafe_allow_html=True,
             )
-            st.info("Remember to attach the PDF in Gmail if needed.")
+            st.info("Attach the downloaded PDF manually in Gmail before sending.")
 
 
 # ====== HELPERS ======
@@ -1569,6 +1572,9 @@ def render_marking_tab():
         if not to_email_input or "@" not in to_email_input:
             st.error("Please enter a valid recipient email address.")
         else:
+            # Open Gmail with the recipient, subject, and body already filled in.
+            # The user still needs to attach the generated PDF manually after
+            # Gmail opens.
             gmail_url = (
                 "https://mail.google.com/mail/?view=cm&fs=1"
                 f"&to={urllib.parse.quote(to_email_input)}"
@@ -1579,6 +1585,7 @@ def render_marking_tab():
                 f'<a href="{gmail_url}" target="_blank">Compose in Gmail</a>',
                 unsafe_allow_html=True,
             )
+            st.info("Attach the generated PDF in Gmail before sending.")
 
     # --- WhatsApp Share Section ---
     st.subheader("7. Share Reference via WhatsApp")
