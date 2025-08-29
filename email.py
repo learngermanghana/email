@@ -736,7 +736,7 @@ with tabs[3]:
         if len(txt) == 1 and not txt.isalnum(): return False
         return True
 
-    if st.button("Generate & Download PDF"):
+    if st.button("Generate PDF"):
         paid    = paid_input
         balance = balance_input
         total   = total_input
@@ -828,13 +828,16 @@ This Payment Agreement is entered into on [DATE] for [CLASS] students of Learn L
         else:
             pdf_bytes = bytes(output_data)
 
+        st.session_state["receipt_pdf"] = pdf_bytes
+        st.success("✅ PDF generated and ready to download.")
+
+    if "receipt_pdf" in st.session_state:
         st.download_button(
             "📄 Download PDF",
-            data=pdf_bytes,
+            data=st.session_state["receipt_pdf"],
             file_name=f"{selected_name.replace(' ', '_')}_receipt_contract.pdf",
             mime="application/pdf"
         )
-        st.success("✅ PDF generated and ready to download.")
 
 with tabs[4]:
 
