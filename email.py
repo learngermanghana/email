@@ -1,7 +1,6 @@
 # ==== IMPORTS ====
 import os
 import re
-import base64
 import requests
 import tempfile
 import textwrap
@@ -17,8 +16,6 @@ from io import BytesIO
 
 
 
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
 
 # ==== CONSTANTS ====
 SCHOOL_NAME = "Learn Language Education Academy"
@@ -38,11 +35,6 @@ REF_ANSWERS_CSV_URL = f"https://docs.google.com/spreadsheets/d/{REF_ANSWERS_SHEE
 
 
 # ==== STREAMLIT SECRETS ====
-SENDER_EMAIL = st.secrets["general"].get("sender_email", "Learngermanghana@gmail.com")
-SENDGRID_KEY = st.secrets["general"].get("sendgrid_api_key", "")
-
-
-
 # ==== SIMPLE PASSWORD GATE ====
 
 
@@ -110,48 +102,6 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
 def strip_leading_number(text):
     """Remove leading digits, dots, spaces (for question/answer lists)."""
     return re.sub(r"^\s*\d+[\.\)]?\s*", "", text).strip()
-
-# ==== EMAIL SENDER ====
-
-def send_email_report(pdf_bytes: bytes, to_email: str, subject: str, html_content: str, extra_attachments=None):
-    """
-    Send an email with (optional) PDF and any extra attachments.
-    extra_attachments: list of tuples (bytes, filename, mimetype)
-    """
-    msg = Mail(
-        from_email=SENDER_EMAIL,
-        to_emails=to_email,
-        subject=subject,
-        html_content=html_content
-    )
-    # Attach PDF if provided
-    if pdf_bytes:
-        pdf_attach = Attachment(
-            FileContent(base64.b64encode(pdf_bytes).decode()),
-            FileName("report.pdf"),
-            FileType("application/pdf"),
-            Disposition("attachment")
-        )
-        msg.add_attachment(pdf_attach)
-    # Attach any extra files
-    if extra_attachments:
-        for bytes_data, filename, mimetype in extra_attachments:
-            file_attach = Attachment(
-                FileContent(base64.b64encode(bytes_data).decode()),
-                FileName(filename),
-                FileType(mimetype or "application/octet-stream"),
-                Disposition("attachment")
-            )
-            msg.add_attachment(file_attach)
-    try:
-        sg = SendGridAPIClient(SENDGRID_KEY)
-        sg.send(msg)
-        return True
-    except Exception as e:
-        st.error(f"Email send failed: {e}")
-        return False
-
-
 
 # ==== AGREEMENT TEMPLATE ====
 if "agreement_template" not in st.session_state:
@@ -1076,36 +1026,20 @@ with tabs[4]:
     st.caption("You can share this PDF on WhatsApp or by email.")
 
     if send_email_submit:
-        msg = Mail(
-            from_email=SENDER_EMAIL,
-            to_emails=recipient_email,
-            subject=email_subject,
-            html_content=email_body,
-        )
-        if attach_pdf:
-            msg.add_attachment(
-                Attachment(
-                    FileContent(base64.b64encode(pdf_bytes).decode()),
-                    FileName(f"{student_name.replace(' ','_')}_{msg_type.replace(' ','_')}.pdf"),
-                    FileType("application/pdf"),
-                    Disposition("attachment"),
-                )
+        if not recipient_email or "@" not in recipient_email:
+            st.error("Please enter a valid recipient email.")
+        else:
+            gmail_url = (
+                "https://mail.google.com/mail/?view=cm&fs=1"
+                f"&to={urllib.parse.quote(recipient_email)}"
+                f"&su={urllib.parse.quote(email_subject)}"
+                f"&body={urllib.parse.quote(email_body)}"
             )
-        if extra_attach:
-            fb = extra_attach.read()
-            msg.add_attachment(
-                Attachment(
-                    FileContent(base64.b64encode(fb).decode()),
-                    FileName(extra_attach.name),
-                    FileType(extra_attach.type or "application/octet-stream"),
-                    Disposition("attachment"),
-                )
+            st.markdown(
+                f'<a href="{gmail_url}" target="_blank">Compose in Gmail</a>',
+                unsafe_allow_html=True,
             )
-        try:
-            SendGridAPIClient(SENDGRID_KEY).send(msg)
-            st.success(f"Email sent to {recipient_email}!")
-        except Exception as e:
-            st.error(f"Email send failed: {e}")
+            st.info("Remember to attach the PDF in Gmail if needed.")
 
 
 # ====== HELPERS ======
@@ -1627,11 +1561,16 @@ def render_marking_tab():
         if not to_email_input or "@" not in to_email_input:
             st.error("Please enter a valid recipient email address.")
         else:
-            try:
-                send_email_report(None, to_email_input, subject_input, body_input)
-                st.success(f"Reference sent to {to_email_input}!")
-            except Exception as e:
-                st.error(f"Failed to send email: {e}")
+            gmail_url = (
+                "https://mail.google.com/mail/?view=cm&fs=1"
+                f"&to={urllib.parse.quote(to_email_input)}"
+                f"&su={urllib.parse.quote(subject_input)}"
+                f"&body={urllib.parse.quote(body_input)}"
+            )
+            st.markdown(
+                f'<a href="{gmail_url}" target="_blank">Compose in Gmail</a>',
+                unsafe_allow_html=True,
+            )
 
     # --- WhatsApp Share Section ---
     st.subheader("7. Share Reference via WhatsApp")
