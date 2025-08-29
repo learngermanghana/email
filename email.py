@@ -38,7 +38,6 @@ REF_ANSWERS_CSV_URL = f"https://docs.google.com/spreadsheets/d/{REF_ANSWERS_SHEE
 # (Sender email retained for reference; Gmail compose links use the user's account)
 
 
-# ==== SIMPLE PASSWORD GATE ====
 
 
 def password_gate(correct_password: str, key="app_pw"):
@@ -105,6 +104,7 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
 def strip_leading_number(text):
     """Remove leading digits, dots, spaces (for question/answer lists)."""
     return re.sub(r"^\s*\d+[\.\)]?\s*", "", text).strip()
+
 
 # ==== EMAIL SENDER ====
 
@@ -1049,9 +1049,12 @@ with tabs[4]:
     st.caption("You can share this PDF on WhatsApp or by email.")
 
     if send_email_submit:
+
         link = send_email_report(pdf_bytes if attach_pdf else None, recipient_email, email_subject, email_body)
         st.markdown(f"[📧 Compose email in Gmail]({link})", unsafe_allow_html=True)
         st.info("Remember to attach the PDF in Gmail before sending.")
+
+
 
 
 # ====== HELPERS ======
@@ -1573,9 +1576,13 @@ def render_marking_tab():
         if not to_email_input or "@" not in to_email_input:
             st.error("Please enter a valid recipient email address.")
         else:
+
             link = send_email_report(None, to_email_input, subject_input, body_input)
             st.markdown(f"[📧 Compose email in Gmail]({link})", unsafe_allow_html=True)
             st.success(f"Gmail draft link generated for {to_email_input}.")
+
+
+
 
     # --- WhatsApp Share Section ---
     st.subheader("7. Share Reference via WhatsApp")
