@@ -35,7 +35,9 @@ REF_ANSWERS_CSV_URL = f"https://docs.google.com/spreadsheets/d/{REF_ANSWERS_SHEE
 
 
 # ==== STREAMLIT SECRETS ====
-# ==== SIMPLE PASSWORD GATE ====
+# (Sender email retained for reference; Gmail compose links use the user's account)
+
+
 
 
 def password_gate(correct_password: str, key="app_pw"):
@@ -102,6 +104,27 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
 def strip_leading_number(text):
     """Remove leading digits, dots, spaces (for question/answer lists)."""
     return re.sub(r"^\s*\d+[\.\)]?\s*", "", text).strip()
+
+
+# ==== EMAIL SENDER ====
+
+def build_gmail_link(to_email: str, subject: str, body: str) -> str:
+    """Create a Gmail compose URL with the provided details."""
+    params = {
+        "view": "cm",
+        "fs": "1",
+        "to": to_email,
+        "su": subject,
+        "body": body,
+    }
+    return "https://mail.google.com/mail/?" + urllib.parse.urlencode(params)
+
+
+def send_email_report(pdf_bytes: bytes, to_email: str, subject: str, html_content: str, extra_attachments=None):
+    """Generate a Gmail draft link for the provided email contents."""
+    return build_gmail_link(to_email, subject, html_content)
+
+
 
 # ==== AGREEMENT TEMPLATE ====
 if "agreement_template" not in st.session_state:
@@ -1026,20 +1049,12 @@ with tabs[4]:
     st.caption("You can share this PDF on WhatsApp or by email.")
 
     if send_email_submit:
-        if not recipient_email or "@" not in recipient_email:
-            st.error("Please enter a valid recipient email.")
-        else:
-            gmail_url = (
-                "https://mail.google.com/mail/?view=cm&fs=1"
-                f"&to={urllib.parse.quote(recipient_email)}"
-                f"&su={urllib.parse.quote(email_subject)}"
-                f"&body={urllib.parse.quote(email_body)}"
-            )
-            st.markdown(
-                f'<a href="{gmail_url}" target="_blank">Compose in Gmail</a>',
-                unsafe_allow_html=True,
-            )
-            st.info("Remember to attach the PDF in Gmail if needed.")
+
+        link = send_email_report(pdf_bytes if attach_pdf else None, recipient_email, email_subject, email_body)
+        st.markdown(f"[📧 Compose email in Gmail]({link})", unsafe_allow_html=True)
+        st.info("Remember to attach the PDF in Gmail before sending.")
+
+
 
 
 # ====== HELPERS ======
@@ -1561,16 +1576,13 @@ def render_marking_tab():
         if not to_email_input or "@" not in to_email_input:
             st.error("Please enter a valid recipient email address.")
         else:
-            gmail_url = (
-                "https://mail.google.com/mail/?view=cm&fs=1"
-                f"&to={urllib.parse.quote(to_email_input)}"
-                f"&su={urllib.parse.quote(subject_input)}"
-                f"&body={urllib.parse.quote(body_input)}"
-            )
-            st.markdown(
-                f'<a href="{gmail_url}" target="_blank">Compose in Gmail</a>',
-                unsafe_allow_html=True,
-            )
+
+            link = send_email_report(None, to_email_input, subject_input, body_input)
+            st.markdown(f"[📧 Compose email in Gmail]({link})", unsafe_allow_html=True)
+            st.success(f"Gmail draft link generated for {to_email_input}.")
+
+
+
 
     # --- WhatsApp Share Section ---
     st.subheader("7. Share Reference via WhatsApp")
