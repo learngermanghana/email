@@ -49,13 +49,16 @@ def password_gate(correct_password: str, key="app_pw"):
         st.session_state["pw_ok"] = False
     if not st.session_state["pw_ok"]:
         st.title("🔒 Enter Password")
-        pw = st.text_input("Password", type="password", key=key)
-        if pw and pw == correct_password:
-            st.session_state["pw_ok"] = True
-            st.rerun()
-        elif pw:
-            st.error("Incorrect password.")
-        st.stop()
+        with st.form("pw_form"):
+            pw = st.text_input("Password", type="password", key=key)
+            submitted = st.form_submit_button("Submit")
+        if submitted:
+            if pw == correct_password:
+                st.session_state["pw_ok"] = True
+            else:
+                st.error("Incorrect password.")
+        if not st.session_state["pw_ok"]:
+            st.stop()
 
 # ==== PUT THIS NEAR THE VERY TOP OF YOUR MAIN SCRIPT! ====
 password_gate("Xenomexpress7727/")  # Change to your desired password!
