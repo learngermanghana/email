@@ -1,6 +1,8 @@
 # utils/pdf_utils.py
 
 from fpdf import FPDF
+from fpdf.enums import WrapMode
+from fpdf.errors import FPDFException
 from datetime import date, datetime, timedelta
 from utils import safe_pdf
 
@@ -68,8 +70,12 @@ def generate_receipt_and_contract_pdf(
     pdf.cell(200, 10, safe_pdf(f"{school_name} Student Contract"), ln=True, align="C")
     pdf.set_font("Arial", size=12)
     pdf.ln(10)
-    for line in filled.split("\n"):
-        pdf.multi_cell(0, 10, safe_pdf(line))
+    try:
+        pdf.multi_cell(0, 10, safe_pdf(filled), wrapmode=WrapMode.CHAR)
+    except FPDFException:
+        pdf.set_text_color(255, 0, 0)
+        pdf.multi_cell(0, 10, safe_pdf("Error: Unable to wrap contract text."))
+        pdf.set_text_color(0, 0, 0)
     pdf.ln(10)
     pdf.cell(0, 10, safe_pdf("Signed: Felix Asadu"), ln=True)
     pdf.set_y(-15)
