@@ -284,12 +284,15 @@ with tabs[2]:
 
     # --- Column Lookup for legacy headers ---
     code_col = col_lookup(df, "studentcode")
+    name_col = col_lookup(df, "name")
+    phone_col = col_lookup(df, "phone")
+    bal_col = col_lookup(df, "balance")
 
     # --- Clean Data Types ---
-    df["balance"] = pd.to_numeric(df["balance"], errors="coerce").fillna(0)
+    df[bal_col] = pd.to_numeric(df[bal_col], errors="coerce").fillna(0)
     df["paid"] = pd.to_numeric(df["paid"], errors="coerce").fillna(0)
     df["contractstart"] = pd.to_datetime(df["contractstart"], errors="coerce")
-    df["phone"] = df["phone"].astype(str).str.replace(r"[^\d+]", "", regex=True)
+    df[phone_col] = df[phone_col].astype(str).str.replace(r"[^\d+]", "", regex=True)
 
     # --- Calculate Due Date & Days Left ---
     df["due_date"] = df["contractstart"] + pd.Timedelta(days=30)
@@ -300,7 +303,7 @@ with tabs[2]:
     m1, m2, m3 = st.columns(3)
     m1.metric("Total Students", len(df))
     m2.metric("Total Collected (GHS)", f"{df['paid'].sum():,.2f}")
-    m3.metric("Total Outstanding (GHS)", f"{df['balance'].sum():,.2f}")
+    m3.metric("Total Outstanding (GHS)", f"{df[bal_col].sum():,.2f}")
 
     st.markdown("---")
 
@@ -311,11 +314,11 @@ with tabs[2]:
 
     filt = df.copy()
     if not show_all:
-        filt = filt[filt["balance"] > 0]
+        filt = filt[filt[bal_col] > 0]
     if search:
-        mask1 = filt["name"].str.contains(search, case=False, na=False)
+        mask1 = filt[name_col].str.contains(search, case=False, na=False)
         mask2 = filt[code_col].astype(str).str.contains(search, case=False, na=False)
-        mask3 = filt["phone"].str.contains(search, case=False, na=False)
+        mask3 = filt[phone_col].str.contains(search, case=False, na=False)
         filt = filt[mask1 | mask2 | mask3]
     if selected_level != "All":
         filt = filt[filt["level"] == selected_level]
@@ -323,9 +326,9 @@ with tabs[2]:
     st.markdown("---")
 
     # --- Table Preview ---
-    tbl = filt[["name", code_col, "phone", "level", "balance", "due_date_str", "days_left"]].rename(columns={
-        "name": "Name", code_col: "Student Code", "phone": "Phone",
-        "level": "Level", "balance": "Balance (GHS)", "due_date_str": "Due Date", "days_left": "Days Left"
+    tbl = filt[[name_col, code_col, phone_col, "level", bal_col, "due_date_str", "days_left"]].rename(columns={
+        name_col: "Name", code_col: "Student Code", phone_col: "Phone",
+        "level": "Level", bal_col: "Balance (GHS)", "due_date_str": "Due Date", "days_left": "Days Left"
     })
     st.dataframe(tbl, use_container_width=True)
 
@@ -353,7 +356,7 @@ with tabs[2]:
         else:
             msg = f"Your payment is overdue by {abs(days)} {'day' if abs(days)==1 else 'days'}. Please settle as soon as possible."
         text = wa_template.format(
-            name=row["name"],
+            name=row[name_col],
             level=row["level"],
             due=due,
             bal=bal,
@@ -373,7 +376,7 @@ with tabs[2]:
                 invalid_numbers.add(raw_phone_str)
 
         links.append({
-            "Name": row["name"],
+            "Name": row[name_col],
             "Student Code": row[code_col],
             "Level": row["level"],
             "Balance (GHS)": bal,
