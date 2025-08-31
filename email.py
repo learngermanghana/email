@@ -305,39 +305,281 @@ tabs = st.tabs(tab_titles)
 
 # ==== TAB 0: PENDING STUDENTS ====
 with tabs[0]:
+    import os, re, urllib.parse, requests
+    import pandas as pd
+    import streamlit as st
+    from datetime import datetime
+
     st.title("🕒 Pending Students")
 
-    # -- Load Pending Students Google Sheet --
-    df_display, df_search = load_pending_students()
+    # ---------------- CONFIG ----------------
+    PENDING_SHEET_ID = "1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo"
+    PENDING_CSV_URL  = f"https://docs.google.com/spreadsheets/d/{PENDING_SHEET_ID}/export?format=csv"
 
-    # --- Universal Search ---
-    search = st.text_input("🔎 Search any field (name, code, email, etc.)")
+    MAIN_SHEET_ID    = "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U"  # destination "Main Students" sheet
+
+    # Apps Script Web App endpoint (preferred path to write without service account creds)
+    APPS_SCRIPT_WEBAPP_URL = (
+        st.secrets.get("gscripts", {}).get("webapp_url", "")
+        or os.environ.get("APPS_SCRIPT_WEBAPP_URL", "")
+    )
+
+    # Columns we want in the Main sheet (the final schema)
+    TARGET_HEADERS = [
+        "Name", "Phone", "Location", "Level",
+        "Paid", "Balance",
+        "ContractStart", "ContractEnd",
+        "StudentCode", "Email",
+        "Emergency Contact (Phone Number)",
+        "Status", "EnrollDate", "ClassName",
+    ]
+
+    # Candidate headers to *map from* in the Pending sheet (case/space/underscore-insensitive)
+    SOURCE_CANDIDATES = {
+        "Name": ["name", "studentname", "full name"],
+        "Phone": ["phone", "phonenumber", "contact", "whatsapp"],
+        "Location": ["location", "city", "town", "address"],
+        "Level": ["level", "class", "courselevel"],
+        "Paid": ["paid", "amountpaid", "deposit"],
+        "Balance": ["balance", "outstanding", "amountbalance", "amountdue"],
+        "ContractStart": ["contractstart", "start", "startdate", "enrolldate", "enrollmentdate"],
+        "ContractEnd": ["contractend", "end", "enddate", "end_date"],
+        "StudentCode": ["studentcode", "code", "id", "student_id"],
+        "Email": ["email", "emailaddress"],
+        "Emergency Contact (Phone Number)": ["emergency contact (phone number)", "emergencycontact", "emergency_phone", "guardianphone", "parentphone"],
+        "Status": ["status", "state"],
+        "EnrollDate": ["enrolldate", "enrollmentdate", "date"],
+        "ClassName": ["classname", "class", "class_name"],
+    }
+
+    # ---------------- HELPERS ----------------
+    def _norm_key(s: str) -> str:
+        return re.sub(r"[\s_]+", "", str(s or "")).strip().lower()
+
+    def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
+        df.columns = [re.sub(r"\s+", "_", c.strip().lower()) for c in df.columns]
+        return df
+
+    @st.cache_data(ttl=0)
+    def load_pending_students():
+        df = pd.read_csv(PENDING_CSV_URL, dtype=str)
+        return normalize_columns(df)
+
+    def find_source_column(df_cols, candidates):
+        """Pick the first present column matching any candidate."""
+        norm_cols = { _norm_key(c): c for c in df_cols }
+        for cand in candidates:
+            k = _norm_key(cand)
+            if k in norm_cols:
+                return norm_cols[k]
+        # partial/startswith fallback
+        for c in df_cols:
+            if any(_norm_key(c).startswith(_norm_key(x)) for x in candidates):
+                return c
+        return None
+
+    def clean_phone_gh(phone):
+        """Normalize Ghana numbers to 233XXXXXXXXX (best-effort, non-fatal)."""
+        if phone is None: return ""
+        digits = re.sub(r"\D", "", str(phone))
+        if len(digits) == 9 and digits[:1] in {"2", "5", "9"}:
+            digits = "0" + digits
+        if digits.startswith("0") and len(digits) == 10:
+            return "233" + digits[1:]
+        if digits.startswith("233") and len(digits) == 12:
+            return digits
+        return digits or ""
+
+    def parse_date_str(s):
+        """Try a few common date formats; return YYYY-MM-DD string if possible."""
+        if not s or str(s).strip().lower() in ("nan", "none", ""):
+            return ""
+        for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%d.%m.%y", "%d/%m/%Y", "%d-%m-%Y"):
+            try:
+                return datetime.strptime(str(s).strip(), fmt).date().isoformat()
+            except ValueError:
+                continue
+        # If it's already ISO-like or Google Sheets datetime text, just return the raw string
+        return str(s).strip()
+
+    def map_pending_row_to_main(row: pd.Series, df_columns) -> dict:
+        """Build a dict with TARGET_HEADERS from a pending row, using SOURCE_CANDIDATES."""
+        out = {h: "" for h in TARGET_HEADERS}
+        # lookup each target
+        for target, candidates in SOURCE_CANDIDATES.items():
+            src_col = find_source_column(df_columns, candidates)
+            if src_col:
+                out[target] = (row.get(src_col, "") if isinstance(row, pd.Series) else "")
+        # transforms / sane defaults
+        out["Phone"]  = clean_phone_gh(out.get("Phone", ""))
+        emerg = out.get("Emergency Contact (Phone Number)", "")
+        out["Emergency Contact (Phone Number)"] = clean_phone_gh(emerg)
+
+        # Dates
+        out["ContractStart"] = parse_date_str(out.get("ContractStart", ""))
+        out["ContractEnd"]   = parse_date_str(out.get("ContractEnd", ""))
+        out["EnrollDate"]    = parse_date_str(out.get("EnrollDate", "")) or datetime.now().date().isoformat()
+
+        # Level to uppercase
+        out["Level"] = str(out.get("Level", "")).upper().strip()
+
+        # Status default
+        if not out.get("Status"):
+            out["Status"] = "Active"
+
+        # ClassName default to Level if empty
+        if not out.get("ClassName"):
+            out["ClassName"] = out.get("Level", "")
+
+        # Numeric cleanup for Paid/Balance
+        def _to_num(s):
+            try:
+                return float(str(s).replace(",", "").strip())
+            except Exception:
+                return 0.0
+        out["Paid"]    = _to_num(out.get("Paid", 0))
+        out["Balance"] = _to_num(out.get("Balance", 0))
+        return out
+
+    def post_to_apps_script(rows_for_main: list) -> dict:
+        """Send selected rows to Apps Script Web App."""
+        payload = {
+            "action": "upsertRows",
+            "targetSheetId": MAIN_SHEET_ID,
+            "rows": rows_for_main,  # list of dicts with TARGET_HEADERS keys
+        }
+        resp = requests.post(APPS_SCRIPT_WEBAPP_URL, json=payload, timeout=30)
+        resp.raise_for_status()
+        try:
+            return resp.json()
+        except Exception:
+            return {"ok": True, "raw": resp.text}
+
+    # ---------------- UI: LOAD + SEARCH ----------------
+    df_pending = load_pending_students()
+    raw_cols = list(df_pending.columns)
+
+    st.caption(f"Loaded **{len(df_pending)}** pending record(s).")
+
+    # universal search
+    search = st.text_input("🔎 Search any field (name, phone, code, email, etc.)")
     if search:
-        mask = df_search.apply(
-            lambda row: row.astype(str).str.contains(search, case=False, na=False).any(),
-            axis=1
-        )
-        filt = df_display[mask]
+        q = search.strip().lower()
+        mask = df_pending.apply(lambda r: q in " ".join(map(str, r.values)).lower(), axis=1)
+        view = df_pending[mask].copy()
     else:
-        filt = df_display
+        view = df_pending.copy()
 
-    # --- Column Selector ---
-    all_cols = list(filt.columns)
+    # Column picker
+    all_cols = list(view.columns)
+    default_cols = [c for c in all_cols if _norm_key(c) in {
+        "name", "phone", "email", "location", "level", "paid", "balance",
+        "contractstart", "contractend", "studentcode", "status"
+    }]
+    if not default_cols:
+        default_cols = all_cols[:6]
+
     selected_cols = st.multiselect(
-        "Show columns (for easy viewing):", all_cols, default=all_cols[:6]
+        "Show columns (for easy viewing):",
+        options=all_cols,
+        default=default_cols,
     )
 
-    # --- Show Table (with scroll bar) ---
-    st.dataframe(filt[selected_cols], use_container_width=True, height=400)
+    # Add selection column for bulk actions
+    show_df = view[selected_cols].copy()
+    show_df.insert(0, "Select", True)
 
-    # --- Download Button (all columns always) ---
-    st.download_button(
-        "⬇️ Download all columns as CSV",
-        filt.to_csv(index=False),
-        file_name="pending_students.csv"
+    edited = st.data_editor(
+        show_df,
+        use_container_width=True,
+        height=420,
+        column_config={
+            "Select": st.column_config.CheckboxColumn(
+                "Select", help="Tick rows you want to transfer", default=True
+            )
+        },
+        disabled=None,
+        key="pending_editor",
     )
 
-# ==== END OF STAGE 3 (TAB 0) ====
+    # Determine which original rows are selected
+    # Map edited view rows back to original df_pending indices
+    sel_mask = edited["Select"] == True
+    edited_noselect = edited.drop(columns=["Select"])
+    # Rejoin on all selected columns to find indices (robust across filters)
+    # Add a temp key to avoid duplicate matches
+    tmp_left = edited_noselect.copy()
+    tmp_left["_row_id"] = range(len(tmp_left))
+    tmp_right = view[selected_cols].copy()
+    tmp_right["_orig_idx"] = view[selected_cols].index
+    merged = tmp_left.merge(tmp_right, how="left", on=selected_cols, suffixes=("", "_orig"))
+    # Pick selected rows
+    selected_view_rows = merged[sel_mask.values]
+
+    st.markdown("---")
+
+    # ---------------- ACTIONS ----------------
+    c1, c2, c3 = st.columns([1.3, 1, 1])
+    with c1:
+        st.download_button(
+            "⬇️ Download current view (CSV)",
+            data=view.to_csv(index=False),
+            file_name="pending_students_view.csv",
+        )
+    with c2:
+        # Download only selected (mapped) as CSV (for manual import if needed)
+        if st.button("Generate selected CSV"):
+            # Build mapped rows
+            rows_for_main = []
+            for _, mrow in selected_view_rows.iterrows():
+                orig_idx = int(mrow["_orig_idx"])
+                prow = df_pending.iloc[orig_idx]
+                rows_for_main.append(map_pending_row_to_main(prow, raw_cols))
+            sel_df = pd.DataFrame(rows_for_main, columns=TARGET_HEADERS)
+            st.session_state["_sel_csv"] = sel_df.to_csv(index=False)
+            st.success(f"Prepared {len(rows_for_main)} row(s). Use the download on the right →")
+    with c3:
+        st.download_button(
+            "📁 Download selected (Main schema)",
+            data=st.session_state.get("_sel_csv", ""),
+            file_name="pending_selected_mainschema.csv",
+            disabled=("_sel_csv" not in st.session_state),
+        )
+
+    st.markdown("---")
+
+    # Transfer via Apps Script Web App
+    if not APPS_SCRIPT_WEBAPP_URL:
+        st.info(
+            "⚙️ To enable one-click transfer, set **st.secrets['gscripts']['webapp_url']** "
+            "to your deployed Apps Script Web App URL."
+        )
+
+    transfer_btn = st.button("🚚 Transfer selected to Main (Apps Script)", disabled=not bool(APPS_SCRIPT_WEBAPP_URL))
+
+    if transfer_btn:
+        with st.spinner("Transferring selected rows to Main…"):
+            try:
+                rows_for_main = []
+                for _, mrow in selected_view_rows.iterrows():
+                    orig_idx = int(mrow["_orig_idx"])
+                    prow = df_pending.iloc[orig_idx]
+                    rows_for_main.append(map_pending_row_to_main(prow, raw_cols))
+
+                if not rows_for_main:
+                    st.warning("No rows selected.")
+                else:
+                    result = post_to_apps_script(rows_for_main)
+                    st.success("✅ Transfer complete.")
+                    st.json(result)
+                    st.caption("If your Apps Script marks moved rows or clears them from the Pending sheet, refresh this page.")
+            except Exception as e:
+                st.error(f"Transfer failed: {e}")
+
+    st.markdown("---")
+    st.caption("Tip: Use the column picker to include fields you need to verify before transfer. The transfer will map into the Main sheet schema automatically.")
+# ==== END TAB 0 ====
+
 
 # ==== TAB 1: ALL STUDENTS ====
 with tabs[1]:
