@@ -16,6 +16,7 @@ import qrcode
 from PIL import Image  # For logo image handling
 from io import BytesIO
 from utils import safe_pdf
+from pdf_utils import generate_receipt_and_contract_pdf
 
 # ==== CONSTANTS ====
 SCHOOL_NAME = "Learn Language Education Academy"
@@ -1113,11 +1114,17 @@ with tabs[4]:
 
     # ---- 2. Message Type Selection ----
     st.subheader("Choose Message Type")
-    msg_type = st.selectbox("Type", [
-        "Letter of Enrollment",
-        "Payment Confirmation",
-        "Course Completion Letter"
-    ], key="msg_type_select")
+
+    msg_type = st.selectbox(
+        "Type",
+        [
+            "Letter of Enrollment",
+            "Course Completion Letter",
+            "Payment Confirmation",
+        ],
+        key="msg_type_select",
+    )
+
 
     # ---- 3. Branding Assets ----
     st.subheader("Upload Logo and Watermark")
@@ -1157,6 +1164,8 @@ with tabs[4]:
 
     # ---- 4. Compose/Preview Message ----
     st.subheader("Compose/Preview Message")
+    payment_amount = None
+    payment_date = None
     if msg_type == "Letter of Enrollment":
         body_default = (
             f"To Whom It May Concern,<br><br>",
@@ -1180,14 +1189,30 @@ with tabs[4]:
         email_body = st.text_area("Email Body (HTML supported)", value=body_default, key="email_body", height=220)
         st.markdown("**Preview Message:**")
         st.markdown(email_body, unsafe_allow_html=True)
-    else:  # Course Completion Letter
-
+    elif msg_type == "Course Completion Letter":
         completion_date = st.date_input("Completion Date", value=date.today(), key="completion_date")
         body_default = render_completion_html(student_name, student_level, completion_date)
         email_subject = st.text_input("Subject", value=f"{msg_type} - {student_name}", key="email_subject")
         email_body = st.text_area("Email Body (HTML supported)", value=body_default, key="email_body", height=220)
         st.markdown("**Preview Message:**")
         st.components.v1.html(email_body, height=600)
+    else:  # Payment Confirmation
+        payment_amount = st.number_input(
+            "Payment Amount", min_value=0.0, value=float(payment), key="payment_amount"
+        )
+        payment_date = st.date_input("Payment Date", value=date.today(), key="payment_date")
+        body_default = (
+            f"Dear {student_name},<br><br>"
+            f"We confirm receipt of your payment of GHS {payment_amount:.2f} on {payment_date:%m/%d/%Y}. "
+            "Please find your receipt and contract attached.<br><br>"
+            f"Best regards,<br>{SCHOOL_NAME}"
+        )
+        email_subject = st.text_input("Subject", value=f"{msg_type} - {student_name}", key="email_subject")
+        email_body = st.text_area(
+            "Email Body (HTML supported)", value=body_default, key="email_body", height=220
+        )
+        st.markdown("**Preview Message:**")
+        st.markdown(email_body, unsafe_allow_html=True)
 
     st.subheader("PDF Preview & Download")
 
@@ -1200,7 +1225,27 @@ with tabs[4]:
         pdf.write_html(email_body)
         output_data = pdf.output(dest="S")
         pdf_bytes = output_data if isinstance(output_data, bytes) else output_data.encode("latin-1", "replace")
-    elif msg_type == "Letter of Enrollment":
+
+    elif msg_type == "Payment Confirmation":
+        student_row_dict = {
+            "Name": student_row.get("name", ""),
+            "StudentCode": student_row.get("studentcode", ""),
+            "Phone": student_row.get("phone", ""),
+            "Level": student_row.get("level", ""),
+            "Paid": student_row.get("paid", 0),
+            "Balance": student_row.get("balance", 0),
+            "ContractStart": student_row.get("contractstart", ""),
+            "ContractEnd": student_row.get("contractend", ""),
+        }
+        pdf_bytes = generate_receipt_and_contract_pdf(
+            student_row_dict,
+            st.session_state.get("agreement_template", ""),
+            payment_amount,
+            payment_date,
+            first_instalment=payment_amount,
+        )
+    else:
+
         class LetterPDF(FPDF):
             def header(self):
                 if logo_file:
@@ -1264,14 +1309,23 @@ with tabs[4]:
     st.subheader("Send Email (with or without PDF)")
     recipient_email = st.text_input("Recipient Email", value=student_email, key="recipient_email")
 
-    encoded_subject = urllib.parse.quote(email_subject)
-    encoded_body = urllib.parse.quote(email_body)
-    mailto_url = f"mailto:{recipient_email}?subject={encoded_subject}&body={encoded_body}"
+    if msg_type == "Payment Confirmation":
+        if st.button("Send Email with Receipt"):
+            html_body = render_reminder_html(email_body)
+            ok = send_email_report(pdf_bytes, recipient_email, email_subject, html_body)
+            if ok:
+                st.success("Email sent successfully.")
+            else:
+                st.error("Failed to send email.")
+    else:
+        encoded_subject = urllib.parse.quote(email_subject)
+        encoded_body = urllib.parse.quote(email_body)
+        mailto_url = f"mailto:{recipient_email}?subject={encoded_subject}&body={encoded_body}"
 
-    st.markdown(f"[Open Email Client]({mailto_url})", unsafe_allow_html=True)
-    st.caption(
-        "Attachments can't be added automatically. Download the PDF or other files above and attach them manually."
-    )
+        st.markdown(f"[Open Email Client]({mailto_url})", unsafe_allow_html=True)
+        st.caption(
+            "Attachments can't be added automatically. Download the PDF or other files above and attach them manually."
+        )
 
 import textwrap
 
