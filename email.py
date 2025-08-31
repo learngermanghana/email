@@ -1115,6 +1115,7 @@ with tabs[4]:
     st.subheader("Choose Message Type")
     msg_type = st.selectbox("Type", [
         "Letter of Enrollment",
+        "Payment Confirmation",
         "Course Completion Letter"
     ], key="msg_type_select")
 
@@ -1153,14 +1154,27 @@ with tabs[4]:
         tmp_sig.close()
         signature_file_path = tmp_sig.name
 
+
     # ---- 4. Compose/Preview Message ----
     st.subheader("Compose/Preview Message")
     if msg_type == "Letter of Enrollment":
         body_default = (
-            f"To Whom It May Concern,<br><br>"
-            f"{student_name} is officially enrolled in {student_level} at Learn Language Education Academy.<br>"
-            f"Enrollment valid from {enrollment_start:%m/%d/%Y} to {enrollment_end:%m/%d/%Y}.<br><br>"
-            f"Business Reg No: {BUSINESS_REG}.<br><br>"
+            f"To Whom It May Concern,<br><br>",
+            f"{student_name} is officially enrolled in {student_level} at Learn Language Education Academy.<br>",
+            f"Enrollment valid from {enrollment_start:%m/%d/%Y} to {enrollment_end:%m/%d/%Y}.<br><br>",
+            f"Business Reg No: {BUSINESS_REG}.<br><br>",
+        )
+        email_subject = st.text_input("Subject", value=f"{msg_type} - {student_name}", key="email_subject")
+        email_body = st.text_area("Email Body (HTML supported)", value=body_default, key="email_body", height=220)
+        st.markdown("**Preview Message:**")
+        st.markdown(email_body, unsafe_allow_html=True)
+    elif msg_type == "Payment Confirmation":
+        body_default = (
+            f"Hello {student_name},<br><br>"
+            f"We have received your payment of GHS {payment:.2f}. "
+            f"Your remaining balance is GHS {balance:.2f}.<br><br>"
+            "Thank you for your prompt payment.<br><br>"
+            f"{TUTOR_NAME}<br>{TUTOR_TITLE}"
         )
         email_subject = st.text_input("Subject", value=f"{msg_type} - {student_name}", key="email_subject")
         email_body = st.text_area("Email Body (HTML supported)", value=body_default, key="email_body", height=220)
@@ -1175,11 +1189,9 @@ with tabs[4]:
         st.markdown("**Preview Message:**")
         st.components.v1.html(email_body, height=600)
 
-
-    # ---- 5. Generate PDF Button (and preview) ----
     st.subheader("PDF Preview & Download")
 
-
+    pdf_bytes = None
     if msg_type == "Course Completion Letter":
         class CompletionPDF(FPDF, HTMLMixin):
             pass
@@ -1188,7 +1200,7 @@ with tabs[4]:
         pdf.write_html(email_body)
         output_data = pdf.output(dest="S")
         pdf_bytes = output_data if isinstance(output_data, bytes) else output_data.encode("latin-1", "replace")
-    else:
+    elif msg_type == "Letter of Enrollment":
         class LetterPDF(FPDF):
             def header(self):
                 if logo_file:
@@ -1240,14 +1252,14 @@ with tabs[4]:
             with open(tmpf.name, "rb") as f: pdf_bytes = f.read()
             os.remove(tmpf.name)
 
-    st.download_button(
-        "📄 Download Letter/PDF",
-        data=pdf_bytes,
-        file_name=f"{student_name.replace(' ', '_')}_{msg_type.replace(' ','_')}.pdf",
-        mime="application/pdf",
-    )
-    st.caption("You can share this PDF on WhatsApp or by email.")
-
+    if pdf_bytes:
+        st.download_button(
+            "📄 Download Letter/PDF",
+            data=pdf_bytes,
+            file_name=f"{student_name.replace(' ', '_')}_{msg_type.replace(' ','_')}.pdf",
+            mime="application/pdf",
+        )
+        st.caption("You can share this PDF on WhatsApp or by email.")
     # ---- 6. Email Option ----
     st.subheader("Send Email (with or without PDF)")
     recipient_email = st.text_input("Recipient Email", value=student_email, key="recipient_email")
