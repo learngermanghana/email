@@ -35,6 +35,54 @@ REF_ANSWERS_CSV_URL = f"https://docs.google.com/spreadsheets/d/{REF_ANSWERS_SHEE
 PENDING_SHEET_ID = "1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo"
 PENDING_CSV_URL = f"https://docs.google.com/spreadsheets/d/{PENDING_SHEET_ID}/export?format=csv"
 
+# ==== EMAIL CONFIGURATION ====
+
+
+def load_email_config():
+    """Load SMTP configuration from Streamlit secrets or environment variables."""
+    config = {
+        "SENDER_EMAIL": None,
+        "SMTP_HOST": None,
+        "SMTP_PORT": None,
+        "SMTP_USE_TLS": None,
+        "SMTP_USERNAME": None,
+        "SMTP_PASSWORD": None,
+    }
+
+    try:
+        secrets = st.secrets
+        config["SENDER_EMAIL"] = secrets["email_sender"]
+        smtp = secrets["smtp"]
+        config["SMTP_HOST"] = smtp["host"]
+        config["SMTP_PORT"] = smtp.get("port")
+        config["SMTP_USE_TLS"] = smtp.get("use_tls", True)
+        config["SMTP_USERNAME"] = smtp.get("username")
+        config["SMTP_PASSWORD"] = smtp.get("password")
+    except Exception:
+        config["SENDER_EMAIL"] = os.environ.get("EMAIL_SENDER")
+        config["SMTP_HOST"] = os.environ.get("SMTP_HOST")
+        config["SMTP_PORT"] = os.environ.get("SMTP_PORT")
+        config["SMTP_USE_TLS"] = os.environ.get("SMTP_USE_TLS", "true").lower() == "true"
+        config["SMTP_USERNAME"] = os.environ.get("SMTP_USERNAME")
+        config["SMTP_PASSWORD"] = os.environ.get("SMTP_PASSWORD")
+
+    try:
+        config["SMTP_PORT"] = int(config["SMTP_PORT"]) if config["SMTP_PORT"] else None
+    except (TypeError, ValueError):
+        config["SMTP_PORT"] = None
+
+    return (
+        config["SENDER_EMAIL"],
+        config["SMTP_HOST"],
+        config["SMTP_PORT"],
+        config["SMTP_USE_TLS"],
+        config["SMTP_USERNAME"],
+        config["SMTP_PASSWORD"],
+    )
+
+
+SENDER_EMAIL, SMTP_HOST, SMTP_PORT, SMTP_USE_TLS, SMTP_USERNAME, SMTP_PASSWORD = load_email_config()
+
 # ==== UNIVERSAL HELPERS ====
 
 def col_lookup(df: pd.DataFrame, name: str) -> str:
@@ -95,6 +143,16 @@ def send_email_report(pdf_bytes: bytes, to_email: str, subject: str, html_conten
     Send an email with (optional) PDF and any extra attachments.
     extra_attachments: list of tuples (bytes, filename, mimetype)
     """
+    required = {
+        "SENDER_EMAIL": SENDER_EMAIL,
+        "SMTP_HOST": SMTP_HOST,
+        "SMTP_PORT": SMTP_PORT,
+    }
+    missing = [k for k, v in required.items() if not v]
+    if missing:
+        st.error(f"Missing email configuration: {', '.join(missing)}")
+        return False
+
     msg = EmailMessage()
     msg["From"] = SENDER_EMAIL
     msg["To"] = to_email
