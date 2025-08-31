@@ -283,56 +283,50 @@ with tabs[2]:
     # --- Use cached df_students loaded at the top ---
     df = df_students.copy()
 
-    # --- Column Lookups ---
-    name_col  = col_lookup(df, "name")
-    code_col  = col_lookup(df, "studentcode")
-    phone_col = col_lookup(df, "phone")
-    bal_col   = col_lookup(df, "balance")
-    paid_col  = col_lookup(df, "paid")
-    lvl_col   = col_lookup(df, "level")
-    cs_col    = col_lookup(df, "contractstart")
+    # --- Column Lookup for legacy headers ---
+    code_col = col_lookup(df, "studentcode")
 
     # --- Clean Data Types ---
-    df[bal_col] = pd.to_numeric(df[bal_col], errors="coerce").fillna(0)
-    df[paid_col] = pd.to_numeric(df[paid_col], errors="coerce").fillna(0)
-    df[cs_col] = pd.to_datetime(df[cs_col], errors="coerce")
-    df[phone_col] = df[phone_col].astype(str).str.replace(r"[^\d+]", "", regex=True)
+    df["balance"] = pd.to_numeric(df["balance"], errors="coerce").fillna(0)
+    df["paid"] = pd.to_numeric(df["paid"], errors="coerce").fillna(0)
+    df["contractstart"] = pd.to_datetime(df["contractstart"], errors="coerce")
+    df["phone"] = df["phone"].astype(str).str.replace(r"[^\d+]", "", regex=True)
 
     # --- Calculate Due Date & Days Left ---
-    df["due_date"] = df[cs_col] + pd.Timedelta(days=30)
+    df["due_date"] = df["contractstart"] + pd.Timedelta(days=30)
     df["due_date_str"] = df["due_date"].dt.strftime("%d %b %Y")
     df["days_left"] = (df["due_date"] - pd.Timestamp.today()).dt.days
 
     # --- Financial Summary ---
     m1, m2, m3 = st.columns(3)
     m1.metric("Total Students", len(df))
-    m2.metric("Total Collected (GHS)", f"{df[paid_col].sum():,.2f}")
-    m3.metric("Total Outstanding (GHS)", f"{df[bal_col].sum():,.2f}")
+    m2.metric("Total Collected (GHS)", f"{df['paid'].sum():,.2f}")
+    m3.metric("Total Outstanding (GHS)", f"{df['balance'].sum():,.2f}")
 
     st.markdown("---")
 
     # --- Filter/Search UI ---
     show_all = st.toggle("Show all students (not just debtors)", value=False)
     search = st.text_input("Search by name, code, or phone", key="wa_search")
-    selected_level = st.selectbox("Filter by Level", ["All"] + sorted(df[lvl_col].dropna().unique()), key="wa_level")
+    selected_level = st.selectbox("Filter by Level", ["All"] + sorted(df["level"].dropna().unique()), key="wa_level")
 
     filt = df.copy()
     if not show_all:
-        filt = filt[filt[bal_col] > 0]
+        filt = filt[filt["balance"] > 0]
     if search:
-        mask1 = filt[name_col].str.contains(search, case=False, na=False)
+        mask1 = filt["name"].str.contains(search, case=False, na=False)
         mask2 = filt[code_col].astype(str).str.contains(search, case=False, na=False)
-        mask3 = filt[phone_col].str.contains(search, case=False, na=False)
+        mask3 = filt["phone"].str.contains(search, case=False, na=False)
         filt = filt[mask1 | mask2 | mask3]
     if selected_level != "All":
-        filt = filt[filt[lvl_col] == selected_level]
+        filt = filt[filt["level"] == selected_level]
 
     st.markdown("---")
 
     # --- Table Preview ---
-    tbl = filt[[name_col, code_col, phone_col, lvl_col, bal_col, "due_date_str", "days_left"]].rename(columns={
-        name_col: "Name", code_col: "Student Code", phone_col: "Phone",
-        lvl_col: "Level", bal_col: "Balance (GHS)", "due_date_str": "Due Date", "days_left": "Days Left"
+    tbl = filt[["name", code_col, "phone", "level", "balance", "due_date_str", "days_left"]].rename(columns={
+        "name": "Name", code_col: "Student Code", "phone": "Phone",
+        "level": "Level", "balance": "Balance (GHS)", "due_date_str": "Due Date", "days_left": "Days Left"
     })
     st.dataframe(tbl, use_container_width=True)
 
@@ -346,8 +340,8 @@ with tabs[2]:
     # --- WhatsApp Links Generation ---
     links = []
     for _, row in filt.iterrows():
-        phone = clean_phone(row[phone_col])
-        bal = f"GHS {row[bal_col]:,.2f}"
+        phone = clean_phone(row["phone"])
+        bal = f"GHS {row['balance']:,.2f}"
         due = row["due_date_str"]
         days = int(row["days_left"])
         if days >= 0:
@@ -355,8 +349,8 @@ with tabs[2]:
         else:
             msg = f"Your payment is overdue by {abs(days)} {'day' if abs(days)==1 else 'days'}. Please settle as soon as possible."
         text = wa_template.format(
-            name=row[name_col],
-            level=row[lvl_col],
+            name=row["name"],
+            level=row["level"],
             due=due,
             bal=bal,
             days=days,
@@ -364,9 +358,9 @@ with tabs[2]:
         )
         link = f"https://wa.me/{phone}?text={urllib.parse.quote(text)}" if phone else ""
         links.append({
-            "Name": row[name_col],
+            "Name": row["name"],
             "Student Code": row[code_col],
-            "Level": row[lvl_col],
+            "Level": row["level"],
             "Balance (GHS)": bal,
             "Due Date": due,
             "Days Left": days,
@@ -406,17 +400,7 @@ with tabs[3]:
         st.warning("No student data available.")
         st.stop()
 
-    def getcol(col): 
-        return col_lookup(df, col)
-
-    name_col    = getcol("name")
-    start_col   = getcol("contractstart")
-    end_col     = getcol("contractend")
-    paid_col    = getcol("paid")
-    bal_col     = getcol("balance")
-    code_col    = getcol("studentcode")
-    phone_col   = getcol("phone")
-    level_col   = getcol("level")
+    code_col = col_lookup(df, "studentcode")
 
     search_val = st.text_input(
         "Search students by name, code, phone, or level:", 
@@ -426,24 +410,24 @@ with tabs[3]:
     if search_val:
         sv = search_val.strip().lower()
         filtered_df = df[
-            df[name_col].str.lower().str.contains(sv, na=False)
+            df["name"].str.lower().str.contains(sv, na=False)
             | df[code_col].astype(str).str.lower().str.contains(sv, na=False)
-            | df[phone_col].astype(str).str.lower().str.contains(sv, na=False)
-            | df[level_col].astype(str).str.lower().str.contains(sv, na=False)
+            | df["phone"].astype(str).str.lower().str.contains(sv, na=False)
+            | df["level"].astype(str).str.lower().str.contains(sv, na=False)
         ]
-    student_names = filtered_df[name_col].tolist()
+    student_names = filtered_df["name"].tolist()
     if not student_names:
         st.warning("No students match your search.")
         st.stop()
     selected_name = st.selectbox("Select Student", student_names)
-    row = filtered_df[filtered_df[name_col] == selected_name].iloc[0]
+    row = filtered_df[filtered_df["name"] == selected_name].iloc[0]
 
-    default_paid    = float(row.get(paid_col, 0))
-    default_balance = float(row.get(bal_col, 0))
-    default_start = pd.to_datetime(row.get(start_col, ""), errors="coerce").date()
+    default_paid    = float(row.get("paid", 0))
+    default_balance = float(row.get("balance", 0))
+    default_start = pd.to_datetime(row.get("contractstart", ""), errors="coerce").date()
     if pd.isnull(default_start):
         default_start = date.today()
-    default_end = pd.to_datetime(row.get(end_col, ""), errors="coerce").date()
+    default_end = pd.to_datetime(row.get("contractend", ""), errors="coerce").date()
     if pd.isnull(default_end):
         default_end = default_start + timedelta(days=30)
 
@@ -519,8 +503,8 @@ with tabs[3]:
         for label, val in [
             ("Name", selected_name),
             ("Student Code", row.get(code_col, "")),
-            ("Phone", row.get(phone_col, "")),
-            ("Level", row.get(level_col, "")),
+            ("Phone", row.get("phone", "")),
+            ("Level", row.get("level", "")),
             ("Contract Start", contract_start_input),
             ("Contract End", contract_end_input),
             ("Amount Paid", f"GHS {paid:.2f}"),
@@ -548,7 +532,7 @@ This Payment Agreement is entered into on [DATE] for [CLASS] students of Learn L
             template
             .replace("[STUDENT_NAME]",     selected_name)
             .replace("[DATE]",             str(receipt_date))
-            .replace("[CLASS]",            row.get(level_col, ""))
+            .replace("[CLASS]",            row.get("level", ""))
             .replace("[AMOUNT]",           str(total))
             .replace("[FIRST_INSTALLMENT]", f"{paid:.2f}")
             .replace("[SECOND_INSTALLMENT]",f"{balance:.2f}")
