@@ -8,6 +8,7 @@ from datetime import datetime, date, timedelta
 import smtplib
 from email.message import EmailMessage
 import base64
+import textwrap
 
 import pandas as pd
 import streamlit as st
@@ -265,6 +266,20 @@ Signatures:
 Date: [DATE]
 Asadu Felix
 """
+
+AGREEMENT_LINE_LIMIT = 120
+
+def wrap_template_lines(text: str, limit: int = AGREEMENT_LINE_LIMIT):
+    """Wrap long lines lacking spaces and report affected line numbers."""
+    wrapped_lines = []
+    warn_lines = []
+    for idx, line in enumerate(text.splitlines(), start=1):
+        if len(line) > limit and " " not in line:
+            warn_lines.append(idx)
+            wrapped_lines.extend(textwrap.wrap(line, limit))
+        else:
+            wrapped_lines.append(line)
+    return "\n".join(wrapped_lines), warn_lines
 
 # ==== END OF STAGE 1 ====
 
@@ -904,6 +919,22 @@ with tabs[3]:
     contract_end_input   = st.date_input("Contract End Date", value=default_end, key="pdf_contract_end")
     course_length        = (contract_end_input - contract_start_input).days
 
+    st.subheader("Agreement Template")
+    template_input = st.text_area(
+        "Payment Agreement Template",
+        value=st.session_state["agreement_template"],
+        key="agreement_template",
+        height=300,
+        help=f"Lines over {AGREEMENT_LINE_LIMIT} characters without spaces will be wrapped automatically."
+    )
+    wrapped_template, warn_lines = wrap_template_lines(template_input)
+    if warn_lines:
+        st.warning(
+            f"Lines {', '.join(map(str, warn_lines))} exceeded {AGREEMENT_LINE_LIMIT} characters without spaces and were wrapped."
+        )
+    if wrapped_template != template_input:
+        st.session_state["agreement_template"] = wrapped_template
+
     logo_url = "https://drive.google.com/uc?export=download&id=1xLTtiCbEeHJjrASvFjBgfFuGrgVzg6wU"
     local_logo_path = os.path.join(os.path.dirname(__file__), "logo.png")
     cached_logo_path = "/tmp/school_logo.png"
@@ -1023,12 +1054,8 @@ with tabs[3]:
         pdf.set_font("Arial", size=12)
         pdf.ln(8)
 
-        template = st.session_state.get("agreement_template", """
-PAYMENT AGREEMENT
-
-This Payment Agreement is entered into on [DATE] for [CLASS] students of Learn Language Education Academy and Felix Asadu ("Teacher").
-...
-""")
+        template_raw = st.session_state.get("agreement_template", "")
+        template, _ = wrap_template_lines(template_raw)
         filled = (
             template
             .replace("[STUDENT_NAME]",     selected_name)
@@ -1237,9 +1264,12 @@ with tabs[4]:
             "ContractStart": student_row.get("contractstart", ""),
             "ContractEnd": student_row.get("contractend", ""),
         }
+        agreement_text, _ = wrap_template_lines(
+            st.session_state.get("agreement_template", "")
+        )
         pdf_bytes = generate_receipt_and_contract_pdf(
             student_row_dict,
-            st.session_state.get("agreement_template", ""),
+            agreement_text,
             payment_amount,
             payment_date,
             first_instalment=payment_amount,
