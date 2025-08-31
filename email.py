@@ -11,7 +11,7 @@ import base64
 
 import pandas as pd
 import streamlit as st
-from fpdf import FPDF
+from fpdf import FPDF, HTMLMixin
 import qrcode
 from PIL import Image  # For logo image handling
 from io import BytesIO
@@ -201,6 +201,35 @@ def render_reminder_html(body_text: str) -> str:
     return template.format(
         logo_base64=logo_b64,
         content=body_text.replace("\n", "<br/>") if body_text else "",
+        school_name=SCHOOL_NAME,
+        school_address=SCHOOL_ADDRESS,
+        school_phone=SCHOOL_PHONE,
+        school_website=SCHOOL_WEBSITE,
+    )
+
+
+def render_completion_html(student_name: str, level: str, completion_date: date) -> str:
+    """Render the course completion letter using the certificate template."""
+    base_dir = os.path.dirname(__file__)
+    template_path = os.path.join(base_dir, "completion_letter_template.html")
+    logo_path = os.path.join(base_dir, "logo.png")
+    with open(logo_path, "rb") as lf:
+        logo_b64 = base64.b64encode(lf.read()).decode("utf-8")
+    with open(template_path, "r", encoding="utf-8") as tf:
+        template = tf.read()
+    default_message = (
+        f"Congratulations on finishing your {level} course, {student_name}! "
+        "You worked hard and made great progress.<br><br>"
+        "Please think about whether you want to prepare for the exam or move on to the next level. "
+        "I wish you continued success as you make your next decision!<br><br>"
+        f"Best wishes,<br>{TUTOR_NAME}<br>{TUTOR_TITLE}"
+    )
+    return template.format(
+        logo_base64=logo_b64,
+        student_name=student_name,
+        level=level,
+        completion_date=completion_date.strftime("%B %d, %Y"),
+        content=default_message,
         school_name=SCHOOL_NAME,
         school_address=SCHOOL_ADDRESS,
         school_phone=SCHOOL_PHONE,
@@ -1131,103 +1160,89 @@ with tabs[4]:
             f"Enrollment valid from {enrollment_start:%m/%d/%Y} to {enrollment_end:%m/%d/%Y}.<br><br>"
             f"Business Reg No: {BUSINESS_REG}.<br><br>"
         )
+        email_subject = st.text_input("Subject", value=f"{msg_type} - {student_name}", key="email_subject")
+        email_body = st.text_area("Email Body (HTML supported)", value=body_default, key="email_body", height=220)
+        st.markdown("**Preview Message:**")
+        st.markdown(email_body, unsafe_allow_html=True)
     else:  # Course Completion Letter
-        body_default = (
-            f"This certifies that {student_name} has successfully completed the {student_level} course "
-            "at Learn Language Education Academy on [COMPLETION_DATE]. "
-            "We commend [HIM/HER] for outstanding dedication and wish continued success.<br><br>"
-            "[ACHIEVEMENTS_OR_GRADES]<br><br>"
-            "Sincerely,<br>"
-            "Felix Asadu<br>"
-            "Director"
-        )
 
-    email_subject = st.text_input("Subject", value=f"{msg_type} - {student_name}", key="email_subject")
-    email_body    = st.text_area("Email Body (HTML supported)", value=body_default, key="email_body", height=220)
+        completion_date = st.date_input("Completion Date", value=date.today(), key="completion_date")
+        body_default = render_completion_html(student_name, student_level, completion_date)
+        email_subject = st.text_input("Subject", value=f"{msg_type} - {student_name}", key="email_subject")
+        email_body = st.text_area("Email Body (HTML supported)", value=body_default, key="email_body", height=220)
+        st.markdown("**Preview Message:**")
+        st.components.v1.html(email_body, height=600)
 
-    st.markdown("**Preview Message:**")
-    st.markdown(email_body, unsafe_allow_html=True)
 
     # ---- 5. Generate PDF Button (and preview) ----
     st.subheader("PDF Preview & Download")
 
-    class LetterPDF(FPDF):
-        def header(self):
-            if logo_file:
-                ext = logo_file.name.split('.')[-1]
-                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
-                tmp.write(logo_file.read())
-                tmp.close()
-                self.image(tmp.name, x=10, y=8, w=28)
-            self.set_font('Arial', 'B', 16)
-            self.cell(0, 9, safe_pdf(SCHOOL_NAME), ln=True, align='C')
-            self.set_font('Arial', '', 11)
-            self.cell(0, 7, safe_pdf(f"{SCHOOL_WEBSITE} | {SCHOOL_PHONE} | {SCHOOL_ADDRESS}"), ln=True, align='C')
-            self.set_font('Arial', 'I', 10)
-            self.cell(0, 7, safe_pdf(f"Business Reg No: {BUSINESS_REG}"), ln=True, align='C')
-            self.ln(2)
-            # Title of the letter
-            self.set_font('Arial', 'B', 14)
-            self.cell(0, 10, safe_pdf(msg_type), ln=True, align='C')
-            self.ln(1)
-            # Horizontal rule
-            self.set_draw_color(200, 200, 200)
-            self.set_line_width(0.5)
-            self.line(self.l_margin, self.get_y(), self.w - self.r_margin, self.get_y())
-            self.ln(6)
 
-        def watermark(self):
-            if watermark_file_path:
-                self.image(watermark_file_path, x=38, y=60, w=130)
+    if msg_type == "Course Completion Letter":
+        class CompletionPDF(FPDF, HTMLMixin):
+            pass
+        pdf = CompletionPDF()
+        pdf.add_page()
+        pdf.write_html(email_body)
+        output_data = pdf.output(dest="S")
+        pdf_bytes = output_data if isinstance(output_data, bytes) else output_data.encode("latin-1", "replace")
+    else:
+        class LetterPDF(FPDF):
+            def header(self):
+                if logo_file:
+                    ext = logo_file.name.split('.')[-1]
+                    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
+                    tmp.write(logo_file.read()); tmp.close()
+                    self.image(tmp.name, x=10, y=8, w=28)
+                self.set_font('Arial', 'B', 16)
+                self.cell(0, 9, safe_pdf(SCHOOL_NAME), ln=True, align='C')
+                self.set_font('Arial', '', 11)
+                self.cell(0, 7, safe_pdf(f"{SCHOOL_WEBSITE} | {SCHOOL_PHONE} | {SCHOOL_ADDRESS}"), ln=True, align='C')
+                self.set_font('Arial', 'I', 10)
+                self.cell(0, 7, safe_pdf(f"Business Reg No: {BUSINESS_REG}"), ln=True, align='C')
+                self.ln(3)
+                self.set_draw_color(200,200,200); self.set_line_width(0.5)
+                self.line(10, self.get_y(), 200, self.get_y()); self.ln(6)
+            def watermark(self):
+                if watermark_file_path:
+                    self.image(watermark_file_path, x=38, y=60, w=130)
+            def footer(self):
+                qr = make_qr_code(SCHOOL_WEBSITE)
+                self.image(qr, x=180, y=275, w=18)
+                self.set_y(-18)
+                self.set_font('Arial', 'I', 8)
+                self.cell(0, 10, safe_pdf("Generated without signature."), 0, 0, 'C')
 
-        def footer(self):
-            # Optional signature near closing section
-            if signature_file_path:
-                self.set_y(-60)
-                self.image(signature_file_path, x=self.l_margin, w=40)
-            qr = make_qr_code(SCHOOL_WEBSITE)
-            self.image(qr, x=self.w - self.r_margin - 20, y=self.h - 22, w=18)
-            self.set_y(-18)
-            self.set_font('Arial', 'I', 8)
-            note = "Digitally signed." if signature_file_path else "Generated without signature."
-            self.cell(0, 10, safe_pdf(note), 0, 0, 'C')
+        pdf = LetterPDF()
+        pdf.add_page()
+        pdf.watermark()
+        pdf.set_font("Arial", size=12)
+        import re
+        pdf.multi_cell(0, 8, safe_pdf(re.sub(r"<br\s*/?>", "\n", email_body)))
+        pdf.ln(6)
 
-    pdf = LetterPDF()
-    pdf.set_left_margin(20)
-    pdf.set_right_margin(20)
-    pdf.set_auto_page_break(auto=True, margin=25)
-    pdf.add_page()
-    pdf.watermark()
-    pdf.set_font("Arial", size=12)
-    import re
-    text_body = safe_pdf(re.sub(r"<br\s*/?>", "\n", email_body))
-    pdf.multi_cell(0, 7, text_body, align="J")
-    pdf.ln(6)
-    if msg_type == "Letter of Enrollment":
         pdf.set_font("Arial", size=11)
         pdf.cell(0, 8, safe_pdf("Yours sincerely,"), ln=True)
         pdf.cell(0, 7, safe_pdf("Felix Asadu"), ln=True)
         pdf.cell(0, 7, safe_pdf("Director"), ln=True)
         pdf.cell(0, 7, safe_pdf(SCHOOL_NAME), ln=True)
 
-    # --- Safe PDF bytes output (universal fallback) ---
-    output_data = pdf.output(dest="S")
-    if isinstance(output_data, bytes):
-        pdf_bytes = output_data
-    elif isinstance(output_data, str):
-        pdf_bytes = output_data.encode("latin-1", "replace")
-    else:
-        # fallback via temp file
-        tmpf = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-        pdf.output(tmpf.name); tmpf.close()
-        with open(tmpf.name, "rb") as f: pdf_bytes = f.read()
-        os.remove(tmpf.name)
+        output_data = pdf.output(dest="S")
+        if isinstance(output_data, bytes):
+            pdf_bytes = output_data
+        elif isinstance(output_data, str):
+            pdf_bytes = output_data.encode("latin-1", "replace")
+        else:
+            tmpf = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+            pdf.output(tmpf.name); tmpf.close()
+            with open(tmpf.name, "rb") as f: pdf_bytes = f.read()
+            os.remove(tmpf.name)
 
     st.download_button(
         "📄 Download Letter/PDF",
         data=pdf_bytes,
         file_name=f"{student_name.replace(' ', '_')}_{msg_type.replace(' ','_')}.pdf",
-        mime="application/pdf"
+        mime="application/pdf",
     )
     st.caption("You can share this PDF on WhatsApp or by email.")
 
