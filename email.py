@@ -497,120 +497,119 @@ with tabs[0]:
     df_pending = load_pending_students()
     if df_pending.empty:
         st.info("No pending records found yet.")
-        st.stop()
+    else:
+        # Resolve flexible column names once for mapping
+        col_lookup_df = {}
+        for key in [
+            "name", "phone", "location", "level", "paid", "balance",
+            "contractstart", "contractend", "studentcode", "email",
+            "emergency_contact_phone_number", "emergency_contact",
+            "status", "enrolldate", "classname"
+        ]:
+            col_lookup_df[key] = col_lookup(df_pending, key)
 
-    # Resolve flexible column names once for mapping
-    col_lookup_df = {}
-    for key in [
-        "name", "phone", "location", "level", "paid", "balance",
-        "contractstart", "contractend", "studentcode", "email",
-        "emergency_contact_phone_number", "emergency_contact",
-        "status", "enrolldate", "classname"
-    ]:
-        col_lookup_df[key] = col_lookup(df_pending, key)
+        # ---- Search / Filter
+        search = st.text_input("🔎 Search any field (name, code, email, etc.)", "")
+        view_df = df_pending.copy()
+        if search:
+            s = search.strip().lower()
+            view_df = view_df[
+                view_df.apply(lambda r: s in str(r.to_dict()).lower(), axis=1)
+            ]
 
-    # ---- Search / Filter
-    search = st.text_input("🔎 Search any field (name, code, email, etc.)", "")
-    view_df = df_pending.copy()
-    if search:
-        s = search.strip().lower()
-        view_df = view_df[
-            view_df.apply(lambda r: s in str(r.to_dict()).lower(), axis=1)
-        ]
-
-    # ---- Choose visible columns
-    all_cols = list(view_df.columns)
-    default_show = [c for c in all_cols if c in {
-        col_lookup_df.get("name"),
-        col_lookup_df.get("phone"),
-        col_lookup_df.get("email"),
-        col_lookup_df.get("location"),
-        col_lookup_df.get("level"),
-        col_lookup_df.get("paid"),
-        col_lookup_df.get("balance"),
-        col_lookup_df.get("contractstart"),
-        col_lookup_df.get("contractend"),
-        col_lookup_df.get("studentcode"),
-    } if c]
-    selected_cols = st.multiselect(
-        "Show columns (for easy viewing):",
-        all_cols,
-        default=default_show or all_cols[:6]
-    )
-
-    # Add a selectable column
-    show_df = view_df[selected_cols].copy()
-    show_df.insert(0, "Select", True)
-
-    st.write("✅ Tick the rows you want to transfer, edit any cells if needed, then click **Transfer Selected to Main Sheet**.")
-    edited = st.data_editor(
-        show_df,
-        use_container_width=True,
-        height=420,
-        column_config={
-            "Select": st.column_config.CheckboxColumn(
-                "Select", help="Tick rows you want to transfer", default=True
-            )
-        },
-        key="pending_editor",
-    )
-
-    # ---- Transfer button
-    left, right = st.columns([1, 1])
-    with left:
-        if st.button("🚚 Transfer Selected to Main Sheet", type="primary"):
-            if edited.empty:
-                st.warning("No rows to transfer.")
-                st.stop()
-
-            # Merge edited values back to original rows by position (safe since we didn't reindex)
-            to_send = []
-            for idx, ed_row in edited.iterrows():
-                if not ed_row.get("Select", False):
-                    continue
-
-                # Construct a source dict from original df (full columns), but update visible edits
-                # Find the original row in view_df by index (retain filtered order)
-                try:
-                    src_full = view_df.iloc[idx].to_dict()
-                except Exception:
-                    # Fallback: build a sparse source from edited row only
-                    src_full = {}
-
-                # Apply edited values for the selected columns
-                for col in selected_cols:
-                    src_full[col] = ed_row.get(col, src_full.get(col, ""))
-
-                # Map to main sheet shape
-                row_out = build_main_row(src_full)
-                # Basic checks
-                if not row_out["Name"]:
-                    st.warning("Skipped a row without a Name.")
-                    continue
-                if not (row_out["Phone"] or row_out["Email"]):
-                    st.warning(f"Skipped {row_out['Name']} – needs Phone or Email.")
-                    continue
-                to_send.append(row_out)
-
-            if not to_send:
-                st.info("Nothing to send after validation.")
-                st.stop()
-
-            with st.status("Transferring rows to main sheet...", expanded=True) as status:
-                ok, msg = post_rows_to_apps_script(to_send)
-                if ok:
-                    st.success(f"✅ Transferred {len(to_send)} row(s) to the main sheet.")
-                    st.json({"sent_rows": to_send})
-                    status.update(label="Done", state="complete")
-                else:
-                    st.error(f"❌ Transfer failed: {msg}")
-
-    with right:
-        st.download_button(
-            "⬇️ Download current (filtered) CSV",
-            view_df.to_csv(index=False),
-            file_name="pending_students_filtered.csv"
+        # ---- Choose visible columns
+        all_cols = list(view_df.columns)
+        default_show = [c for c in all_cols if c in {
+            col_lookup_df.get("name"),
+            col_lookup_df.get("phone"),
+            col_lookup_df.get("email"),
+            col_lookup_df.get("location"),
+            col_lookup_df.get("level"),
+            col_lookup_df.get("paid"),
+            col_lookup_df.get("balance"),
+            col_lookup_df.get("contractstart"),
+            col_lookup_df.get("contractend"),
+            col_lookup_df.get("studentcode"),
+        } if c]
+        selected_cols = st.multiselect(
+            "Show columns (for easy viewing):",
+            all_cols,
+            default=default_show or all_cols[:6]
         )
+
+        # Add a selectable column
+        show_df = view_df[selected_cols].copy()
+        show_df.insert(0, "Select", True)
+
+        st.write("✅ Tick the rows you want to transfer, edit any cells if needed, then click **Transfer Selected to Main Sheet**.")
+        edited = st.data_editor(
+            show_df,
+            use_container_width=True,
+            height=420,
+            column_config={
+                "Select": st.column_config.CheckboxColumn(
+                    "Select", help="Tick rows you want to transfer", default=True
+                )
+            },
+            key="pending_editor",
+        )
+
+        # ---- Transfer button
+        left, right = st.columns([1, 1])
+        with left:
+            if st.button("🚚 Transfer Selected to Main Sheet", type="primary"):
+                if edited.empty:
+                    st.warning("No rows to transfer.")
+                    st.stop()
+
+                # Merge edited values back to original rows by position (safe since we didn't reindex)
+                to_send = []
+                for idx, ed_row in edited.iterrows():
+                    if not ed_row.get("Select", False):
+                        continue
+
+                    # Construct a source dict from original df (full columns), but update visible edits
+                    # Find the original row in view_df by index (retain filtered order)
+                    try:
+                        src_full = view_df.iloc[idx].to_dict()
+                    except Exception:
+                        # Fallback: build a sparse source from edited row only
+                        src_full = {}
+
+                    # Apply edited values for the selected columns
+                    for col in selected_cols:
+                        src_full[col] = ed_row.get(col, src_full.get(col, ""))
+
+                    # Map to main sheet shape
+                    row_out = build_main_row(src_full)
+                    # Basic checks
+                    if not row_out["Name"]:
+                        st.warning("Skipped a row without a Name.")
+                        continue
+                    if not (row_out["Phone"] or row_out["Email"]):
+                        st.warning(f"Skipped {row_out['Name']} – needs Phone or Email.")
+                        continue
+                    to_send.append(row_out)
+
+                if not to_send:
+                    st.info("Nothing to send after validation.")
+                    st.stop()
+
+                with st.status("Transferring rows to main sheet...", expanded=True) as status:
+                    ok, msg = post_rows_to_apps_script(to_send)
+                    if ok:
+                        st.success(f"✅ Transferred {len(to_send)} row(s) to the main sheet.")
+                        st.json({"sent_rows": to_send})
+                        status.update(label="Done", state="complete")
+                    else:
+                        st.error(f"❌ Transfer failed: {msg}")
+
+        with right:
+            st.download_button(
+                "⬇️ Download current (filtered) CSV",
+                view_df.to_csv(index=False),
+                file_name="pending_students_filtered.csv"
+            )
 
 
 # ==== TAB 1: ALL STUDENTS ====
