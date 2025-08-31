@@ -84,4 +84,9 @@ def generate_receipt_and_contract_pdf(
     pdf.cell(0, 10, safe_pdf(f"Generated on {now_str}"), align="C")
 
     # Return as bytes (for Streamlit or emailing)
-    return pdf.output(dest="S").encode('latin-1')
+    data = pdf.output(dest="S")
+    if isinstance(data, bytes):
+        return data
+    if isinstance(data, bytearray):
+        data = data.decode("latin-1")
+    return data.encode("latin-1")
