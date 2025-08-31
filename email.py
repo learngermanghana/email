@@ -844,7 +844,7 @@ with tabs[4]:
         "Course Completion Letter"
     ], key="msg_type_select")
 
-    # ---- 3. Logo/Watermark/Extra Attachment ----
+    # ---- 3. Logo/Watermark ----
     st.subheader("Upload Logo and Watermark")
     logo_file = st.file_uploader("School Logo (PNG/JPG)", type=["png", "jpg", "jpeg"], key="logo_up")
     watermark_file_path = None
@@ -861,7 +861,6 @@ with tabs[4]:
                 watermark_file_path = tmp.name
         except:
             watermark_file_path = None
-    extra_attach = st.file_uploader("Additional Attachment (optional)", type=None, key="extra_attach")
 
     # ---- 4. Compose/Preview Message ----
     st.subheader("Compose/Preview Message")
@@ -953,24 +952,16 @@ with tabs[4]:
 
     # ---- 6. Email Option ----
     st.subheader("Send Email (with or without PDF)")
-    attach_pdf     = st.checkbox("Attach the generated PDF?", key="attach_pdf")
     recipient_email = st.text_input("Recipient Email", value=student_email, key="recipient_email")
-    if st.button("Send Email Now", key="send_email"):
-        attachments = []
-        if attach_pdf:
-            attachments.append(
-                (pdf_bytes, f"{student_name.replace(' ', '_')}_{msg_type.replace(' ','_')}.pdf", "application/pdf")
-            )
-        if extra_attach:
-            fb = extra_attach.read()
-            attachments.append(
-                (fb, extra_attach.name, extra_attach.type or "application/octet-stream")
-            )
-        try:
-            send_email_report(None, recipient_email, email_subject, email_body, extra_attachments=attachments)
-            st.success(f"Email sent to {recipient_email}!")
-        except Exception as e:
-            st.error(f"Email send failed: {e}")
+
+    encoded_subject = urllib.parse.quote(email_subject)
+    encoded_body = urllib.parse.quote(email_body)
+    mailto_url = f"mailto:{recipient_email}?subject={encoded_subject}&body={encoded_body}"
+
+    st.markdown(f"[Open Email Client]({mailto_url})", unsafe_allow_html=True)
+    st.caption(
+        "Attachments can't be added automatically. Download the PDF or other files above and attach them manually."
+    )
 
 import textwrap
 
