@@ -701,11 +701,7 @@ with tabs[4]:
     # ---- 2. Message Type Selection ----
     st.subheader("Choose Message Type")
     msg_type = st.selectbox("Type", [
-        "Custom Message",
-        "Welcome Message",
-        "Assignment Results",
         "Letter of Enrollment",
-        "Outstanding Balance Notice",
         "Course Completion Letter"
     ], key="msg_type_select")
 
@@ -730,42 +726,19 @@ with tabs[4]:
 
     # ---- 4. Compose/Preview Message ----
     st.subheader("Compose/Preview Message")
-    if msg_type == "Welcome Message":
-        body_default = (
-            f"Hello {student_name},<br><br>"
-            "Welcome to Learn Language Education Academy! We have helped many students succeed, "
-            "and we’re excited to support you as well.<br><br>"
-            "Your contract starts on "
-            f"{enrollment_start.strftime('%d %B %Y')}.<br>"
-            f"Your payment status: {payment_status}. Paid: GHS {payment:.2f} / Balance: GHS {balance:.2f}<br><br>"
-            f"All materials are on our <a href='{student_link}'>Falowen App</a>.<br><br>"
-        )
-    elif msg_type == "Letter of Enrollment":
+    if msg_type == "Letter of Enrollment":
         body_default = (
             f"To Whom It May Concern,<br><br>"
             f"{student_name} is officially enrolled in {student_level} at Learn Language Education Academy.<br>"
             f"Enrollment valid from {enrollment_start:%m/%d/%Y} to {enrollment_end:%m/%d/%Y}.<br><br>"
             f"Business Reg No: {BUSINESS_REG}.<br><br>"
         )
-    elif msg_type == "Assignment Results":
-        body_default = (
-            f"Hello {student_name},<br><br>"
-            "Here are your latest assignment results:<br>"
-            "<ul><li>Assignment 1: 85 percent</li><li>Assignment 2: 90 percent</li></ul>"
-        )
-    elif msg_type == "Outstanding Balance Notice":
-        body_default = (
-            f"Dear {student_name},<br><br>"
-            f"You have an outstanding balance of GHS {balance:.2f}. Please settle promptly.<br><br>"
-        )
-    elif msg_type == "Course Completion Letter":
+    else:  # Course Completion Letter
         body_default = (
             f"Dear {student_name},<br><br>"
             f"Congratulations on completing the {student_level} course!<br><br>"
             "Best wishes,<br>Felix Asadu<br>Director"
         )
-    else:
-        body_default = ""
 
     email_subject = st.text_input("Subject", value=f"{msg_type} - {student_name}", key="email_subject")
     email_body    = st.text_area("Email Body (HTML supported)", value=body_default, key="email_body", height=220)
