@@ -1255,7 +1255,12 @@ with tabs[4]:
         pdf.add_page()
         pdf.write_html(email_body)
         output_data = pdf.output(dest="S")
-        pdf_bytes = output_data if isinstance(output_data, bytes) else output_data.encode("latin-1", "replace")
+        if isinstance(output_data, bytes):
+            pdf_bytes = output_data
+        elif isinstance(output_data, str):
+            pdf_bytes = output_data.encode("latin-1", "replace")
+        else:
+            pdf_bytes = bytes(output_data)
 
     elif msg_type == "Payment Confirmation":
         student_row_dict = {
