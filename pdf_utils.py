@@ -2,9 +2,7 @@
 
 from fpdf import FPDF
 from datetime import date, datetime, timedelta
-
-def safe_pdf(text):
-    return str(text).encode('latin-1', 'replace').decode('latin-1')
+from utils import safe_pdf
 
 def generate_receipt_and_contract_pdf(
     student_row,
