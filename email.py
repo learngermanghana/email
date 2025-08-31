@@ -588,14 +588,15 @@ with tabs[4]:
     from fpdf import FPDF
     import tempfile, os
 
-    # ---- Helper: QR Code generation ----
-    def make_qr_code(url):
-        import qrcode, tempfile
-        qr_img = qrcode.make(url)
-        qr_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-        qr_img.save(qr_tmp)
-        qr_tmp.close()
-        return qr_tmp.name
+
+    # ---- Helper: Ensure all text in PDF is latin-1 safe ----
+    def safe_pdf(text):
+        if not text:
+            return ""
+        return "".join(c if ord(c) < 256 else "?" for c in str(text))
+
+    # QR Code generation uses shared utility function make_qr_code
+
 
     # Watermark image from Google Drive (direct download)
     watermark_drive_url = "https://drive.google.com/uc?export=download&id=1dEXHtaPBmvnX941GKK-DsTmj3szz2Z5A"
