@@ -1049,49 +1049,22 @@ with tabs[5]:
 
 
 
-
-# --- 1. URLS ---
-students_csv_url = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
-ref_answers_url = "https://docs.google.com/spreadsheets/d/1CtNlidMfmE836NBh5FmEF5tls9sLmMmkkhewMTQjkBo/export?format=csv"
-
 # ==== TAB 6: REFERENCE & STUDENT WORK SHARE ====
 with tabs[6]:
     st.title("📝 Reference & Student Work Share")
 
-    # --- Load Data ---
-    @st.cache_data(show_spinner=False)
-    def load_students():
-        df = pd.read_csv(students_csv_url)
-        df.columns = [c.strip().lower().replace(" ", "").replace("_", "") for c in df.columns]
-        if "student_code" in df.columns:
-            df = df.rename(columns={"student_code": "studentcode"})
-        return df
-    df_students = load_students()
-
-    @st.cache_data(ttl=0)
-    def load_ref_answers():
-        df = pd.read_csv(ref_answers_url, dtype=str)
-        df.columns = [c.strip().lower().replace(" ", "").replace("_", "") for c in df.columns]
-        if "assignment" not in df.columns:
-            raise Exception("No 'assignment' column found in reference answers sheet.")
-        return df
+    # --- Load Data using top-level functions ---
+    df_students_marking = load_students()
     ref_df = load_ref_answers()
 
     # --- Student search and select ---
     st.subheader("1. Search & Select Student")
-    def col_lookup(df, name):
-        key = name.lower().replace(" ", "").replace("_", "")
-        for c in df.columns:
-            if c.lower().replace(" ", "").replace("_", "") == key:
-                return c
-        raise KeyError(f"Column '{name}' not found in DataFrame")
-
-    name_col, code_col = col_lookup(df_students, "name"), col_lookup(df_students, "studentcode")
+    name_col, code_col = col_lookup(df_students_marking, "name"), col_lookup(df_students_marking, "studentcode")
     search_student = st.text_input("Type student name or code...")
-    students_filtered = df_students[
-        df_students[name_col].str.contains(search_student, case=False, na=False) |
-        df_students[code_col].astype(str).str.contains(search_student, case=False, na=False)
-    ] if search_student else df_students
+    students_filtered = df_students_marking[
+        df_students_marking[name_col].str.contains(search_student, case=False, na=False) |
+        df_students_marking[code_col].astype(str).str.contains(search_student, case=False, na=False)
+    ] if search_student else df_students_marking
 
     student_list = students_filtered[name_col] + " (" + students_filtered[code_col].astype(str) + ")"
     chosen = st.selectbox("Select Student", student_list, key="tab7_single_student")
