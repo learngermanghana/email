@@ -286,6 +286,7 @@ with tabs[2]:
     code_col = col_lookup(df, "studentcode")
     name_col = col_lookup(df, "name")
     phone_col = col_lookup(df, "phone")
+    email_col = col_lookup(df, "email")
     bal_col = col_lookup(df, "balance")
 
     # --- Clean Data Types ---
@@ -339,6 +340,16 @@ with tabs[2]:
         help="You can use {name}, {level}, {due}, {bal}, {days}, {msg}"
     )
 
+    email_template = st.text_area(
+        "Custom Email Message Template",
+        value=(
+            "Hello {name},\n\n"
+            "This is a friendly reminder that your payment for the {level} class is due by {due}. {msg}\n\n"
+            "Thank you!"
+        ),
+        help="You can use {name}, {level}, {due}, {bal}, {days}, {msg}"
+    )
+
     # --- WhatsApp Links Generation ---
     links = []
     invalid_numbers = set()
@@ -375,6 +386,22 @@ with tabs[2]:
                 st.warning(f"Invalid phone number for {row[name_col]}: {raw_phone_str}")
                 invalid_numbers.add(raw_phone_str)
 
+        email_addr = row[email_col]
+        mailto = ""
+        if email_addr and pd.notna(email_addr):
+            subject = "Payment Reminder"
+            body = email_template.format(
+                name=row[name_col],
+                level=row["level"],
+                due=due,
+                bal=bal,
+                days=days,
+                msg=msg
+            )
+            mailto = (
+                f"mailto:{email_addr}?subject={urllib.parse.quote(subject)}&body={urllib.parse.quote(body)}"
+            )
+
         links.append({
             "Name": row[name_col],
             "Student Code": row[code_col],
@@ -383,12 +410,26 @@ with tabs[2]:
             "Due Date": due,
             "Days Left": days,
             "Phone": phone or "",
-            "WhatsApp Link": link
+            "WhatsApp Link": link,
+            "Email": email_addr or "",
+            "Email Link": mailto
         })
 
     df_links = pd.DataFrame(links)
     st.markdown("---")
-    st.dataframe(df_links[["Name", "Level", "Balance (GHS)", "Due Date", "Days Left", "WhatsApp Link"]], use_container_width=True)
+    st.dataframe(
+        df_links[[
+            "Name",
+            "Level",
+            "Balance (GHS)",
+            "Due Date",
+            "Days Left",
+            "WhatsApp Link",
+            "Email",
+            "Email Link",
+        ]],
+        use_container_width=True,
+    )
 
     # --- List links for quick access ---
     st.markdown("### Send WhatsApp Reminders")
@@ -396,11 +437,17 @@ with tabs[2]:
         if row["WhatsApp Link"]:
             st.markdown(f"- **{row['Name']}** ([Send WhatsApp]({row['WhatsApp Link']}))")
 
+    st.markdown("### Send Email Reminders")
+    for _, row in df_links.iterrows():
+        if row["Email Link"]:
+            st.markdown(f"- **{row['Name']}** ([Send Email]({row['Email Link']}))")
+
     st.download_button(
         "📁 Download Reminder Links CSV",
-        df_links[["Name", "Student Code", "Phone", "Level", "Balance (GHS)", "Due Date", "Days Left", "WhatsApp Link"]].to_csv(index=False),
-        file_name="debtor_whatsapp_links.csv"
+        df_links[["Name", "Student Code", "Phone", "Email", "Level", "Balance (GHS)", "Due Date", "Days Left", "WhatsApp Link", "Email Link"]].to_csv(index=False),
+        file_name="debtor_whatsapp_links.csv",
     )
+
 
 
 # ==== TAB 3: CONTRACT & RECEIPT PDF ====
