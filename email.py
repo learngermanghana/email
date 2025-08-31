@@ -845,23 +845,40 @@ with tabs[4]:
         "Course Completion Letter"
     ], key="msg_type_select")
 
-    # ---- 3. Logo/Watermark ----
+    # ---- 3. Branding Assets ----
     st.subheader("Upload Logo and Watermark")
-    logo_file = st.file_uploader("School Logo (PNG/JPG)", type=["png", "jpg", "jpeg"], key="logo_up")
+    logo_file = st.file_uploader(
+        "School Logo (PNG/JPG)", type=["png", "jpg", "jpeg"], key="logo_up"
+    )
+    signature_file = st.file_uploader(
+        "Signature Image (optional)", type=["png", "jpg", "jpeg"], key="sig_up"
+    )
+
+    # Prepare temp path for optional watermark (only used for enrollment letters)
     watermark_file_path = None
     if msg_type == "Letter of Enrollment":
         try:
             import requests
             from PIL import Image
             from io import BytesIO
+
             resp = requests.get(watermark_drive_url)
             if resp.status_code == 200:
                 img = Image.open(BytesIO(resp.content))
                 tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
                 img.save(tmp.name)
                 watermark_file_path = tmp.name
-        except:
+        except Exception:
             watermark_file_path = None
+
+    # Prepare temp path for optional signature image
+    signature_file_path = None
+    if signature_file:
+        ext = signature_file.name.split(".")[-1]
+        tmp_sig = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
+        tmp_sig.write(signature_file.read())
+        tmp_sig.close()
+        signature_file_path = tmp_sig.name
 
     # ---- 4. Compose/Preview Message ----
     st.subheader("Compose/Preview Message")
@@ -895,7 +912,8 @@ with tabs[4]:
             if logo_file:
                 ext = logo_file.name.split('.')[-1]
                 tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
-                tmp.write(logo_file.read()); tmp.close()
+                tmp.write(logo_file.read())
+                tmp.close()
                 self.image(tmp.name, x=10, y=8, w=28)
             self.set_font('Arial', 'B', 16)
             self.cell(0, 9, safe_pdf(SCHOOL_NAME), ln=True, align='C')
@@ -903,25 +921,43 @@ with tabs[4]:
             self.cell(0, 7, safe_pdf(f"{SCHOOL_WEBSITE} | {SCHOOL_PHONE} | {SCHOOL_ADDRESS}"), ln=True, align='C')
             self.set_font('Arial', 'I', 10)
             self.cell(0, 7, safe_pdf(f"Business Reg No: {BUSINESS_REG}"), ln=True, align='C')
-            self.ln(3)
-            self.set_draw_color(200,200,200); self.set_line_width(0.5)
-            self.line(10, self.get_y(), 200, self.get_y()); self.ln(6)
+            self.ln(2)
+            # Title of the letter
+            self.set_font('Arial', 'B', 14)
+            self.cell(0, 10, safe_pdf(msg_type), ln=True, align='C')
+            self.ln(1)
+            # Horizontal rule
+            self.set_draw_color(200, 200, 200)
+            self.set_line_width(0.5)
+            self.line(self.l_margin, self.get_y(), self.w - self.r_margin, self.get_y())
+            self.ln(6)
+
         def watermark(self):
             if watermark_file_path:
                 self.image(watermark_file_path, x=38, y=60, w=130)
+
         def footer(self):
+            # Optional signature near closing section
+            if signature_file_path:
+                self.set_y(-60)
+                self.image(signature_file_path, x=self.l_margin, w=40)
             qr = make_qr_code(SCHOOL_WEBSITE)
-            self.image(qr, x=180, y=275, w=18)
+            self.image(qr, x=self.w - self.r_margin - 20, y=self.h - 22, w=18)
             self.set_y(-18)
             self.set_font('Arial', 'I', 8)
-            self.cell(0, 10, safe_pdf("Generated without signature."), 0, 0, 'C')
+            note = "Digitally signed." if signature_file_path else "Generated without signature."
+            self.cell(0, 10, safe_pdf(note), 0, 0, 'C')
 
     pdf = LetterPDF()
+    pdf.set_left_margin(20)
+    pdf.set_right_margin(20)
+    pdf.set_auto_page_break(auto=True, margin=25)
     pdf.add_page()
     pdf.watermark()
     pdf.set_font("Arial", size=12)
     import re
-    pdf.multi_cell(0, 8, safe_pdf(re.sub(r"<br\s*/?>", "\n", email_body)))
+    text_body = safe_pdf(re.sub(r"<br\s*/?>", "\n", email_body))
+    pdf.multi_cell(0, 7, text_body, align="J")
     pdf.ln(6)
     if msg_type == "Letter of Enrollment":
         pdf.set_font("Arial", size=11)
