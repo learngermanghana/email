@@ -32,14 +32,6 @@ REF_ANSWERS_SHEET_ID = "1CtNlidMfmE836NBh5FmEF5tls9sLmMmkkhewMTQjkBo"
 STUDENTS_CSV_URL = f"https://docs.google.com/spreadsheets/d/{STUDENTS_SHEET_ID}/export?format=csv"
 REF_ANSWERS_CSV_URL = f"https://docs.google.com/spreadsheets/d/{REF_ANSWERS_SHEET_ID}/export?format=csv"
 
-# ==== STREAMLIT SECRETS ====
-SENDER_EMAIL = st.secrets["general"].get("sender_email", "Learngermanghana@gmail.com")
-SMTP_HOST = st.secrets.get("smtp", {}).get("host", "")
-SMTP_PORT = int(st.secrets.get("smtp", {}).get("port", 587))
-SMTP_USERNAME = st.secrets.get("smtp", {}).get("username", "")
-SMTP_PASSWORD = st.secrets.get("smtp", {}).get("password", "")
-SMTP_USE_TLS = st.secrets.get("smtp", {}).get("use_tls", True)
-
 # ==== UNIVERSAL HELPERS ====
 
 def col_lookup(df: pd.DataFrame, name: str) -> str:
