@@ -829,8 +829,10 @@ with tabs[4]:
         )
     else:  # Course Completion Letter
         body_default = (
-            f"Dear {student_name},<br><br>"
-            f"Congratulations on completing the {student_level} course!<br><br>"
+            f"Congratulations on finishing your {student_level} course, {student_name}! "
+            "You worked hard and made great progress.<br><br>"
+            "Please think about whether you want to prepare for the exam or move on to the next level. "
+            "I wish you continued success as you make your next decision!<br><br>"
             "Best wishes,<br>Felix Asadu<br>Director"
         )
 
