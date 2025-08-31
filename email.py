@@ -334,190 +334,215 @@ tabs = st.tabs(tab_titles)
 
 # ==== TAB 0: PENDING STUDENTS ====
 with tabs[0]:
-    import os, re, urllib.parse, requests
+    import os
     import pandas as pd
     import streamlit as st
-    from datetime import datetime
+    import requests
+    from datetime import date, timedelta
 
-    st.title("🕒 Pending Students")
-
-    # ---------------- CONFIG ----------------
+    # ---------- CONFIG ----------
+    # Pending Google Sheet (Form responses)
     PENDING_SHEET_ID = "1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo"
-    PENDING_CSV_URL  = f"https://docs.google.com/spreadsheets/d/{PENDING_SHEET_ID}/export?format=csv"
+    PENDING_CSV_URL = f"https://docs.google.com/spreadsheets/d/{PENDING_SHEET_ID}/export?format=csv"
 
-    MAIN_SHEET_ID    = "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U"  # destination "Main Students" sheet
-
-    # Apps Script Web App endpoint (preferred path to write without service account creds)
+    # Apps Script Web App endpoint (set one of these)
     APPS_SCRIPT_WEBAPP_URL = (
-        st.secrets.get("gscripts", {}).get("webapp_url", "")
-        or os.environ.get("APPS_SCRIPT_WEBAPP_URL", "")
+        st.secrets.get("apps_script", {}).get("pending_to_main_webapp_url")
+        or os.getenv("PENDING_TO_MAIN_WEBAPP_URL")
+        or ""  # <- put a literal URL here if you prefer
     )
 
-    # Columns we want in the Main sheet (the final schema)
-    TARGET_HEADERS = [
-        "Name", "Phone", "Location", "Level",
-        "Paid", "Balance",
-        "ContractStart", "ContractEnd",
-        "StudentCode", "Email",
-        "Emergency Contact (Phone Number)",
-        "Status", "EnrollDate", "ClassName",
+    # Main sheet columns (final target). We will OMIT the 4 you asked to remove.
+    TARGET_COLUMNS = [
+        "Name", "Phone", "Location", "Level", "Paid", "Balance",
+        "ContractStart", "ContractEnd", "StudentCode", "Email",
+        "Emergency Contact (Phone Number)", "Status", "EnrollDate",
+        "ClassName",
+        # Omitted on purpose:
+        # "Filter Rows to Merge", "Daily_Limit", "Uses_Today", "Last_Date"
     ]
 
-    # Candidate headers to *map from* in the Pending sheet (case/space/underscore-insensitive)
-    SOURCE_CANDIDATES = {
-        "Name": ["name", "studentname", "full name"],
-        "Phone": ["phone", "phonenumber", "contact", "whatsapp"],
-        "Location": ["location", "city", "town", "address"],
-        "Level": ["level", "class", "courselevel"],
-        "Paid": ["paid", "amountpaid", "deposit"],
-        "Balance": ["balance", "outstanding", "amountbalance", "amountdue"],
-        "ContractStart": ["contractstart", "start", "startdate", "enrolldate", "enrollmentdate"],
-        "ContractEnd": ["contractend", "end", "enddate", "end_date"],
-        "StudentCode": ["studentcode", "code", "id", "student_id"],
-        "Email": ["email", "emailaddress"],
-        "Emergency Contact (Phone Number)": ["emergency contact (phone number)", "emergencycontact", "emergency_phone", "guardianphone", "parentphone"],
-        "Status": ["status", "state"],
-        "EnrollDate": ["enrolldate", "enrollmentdate", "date"],
-        "ClassName": ["classname", "class", "class_name"],
-    }
-
-    # ---------------- HELPERS ----------------
-    def _norm_key(s: str) -> str:
-        return re.sub(r"[\s_]+", "", str(s or "")).strip().lower()
-
+    # ---------- HELPERS ----------
     def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
-        df.columns = [re.sub(r"\s+", "_", c.strip().lower()) for c in df.columns]
+        df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
         return df
 
-    @st.cache_data(ttl=0)
-    def load_pending_students():
-        df = pd.read_csv(PENDING_CSV_URL, dtype=str)
-        return normalize_columns(df)
-
-    def find_source_column(df_cols, candidates):
-        """Pick the first present column matching any candidate."""
-        norm_cols = { _norm_key(c): c for c in df_cols }
-        for cand in candidates:
-            k = _norm_key(cand)
-            if k in norm_cols:
-                return norm_cols[k]
-        # partial/startswith fallback
-        for c in df_cols:
-            if any(_norm_key(c).startswith(_norm_key(x)) for x in candidates):
+    def col_lookup(df: pd.DataFrame, name: str) -> str:
+        """Case/space/underscore insensitive column resolver."""
+        key = name.lower().replace(" ", "").replace("_", "")
+        for c in df.columns:
+            if c.lower().replace(" ", "").replace("_", "") == key:
                 return c
         return None
 
     def clean_phone_gh(phone):
-        """Normalize Ghana numbers to 233XXXXXXXXX (best-effort, non-fatal)."""
-        if phone is None: return ""
-        digits = re.sub(r"\D", "", str(phone))
-        if len(digits) == 9 and digits[:1] in {"2", "5", "9"}:
+        """Return Ghana phone as 233XXXXXXXXX or '' if invalid."""
+        import re
+        digits = re.sub(r"\D", "", str(phone or ""))
+        # Allow 9-digit numbers (prefix with 0)
+        if len(digits) == 9 and digits[0] in {"2", "5", "9"}:
             digits = "0" + digits
         if digits.startswith("0") and len(digits) == 10:
             return "233" + digits[1:]
         if digits.startswith("233") and len(digits) == 12:
             return digits
-        return digits or ""
+        return ""
 
-    def parse_date_str(s):
-        """Try a few common date formats; return YYYY-MM-DD string if possible."""
-        if not s or str(s).strip().lower() in ("nan", "none", ""):
-            return ""
-        for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%d.%m.%y", "%d/%m/%Y", "%d-%m-%Y"):
-            try:
-                return datetime.strptime(str(s).strip(), fmt).date().isoformat()
-            except ValueError:
-                continue
-        # If it's already ISO-like or Google Sheets datetime text, just return the raw string
-        return str(s).strip()
+    @st.cache_data(ttl=0, show_spinner="Loading pending students...")
+    def load_pending_students():
+        df = pd.read_csv(PENDING_CSV_URL, dtype=str)
+        df = normalize_columns(df)
+        return df
 
-    def map_pending_row_to_main(row: pd.Series, df_columns) -> dict:
-        """Build a dict with TARGET_HEADERS from a pending row, using SOURCE_CANDIDATES."""
-        out = {h: "" for h in TARGET_HEADERS}
-        # lookup each target
-        for target, candidates in SOURCE_CANDIDATES.items():
-            src_col = find_source_column(df_columns, candidates)
-            if src_col:
-                out[target] = (row.get(src_col, "") if isinstance(row, pd.Series) else "")
-        # transforms / sane defaults
-        out["Phone"]  = clean_phone_gh(out.get("Phone", ""))
-        emerg = out.get("Emergency Contact (Phone Number)", "")
-        out["Emergency Contact (Phone Number)"] = clean_phone_gh(emerg)
+    def parse_date_flex(s):
+        """Try a few common date formats; return ISO yyyy-mm-dd or ''."""
+        import pandas as _pd
+        d = _pd.to_datetime(s, errors="coerce")
+        return (d.date().isoformat() if pd.notna(d) else "")
 
-        # Dates
-        out["ContractStart"] = parse_date_str(out.get("ContractStart", ""))
-        out["ContractEnd"]   = parse_date_str(out.get("ContractEnd", ""))
-        out["EnrollDate"]    = parse_date_str(out.get("EnrollDate", "")) or datetime.now().date().isoformat()
+    def build_main_row(src_row: dict) -> dict:
+        """
+        Map a single pending row -> main sheet shape.
+        Omits: Filter Rows to Merge, Daily_Limit, Uses_Today, Last_Date.
+        """
+        name = src_row.get(col_lookup_df.get("name", ""), "").strip()
+        phone_raw = src_row.get(col_lookup_df.get("phone", ""), "")
+        phone = clean_phone_gh(phone_raw)
+        location = src_row.get(col_lookup_df.get("location", ""), "").strip()
+        level = (src_row.get(col_lookup_df.get("level", ""), "") or "").upper().strip()
 
-        # Level to uppercase
-        out["Level"] = str(out.get("Level", "")).upper().strip()
-
-        # Status default
-        if not out.get("Status"):
-            out["Status"] = "Active"
-
-        # ClassName default to Level if empty
-        if not out.get("ClassName"):
-            out["ClassName"] = out.get("Level", "")
-
-        # Numeric cleanup for Paid/Balance
-        def _to_num(s):
-            try:
-                return float(str(s).replace(",", "").strip())
-            except Exception:
-                return 0.0
-        out["Paid"]    = _to_num(out.get("Paid", 0))
-        out["Balance"] = _to_num(out.get("Balance", 0))
-        return out
-
-    def post_to_apps_script(rows_for_main: list) -> dict:
-        """Send selected rows to Apps Script Web App."""
-        payload = {
-            "action": "upsertRows",
-            "targetSheetId": MAIN_SHEET_ID,
-            "rows": rows_for_main,  # list of dicts with TARGET_HEADERS keys
-        }
-        resp = requests.post(APPS_SCRIPT_WEBAPP_URL, json=payload, timeout=30)
-        resp.raise_for_status()
+        paid = src_row.get(col_lookup_df.get("paid", ""), "")
+        bal = src_row.get(col_lookup_df.get("balance", ""), "")
         try:
-            return resp.json()
+            paid = float(str(paid).replace(",", "")) if str(paid).strip() else 0.0
         except Exception:
-            return {"ok": True, "raw": resp.text}
+            paid = 0.0
+        try:
+            bal = float(str(bal).replace(",", "")) if str(bal).strip() else 0.0
+        except Exception:
+            bal = 0.0
 
-    # ---------------- UI: LOAD + SEARCH ----------------
+        cs = src_row.get(col_lookup_df.get("contractstart", ""), "")
+        ce = src_row.get(col_lookup_df.get("contractend", ""), "")
+        cs_iso = parse_date_flex(cs)
+        ce_iso = parse_date_flex(ce)
+
+        # If no end date, default +30 days from start if start exists
+        if not ce_iso and cs_iso:
+            try:
+                from datetime import date, timedelta
+                parts = [int(x) for x in cs_iso.split("-")]
+                d0 = date(parts[0], parts[1], parts[2])
+                ce_iso = (d0 + timedelta(days=30)).isoformat()
+            except Exception:
+                ce_iso = ""
+
+        email = src_row.get(col_lookup_df.get("email", ""), "").strip()
+        student_code = src_row.get(col_lookup_df.get("studentcode", ""), "").strip()
+
+        # Emergency contact: try a few candidates from the pending sheet
+        ec_key = (
+            col_lookup_df.get("emergency_contact_phone_number")
+            or col_lookup_df.get("emergency_contact")
+            or col_lookup_df.get("emergency")
+            or ""
+        )
+        emergency_phone = clean_phone_gh(src_row.get(ec_key, "")) if ec_key else ""
+
+        # Status & dates
+        status = (src_row.get(col_lookup_df.get("status", ""), "") or "Active").strip()
+        enroll_date = parse_date_flex(
+            src_row.get(col_lookup_df.get("enrolldate", ""), "")
+            or src_row.get(col_lookup_df.get("enrolldate", ""), "")
+        )
+        if not enroll_date:
+            enroll_date = date.today().isoformat()
+
+        # ClassName fallback
+        class_name = (src_row.get(col_lookup_df.get("classname", ""), "") or level).strip()
+
+        row = {
+            "Name": name,
+            "Phone": phone,
+            "Location": location,
+            "Level": level,
+            "Paid": paid,
+            "Balance": bal,
+            "ContractStart": cs_iso,
+            "ContractEnd": ce_iso,
+            "StudentCode": student_code,
+            "Email": email,
+            "Emergency Contact (Phone Number)": emergency_phone,
+            "Status": status,
+            "EnrollDate": enroll_date,
+            "ClassName": class_name,
+        }
+        # Keep only TARGET_COLUMNS order
+        return {k: row.get(k, "") for k in TARGET_COLUMNS}
+
+    def post_rows_to_apps_script(rows: list) -> tuple[bool, str]:
+        if not APPS_SCRIPT_WEBAPP_URL:
+            return False, "Apps Script Web App URL is not configured."
+        try:
+            resp = requests.post(APPS_SCRIPT_WEBAPP_URL, json={"rows": rows}, timeout=20)
+            if resp.status_code == 200:
+                return True, "OK"
+            return False, f"HTTP {resp.status_code}: {resp.text[:300]}"
+        except Exception as e:
+            return False, f"Request failed: {e}"
+
+    # ---------- UI ----------
+    st.title("🕒 Pending Students")
+
     df_pending = load_pending_students()
-    raw_cols = list(df_pending.columns)
+    if df_pending.empty:
+        st.info("No pending records found yet.")
+        st.stop()
 
-    st.caption(f"Loaded **{len(df_pending)}** pending record(s).")
+    # Resolve flexible column names once for mapping
+    col_lookup_df = {}
+    for key in [
+        "name", "phone", "location", "level", "paid", "balance",
+        "contractstart", "contractend", "studentcode", "email",
+        "emergency_contact_phone_number", "emergency_contact",
+        "status", "enrolldate", "classname"
+    ]:
+        col_lookup_df[key] = col_lookup(df_pending, key)
 
-    # universal search
-    search = st.text_input("🔎 Search any field (name, phone, code, email, etc.)")
+    # ---- Search / Filter
+    search = st.text_input("🔎 Search any field (name, code, email, etc.)", "")
+    view_df = df_pending.copy()
     if search:
-        q = search.strip().lower()
-        mask = df_pending.apply(lambda r: q in " ".join(map(str, r.values)).lower(), axis=1)
-        view = df_pending[mask].copy()
-    else:
-        view = df_pending.copy()
+        s = search.strip().lower()
+        view_df = view_df[
+            view_df.apply(lambda r: s in str(r.to_dict()).lower(), axis=1)
+        ]
 
-    # Column picker
-    all_cols = list(view.columns)
-    default_cols = [c for c in all_cols if _norm_key(c) in {
-        "name", "phone", "email", "location", "level", "paid", "balance",
-        "contractstart", "contractend", "studentcode", "status"
-    }]
-    if not default_cols:
-        default_cols = all_cols[:6]
-
+    # ---- Choose visible columns
+    all_cols = list(view_df.columns)
+    default_show = [c for c in all_cols if c in {
+        col_lookup_df.get("name"),
+        col_lookup_df.get("phone"),
+        col_lookup_df.get("email"),
+        col_lookup_df.get("location"),
+        col_lookup_df.get("level"),
+        col_lookup_df.get("paid"),
+        col_lookup_df.get("balance"),
+        col_lookup_df.get("contractstart"),
+        col_lookup_df.get("contractend"),
+        col_lookup_df.get("studentcode"),
+    } if c]
     selected_cols = st.multiselect(
         "Show columns (for easy viewing):",
-        options=all_cols,
-        default=default_cols,
+        all_cols,
+        default=default_show or all_cols[:6]
     )
 
-    # Add selection column for bulk actions
-    show_df = view[selected_cols].copy()
+    # Add a selectable column
+    show_df = view_df[selected_cols].copy()
     show_df.insert(0, "Select", True)
 
+    st.write("✅ Tick the rows you want to transfer, edit any cells if needed, then click **Transfer Selected to Main Sheet**.")
     edited = st.data_editor(
         show_df,
         use_container_width=True,
@@ -527,87 +552,65 @@ with tabs[0]:
                 "Select", help="Tick rows you want to transfer", default=True
             )
         },
-        disabled=None,
         key="pending_editor",
     )
 
-    # Determine which original rows are selected
-    # Map edited view rows back to original df_pending indices
-    sel_mask = edited["Select"] == True
-    edited_noselect = edited.drop(columns=["Select"])
-    # Rejoin on all selected columns to find indices (robust across filters)
-    # Add a temp key to avoid duplicate matches
-    tmp_left = edited_noselect.copy()
-    tmp_left["_row_id"] = range(len(tmp_left))
-    tmp_right = view[selected_cols].copy()
-    tmp_right["_orig_idx"] = view[selected_cols].index
-    merged = tmp_left.merge(tmp_right, how="left", on=selected_cols, suffixes=("", "_orig"))
-    # Pick selected rows
-    selected_view_rows = merged[sel_mask.values]
+    # ---- Transfer button
+    left, right = st.columns([1, 1])
+    with left:
+        if st.button("🚚 Transfer Selected to Main Sheet", type="primary"):
+            if edited.empty:
+                st.warning("No rows to transfer.")
+                st.stop()
 
-    st.markdown("---")
+            # Merge edited values back to original rows by position (safe since we didn't reindex)
+            to_send = []
+            for idx, ed_row in edited.iterrows():
+                if not ed_row.get("Select", False):
+                    continue
 
-    # ---------------- ACTIONS ----------------
-    c1, c2, c3 = st.columns([1.3, 1, 1])
-    with c1:
-        st.download_button(
-            "⬇️ Download current view (CSV)",
-            data=view.to_csv(index=False),
-            file_name="pending_students_view.csv",
-        )
-    with c2:
-        # Download only selected (mapped) as CSV (for manual import if needed)
-        if st.button("Generate selected CSV"):
-            # Build mapped rows
-            rows_for_main = []
-            for _, mrow in selected_view_rows.iterrows():
-                orig_idx = int(mrow["_orig_idx"])
-                prow = df_pending.iloc[orig_idx]
-                rows_for_main.append(map_pending_row_to_main(prow, raw_cols))
-            sel_df = pd.DataFrame(rows_for_main, columns=TARGET_HEADERS)
-            st.session_state["_sel_csv"] = sel_df.to_csv(index=False)
-            st.success(f"Prepared {len(rows_for_main)} row(s). Use the download on the right →")
-    with c3:
-        st.download_button(
-            "📁 Download selected (Main schema)",
-            data=st.session_state.get("_sel_csv", ""),
-            file_name="pending_selected_mainschema.csv",
-            disabled=("_sel_csv" not in st.session_state),
-        )
+                # Construct a source dict from original df (full columns), but update visible edits
+                # Find the original row in view_df by index (retain filtered order)
+                try:
+                    src_full = view_df.iloc[idx].to_dict()
+                except Exception:
+                    # Fallback: build a sparse source from edited row only
+                    src_full = {}
 
-    st.markdown("---")
+                # Apply edited values for the selected columns
+                for col in selected_cols:
+                    src_full[col] = ed_row.get(col, src_full.get(col, ""))
 
-    # Transfer via Apps Script Web App
-    if not APPS_SCRIPT_WEBAPP_URL:
-        st.info(
-            "⚙️ To enable one-click transfer, set **st.secrets['gscripts']['webapp_url']** "
-            "to your deployed Apps Script Web App URL."
-        )
+                # Map to main sheet shape
+                row_out = build_main_row(src_full)
+                # Basic checks
+                if not row_out["Name"]:
+                    st.warning("Skipped a row without a Name.")
+                    continue
+                if not (row_out["Phone"] or row_out["Email"]):
+                    st.warning(f"Skipped {row_out['Name']} – needs Phone or Email.")
+                    continue
+                to_send.append(row_out)
 
-    transfer_btn = st.button("🚚 Transfer selected to Main (Apps Script)", disabled=not bool(APPS_SCRIPT_WEBAPP_URL))
+            if not to_send:
+                st.info("Nothing to send after validation.")
+                st.stop()
 
-    if transfer_btn:
-        with st.spinner("Transferring selected rows to Main…"):
-            try:
-                rows_for_main = []
-                for _, mrow in selected_view_rows.iterrows():
-                    orig_idx = int(mrow["_orig_idx"])
-                    prow = df_pending.iloc[orig_idx]
-                    rows_for_main.append(map_pending_row_to_main(prow, raw_cols))
-
-                if not rows_for_main:
-                    st.warning("No rows selected.")
+            with st.status("Transferring rows to main sheet...", expanded=True) as status:
+                ok, msg = post_rows_to_apps_script(to_send)
+                if ok:
+                    st.success(f"✅ Transferred {len(to_send)} row(s) to the main sheet.")
+                    st.json({"sent_rows": to_send})
+                    status.update(label="Done", state="complete")
                 else:
-                    result = post_to_apps_script(rows_for_main)
-                    st.success("✅ Transfer complete.")
-                    st.json(result)
-                    st.caption("If your Apps Script marks moved rows or clears them from the Pending sheet, refresh this page.")
-            except Exception as e:
-                st.error(f"Transfer failed: {e}")
+                    st.error(f"❌ Transfer failed: {msg}")
 
-    st.markdown("---")
-    st.caption("Tip: Use the column picker to include fields you need to verify before transfer. The transfer will map into the Main sheet schema automatically.")
-# ==== END TAB 0 ====
+    with right:
+        st.download_button(
+            "⬇️ Download current (filtered) CSV",
+            view_df.to_csv(index=False),
+            file_name="pending_students_filtered.csv"
+        )
 
 
 # ==== TAB 1: ALL STUDENTS ====
