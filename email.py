@@ -460,6 +460,8 @@ with tabs[3]:
     course_length        = (contract_end_input - contract_start_input).days
 
     logo_url = "https://drive.google.com/uc?export=download&id=1xLTtiCbEeHJjrASvFjBgfFuGrgVzg6wU"
+    local_logo_path = os.path.join(os.path.dirname(__file__), "logo.png")
+    cached_logo_path = "/tmp/school_logo.png"
 
     def sanitize_text(text):
         cleaned = "".join(c if ord(c) < 256 else "?" for c in str(text))
@@ -489,19 +491,34 @@ with tabs[3]:
         pdf = FPDF()
         pdf.add_page()
 
+        logo_path = None
         try:
-            response = requests.get(logo_url)
-            if response.status_code == 200:
-                img = Image.open(BytesIO(response.content)).convert("RGB")
-                img_path = "/tmp/school_logo.png"
-                img.save(img_path)
-                pdf.image(img_path, x=10, y=8, w=33)
-                pdf.ln(25)
+            img = Image.open(local_logo_path).convert("RGB")
+            img.save(cached_logo_path)
+            logo_path = cached_logo_path
+        except Exception:
+            if os.path.exists(cached_logo_path):
+                logo_path = cached_logo_path
             else:
-                st.warning("Could not download logo image from the URL.")
+                try:
+                    response = requests.get(logo_url)
+                    if response.status_code == 200:
+                        img = Image.open(BytesIO(response.content)).convert("RGB")
+                        img.save(cached_logo_path)
+                        logo_path = cached_logo_path
+                    else:
+                        st.warning("Could not download logo image from the URL.")
+                except Exception as e:
+                    st.warning(f"Logo insertion failed: {e}")
+
+        if logo_path:
+            try:
+                pdf.image(logo_path, x=10, y=8, w=33)
+                pdf.ln(25)
+            except Exception as e:
+                st.warning(f"Logo insertion failed: {e}")
                 pdf.ln(2)
-        except Exception as e:
-            st.warning(f"Logo insertion failed: {e}")
+        else:
             pdf.ln(2)
 
         status = "FULLY PAID" if balance == 0 else "INSTALLMENT PLAN"
