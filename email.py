@@ -14,6 +14,7 @@ from fpdf import FPDF
 import qrcode
 from PIL import Image  # For logo image handling
 from io import BytesIO
+from utils import safe_pdf
 
 # ==== CONSTANTS ====
 SCHOOL_NAME = "Learn Language Education Academy"
@@ -40,10 +41,6 @@ SMTP_PASSWORD = st.secrets.get("smtp", {}).get("password", "")
 SMTP_USE_TLS = st.secrets.get("smtp", {}).get("use_tls", True)
 
 # ==== UNIVERSAL HELPERS ====
-
-def safe_pdf(text):
-    """Ensure all strings are PDF-safe (latin-1 only)."""
-    return "".join(c if ord(c) < 256 else "?" for c in str(text or ""))
 
 def col_lookup(df: pd.DataFrame, name: str) -> str:
     """Find the actual column name for a logical key, case/space/underscore-insensitive."""
@@ -591,12 +588,6 @@ with tabs[4]:
     from fpdf import FPDF
     import tempfile, os
 
-    # ---- Helper: Ensure all text in PDF is latin-1 safe ----
-    def safe_pdf(text):
-        if not text:
-            return ""
-        return "".join(c if ord(c) < 256 else "?" for c in str(text))
-
     # ---- Helper: QR Code generation ----
     def make_qr_code(url):
         import qrcode, tempfile
@@ -806,10 +797,6 @@ with tabs[4]:
 import textwrap
 
 # ====== HELPERS ======
-def safe_pdf(text):
-    """Ensure all strings are PDF-safe (latin-1 only)."""
-    return "".join(c if ord(c) < 256 else "?" for c in str(text or ""))
-
 def wrap_lines(text, width=80):
     """Wrap text to avoid FPDF width errors."""
     lines = []
