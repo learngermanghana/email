@@ -61,15 +61,23 @@ def make_qr_code(url):
     return tmp.name
 
 def clean_phone(phone):
-    """Clean and format Ghana phone numbers for WhatsApp (233XXXXXXXXX)."""
-    phone = str(phone).replace(" ", "").replace("-", "")
-    if phone.startswith("+233"):
-        return phone[1:]
-    if phone.startswith("233"):
-        return phone
-    if phone.startswith("0") and len(phone) == 10:
-        return "233" + phone[1:]
-    return phone  # fallback
+    """Normalize Ghana phone numbers to the `233XXXXXXXXX` format.
+
+    Acceptable inputs:
+      - ``0XXXXXXXXX``
+      - ``233XXXXXXXXX``
+      - ``+233XXXXXXXXX``
+
+    Any other value returns ``None``.
+    """
+    # Remove all non-digit characters (spaces, dashes, plus signs, etc.)
+    digits = re.sub(r"\D", "", str(phone))
+
+    if digits.startswith("0") and len(digits) == 10:
+        return "233" + digits[1:]
+    if digits.startswith("233") and len(digits) == 12:
+        return digits
+    return None
 
 def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     """Standardize all DataFrame columns to snake_case (lower, underscores)."""
@@ -345,8 +353,11 @@ with tabs[2]:
 
     # --- WhatsApp Links Generation ---
     links = []
+    invalid_numbers = set()
     for _, row in filt.iterrows():
-        phone = clean_phone(row[phone_col])
+        raw_phone = row[phone_col]
+        raw_phone_str = str(raw_phone)
+        phone = clean_phone(raw_phone)
         bal = f"GHS {row[bal_col]:,.2f}"
         due = row["due_date_str"]
         days = int(row["days_left"])
@@ -362,7 +373,18 @@ with tabs[2]:
             days=days,
             msg=msg
         )
-        link = f"https://wa.me/{phone}?text={urllib.parse.quote(text)}" if phone else ""
+
+        if pd.isna(raw_phone) or raw_phone_str.strip() == "":
+            # No phone provided – build generic link
+            link = f"https://wa.me/?text={urllib.parse.quote(text)}"
+        elif phone:
+            link = f"https://wa.me/{phone}?text={urllib.parse.quote(text)}"
+        else:
+            link = ""
+            if raw_phone_str not in invalid_numbers:
+                st.warning(f"Invalid phone number for {row[name_col]}: {raw_phone_str}")
+                invalid_numbers.add(raw_phone_str)
+
         links.append({
             "Name": row[name_col],
             "Student Code": row[code_col],
@@ -370,7 +392,7 @@ with tabs[2]:
             "Balance (GHS)": bal,
             "Due Date": due,
             "Days Left": days,
-            "Phone": phone,
+            "Phone": phone or "",
             "WhatsApp Link": link
         })
 
