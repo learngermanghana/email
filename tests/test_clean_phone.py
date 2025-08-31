@@ -4,13 +4,13 @@ import re
 
 
 def get_clean_phone():
-    source = (pathlib.Path(__file__).resolve().parents[1] / "email.py").read_text()
+    source = (pathlib.Path(__file__).resolve().parents[1] / "app.py").read_text()
     module_ast = ast.parse(source)
     func_node = next(
         node for node in module_ast.body if isinstance(node, ast.FunctionDef) and node.name == "clean_phone"
     )
     module = ast.Module(body=[func_node], type_ignores=[])
-    code = compile(module, filename="email.py", mode="exec")
+    code = compile(module, filename="app.py", mode="exec")
     ns = {"re": re}
     exec(code, ns)
     return ns["clean_phone"]
