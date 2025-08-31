@@ -36,8 +36,8 @@ def generate_receipt_and_contract_pdf(
         .replace("[DATE]", str(payment_date)) \
         .replace("[CLASS]", str(student_row.get("Level", ""))) \
         .replace("[AMOUNT]", str(payment_amount)) \
-        .replace("[FIRST_INSTALMENT]", str(first_instalment)) \
-        .replace("[SECOND_INSTALMENT]", str(balance)) \
+        .replace("[FIRST_INSTALLMENT]", str(first_instalment)) \
+        .replace("[SECOND_INSTALLMENT]", str(balance)) \
         .replace("[SECOND_DUE_DATE]", str(second_due_date)) \
         .replace("[COURSE_LENGTH]", str(course_length))
 
