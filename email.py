@@ -26,11 +26,9 @@ TUTOR_TITLE = "Director"
 
 # --- Sheet IDs & URLs ---
 STUDENTS_SHEET_ID = "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U"
-EXPENSES_SHEET_ID = "1I5mGFcWbWdK6YQrJtabTg_g-XBEVaIRK1aMFm72vDEM"
 REF_ANSWERS_SHEET_ID = "1CtNlidMfmE836NBh5FmEF5tls9sLmMmkkhewMTQjkBo"
 
 STUDENTS_CSV_URL = f"https://docs.google.com/spreadsheets/d/{STUDENTS_SHEET_ID}/export?format=csv"
-EXPENSES_CSV_URL = f"https://docs.google.com/spreadsheets/d/{EXPENSES_SHEET_ID}/export?format=csv"
 REF_ANSWERS_CSV_URL = f"https://docs.google.com/spreadsheets/d/{REF_ANSWERS_SHEET_ID}/export?format=csv"
 
 # ==== STREAMLIT SECRETS ====
@@ -169,16 +167,6 @@ def load_students():
         df = df.rename(columns={"student_code": "studentcode"})
     return df
 
-@st.cache_data(ttl=300, show_spinner="Loading expenses...")
-def load_expenses():
-    try:
-        df = pd.read_csv(EXPENSES_CSV_URL, dtype=str)
-        df = normalize_columns(df)
-    except Exception as e:
-        st.error(f"Could not load expenses: {e}")
-        df = pd.DataFrame(columns=["type", "item", "amount", "date"])
-    return df
-
 @st.cache_data(ttl=300, show_spinner="Loading reference answers...")
 def load_ref_answers():
     df = pd.read_csv(REF_ANSWERS_CSV_URL, dtype=str)
@@ -201,7 +189,6 @@ if "tabs_loaded" not in st.session_state:
 
 # ==== LOAD MAIN DATAFRAMES ONCE ====
 df_students = load_students()
-df_expenses = load_expenses()
 df_ref_answers = load_ref_answers()
 
 # ==== UNIVERSAL VARIABLES (for later use) ====
@@ -214,13 +201,12 @@ STUDENT_CODES = df_students["studentcode"].dropna().unique().tolist() if "studen
 tabs = st.tabs([
     "📝 Pending",                # 0
     "👩‍🎓 All Students",           # 1
-    "💵 Expenses",               # 2
-    "📲 Reminders",              # 3
-    "📄 Contract",               # 4
-    "📧 Send Email",              # 5 
-    "📧 Course",               # 6
-    "📝 Marking"                # 7
-    
+    "📲 Reminders",              # 2
+    "📄 Contract",               # 3
+    "📧 Send Email",             # 4
+    "📧 Course",                 # 5
+    "📝 Marking"                # 6
+
 ])
 
 # ==== TAB 0: PENDING STUDENTS ====
@@ -294,85 +280,8 @@ with tabs[1]:
         file_name="all_students.csv"
     )
 
-# ==== TAB 2: EXPENSES AND FINANCIAL SUMMARY ====
+# ==== TAB 2: WHATSAPP REMINDERS ====
 with tabs[2]:
-    st.title("💵 Expenses and Financial Summary")
-
-    # --- Use cached data loaded at top ---
-    df_exp = df_expenses.copy()
-    df_stu = df_students.copy()
-
-    # --- Add New Expense Form ---
-    with st.form("add_expense_form"):
-        exp_type   = st.selectbox("Type", ["Bill","Rent","Salary","Marketing","Other"])
-        exp_item   = st.text_input("Expense Item")
-        exp_amount = st.number_input("Amount (GHS)", min_value=0.0, step=1.0)
-        exp_date   = st.date_input("Date", value=date.today())
-        submit     = st.form_submit_button("Add Expense")
-        if submit and exp_item and exp_amount > 0:
-            # Append new row to the expenses dataframe (local, not Google Sheet)
-            new_row = {"type": exp_type, "item": exp_item, "amount": exp_amount, "date": exp_date}
-            df_exp = pd.concat([df_exp, pd.DataFrame([new_row])], ignore_index=True)
-            st.success(f"✅ Recorded: {exp_type} – {exp_item}")
-            # Save locally so that session users can download the updated file
-            df_exp.to_csv("expenses_all.csv", index=False)
-            st.experimental_rerun()
-
-    # --- Financial Summary ---
-    st.write("## 📊 Financial Summary")
-
-    # Total Expenses
-    total_expenses = pd.to_numeric(df_exp["amount"], errors="coerce").fillna(0).sum() if not df_exp.empty else 0.0
-
-    # Total Income
-    if "paid" in df_stu.columns:
-        total_income = pd.to_numeric(df_stu["paid"], errors="coerce").fillna(0).sum()
-    else:
-        total_income = 0.0
-
-    # Net Profit
-    net_profit = total_income - total_expenses
-
-    # Total Outstanding (Balance)
-    if "balance" in df_stu.columns:
-        total_balance_due = pd.to_numeric(df_stu["balance"], errors="coerce").fillna(0).sum()
-    else:
-        total_balance_due = 0.0
-
-    # Student Count
-    student_count = len(df_stu) if not df_stu.empty else 0
-
-    # --- Display Summary Metrics ---
-    col1, col2, col3 = st.columns(3)
-    col1.metric("💰 Total Income (Paid)", f"GHS {total_income:,.2f}")
-    col2.metric("💸 Total Expenses", f"GHS {total_expenses:,.2f}")
-    col3.metric("🟢 Net Profit", f"GHS {net_profit:,.2f}")
-
-    st.info(f"📋 **Students Enrolled:** {student_count}")
-    st.info(f"🧾 **Outstanding Balances:** GHS {total_balance_due:,.2f}")
-
-    # --- Paginated Expense Table ---
-    st.write("### All Expenses")
-    ROWS_PER_PAGE = 10
-    total_rows    = len(df_exp)
-    total_pages   = (total_rows - 1) // ROWS_PER_PAGE + 1
-    page = st.number_input(
-        f"Page (1-{total_pages})", min_value=1, max_value=total_pages, value=1, step=1, key="exp_page"
-    ) if total_pages > 1 else 1
-    start = (page - 1) * ROWS_PER_PAGE
-    end   = start + ROWS_PER_PAGE
-    st.dataframe(df_exp.iloc[start:end].reset_index(drop=True), use_container_width=True)
-
-    # --- Export to CSV ---
-    st.download_button(
-        "📁 Download Expenses CSV",
-        data=df_exp.to_csv(index=False),
-        file_name="expenses_data.csv",
-        mime="text/csv"
-    )
-
-# ==== TAB 3: WHATSAPP REMINDERS ====
-with tabs[3]:
     st.title("📲 WhatsApp Reminders for Debtors")
 
     # --- Use cached df_students loaded at the top ---
@@ -486,7 +395,8 @@ with tabs[3]:
     )
 
 
-with tabs[4]:
+# ==== TAB 3: CONTRACT & RECEIPT PDF ====
+with tabs[3]:
     st.title("📄 Generate Contract & Receipt PDF for Any Student")
 
     google_csv = (
@@ -675,7 +585,8 @@ This Payment Agreement is entered into on [DATE] for [CLASS] students of Learn L
         )
         st.success("✅ PDF generated and ready to download.")
 
-with tabs[5]:
+# ==== TAB 4: SEND EMAIL / LETTER ====
+with tabs[4]:
     from datetime import date, timedelta
     from fpdf import FPDF
     import tempfile, os
@@ -975,8 +886,8 @@ RAW_SCHEDULE_B1 = [
     ("Woche 10", ["10.27. Umweltfreundlich im Alltag", "10.28. Klimafreundlich leben"])
 ]
 
-# ====== TAB 6 CODE ======
-with tabs[6]:
+# ====== TAB 5 CODE ======
+with tabs[5]:
     import pandas as pd
     import textwrap
     from datetime import date, timedelta
@@ -1155,7 +1066,8 @@ with tabs[6]:
 students_csv_url = "https://docs.google.com/spreadsheets/d/12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
 ref_answers_url = "https://docs.google.com/spreadsheets/d/1CtNlidMfmE836NBh5FmEF5tls9sLmMmkkhewMTQjkBo/export?format=csv"
 
-with tabs[7]:
+# ==== TAB 6: REFERENCE & STUDENT WORK SHARE ====
+with tabs[6]:
     st.title("📝 Reference & Student Work Share")
 
     # --- Load Data ---
