@@ -31,6 +31,8 @@ REF_ANSWERS_SHEET_ID = "1CtNlidMfmE836NBh5FmEF5tls9sLmMmkkhewMTQjkBo"
 
 STUDENTS_CSV_URL = f"https://docs.google.com/spreadsheets/d/{STUDENTS_SHEET_ID}/export?format=csv"
 REF_ANSWERS_CSV_URL = f"https://docs.google.com/spreadsheets/d/{REF_ANSWERS_SHEET_ID}/export?format=csv"
+PENDING_SHEET_ID = "1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo"
+PENDING_CSV_URL = f"https://docs.google.com/spreadsheets/d/{PENDING_SHEET_ID}/export?format=csv"
 
 # ==== STREAMLIT SECRETS ====
 SENDER_EMAIL = st.secrets["general"].get("sender_email", "Learngermanghana@gmail.com")
@@ -172,6 +174,14 @@ def load_ref_answers():
         raise Exception("No 'assignment' column found in reference answers sheet.")
     return df
 
+@st.cache_data(ttl=300, show_spinner="Loading pending students...")
+def load_pending_students():
+    df = pd.read_csv(PENDING_CSV_URL, dtype=str)
+    df = normalize_columns(df)
+    df_display = df.copy()
+    df_search = df.copy()
+    return df_display, df_search
+
 # Optional: SQLite or other local storage helpers here (for local persistence if desired)
 # @st.cache_resource
 # def init_sqlite_connection():
@@ -209,19 +219,8 @@ tabs = st.tabs([
 with tabs[0]:
     st.title("🕒 Pending Students")
 
-    # -- Define/Load Pending Students Google Sheet URL --
-    PENDING_SHEET_ID = "1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo"
-    PENDING_CSV_URL = f"https://docs.google.com/spreadsheets/d/{PENDING_SHEET_ID}/export?format=csv"
-
-    @st.cache_data(ttl=0)
-    def load_pending():
-        df = pd.read_csv(PENDING_CSV_URL, dtype=str)
-        df = normalize_columns(df)
-        df_display = df.copy()
-        df_search = df.copy()
-        return df_display, df_search
-
-    df_display, df_search = load_pending()
+    # -- Load Pending Students Google Sheet --
+    df_display, df_search = load_pending_students()
 
     # --- Universal Search ---
     search = st.text_input("🔎 Search any field (name, code, email, etc.)")
