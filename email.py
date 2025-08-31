@@ -1237,13 +1237,17 @@ with tabs[4]:
             "ContractStart": student_row.get("contractstart", ""),
             "ContractEnd": student_row.get("contractend", ""),
         }
-        pdf_bytes = generate_receipt_and_contract_pdf(
-            student_row_dict,
-            st.session_state.get("agreement_template", ""),
-            payment_amount,
-            payment_date,
-            first_instalment=payment_amount,
-        )
+        try:
+            pdf_bytes = generate_receipt_and_contract_pdf(
+                student_row_dict,
+                st.session_state.get("agreement_template", ""),
+                payment_amount,
+                payment_date,
+                first_instalment=payment_amount,
+            )
+        except Exception as e:
+            st.error(f"Failed to generate receipt/contract PDF: {e}")
+            pdf_bytes = None
     else:
 
         class LetterPDF(FPDF):
