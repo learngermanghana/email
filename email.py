@@ -241,8 +241,8 @@ def render_completion_html(student_name: str, level: str, completion_date: date)
 
 
 # ==== AGREEMENT TEMPLATE ====
-if "agreement_template" not in st.session_state:
-    st.session_state["agreement_template"] = """
+if "agreement_template_raw" not in st.session_state:
+    st.session_state["agreement_template_raw"] = """
 PAYMENT AGREEMENT
 
 This Payment Agreement is entered into on [DATE] for [CLASS] students of Learn Language Education Academy and Felix Asadu ("Teacher").
@@ -920,20 +920,24 @@ with tabs[3]:
     course_length        = (contract_end_input - contract_start_input).days
 
     st.subheader("Agreement Template")
-    template_input = st.text_area(
+
+    def _wrap_agreement():
+        tmpl = st.session_state["agreement_template_raw"]
+        wrapped, warn_lines = wrap_template_lines(tmpl)
+        st.session_state["agreement_template_raw"] = wrapped
+        if warn_lines:
+            st.warning(
+                f"Lines {', '.join(map(str, warn_lines))} exceeded {AGREEMENT_LINE_LIMIT} characters without spaces and were wrapped."
+            )
+
+    st.text_area(
         "Payment Agreement Template",
-        value=st.session_state["agreement_template"],
-        key="agreement_template",
+        value=st.session_state.get("agreement_template_raw", ""),
+        key="agreement_template_raw",
+        on_change=_wrap_agreement,
         height=300,
-        help=f"Lines over {AGREEMENT_LINE_LIMIT} characters without spaces will be wrapped automatically."
+        help=f"Lines over {AGREEMENT_LINE_LIMIT} characters without spaces will be wrapped automatically.",
     )
-    wrapped_template, warn_lines = wrap_template_lines(template_input)
-    if warn_lines:
-        st.warning(
-            f"Lines {', '.join(map(str, warn_lines))} exceeded {AGREEMENT_LINE_LIMIT} characters without spaces and were wrapped."
-        )
-    if wrapped_template != template_input:
-        st.session_state["agreement_template"] = wrapped_template
 
     logo_url = "https://drive.google.com/uc?export=download&id=1xLTtiCbEeHJjrASvFjBgfFuGrgVzg6wU"
     local_logo_path = os.path.join(os.path.dirname(__file__), "logo.png")
@@ -1054,7 +1058,7 @@ with tabs[3]:
         pdf.set_font("Arial", size=12)
         pdf.ln(8)
 
-        template_raw = st.session_state.get("agreement_template", "")
+        template_raw = st.session_state.get("agreement_template_raw", "")
         template, _ = wrap_template_lines(template_raw)
         filled = (
             template
@@ -1265,7 +1269,7 @@ with tabs[4]:
             "ContractEnd": student_row.get("contractend", ""),
         }
         agreement_text, _ = wrap_template_lines(
-            st.session_state.get("agreement_template", "")
+            st.session_state.get("agreement_template_raw", "")
         )
         pdf_bytes = generate_receipt_and_contract_pdf(
             student_row_dict,
