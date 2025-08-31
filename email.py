@@ -294,7 +294,8 @@ tab_titles = [
     "📲 Reminders",              # 2
     "📄 Contract",               # 3
     "📧 Send Email",             # 4
-    "📧 Course"                 # 5
+    "📧 Course",                 # 5
+    "🏆 Leadership Board"        # 6  <-- NEW
 ]
 
 if "active_tab" not in st.session_state:
@@ -1213,6 +1214,153 @@ with tabs[5]:
     )
 
 
+# ==== TAB 6: LEADERSHIP BOARD ====
+with tabs[6]:
+    st.title("🏆 Student Leadership Board")
+
+    # --- Config: the sheet you gave me (converted to CSV export) ---
+    ASSIGNMENTS_CSV_URL = (
+        "https://docs.google.com/spreadsheets/d/"
+        "1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/export?format=csv&gid=2121051612"
+    )
+
+    # --- Helpers (reuse your style) ---
+    def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
+        df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
+        return df
+
+    def _match(colnames, *cands):
+        s = set(colnames)
+        for c in cands:
+            if c in s: return c
+        for c in colnames:
+            if any(c.startswith(x) for x in cands): return c
+        return None
+
+    @st.cache_data(ttl=300, show_spinner="Loading assignment scores...")
+    def load_assignment_scores():
+        df = pd.read_csv(ASSIGNMENTS_CSV_URL, dtype=str)
+        df = _normalize_columns(df)
+
+        # Try to find expected columns with forgiving matching
+        col_student  = _match(df.columns, "studentcode", "student_code", "code", "id")
+        col_name     = _match(df.columns, "name", "student_name")
+        col_level    = _match(df.columns, "level", "class_level")
+        col_assign   = _match(df.columns, "assignment", "task", "paper", "exam")
+        col_score    = _match(df.columns, "score", "points", "mark")
+        col_date     = _match(df.columns, "date", "submitted", "timestamp")
+
+        required = [col_student, col_name, col_level, col_assign, col_score]
+        if any(c is None for c in required):
+            missing = ["studentcode","name","level","assignment","score"]
+            st.error(f"Missing one or more required columns in the sheet. Expected like: {missing}")
+            return pd.DataFrame()
+
+        # Standardize + clean
+        df = df.rename(columns={
+            col_student: "studentcode",
+            col_name: "name",
+            col_level: "level",
+            col_assign: "assignment",
+            col_score: "score",
+            **({col_date: "date"} if col_date else {})
+        })
+        df["level"] = df["level"].astype(str).str.upper().str.strip()
+        df["score"] = pd.to_numeric(df["score"], errors="coerce").fillna(0)
+        if "date" in df.columns:
+            df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        return df
+
+    df_scores = load_assignment_scores()
+    if df_scores is None or df_scores.empty:
+        st.info("No assignment score data available.")
+        st.stop()
+
+    # --- Filters (level + min assignments + optional date range + search) ---
+    levels = sorted(df_scores["level"].dropna().unique().tolist())
+    # default level from session if present
+    default_level = (st.session_state.get("student_row", {}).get("Level", "") or "A1").upper()
+    if default_level not in levels and levels:
+        default_level = levels[0]
+
+    c1, c2, c3 = st.columns([1,1,1])
+    with c1:
+        level_sel = st.selectbox("Level", levels, index=(levels.index(default_level) if default_level in levels else 0))
+    with c2:
+        min_assign = st.number_input("Min assignments to be ranked", min_value=1, value=3, step=1)
+    with c3:
+        search = st.text_input("Search name/code (optional)")
+
+    # Optional date range if a date column exists
+    date_from, date_to = None, None
+    if "date" in df_scores.columns:
+        df_min = pd.to_datetime(df_scores["date"], errors="coerce").min()
+        df_max = pd.to_datetime(df_scores["date"], errors="coerce").max()
+        with st.expander("Filter by date range"):
+            colA, colB = st.columns(2)
+            with colA:
+                date_from = st.date_input("From", value=df_min.date() if pd.notna(df_min) else date.today())
+            with colB:
+                date_to = st.date_input("To", value=df_max.date() if pd.notna(df_max) else date.today())
+
+    # --- Apply filters ---
+    df_level = df_scores[df_scores["level"] == level_sel].copy()
+    if "date" in df_level.columns and date_from and date_to:
+        m = (df_level["date"].dt.date >= date_from) & (df_level["date"].dt.date <= date_to)
+        df_level = df_level[m]
+
+    if search:
+        q = search.strip().lower()
+        df_level = df_level[
+            df_level["name"].astype(str).str.lower().str.contains(q, na=False) |
+            df_level["studentcode"].astype(str).str.lower().str.contains(q, na=False)
+        ]
+
+    # --- OLD LOGIC: group, require ≥ min assignments, rank by total_score then completed ---
+    if df_level.empty:
+        st.info("No rows after filtering.")
+        st.stop()
+
+    grouped = (
+        df_level
+        .groupby(["studentcode", "name"], as_index=False)
+        .agg(
+            total_score=("score", "sum"),
+            completed=("assignment", "nunique")
+        )
+    )
+    ranked = grouped[grouped["completed"] >= int(min_assign)].copy()
+    if ranked.empty:
+        st.info("No students meet the minimum assignments requirement.")
+        st.stop()
+
+    ranked = ranked.sort_values(["total_score", "completed"], ascending=[False, False]).reset_index(drop=True)
+    ranked["Rank"] = ranked.index + 1
+
+    # Show your rank if known
+    your_rank_text = ""
+    _student_code = (st.session_state.get("student_code", "") or "").strip().lower()
+    if _student_code:
+        mine = ranked[ranked["studentcode"].astype(str).str.lower() == _student_code]
+        if not mine.empty:
+            r = int(mine.iloc[0]["Rank"])
+            your_rank_text = f"Your rank: #{r} of {len(ranked)}"
+
+    # --- Display ---
+    m1, m2 = st.columns(2)
+    m1.metric("Total ranked", f"{len(ranked)}")
+    if your_rank_text:
+        m2.success(your_rank_text)
+
+    display_cols = ["Rank", "name", "studentcode", "completed", "total_score"]
+    st.dataframe(ranked[display_cols], use_container_width=True)
+
+    # --- Download ---
+    st.download_button(
+        "⬇️ Download leaderboard CSV",
+        ranked[display_cols].to_csv(index=False),
+        file_name=f"leaderboard_{level_sel}.csv"
+    )
 
 
 
