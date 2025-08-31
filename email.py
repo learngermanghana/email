@@ -7,6 +7,7 @@ import urllib.parse
 from datetime import datetime, date, timedelta
 import smtplib
 from email.message import EmailMessage
+import base64
 
 import pandas as pd
 import streamlit as st
@@ -128,6 +129,25 @@ def send_email_report(pdf_bytes: bytes, to_email: str, subject: str, html_conten
     except Exception as e:
         st.error(f"Email send failed: {e}")
         return False
+
+
+def render_reminder_html(body_text: str) -> str:
+    """Inject the message into the branded HTML template."""
+    base_dir = os.path.dirname(__file__)
+    template_path = os.path.join(base_dir, "email_template.html")
+    logo_path = os.path.join(base_dir, "logo.png")
+    with open(logo_path, "rb") as lf:
+        logo_b64 = base64.b64encode(lf.read()).decode("utf-8")
+    with open(template_path, "r", encoding="utf-8") as tf:
+        template = tf.read()
+    return template.format(
+        logo_base64=logo_b64,
+        content=body_text.replace("\n", "<br/>") if body_text else "",
+        school_name=SCHOOL_NAME,
+        school_address=SCHOOL_ADDRESS,
+        school_phone=SCHOOL_PHONE,
+        school_website=SCHOOL_WEBSITE,
+    )
 
 
 
@@ -355,6 +375,20 @@ with tabs[2]:
         help="You can use {name}, {level}, {due}, {bal}, {days}, {msg}"
     )
 
+    email_mode = st.radio(
+        "Email Mode",
+        ["Mailto Links", "Send Branded Emails"],
+        horizontal=True,
+    )
+    attachments = []
+    if email_mode == "Send Branded Emails":
+        uploaded_files = st.file_uploader(
+            "Optional attachments",
+            accept_multiple_files=True,
+        )
+        if uploaded_files:
+            attachments = [(f.getvalue(), f.name, f.type) for f in uploaded_files]
+
     # --- WhatsApp Links Generation ---
     links = []
     invalid_numbers = set()
@@ -393,19 +427,21 @@ with tabs[2]:
 
         email_addr = row[email_col]
         mailto = ""
+        body = ""
+        subject = "Payment Reminder"
         if email_addr and pd.notna(email_addr):
-            subject = "Payment Reminder"
             body = email_template.format(
                 name=row[name_col],
                 level=row["level"],
                 due=due,
                 bal=bal,
                 days=days,
-                msg=msg
+                msg=msg,
             )
-            mailto = (
-                f"mailto:{email_addr}?subject={urllib.parse.quote(subject)}&body={urllib.parse.quote(body)}"
-            )
+            if email_mode == "Mailto Links":
+                mailto = (
+                    f"mailto:{email_addr}?subject={urllib.parse.quote(subject)}&body={urllib.parse.quote(body)}"
+                )
 
         links.append({
             "Name": row[name_col],
@@ -417,24 +453,24 @@ with tabs[2]:
             "Phone": phone or "",
             "WhatsApp Link": link,
             "Email": email_addr or "",
-            "Email Link": mailto
+            "Email Link": mailto,
+            "Email Body": body,
         })
 
     df_links = pd.DataFrame(links)
     st.markdown("---")
-    st.dataframe(
-        df_links[[
-            "Name",
-            "Level",
-            "Balance (GHS)",
-            "Due Date",
-            "Days Left",
-            "WhatsApp Link",
-            "Email",
-            "Email Link",
-        ]],
-        use_container_width=True,
-    )
+    cols = [
+        "Name",
+        "Level",
+        "Balance (GHS)",
+        "Due Date",
+        "Days Left",
+        "WhatsApp Link",
+        "Email",
+    ]
+    if email_mode == "Mailto Links":
+        cols.append("Email Link")
+    st.dataframe(df_links[cols], use_container_width=True)
 
     # --- List links for quick access ---
     st.markdown("### Send WhatsApp Reminders")
@@ -444,8 +480,27 @@ with tabs[2]:
 
     st.markdown("### Send Email Reminders")
     for _, row in df_links.iterrows():
-        if row["Email Link"]:
-            st.markdown(f"- **{row['Name']}** ([Send Email]({row['Email Link']}))")
+        if email_mode == "Mailto Links":
+            if row["Email Link"]:
+                st.markdown(
+                    f"- **{row['Name']}** ([Send Email]({row['Email Link']}))"
+                )
+        else:
+            if row["Email"]:
+                if st.button(
+                    f"Send Email to {row['Name']}",
+                    key=f"email_{row['Student Code']}",
+                ):
+                    html_body = render_reminder_html(row["Email Body"])
+                    ok = send_email_report(
+                        None,
+                        row["Email"],
+                        "Payment Reminder",
+                        html_body,
+                        attachments or None,
+                    )
+                    if ok:
+                        st.success(f"Email sent to {row['Name']}")
 
     st.download_button(
         "📁 Download Reminder Links CSV",
