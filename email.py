@@ -210,15 +210,22 @@ STUDENT_CODES = df_students["studentcode"].dropna().unique().tolist() if "studen
 # ==== END OF STAGE 2 ====
 
 # ==== TABS SETUP ====
-tabs = st.tabs([
+tab_titles = [
     "📝 Pending",                # 0
     "👩‍🎓 All Students",           # 1
     "📲 Reminders",              # 2
     "📄 Contract",               # 3
     "📧 Send Email",             # 4
     "📧 Course"                 # 5
+]
 
-])
+if "active_tab" not in st.session_state:
+    st.session_state["active_tab"] = 3  # Contract tab index
+
+# Ensure the previously active tab remains selected on rerun
+st.session_state.setdefault("main_tabs", tab_titles[st.session_state["active_tab"]])
+
+tabs = st.tabs(tab_titles, key="main_tabs")
 
 # ==== TAB 0: PENDING STUDENTS ====
 with tabs[0]:
@@ -253,6 +260,8 @@ with tabs[0]:
         filt.to_csv(index=False),
         file_name="pending_students.csv"
     )
+    if st.session_state.get("main_tabs") == tab_titles[0]:
+        st.session_state["active_tab"] = 0
 
 # ==== END OF STAGE 3 (TAB 0) ====
 
@@ -279,6 +288,8 @@ with tabs[1]:
         filt.to_csv(index=False),
         file_name="all_students.csv"
     )
+    if st.session_state.get("main_tabs") == tab_titles[1]:
+        st.session_state["active_tab"] = 1
 
 # ==== TAB 2: WHATSAPP REMINDERS ====
 with tabs[2]:
@@ -452,7 +463,9 @@ with tabs[2]:
         df_links[["Name", "Student Code", "Phone", "Email", "Level", "Balance (GHS)", "Due Date", "Days Left", "WhatsApp Link", "Email Link"]].to_csv(index=False),
         file_name="debtor_whatsapp_links.csv",
     )
-
+# Update active tab when this tab is viewed
+    if st.session_state.get("main_tabs") == tab_titles[2]:
+        st.session_state["active_tab"] = 2
 
 
 # ==== TAB 3: CONTRACT & RECEIPT PDF ====
@@ -651,6 +664,9 @@ This Payment Agreement is entered into on [DATE] for [CLASS] students of Learn L
             mime="application/pdf"
         )
         st.success("✅ PDF generated and ready to download.")
+
+    if st.session_state.get("main_tabs") == tab_titles[3]:
+        st.session_state["active_tab"] = 3
 
 # ==== TAB 4: SEND EMAIL / LETTER ====
 with tabs[4]:
@@ -858,6 +874,8 @@ with tabs[4]:
         except Exception as e:
             st.error(f"Email send failed: {e}")
 
+    if st.session_state.get("main_tabs") == tab_titles[4]:
+        st.session_state["active_tab"] = 4
 
 import textwrap
 
@@ -1107,6 +1125,8 @@ with tabs[5]:
         file_name=f"{file_prefix}.pdf",
         mime="application/pdf"
     )
+    if st.session_state.get("main_tabs") == tab_titles[5]:
+        st.session_state["active_tab"] = 5
 
 
 
