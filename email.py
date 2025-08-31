@@ -874,11 +874,13 @@ with tabs[4]:
         )
     else:  # Course Completion Letter
         body_default = (
-            f"Congratulations on finishing your {student_level} course, {student_name}! "
-            "You worked hard and made great progress.<br><br>"
-            "Please think about whether you want to prepare for the exam or move on to the next level. "
-            "I wish you continued success as you make your next decision!<br><br>"
-            "Best wishes,<br>Felix Asadu<br>Director"
+            f"This certifies that {student_name} has successfully completed the {student_level} course "
+            "at Learn Language Education Academy on [COMPLETION_DATE]. "
+            "We commend [HIM/HER] for outstanding dedication and wish continued success.<br><br>"
+            "[ACHIEVEMENTS_OR_GRADES]<br><br>"
+            "Sincerely,<br>"
+            "Felix Asadu<br>"
+            "Director"
         )
 
     email_subject = st.text_input("Subject", value=f"{msg_type} - {student_name}", key="email_subject")
