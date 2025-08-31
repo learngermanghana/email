@@ -1,11 +1,12 @@
 # ==== IMPORTS ====
 import os
 import re
-import base64
 import requests
 import tempfile
 import urllib.parse
 from datetime import datetime, date, timedelta
+import smtplib
+from email.message import EmailMessage
 
 import pandas as pd
 import streamlit as st
@@ -13,11 +14,6 @@ from fpdf import FPDF
 import qrcode
 from PIL import Image  # For logo image handling
 from io import BytesIO
-
-
-
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
 
 # ==== CONSTANTS ====
 SCHOOL_NAME = "Learn Language Education Academy"
@@ -39,7 +35,11 @@ REF_ANSWERS_CSV_URL = f"https://docs.google.com/spreadsheets/d/{REF_ANSWERS_SHEE
 
 # ==== STREAMLIT SECRETS ====
 SENDER_EMAIL = st.secrets["general"].get("sender_email", "Learngermanghana@gmail.com")
-SENDGRID_KEY = st.secrets["general"].get("sendgrid_api_key", "")
+SMTP_HOST = st.secrets.get("smtp", {}).get("host", "")
+SMTP_PORT = int(st.secrets.get("smtp", {}).get("port", 587))
+SMTP_USERNAME = st.secrets.get("smtp", {}).get("username", "")
+SMTP_PASSWORD = st.secrets.get("smtp", {}).get("password", "")
+SMTP_USE_TLS = st.secrets.get("smtp", {}).get("use_tls", True)
 
 # ==== UNIVERSAL HELPERS ====
 
@@ -92,34 +92,36 @@ def send_email_report(pdf_bytes: bytes, to_email: str, subject: str, html_conten
     Send an email with (optional) PDF and any extra attachments.
     extra_attachments: list of tuples (bytes, filename, mimetype)
     """
-    msg = Mail(
-        from_email=SENDER_EMAIL,
-        to_emails=to_email,
-        subject=subject,
-        html_content=html_content
-    )
+    msg = EmailMessage()
+    msg["From"] = SENDER_EMAIL
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    msg.set_content(html_content, subtype="html")
+
     # Attach PDF if provided
     if pdf_bytes:
-        pdf_attach = Attachment(
-            FileContent(base64.b64encode(pdf_bytes).decode()),
-            FileName("report.pdf"),
-            FileType("application/pdf"),
-            Disposition("attachment")
+        msg.add_attachment(
+            pdf_bytes,
+            maintype="application",
+            subtype="pdf",
+            filename="report.pdf",
         )
-        msg.add_attachment(pdf_attach)
+
     # Attach any extra files
     if extra_attachments:
         for bytes_data, filename, mimetype in extra_attachments:
-            file_attach = Attachment(
-                FileContent(base64.b64encode(bytes_data).decode()),
-                FileName(filename),
-                FileType(mimetype or "application/octet-stream"),
-                Disposition("attachment")
-            )
-            msg.add_attachment(file_attach)
+            maintype, subtype = ("application", "octet-stream")
+            if mimetype and "/" in mimetype:
+                maintype, subtype = mimetype.split("/", 1)
+            msg.add_attachment(bytes_data, maintype=maintype, subtype=subtype, filename=filename)
+
     try:
-        sg = SendGridAPIClient(SENDGRID_KEY)
-        sg.send(msg)
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            if SMTP_USE_TLS:
+                server.starttls()
+            if SMTP_USERNAME and SMTP_PASSWORD:
+                server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            server.send_message(msg)
         return True
     except Exception as e:
         st.error(f"Email send failed: {e}")
@@ -873,33 +875,18 @@ with tabs[5]:
     attach_pdf     = st.checkbox("Attach the generated PDF?", key="attach_pdf")
     recipient_email = st.text_input("Recipient Email", value=student_email, key="recipient_email")
     if st.button("Send Email Now", key="send_email"):
-        msg = Mail(
-            from_email=SENDER_EMAIL,
-            to_emails=recipient_email,
-            subject=email_subject,
-            html_content=email_body
-        )
+        attachments = []
         if attach_pdf:
-            msg.add_attachment(
-                Attachment(
-                    FileContent(base64.b64encode(pdf_bytes).decode()),
-                    FileName(f"{student_name.replace(' ','_')}_{msg_type.replace(' ','_')}.pdf"),
-                    FileType("application/pdf"),
-                    Disposition("attachment")
-                )
+            attachments.append(
+                (pdf_bytes, f"{student_name.replace(' ', '_')}_{msg_type.replace(' ','_')}.pdf", "application/pdf")
             )
         if extra_attach:
             fb = extra_attach.read()
-            msg.add_attachment(
-                Attachment(
-                    FileContent(base64.b64encode(fb).decode()),
-                    FileName(extra_attach.name),
-                    FileType(extra_attach.type or "application/octet-stream"),
-                    Disposition("attachment")
-                )
+            attachments.append(
+                (fb, extra_attach.name, extra_attach.type or "application/octet-stream")
             )
         try:
-            SendGridAPIClient(SENDGRID_KEY).send(msg)
+            send_email_report(None, recipient_email, email_subject, email_body, extra_attachments=attachments)
             st.success(f"Email sent to {recipient_email}!")
         except Exception as e:
             st.error(f"Email send failed: {e}")
