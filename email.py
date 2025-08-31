@@ -588,12 +588,6 @@ with tabs[4]:
     import tempfile, os
 
 
-    # ---- Helper: Ensure all text in PDF is latin-1 safe ----
-    def safe_pdf(text):
-        if not text:
-            return ""
-        return "".join(c if ord(c) < 256 else "?" for c in str(text))
-
     # QR Code generation uses shared utility function make_qr_code
 
 
