@@ -55,17 +55,22 @@ def make_qr_code(url):
     return tmp.name
 
 def clean_phone(phone):
-    """Normalize Ghana phone numbers to the `233XXXXXXXXX` format.
+    """Normalize Ghana phone numbers to the ``233XXXXXXXXX`` format.
 
     Acceptable inputs:
       - ``0XXXXXXXXX``
       - ``233XXXXXXXXX``
       - ``+233XXXXXXXXX``
+      - ``XXXXXXXXX`` (9 digits starting with 2, 5, or 9)
 
     Any other value returns ``None``.
     """
     # Remove all non-digit characters (spaces, dashes, plus signs, etc.)
     digits = re.sub(r"\D", "", str(phone))
+
+    # Handle 9-digit numbers missing the leading zero
+    if len(digits) == 9 and digits[:1] in {"2", "5", "9"}:
+        digits = "0" + digits
 
     if digits.startswith("0") and len(digits) == 10:
         return "233" + digits[1:]
