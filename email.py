@@ -764,8 +764,9 @@ with tabs[0]:
     with right:
         st.download_button(
             "⬇️ Download edited CSV",
-            pd.DataFrame(to_send)[TARGET_COLUMNS].to_csv(index=False),
-            file_name="pending_to_send.csv"
+            pd.DataFrame(to_send, columns=TARGET_COLUMNS).to_csv(index=False),
+            file_name="pending_to_send.csv",
+            disabled=(len(to_send) == 0),
         )
 
     if send_btn:
