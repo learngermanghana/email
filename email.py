@@ -378,6 +378,30 @@ with tabs[0]:
         df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
         return df
 
+
+    from typing import Any
+
+    def _safe_str(value: Any) -> str:
+        if value is None:
+            return ""
+        try:
+            if pd.isna(value):
+                return ""
+        except Exception:
+            pass
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return ""
+        return str(value)
+
+    def col_lookup(df: pd.DataFrame, name: str) -> str:
+        """Case/space/underscore insensitive column resolver."""
+        key = name.lower().replace(" ", "").replace("_", "")
+        for c in df.columns:
+            if c.lower().replace(" ", "").replace("_", "") == key:
+                return c
+        return None
+
+
     def clean_phone_gh(phone):
         """Return Ghana phone as 233XXXXXXXXX or '' if invalid."""
         import re
@@ -408,10 +432,10 @@ with tabs[0]:
         Map a single pending row -> main sheet shape.
         Omits: Filter Rows to Merge, Daily_Limit, Uses_Today, Last_Date.
         """
-        name = src_row.get(col_lookup_df.get("name", ""), "").strip()
+        name = _safe_str(src_row.get(col_lookup_df.get("name", ""), "")).strip()
         phone_raw = src_row.get(col_lookup_df.get("phone", ""), "")
         phone = clean_phone_gh(phone_raw)
-        location = src_row.get(col_lookup_df.get("location", ""), "").strip()
+        location = _safe_str(src_row.get(col_lookup_df.get("location", ""), "")).strip()
         level = (src_row.get(col_lookup_df.get("level", ""), "") or "").upper().strip()
 
         paid = src_row.get(col_lookup_df.get("paid", ""), "")
@@ -440,8 +464,8 @@ with tabs[0]:
             except Exception:
                 ce_iso = ""
 
-        email = src_row.get(col_lookup_df.get("email", ""), "").strip()
-        student_code = src_row.get(col_lookup_df.get("studentcode", ""), "").strip()
+        email = _safe_str(src_row.get(col_lookup_df.get("email", ""), "")).strip()
+        student_code = _safe_str(src_row.get(col_lookup_df.get("studentcode", ""), "")).strip()
 
         # Emergency contact: try a few candidates from the pending sheet
         ec_key = (
@@ -453,10 +477,10 @@ with tabs[0]:
         emergency_phone = clean_phone_gh(src_row.get(ec_key, "")) if ec_key else ""
 
         # Status & dates
-        status = (src_row.get(col_lookup_df.get("status", ""), "") or "Active").strip()
 
-        # Enrollment date column supports "EnrollDate" or "Enroll_Date" headers
-        raw_enroll = (
+        status = _safe_str(src_row.get(col_lookup_df.get("status", ""), "")).strip() or "Active"
+        enroll_date = parse_date_flex(
+
             src_row.get(col_lookup_df.get("enrolldate", ""), "")
             or src_row.get(col_lookup_df.get("enroll_date", ""), "")
         )
@@ -465,7 +489,8 @@ with tabs[0]:
             enroll_date = date.today().isoformat()
 
         # ClassName fallback
-        class_name = (src_row.get(col_lookup_df.get("classname", ""), "") or level).strip()
+        class_name = _safe_str(src_row.get(col_lookup_df.get("classname", ""), "")).strip()
+        class_name = class_name or level
 
         row = {
             "Name": name,
