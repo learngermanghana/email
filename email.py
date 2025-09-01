@@ -138,6 +138,39 @@ def strip_leading_number(text):
     """Remove leading digits, dots, spaces (for question/answer lists)."""
     return re.sub(r"^\s*\d+[\.\)]?\s*", "", text).strip()
 
+
+def parse_date_flex(value):
+    """Parse a date string into ISO format if possible.
+
+    Returns an empty string for blank or unparseable inputs.
+    """
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if not text:
+        return ""
+    try:
+        dt = pd.to_datetime(text, errors="coerce")
+        return dt.date().isoformat() if pd.notna(dt) else ""
+    except Exception:
+        return ""
+
+
+def build_main_row(src: dict) -> dict:
+    """Map a pending row ``src`` to the ``TARGET_COLUMNS`` structure."""
+    import re
+
+    out = {}
+    lookup = globals().get("col_lookup_df", {})
+    for tgt in globals().get("TARGET_COLUMNS", []):
+        snake = re.sub(r"(?<!^)(?=[A-Z])", "_", tgt).lower()
+        key = lookup.get(snake) or lookup.get(snake.replace("_", "")) or tgt
+        val = src.get(key, "")
+        if tgt.lower() == "enrolldate":
+            val = parse_date_flex(val)
+        out[tgt] = val
+    return out
+
 # ==== EMAIL SENDER ====
 
 def send_email_report(pdf_bytes: bytes, to_email: str, subject: str, html_content: str, extra_attachments=None):
@@ -594,6 +627,14 @@ with tabs[0]:
                    for r in view_df.to_dict(orient="records")]
 
     edit_df = pd.DataFrame(mapped_rows, columns=TARGET_COLUMNS)
+
+    # Drop rows where Name, Phone, and Email are all blank
+    blank_mask = (
+        edit_df["Name"].fillna("").str.strip().eq("")
+        & edit_df["Phone"].fillna("").str.strip().eq("")
+        & edit_df["Email"].fillna("").str.strip().eq("")
+    )
+    edit_df = edit_df[~blank_mask].reset_index(drop=True)
 
     for col in ["ContractStart", "ContractEnd", "EnrollDate"]:
         edit_df[col] = pd.to_datetime(edit_df[col], errors="coerce")
