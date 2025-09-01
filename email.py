@@ -475,7 +475,12 @@ with tabs[0]:
                 df = df.rename(columns=mapping)
 
         # Normalize after any renaming so column lookups succeed later.
-        return _normalize_columns(df)
+        df = _normalize_columns(df)
+
+        # Replace empty strings with NA and drop rows where all fields are NA
+        df = df.replace("", pd.NA).dropna(how="all")
+
+        return df
 
     def map_pending_row_to_target(src: dict) -> dict:
         """
@@ -569,6 +574,8 @@ with tabs[0]:
 
     # ---------- UI: Load + Review ----------
     df_pending = load_pending()
+    pending_count = len(df_pending)
+    st.metric("Pending students", pending_count)
     if df_pending.empty:
         st.info("No pending form submissions found yet.")
         st.stop()
@@ -624,7 +631,7 @@ with tabs[0]:
     remaining_cols = [c for c in view_df.columns if c not in view_columns]
     view_df = view_df[view_columns + remaining_cols]
 
-    st.caption(f"Showing {len(view_df)} of {len(df_pending)} pending rows.")
+    st.caption(f"Showing {len(view_df)} of {pending_count} pending rows.")
     cols_to_show = st.multiselect(
         "Columns to display", view_df.columns.tolist(), default=view_columns or view_df.columns.tolist()
     )
