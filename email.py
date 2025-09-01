@@ -533,6 +533,7 @@ with tabs[0]:
             col_lookup_df.get("contractstart"),
             col_lookup_df.get("contractend"),
             col_lookup_df.get("studentcode"),
+            col_lookup_df.get("classname"),
         } if c]
         selected_cols = st.multiselect(
             "Show columns (for easy viewing):",
