@@ -1333,13 +1333,17 @@ with tabs[4]:
             os.remove(tmpf.name)
 
     if pdf_bytes:
+        file_name = f"{student_name.replace(' ', '_')}_{msg_type.replace(' ','_')}.pdf"
         st.download_button(
             "📄 Download Letter/PDF",
             data=pdf_bytes,
-            file_name=f"{student_name.replace(' ', '_')}_{msg_type.replace(' ','_')}.pdf",
+            file_name=file_name,
             mime="application/pdf",
         )
-        st.caption("You can share this PDF on WhatsApp or by email.")
+        pdf_b64 = base64.b64encode(pdf_bytes).decode("utf-8")
+        href = f'<a href="data:application/pdf;base64,{pdf_b64}" download="{file_name}">🔗 Click here to download the PDF</a>'
+        st.markdown(href, unsafe_allow_html=True)
+        st.caption("Download the PDF above; it is not attached to emails automatically.")
     # ---- 6. Email Option ----
     st.subheader("Send Email (with or without PDF)")
     recipient_email = st.text_input("Recipient Email", value=student_email, key="recipient_email")
@@ -1352,6 +1356,22 @@ with tabs[4]:
                 st.success("Email sent successfully.")
             else:
                 st.error("Failed to send email.")
+    elif msg_type == "Course Completion Letter":
+        if st.button("Send Email without PDF"):
+            html_body = render_reminder_html(email_body)
+            ok = send_email_report(None, recipient_email, email_subject, html_body)
+            if ok:
+                st.success("Email sent successfully.")
+            else:
+                st.error("Failed to send email.")
+        encoded_subject = urllib.parse.quote(email_subject)
+        plain_body = email_body.replace("<br/>", "\n").replace("<br>", "\n")
+        encoded_body = urllib.parse.quote(plain_body)
+        mailto_url = f"mailto:{recipient_email}?subject={encoded_subject}&body={encoded_body}"
+        st.markdown(f"[Open Email Client]({mailto_url})", unsafe_allow_html=True)
+        st.caption(
+            "The PDF must be downloaded separately and attached manually; it is not included in the email."
+        )
     else:
         encoded_subject = urllib.parse.quote(email_subject)
         plain_body = email_body.replace("<br/>", "\n").replace("<br>", "\n")
@@ -1360,7 +1380,7 @@ with tabs[4]:
 
         st.markdown(f"[Open Email Client]({mailto_url})", unsafe_allow_html=True)
         st.caption(
-            "Attachments can't be added automatically. Download the PDF or other files above and attach them manually."
+            "The PDF must be downloaded separately and attached manually; it is not included in the email."
         )
 
 import textwrap
