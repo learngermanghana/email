@@ -664,8 +664,9 @@ with tabs[0]:
     with left:
         send_btn = st.button("🚚 Send selected to Main Sheet", type="primary", disabled=(len(to_send) == 0))
     with right:
+        st.caption("Only rows marked with the 'Select' checkbox are included in the download.")
         st.download_button(
-            "⬇️ Download edited CSV",
+            "⬇️ Download selected rows as CSV",
             pd.DataFrame(to_send)[TARGET_COLUMNS].to_csv(index=False),
             file_name="pending_to_send.csv"
         )
