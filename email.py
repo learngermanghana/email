@@ -382,15 +382,14 @@ with tabs[0]:
     PENDING_SHEET_ID = "1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo"
     PENDING_CSV_URL = f"https://docs.google.com/spreadsheets/d/{PENDING_SHEET_ID}/export?format=csv"
 
-    # Apps Script Web App endpoint (same key name you used before).
-    # You can also set ENV var PENDING_TO_MAIN_WEBAPP_URL
+    # Apps Script Web App endpoint set via Streamlit secrets or environment variable
     APPS_SCRIPT_WEBAPP_URL = (
         st.secrets.get("apps_script", {}).get("pending_to_main_webapp_url")
         or os.getenv("PENDING_TO_MAIN_WEBAPP_URL")
-        or ""  # put a literal URL string here if you prefer
+        or ""
     )
 
-    # Optional API key (if your Apps Script checks ?key=...)
+    # Optional API key read from Streamlit secrets or environment variable
     DEFAULT_API_KEY = (
         st.secrets.get("apps_script", {}).get("app_key")
         or os.getenv("APP_KEY")
@@ -552,6 +551,10 @@ with tabs[0]:
 
     def post_rows(rows: list, api_key: str = "") -> tuple[bool, str, dict | None]:
         if not APPS_SCRIPT_WEBAPP_URL:
+            st.error(
+                "Apps Script Web App URL is not configured. Set the 'apps_script.pending_to_main_webapp_url' "
+                "secret or the 'PENDING_TO_MAIN_WEBAPP_URL' environment variable."
+            )
             return False, "Apps Script Web App URL is not configured.", None
         try:
             url = APPS_SCRIPT_WEBAPP_URL
@@ -745,9 +748,19 @@ with tabs[0]:
     with st.expander("Preview JSON payload", expanded=False):
         st.code(json.dumps({"rows": to_send}, ensure_ascii=False, indent=2))
 
+    if not APPS_SCRIPT_WEBAPP_URL:
+        st.error(
+            "Apps Script Web App URL is not configured. Set the 'apps_script.pending_to_main_webapp_url' "
+            "secret or the 'PENDING_TO_MAIN_WEBAPP_URL' environment variable."
+        )
+
     left, right = st.columns([1,1])
     with left:
-        send_btn = st.button("🚚 Send selected to Main Sheet", type="primary", disabled=(len(to_send) == 0))
+        send_btn = st.button(
+            "🚚 Send selected to Main Sheet",
+            type="primary",
+            disabled=(len(to_send) == 0 or not APPS_SCRIPT_WEBAPP_URL),
+        )
     with right:
         st.download_button(
             "⬇️ Download edited CSV",
