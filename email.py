@@ -454,10 +454,13 @@ with tabs[0]:
 
         # Status & dates
         status = (src_row.get(col_lookup_df.get("status", ""), "") or "Active").strip()
-        enroll_date = parse_date_flex(
+
+        # Enrollment date column supports "EnrollDate" or "Enroll_Date" headers
+        raw_enroll = (
             src_row.get(col_lookup_df.get("enrolldate", ""), "")
-            or src_row.get(col_lookup_df.get("enrolldate", ""), "")
+            or src_row.get(col_lookup_df.get("enroll_date", ""), "")
         )
+        enroll_date = parse_date_flex(raw_enroll)
         if not enroll_date:
             enroll_date = date.today().isoformat()
 
