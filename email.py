@@ -87,13 +87,13 @@ SENDER_EMAIL, SMTP_HOST, SMTP_PORT, SMTP_USE_TLS, SMTP_USERNAME, SMTP_PASSWORD =
 
 # ==== UNIVERSAL HELPERS ====
 
-def col_lookup(df: pd.DataFrame, name: str) -> str:
+def col_lookup(df: pd.DataFrame, name: str, default=None) -> str:
     """Find the actual column name for a logical key, case/space/underscore-insensitive."""
     key = name.lower().replace(" ", "").replace("_", "")
     for c in df.columns:
         if c.lower().replace(" ", "").replace("_", "") == key:
             return c
-    raise KeyError(f"Column '{name}' not found in DataFrame")
+    return default
 
 def make_qr_code(url):
     """Generate QR code image file for a given URL, return temp filename."""
@@ -378,14 +378,6 @@ with tabs[0]:
         df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
         return df
 
-    def col_lookup(df: pd.DataFrame, name: str) -> str:
-        """Case/space/underscore insensitive column resolver."""
-        key = name.lower().replace(" ", "").replace("_", "")
-        for c in df.columns:
-            if c.lower().replace(" ", "").replace("_", "") == key:
-                return c
-        return None
-
     def clean_phone_gh(phone):
         """Return Ghana phone as 233XXXXXXXXX or '' if invalid."""
         import re
@@ -517,7 +509,7 @@ with tabs[0]:
             "emergency_contact_phone_number", "emergency_contact",
             "status", "enrolldate", "classname"
         ]:
-            col_lookup_df[key] = col_lookup(df_pending, key)
+            col_lookup_df[key] = col_lookup(df_pending, key, default=None)
 
         # ---- Search / Filter
         search = st.text_input("🔎 Search any field (name, code, email, etc.)", "")
