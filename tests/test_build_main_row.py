@@ -1,5 +1,7 @@
 import ast
+
 from pathlib import Path
+
 from datetime import date
 
 import pandas as pd
@@ -66,3 +68,4 @@ def test_build_main_row_non_string_inputs(bad_value):
     assert row["StudentCode"] == ""
     assert row["Status"] == "Active"
     assert row["ClassName"] == "B2"
+
