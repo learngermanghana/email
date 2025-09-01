@@ -552,6 +552,12 @@ with tabs[0]:
     st.caption(f"Showing {len(view_df)} of {len(df_pending)} pending rows.")
     with st.expander("Show raw pending rows", expanded=False):
         st.dataframe(view_df, use_container_width=True, height=320)
+        st.download_button(
+            "Download CSV",
+            view_df.to_csv(index=False).encode("utf-8"),
+            file_name="pending_raw.csv",
+            mime="text/csv",
+        )
 
     # ---------- Build editable TARGET table ----------
     st.markdown("### 2️⃣ Edit student info (normalized to main sheet columns)")
