@@ -389,13 +389,6 @@ with tabs[0]:
         or ""
     )
 
-    # Optional API key read from Streamlit secrets or environment variable
-    DEFAULT_API_KEY = (
-        st.secrets.get("apps_script", {}).get("app_key")
-        or os.getenv("APP_KEY")
-        or ""
-    )
-
     # The exact target columns (order matters; must match Apps Script REQUIRED_HEADERS)
     TARGET_COLUMNS = [
         "Name", "Phone", "Location", "Level", "Paid", "Balance",
@@ -549,7 +542,7 @@ with tabs[0]:
         # Only keep required keys & order
         return {k: row.get(k, "") for k in TARGET_COLUMNS}
 
-    def post_rows(rows: list, api_key: str = "") -> tuple[bool, str, dict | None]:
+    def post_rows(rows: list) -> tuple[bool, str, dict | None]:
         if not APPS_SCRIPT_WEBAPP_URL:
             st.error(
                 "Apps Script Web App URL is not configured. Set the 'apps_script.pending_to_main_webapp_url' "
@@ -558,6 +551,11 @@ with tabs[0]:
             return False, "Apps Script Web App URL is not configured.", None
         try:
             url = APPS_SCRIPT_WEBAPP_URL
+            api_key = (
+                st.secrets.get("apps_script", {}).get("app_key")
+                or os.getenv("APP_KEY")
+                or ""
+            )
             if api_key:
                 sep = "&" if "?" in url else "?"
                 url = f"{url}{sep}key={api_key}"
@@ -678,12 +676,6 @@ with tabs[0]:
 
     # ---------- Validation preview ----------
     st.markdown("### 3️⃣ Validate & Send to Main Sheet")
-    c1, c2 = st.columns([1,1])
-    with c1:
-        api_key_input = st.text_input("Optional API Key (Apps Script ?key=...)", value=DEFAULT_API_KEY or "")
-    with c2:
-        st.write("")  # spacing
-        st.caption("If your script has APP_KEY set, provide it here; leave blank if not used.")
 
     # Build payload from the edited table
     to_send = []
@@ -771,7 +763,7 @@ with tabs[0]:
 
     if send_btn:
         with st.status("Sending rows to Apps Script…", expanded=True) as status:
-            ok, msg, data = post_rows(to_send, api_key_input.strip())
+            ok, msg, data = post_rows(to_send)
             if ok:
                 st.success(f"✅ Sent {len(to_send)} row(s).")
                 if data and "results" in data:
