@@ -559,6 +559,14 @@ with tabs[0]:
                    for r in view_df.to_dict(orient="records")]
 
     edit_df = pd.DataFrame(mapped_rows, columns=TARGET_COLUMNS)
+
+    for col in ["ContractStart", "ContractEnd", "EnrollDate"]:
+        edit_df[col] = pd.to_datetime(edit_df[col], errors="coerce")
+    edit_df["EnrollDate"].fillna(pd.Timestamp.today().normalize(), inplace=True)
+
+    if not all(pd.api.types.is_datetime64_ns_dtype(edit_df[col]) for col in ["ContractStart", "ContractEnd", "EnrollDate"]):
+        raise TypeError("Date columns must be datetime64[ns]")
+
     # Add a selection column for sending
     edit_df.insert(0, "Select", True)
 
