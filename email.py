@@ -171,6 +171,7 @@ def build_main_row(src: dict) -> dict:
         out[tgt] = val
     return out
 
+
 # ==== EMAIL SENDER ====
 
 def send_email_report(pdf_bytes: bytes, to_email: str, subject: str, html_content: str, extra_attachments=None):
@@ -465,6 +466,27 @@ with tabs[0]:
     @st.cache_data(ttl=0, show_spinner="Loading pending form submissions...")
     def load_pending():
         df = pd.read_csv(PENDING_CSV_URL, dtype=str)
+
+        # Some Google Sheets exports may end up with numeric column headers
+        # ("1", "2", ...). When this happens the actual headers are usually
+        # contained in the first row of data.  Detect this situation and fix
+        # up the DataFrame so downstream lookups work as expected.
+        if all(str(c).strip().isdigit() for c in df.columns):
+            first_row = [str(x).strip() for x in df.iloc[0].tolist()]
+
+            # If the first row looks like actual headers (contains any
+            # non-numeric values) use it as such; otherwise fall back to an
+            # explicit mapping against TARGET_COLUMNS.
+            if any(not re.fullmatch(r"\d+", h or "") for h in first_row):
+                df = df[1:].rename(columns={df.columns[i]: first_row[i] for i in range(len(first_row))})
+            else:
+                mapping = {
+                    col: TARGET_COLUMNS[i]
+                    for i, col in enumerate(df.columns[: len(TARGET_COLUMNS)])
+                }
+                df = df.rename(columns=mapping)
+
+        # Normalize after any renaming so column lookups succeed later.
         return _normalize_columns(df)
 
     def map_pending_row_to_target(src: dict) -> dict:
