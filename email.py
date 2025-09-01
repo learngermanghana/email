@@ -623,7 +623,6 @@ with tabs[0]:
 
                         # Refresh main student list and offer navigation
                         load_students.clear()
-                        global df_students
                         df_students = load_students()
                         if st.button("👀 View in All Students"):
                             st.session_state["active_tab"] = 1
