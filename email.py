@@ -214,9 +214,6 @@ def render_completion_html(student_name: str, level: str, completion_date: date)
     """Render the course completion letter using the certificate template."""
     base_dir = os.path.dirname(__file__)
     template_path = os.path.join(base_dir, "completion_letter_template.html")
-    logo_path = os.path.join(base_dir, "logo.png")
-    with open(logo_path, "rb") as lf:
-        logo_b64 = base64.b64encode(lf.read()).decode("utf-8")
     with open(template_path, "r", encoding="utf-8") as tf:
         template = tf.read()
     default_message = (
@@ -227,7 +224,6 @@ def render_completion_html(student_name: str, level: str, completion_date: date)
         f"Best wishes,<br>{TUTOR_NAME}<br>{TUTOR_TITLE}"
     )
     return template.format(
-        logo_base64=logo_b64,
         student_name=student_name,
         level=level,
         completion_date=completion_date.strftime("%B %d, %Y"),
