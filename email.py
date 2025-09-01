@@ -139,26 +139,38 @@ def strip_leading_number(text):
     return re.sub(r"^\s*\d+[\.\)]?\s*", "", text).strip()
 
 
-# The legacy Stage 2 tests expect these helpers to exist at module level.
-def parse_date_flex(value, default=""):
-    """Parse ``value`` into ``YYYY-MM-DD`` or return ``default`` if invalid."""
-    ts = pd.to_datetime(value, errors="coerce")
-    if pd.notna(ts):
-        return ts.date().isoformat()
-    return default
+def parse_date_flex(value):
+    """Parse a date string into ISO format if possible.
+
+    Returns an empty string for blank or unparseable inputs.
+    """
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if not text:
+        return ""
+    try:
+        dt = pd.to_datetime(text, errors="coerce")
+        return dt.date().isoformat() if pd.notna(dt) else ""
+    except Exception:
+        return ""
 
 
 def build_main_row(src: dict) -> dict:
-    """Minimal builder used in unit tests for backward compatibility."""
-    # ``col_lookup_df`` is injected during tests
-    key = col_lookup_df.get("enrolldate") or col_lookup_df.get("enroll_date")
-    raw = src.get(key, "")
-    row = {"EnrollDate": parse_date_flex(raw, date.today().isoformat())}
-    # Only keep the columns requested in TARGET_COLUMNS if defined
-    try:
-        return {k: row.get(k, "") for k in TARGET_COLUMNS}
-    except Exception:
-        return row
+    """Map a pending row ``src`` to the ``TARGET_COLUMNS`` structure."""
+    import re
+
+    out = {}
+    lookup = globals().get("col_lookup_df", {})
+    for tgt in globals().get("TARGET_COLUMNS", []):
+        snake = re.sub(r"(?<!^)(?=[A-Z])", "_", tgt).lower()
+        key = lookup.get(snake) or lookup.get(snake.replace("_", "")) or tgt
+        val = src.get(key, "")
+        if tgt.lower() == "enrolldate":
+            val = parse_date_flex(val)
+        out[tgt] = val
+    return out
+
 
 # ==== EMAIL SENDER ====
 
@@ -647,6 +659,14 @@ with tabs[0]:
                    for r in view_df.to_dict(orient="records")]
 
     edit_df = pd.DataFrame(mapped_rows, columns=TARGET_COLUMNS)
+
+    # Drop rows where Name, Phone, and Email are all blank
+    blank_mask = (
+        edit_df["Name"].fillna("").str.strip().eq("")
+        & edit_df["Phone"].fillna("").str.strip().eq("")
+        & edit_df["Email"].fillna("").str.strip().eq("")
+    )
+    edit_df = edit_df[~blank_mask].reset_index(drop=True)
 
     for col in ["ContractStart", "ContractEnd", "EnrollDate"]:
         edit_df[col] = pd.to_datetime(edit_df[col], errors="coerce")
