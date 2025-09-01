@@ -1199,10 +1199,10 @@ with tabs[4]:
     payment_date = None
     if msg_type == "Letter of Enrollment":
         body_default = (
-            f"To Whom It May Concern,<br><br>",
-            f"{student_name} is officially enrolled in {student_level} at Learn Language Education Academy.<br>",
-            f"Enrollment valid from {enrollment_start:%m/%d/%Y} to {enrollment_end:%m/%d/%Y}.<br><br>",
-            f"Business Reg No: {BUSINESS_REG}.<br><br>",
+            f"To Whom It May Concern,<br><br>"
+            f"{student_name} is officially enrolled in {student_level} at Learn Language Education Academy.<br>"
+            f"Enrollment valid from {enrollment_start:%m/%d/%Y} to {enrollment_end:%m/%d/%Y}.<br><br>"
+            f"Business Reg No: {BUSINESS_REG}.<br><br>"
         )
         email_subject = st.text_input("Subject", value=f"{msg_type} - {student_name}", key="email_subject")
         email_body = st.text_area("Email Body (HTML supported)", value=body_default, key="email_body", height=220)
@@ -1358,7 +1358,8 @@ with tabs[4]:
                 st.error("Failed to send email.")
     else:
         encoded_subject = urllib.parse.quote(email_subject)
-        encoded_body = urllib.parse.quote(email_body)
+        plain_body = email_body.replace("<br/>", "\n").replace("<br>", "\n")
+        encoded_body = urllib.parse.quote(plain_body)
         mailto_url = f"mailto:{recipient_email}?subject={encoded_subject}&body={encoded_body}"
 
         st.markdown(f"[Open Email Client]({mailto_url})", unsafe_allow_html=True)
