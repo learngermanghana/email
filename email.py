@@ -514,8 +514,13 @@ with tabs[0]:
         ]:
             col_lookup_df[key] = col_lookup(df_pending, key, default=None)
 
-        # ---- Search / Filter
-        search = st.text_input("🔎 Search any field (name, code, email, etc.)", "")
+        # ---- Step 1: Review & Filter ----
+        st.markdown("### 1️⃣ Review Pending Submissions")
+        search = st.text_input(
+            "🔍 Search any field (name, code, email, etc.)",
+            "",
+            help="Type to filter the list below",
+        )
         view_df = df_pending.copy()
         if search:
             s = search.strip().lower()
@@ -523,32 +528,39 @@ with tabs[0]:
                 view_df.apply(lambda r: s in str(r.to_dict()).lower(), axis=1)
             ]
 
-        # ---- Choose visible columns
-        all_cols = list(view_df.columns)
-        default_show = [c for c in all_cols if c in {
-            col_lookup_df.get("name"),
-            col_lookup_df.get("phone"),
-            col_lookup_df.get("email"),
-            col_lookup_df.get("location"),
-            col_lookup_df.get("level"),
-            col_lookup_df.get("paid"),
-            col_lookup_df.get("balance"),
-            col_lookup_df.get("contractstart"),
-            col_lookup_df.get("contractend"),
-            col_lookup_df.get("studentcode"),
-            col_lookup_df.get("classname"),
-        } if c]
-        selected_cols = st.multiselect(
-            "Show columns (for easy viewing):",
-            all_cols,
-            default=default_show or all_cols[:6]
-        )
+        with st.expander("Choose columns to display", expanded=False):
+            all_cols = list(view_df.columns)
+            default_show = [
+                c
+                for c in all_cols
+                if c
+                in {
+                    col_lookup_df.get("name"),
+                    col_lookup_df.get("phone"),
+                    col_lookup_df.get("email"),
+                    col_lookup_df.get("location"),
+                    col_lookup_df.get("level"),
+                    col_lookup_df.get("paid"),
+                    col_lookup_df.get("balance"),
+                    col_lookup_df.get("contractstart"),
+                    col_lookup_df.get("contractend"),
+                    col_lookup_df.get("studentcode"),
+                    col_lookup_df.get("classname"),
+                }
+            ]
+            selected_cols = st.multiselect(
+                "Columns to show:",
+                all_cols,
+                default=default_show or all_cols[:6],
+            )
 
-        # Add a selectable column
         show_df = view_df[selected_cols].copy()
         show_df.insert(0, "Select", True)
 
-        st.write("✅ Tick the rows you want to transfer, edit any cells if needed, then click **Transfer Selected to Main Sheet**.")
+        st.markdown("### 2️⃣ Edit & Prepare")
+        st.write(
+            "Tick the rows you want to transfer and adjust any values before sending."
+        )
         edited = st.data_editor(
             show_df,
             use_container_width=True,
@@ -561,7 +573,8 @@ with tabs[0]:
             key="pending_editor",
         )
 
-        # ---- Transfer button
+        # ---- Step 3: Transfer ----
+        st.markdown("### 3️⃣ Transfer to Main Sheet")
         left, right = st.columns([1, 1])
         with left:
             if st.button("🚚 Transfer Selected to Main Sheet", type="primary"):
@@ -569,32 +582,27 @@ with tabs[0]:
                     st.warning("No rows to transfer.")
                     st.stop()
 
-                # Merge edited values back to original rows by position (safe since we didn't reindex)
                 to_send = []
                 for idx, ed_row in edited.iterrows():
                     if not ed_row.get("Select", False):
                         continue
 
-                    # Construct a source dict from original df (full columns), but update visible edits
-                    # Find the original row in view_df by index (retain filtered order)
                     try:
                         src_full = view_df.iloc[idx].to_dict()
                     except Exception:
-                        # Fallback: build a sparse source from edited row only
                         src_full = {}
 
-                    # Apply edited values for the selected columns
                     for col in selected_cols:
                         src_full[col] = ed_row.get(col, src_full.get(col, ""))
 
-                    # Map to main sheet shape
                     row_out = build_main_row(src_full)
-                    # Basic checks
                     if not row_out["Name"]:
                         st.warning("Skipped a row without a Name.")
                         continue
                     if not (row_out["Phone"] or row_out["Email"]):
-                        st.warning(f"Skipped {row_out['Name']} – needs Phone or Email.")
+                        st.warning(
+                            f"Skipped {row_out['Name']} – needs Phone or Email."
+                        )
                         continue
                     to_send.append(row_out)
 
@@ -602,12 +610,24 @@ with tabs[0]:
                     st.info("Nothing to send after validation.")
                     st.stop()
 
-                with st.status("Transferring rows to main sheet...", expanded=True) as status:
+                with st.status(
+                    "Transferring rows to main sheet...", expanded=True
+                ) as status:
                     ok, msg = post_rows_to_apps_script(to_send)
                     if ok:
-                        st.success(f"✅ Transferred {len(to_send)} row(s) to the main sheet.")
+                        st.success(
+                            f"✅ Transferred {len(to_send)} row(s) to the main sheet."
+                        )
                         st.json({"sent_rows": to_send})
                         status.update(label="Done", state="complete")
+
+                        # Refresh main student list and offer navigation
+                        load_students.clear()
+                        global df_students
+                        df_students = load_students()
+                        if st.button("👀 View in All Students"):
+                            st.session_state["active_tab"] = 1
+                            st.experimental_rerun()
                     else:
                         st.error(f"❌ Transfer failed: {msg}")
 
