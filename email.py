@@ -548,10 +548,45 @@ with tabs[0]:
     if search:
         s = search.strip().lower()
         view_df = view_df[view_df.apply(lambda r: s in str(r.to_dict()).lower(), axis=1)]
+    # Reorder/subset columns to mirror TARGET_COLUMNS where possible
+    view_col_candidates = {
+        "Name": ["name", "full_name"],
+        "Phone": ["phone", "phone_number"],
+        "Location": ["location", "city"],
+        "Level": ["level", "class"],
+        "Paid": ["paid", "amount_paid"],
+        "Balance": ["balance", "outstanding"],
+        "ContractStart": ["contractstart", "start_date"],
+        "ContractEnd": ["contractend", "end_date"],
+        "StudentCode": ["studentcode", "student_code", "code"],
+        "Email": ["email", "email_address"],
+        "Emergency Contact (Phone Number)": [
+            "emergency_contact_phone_number",
+            "emergency_contact",
+            "emergency",
+            "guardian_phone",
+        ],
+        "Status": ["status"],
+        "EnrollDate": ["enrolldate", "enroll_date", "registration_date"],
+        "ClassName": ["classname", "class_name", "course"],
+    }
+    view_columns = []
+    for tgt in TARGET_COLUMNS:
+        for cand in view_col_candidates.get(tgt, []):
+            col = _col_lookup_df.get(cand)
+            if col:
+                view_columns.append(col)
+                break
+    # Place any remaining columns after the target-ordered ones
+    remaining_cols = [c for c in view_df.columns if c not in view_columns]
+    view_df = view_df[view_columns + remaining_cols]
 
     st.caption(f"Showing {len(view_df)} of {len(df_pending)} pending rows.")
+    cols_to_show = st.multiselect(
+        "Columns to display", view_df.columns.tolist(), default=view_columns or view_df.columns.tolist()
+    )
     with st.expander("Show raw pending rows", expanded=False):
-        st.dataframe(view_df, use_container_width=True, height=320)
+        st.dataframe(view_df[cols_to_show], use_container_width=True, height=320)
 
     # ---------- Build editable TARGET table ----------
     st.markdown("### 2️⃣ Edit student info (normalized to main sheet columns)")
