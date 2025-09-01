@@ -216,22 +216,21 @@ def render_completion_html(student_name: str, level: str, completion_date: date)
     template_path = os.path.join(base_dir, "completion_letter_template.html")
     with open(template_path, "r", encoding="utf-8") as tf:
         template = tf.read()
-    default_message = (
+    return template.format(
+        student_name=student_name,
+        level=level,
+        completion_date=completion_date.strftime("%B %d, %Y"),
+    )
+
+
+def render_completion_message(student_name: str, level: str) -> str:
+    """Generate the default congratulatory email body for course completion."""
+    return (
         f"Congratulations on finishing your {level} course, {student_name}! "
         "You worked hard and made great progress.<br><br>"
         "Please think about whether you want to prepare for the exam or move on to the next level. "
         "I wish you continued success as you make your next decision!<br><br>"
         f"Best wishes,<br>{TUTOR_NAME}<br>{TUTOR_TITLE}"
-    )
-    return template.format(
-        student_name=student_name,
-        level=level,
-        completion_date=completion_date.strftime("%B %d, %Y"),
-        content=default_message,
-        school_name=SCHOOL_NAME,
-        school_address=SCHOOL_ADDRESS,
-        school_phone=SCHOOL_PHONE,
-        school_website=SCHOOL_WEBSITE,
     )
 
 
@@ -1218,11 +1217,11 @@ with tabs[4]:
         st.markdown(email_body, unsafe_allow_html=True)
     elif msg_type == "Course Completion Letter":
         completion_date = st.date_input("Completion Date", value=date.today(), key="completion_date")
-        body_default = render_completion_html(student_name, student_level, completion_date)
+        body_default = render_completion_message(student_name, student_level)
         email_subject = st.text_input("Subject", value=f"{msg_type} - {student_name}", key="email_subject")
         email_body = st.text_area("Email Body (HTML supported)", value=body_default, key="email_body", height=220)
         st.markdown("**Preview Message:**")
-        st.components.v1.html(email_body, height=600)
+        st.markdown(email_body, unsafe_allow_html=True)
     else:  # Payment Confirmation
         payment_amount = st.number_input(
             "Payment Amount", min_value=0.0, value=float(payment), key="payment_amount"
@@ -1249,7 +1248,8 @@ with tabs[4]:
             pass
         pdf = CompletionPDF()
         pdf.add_page()
-        pdf.write_html(email_body)
+        certificate_html = render_completion_html(student_name, student_level, completion_date)
+        pdf.write_html(certificate_html)
         output_data = pdf.output(dest="S")
         if isinstance(output_data, bytes):
             pdf_bytes = output_data
