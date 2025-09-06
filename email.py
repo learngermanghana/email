@@ -1369,13 +1369,33 @@ elif selected_tab == tab_titles[4]:
     else:
         filtered_students = df_students
 
-    student_names = filtered_students["name"].dropna().unique().tolist()
-    student_name = st.selectbox("Student Name", student_names, key="student_select")
-    if not student_name:
+    # Display students in an editable table with selection checkboxes
+    filtered_students = filtered_students.copy()
+    filtered_students["selected"] = False
+    edited_students = st.data_editor(
+        filtered_students,
+        hide_index=True,
+        column_order=["selected", "name", "email", "level"],
+        column_config={
+            "selected": st.column_config.CheckboxColumn("Select"),
+            "email": st.column_config.TextColumn("Email"),
+            "level": st.column_config.TextColumn("Level"),
+        },
+        use_container_width=True,
+        key="student_editor",
+    )
+
+    selected_students = edited_students[edited_students["selected"]]
+    st.session_state["selected_students"] = selected_students
+    if selected_students.empty:
         st.stop()
 
-    student_row = filtered_students[filtered_students["name"] == student_name].iloc[0]
-    student_level = student_row["level"]
+    if len(selected_students) > 1:
+        st.info("Multiple students selected. Using the first for preview.")
+
+    student_row = selected_students.iloc[0]
+    student_name = student_row.get("name", "")
+    student_level = student_row.get("level", "")
     student_email = student_row.get("email", "")
     enrollment_start = pd.to_datetime(student_row.get("contractstart", date.today()), errors="coerce").date()
     enrollment_end   = pd.to_datetime(student_row.get("contractend",   date.today()), errors="coerce").date()
