@@ -18,6 +18,7 @@ from PIL import Image  # For logo image handling
 from io import BytesIO
 from utils import safe_pdf
 from pdf_utils import generate_receipt_and_contract_pdf
+from attendance_utils import save_attendance_to_firestore, load_attendance_from_firestore
 
 # ==== CONSTANTS ====
 SCHOOL_NAME = "Learn Language Education Academy"
@@ -1991,6 +1992,12 @@ with tabs[7]:
             st.info("No schedule defined for this level.")
         else:
             st.write("### Attendance")
+            existing_attendance = {}
+            try:
+                existing_attendance = load_attendance_from_firestore(sel_class)
+            except Exception:
+                st.info("Could not load existing attendance.")
+
             header_cols = st.columns(len(session_labels) + 1)
             header_cols[0].markdown("**Student**")
             for i, label in enumerate(session_labels):
@@ -1999,31 +2006,22 @@ with tabs[7]:
             for _, row in class_df.iterrows():
                 row_cols = st.columns(len(session_labels) + 1)
                 row_cols[0].write(row.get("name", ""))
+                s_code = row.get("studentcode", "")
                 for i in range(len(session_labels)):
-                    key = f"att_{sel_class}_{row.get('studentcode', '')}_{i}"
-                    row_cols[i + 1].checkbox("", key=key)
+                    key = f"att_{sel_class}_{s_code}_{i}"
+                    checked = existing_attendance.get(str(i), {}).get(s_code, False)
+                    row_cols[i + 1].checkbox("", key=key, value=checked)
 
             if st.button("Save attendance"):
-                records = []
+                attendance_map = {}
                 for _, row in class_df.iterrows():
                     s_code = row.get("studentcode", "")
-                    for i, label in enumerate(session_labels):
+                    for i in range(len(session_labels)):
                         key = f"att_{sel_class}_{s_code}_{i}"
-                        if st.session_state.get(key):
-                            records.append(
-                                {
-                                    "studentcode": s_code,
-                                    "classname": sel_class,
-                                    "level": sel_level,
-                                    "session_index": i,
-                                    "session_label": label,
-                                }
-                            )
+                        present = bool(st.session_state.get(key))
+                        attendance_map.setdefault(str(i), {})[s_code] = present
 
-                if "save_attendance" in globals() and callable(save_attendance):
-                    save_attendance(records)
-                    st.success("Attendance saved.")
-                else:
-                    st.info("Persistence helper not configured.")
+                save_attendance_to_firestore(sel_class, attendance_map)
+                st.success("Attendance saved.")
 
 
