@@ -350,6 +350,84 @@ STUDENT_CODES = df_students["studentcode"].dropna().unique().tolist() if "studen
 
 # ==== END OF STAGE 2 ====
 
+import textwrap
+
+# ====== HELPERS ======
+def wrap_lines(text, width=80):
+    """Wrap text to avoid FPDF width errors."""
+    lines = []
+    for para in text.split("\n"):
+        lines.extend(textwrap.wrap(para, width=width) or [""])
+    return lines
+
+# ====== COURSE SCHEDULE CONSTANTS ======
+RAW_SCHEDULE_A1 = [
+    ("Week One", ["Chapter 0.1 - Lesen & Horen"]),
+    ("Week Two", [
+        "Chapters 0.2 and 1.1 - Lesen & Horen",
+        "Chapter 1.1 - Schreiben & Sprechen and Chapter 1.2 - Lesen & Horen",
+        "Chapter 2 - Lesen & Horen"
+    ]),
+    ("Week Three", [
+        "Chapter 1.2 - Schreiben & Sprechen (Recap)",
+        "Chapter 2.3 - Schreiben & Sprechen",
+        "Chapter 3 - Lesen & Horen"
+    ]),
+    ("Week Four", [
+        "Chapter 4 - Lesen & Horen",
+        "Chapter 5 - Lesen & Horen",
+        "Chapter 6 - Lesen & Horen and Chapter 2.4 - Schreiben & Sprechen"
+    ]),
+    ("Week Five", [
+        "Chapter 7 - Lesen & Horen",
+        "Chapter 8 - Lesen & Horen",
+        "Chapter 3.5 - Schreiben & Sprechen"
+    ]),
+    ("Week Six", [
+        "Chapter 3.6 - Schreiben & Sprechen",
+        "Chapter 4.7 - Schreiben & Sprechen",
+        "Chapter 9 and 10 - Lesen & Horen"
+    ]),
+    ("Week Seven", [
+        "Chapter 11 - Lesen & Horen",
+        "Chapter 12.1 - Lesen & Horen and Schreiben & Sprechen (including 5.8)",
+        "Chapter 5.9 - Schreiben & Sprechen"
+    ]),
+    ("Week Eight", [
+        "Chapter 6.10 - Schreiben & Sprechen (Intro to letter writing)",
+        "Chapter 13 - Lesen & Horen and Chapter 6.11 - Schreiben & Sprechen",
+        "Chapter 14.1 - Lesen & Horen and Chapter 7.12 - Schreiben & Sprechen"
+    ]),
+    ("Week Nine", [
+        "Chapter 14.2 - Lesen & Horen and Chapter 7.12 - Schreiben & Sprechen",
+        "Chapter 8.13 - Schreiben & Sprechen",
+        "Exam tips - Schreiben & Sprechen recap"
+    ])
+]
+RAW_SCHEDULE_A2 = [
+    ("Woche 1", ["1.1. Small Talk (Exercise)", "1.2. Personen Beschreiben (Exercise)", "1.3. Dinge und Personen vergleichen"]),
+    ("Woche 2", ["2.4. Wo möchten wir uns treffen?", "2.5. Was machst du in deiner Freizeit?"]),
+    ("Woche 3", ["3.6. Möbel und Räume kennenlernen", "3.7. Eine Wohnung suchen (Übung)", "3.8. Rezepte und Essen (Exercise)"]),
+    ("Woche 4", ["4.9. Urlaub", "4.10. Tourismus und Traditionelle Feste", "4.11. Unterwegs: Verkehrsmittel vergleichen"]),
+    ("Woche 5", ["5.12. Ein Tag im Leben (Übung)", "5.13. Ein Vorstellungsgesprach (Exercise)", "5.14. Beruf und Karriere (Exercise)"]),
+    ("Woche 6", ["6.15. Mein Lieblingssport", "6.16. Wohlbefinden und Entspannung", "6.17. In die Apotheke gehen"]),
+    ("Woche 7", ["7.18. Die Bank Anrufen", "7.19. Einkaufen – Wo und wie? (Exercise)", "7.20. Typische Reklamationssituationen üben"]),
+    ("Woche 8", ["8.21. Ein Wochenende planen", "8.22. Die Woche Plannung"]),
+    ("Woche 9", ["9.23. Wie kommst du zur Schule / zur Arbeit?", "9.24. Einen Urlaub planen", "9.25. Tagesablauf (Exercise)"]),
+    ("Woche 10", ["10.26. Gefühle in verschiedenen Situationen beschr", "10.27. Digitale Kommunikation", "10.28. Über die Zukunft sprechen"])
+]
+RAW_SCHEDULE_B1 = [
+    ("Woche 1", ["1.1. Traumwelten (Übung)", "1.2. Freundes für Leben (Übung)", "1.3. Erfolgsgeschichten (Übung)"]),
+    ("Woche 2", ["2.4. Wohnung suchen (Übung)", "2.5. Der Besichtigungsg termin (Übung)", "2.6. Leben in der Stadt oder auf dem Land?"]),
+    ("Woche 3", ["3.7. Fast Food vs. Hausmannskost", "3.8. Alles für die Gesundheit", "3.9. Work-Life-Balance im modernen Arbeitsumfeld"]),
+    ("Woche 4", ["4.10. Digitale Auszeit und Selbstfürsorge", "4.11. Teamspiele und Kooperative Aktivitäten", "4.12. Abenteuer in der Natur", "4.13. Eigene Filmkritik schreiben"]),
+    ("Woche 5", ["5.14. Traditionelles vs. digitales Lernen", "5.15. Medien und Arbeiten im Homeoffice", "5.16. Prüfungsangst und Stressbewältigung", "5.17. Wie lernt man am besten?"]),
+    ("Woche 6", ["6.18. Wege zum Wunschberuf", "6.19. Das Vorstellungsgespräch", "6.20. Wie wird man …? (Ausbildung und Qu)"]),
+    ("Woche 7", ["7.21. Lebensformen heute – Familie, Wohnge", "7.22. Was ist dir in einer Beziehung wichtig?", "7.23. Erstes Date – Typische Situationen"]),
+    ("Woche 8", ["8.24. Konsum und Nachhaltigkeit", "8.25. Online einkaufen – Rechte und Risiken"]),
+    ("Woche 9", ["9.26. Reiseprobleme und Lösungen"]),
+    ("Woche 10", ["10.27. Umweltfreundlich im Alltag", "10.28. Klimafreundlich leben"])
+]
 # ==== TABS SETUP ====
 tab_titles = [
     "📝 Pending",                # 0
@@ -365,10 +443,12 @@ tab_titles = [
 if "active_tab" not in st.session_state:
     st.session_state["active_tab"] = 3  # Contract tab index
 
-tabs = st.tabs(tab_titles)
+selected_tab = st.sidebar.radio("Navigate", tab_titles,
+                                index=st.session_state.get("active_tab", 3))
+st.session_state["active_tab"] = tab_titles.index(selected_tab)
 
 # ==== TAB 0: PENDING STUDENTS (REWRITTEN) ====
-with tabs[0]:
+if selected_tab == tab_titles[0]:
     import os
     import re
     import json
@@ -791,7 +871,7 @@ with tabs[0]:
 
 
 # ==== TAB 1: ALL STUDENTS ====
-with tabs[1]:
+elif selected_tab == tab_titles[1]:
     st.title("👩‍🎓 All Students")
 
     # --- Optional: Search/Filter ---
@@ -815,7 +895,7 @@ with tabs[1]:
     )
 
 # ==== TAB 2: WHATSAPP REMINDERS ====
-with tabs[2]:
+elif selected_tab == tab_titles[2]:
     st.title("📲 WhatsApp Reminders for Debtors")
 
     # --- Use cached df_students loaded at the top ---
@@ -1024,7 +1104,7 @@ with tabs[2]:
 
 
 # ==== TAB 3: CONTRACT & RECEIPT PDF ====
-with tabs[3]:
+elif selected_tab == tab_titles[3]:
     st.title("📄 Generate Contract & Receipt PDF for Any Student")
 
     google_csv = (
@@ -1260,7 +1340,7 @@ with tabs[3]:
         st.success("✅ PDF generated and ready to download.")
 
 # ==== TAB 4: SEND EMAIL / LETTER ====
-with tabs[4]:
+elif selected_tab == tab_titles[4]:
     from datetime import date, timedelta
     from fpdf import FPDF
     import tempfile, os
@@ -1550,87 +1630,9 @@ with tabs[4]:
             "The PDF must be downloaded separately and attached manually; it is not included in the email."
         )
 
-import textwrap
-
-# ====== HELPERS ======
-def wrap_lines(text, width=80):
-    """Wrap text to avoid FPDF width errors."""
-    lines = []
-    for para in text.split("\n"):
-        lines.extend(textwrap.wrap(para, width=width) or [""])
-    return lines
-
-# ====== COURSE SCHEDULE CONSTANTS ======
-RAW_SCHEDULE_A1 = [
-    ("Week One", ["Chapter 0.1 - Lesen & Horen"]),
-    ("Week Two", [
-        "Chapters 0.2 and 1.1 - Lesen & Horen",
-        "Chapter 1.1 - Schreiben & Sprechen and Chapter 1.2 - Lesen & Horen",
-        "Chapter 2 - Lesen & Horen"
-    ]),
-    ("Week Three", [
-        "Chapter 1.2 - Schreiben & Sprechen (Recap)",
-        "Chapter 2.3 - Schreiben & Sprechen",
-        "Chapter 3 - Lesen & Horen"
-    ]),
-    ("Week Four", [
-        "Chapter 4 - Lesen & Horen",
-        "Chapter 5 - Lesen & Horen",
-        "Chapter 6 - Lesen & Horen and Chapter 2.4 - Schreiben & Sprechen"
-    ]),
-    ("Week Five", [
-        "Chapter 7 - Lesen & Horen",
-        "Chapter 8 - Lesen & Horen",
-        "Chapter 3.5 - Schreiben & Sprechen"
-    ]),
-    ("Week Six", [
-        "Chapter 3.6 - Schreiben & Sprechen",
-        "Chapter 4.7 - Schreiben & Sprechen",
-        "Chapter 9 and 10 - Lesen & Horen"
-    ]),
-    ("Week Seven", [
-        "Chapter 11 - Lesen & Horen",
-        "Chapter 12.1 - Lesen & Horen and Schreiben & Sprechen (including 5.8)",
-        "Chapter 5.9 - Schreiben & Sprechen"
-    ]),
-    ("Week Eight", [
-        "Chapter 6.10 - Schreiben & Sprechen (Intro to letter writing)",
-        "Chapter 13 - Lesen & Horen and Chapter 6.11 - Schreiben & Sprechen",
-        "Chapter 14.1 - Lesen & Horen and Chapter 7.12 - Schreiben & Sprechen"
-    ]),
-    ("Week Nine", [
-        "Chapter 14.2 - Lesen & Horen and Chapter 7.12 - Schreiben & Sprechen",
-        "Chapter 8.13 - Schreiben & Sprechen",
-        "Exam tips - Schreiben & Sprechen recap"
-    ])
-]
-RAW_SCHEDULE_A2 = [
-    ("Woche 1", ["1.1. Small Talk (Exercise)", "1.2. Personen Beschreiben (Exercise)", "1.3. Dinge und Personen vergleichen"]),
-    ("Woche 2", ["2.4. Wo möchten wir uns treffen?", "2.5. Was machst du in deiner Freizeit?"]),
-    ("Woche 3", ["3.6. Möbel und Räume kennenlernen", "3.7. Eine Wohnung suchen (Übung)", "3.8. Rezepte und Essen (Exercise)"]),
-    ("Woche 4", ["4.9. Urlaub", "4.10. Tourismus und Traditionelle Feste", "4.11. Unterwegs: Verkehrsmittel vergleichen"]),
-    ("Woche 5", ["5.12. Ein Tag im Leben (Übung)", "5.13. Ein Vorstellungsgesprach (Exercise)", "5.14. Beruf und Karriere (Exercise)"]),
-    ("Woche 6", ["6.15. Mein Lieblingssport", "6.16. Wohlbefinden und Entspannung", "6.17. In die Apotheke gehen"]),
-    ("Woche 7", ["7.18. Die Bank Anrufen", "7.19. Einkaufen – Wo und wie? (Exercise)", "7.20. Typische Reklamationssituationen üben"]),
-    ("Woche 8", ["8.21. Ein Wochenende planen", "8.22. Die Woche Plannung"]),
-    ("Woche 9", ["9.23. Wie kommst du zur Schule / zur Arbeit?", "9.24. Einen Urlaub planen", "9.25. Tagesablauf (Exercise)"]),
-    ("Woche 10", ["10.26. Gefühle in verschiedenen Situationen beschr", "10.27. Digitale Kommunikation", "10.28. Über die Zukunft sprechen"])
-]
-RAW_SCHEDULE_B1 = [
-    ("Woche 1", ["1.1. Traumwelten (Übung)", "1.2. Freundes für Leben (Übung)", "1.3. Erfolgsgeschichten (Übung)"]),
-    ("Woche 2", ["2.4. Wohnung suchen (Übung)", "2.5. Der Besichtigungsg termin (Übung)", "2.6. Leben in der Stadt oder auf dem Land?"]),
-    ("Woche 3", ["3.7. Fast Food vs. Hausmannskost", "3.8. Alles für die Gesundheit", "3.9. Work-Life-Balance im modernen Arbeitsumfeld"]),
-    ("Woche 4", ["4.10. Digitale Auszeit und Selbstfürsorge", "4.11. Teamspiele und Kooperative Aktivitäten", "4.12. Abenteuer in der Natur", "4.13. Eigene Filmkritik schreiben"]),
-    ("Woche 5", ["5.14. Traditionelles vs. digitales Lernen", "5.15. Medien und Arbeiten im Homeoffice", "5.16. Prüfungsangst und Stressbewältigung", "5.17. Wie lernt man am besten?"]),
-    ("Woche 6", ["6.18. Wege zum Wunschberuf", "6.19. Das Vorstellungsgespräch", "6.20. Wie wird man …? (Ausbildung und Qu)"]),
-    ("Woche 7", ["7.21. Lebensformen heute – Familie, Wohnge", "7.22. Was ist dir in einer Beziehung wichtig?", "7.23. Erstes Date – Typische Situationen"]),
-    ("Woche 8", ["8.24. Konsum und Nachhaltigkeit", "8.25. Online einkaufen – Rechte und Risiken"]),
-    ("Woche 9", ["9.26. Reiseprobleme und Lösungen"]),
-    ("Woche 10", ["10.27. Umweltfreundlich im Alltag", "10.28. Klimafreundlich leben"])
-]
 
 # ====== TAB 5 CODE ======
-with tabs[5]:
+elif selected_tab == tab_titles[5]:
     import pandas as pd
     import textwrap
     from datetime import date, timedelta
@@ -1801,7 +1803,7 @@ with tabs[5]:
 
 
 # ==== TAB 6: LEADERSHIP BOARD ====
-with tabs[6]:
+elif selected_tab == tab_titles[6]:
     st.title("🏆 Student Leadership Board")
 
     # --- Config: the sheet you gave me (converted to CSV export) ---
@@ -1950,7 +1952,7 @@ with tabs[6]:
 
 
 # ==== TAB 7: CLASS ATTENDANCE ====
-with tabs[7]:
+elif selected_tab == tab_titles[7]:
     import pandas as pd
 
     st.title("📘 Class Attendance")
