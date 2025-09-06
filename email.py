@@ -357,7 +357,8 @@ tab_titles = [
     "📄 Contract",               # 3
     "📧 Send Email",             # 4
     "📧 Course",                 # 5
-    "🏆 Leadership Board"        # 6  <-- NEW
+    "🏆 Leadership Board",       # 6
+    "📘 Class Attendance"        # 7
 ]
 
 if "active_tab" not in st.session_state:
@@ -1947,5 +1948,82 @@ with tabs[6]:
     )
 
 
+# ==== TAB 7: CLASS ATTENDANCE ====
+with tabs[7]:
+    import pandas as pd
+
+    st.title("📘 Class Attendance")
+
+    df_students = pd.read_csv(STUDENTS_CSV_URL, dtype=str)
+    df_students = normalize_columns(df_students)
+
+    if df_students.empty:
+        st.info("No student data available.")
+    else:
+        class_groups = (
+            df_students.groupby(["classname", "level"]).size().reset_index()[["classname", "level"]]
+        )
+        class_groups["label"] = class_groups.apply(
+            lambda r: f"{r['classname']} ({r['level']})", axis=1
+        )
+        selection = st.selectbox("Select class", class_groups["label"].tolist())
+        selected = class_groups[class_groups["label"] == selection].iloc[0]
+        sel_class = selected["classname"]
+        sel_level = selected["level"]
+
+        class_df = df_students[
+            (df_students["classname"] == sel_class) & (df_students["level"] == sel_level)
+        ].copy()
+
+        schedule_map = {
+            "A1": RAW_SCHEDULE_A1,
+            "A2": RAW_SCHEDULE_A2,
+            "B1": RAW_SCHEDULE_B1,
+        }
+        schedule = schedule_map.get(sel_level.upper(), [])
+
+        session_labels = []
+        for week, topics in schedule:
+            for topic in topics:
+                session_labels.append(f"{week}: {topic}")
+
+        if not session_labels:
+            st.info("No schedule defined for this level.")
+        else:
+            st.write("### Attendance")
+            header_cols = st.columns(len(session_labels) + 1)
+            header_cols[0].markdown("**Student**")
+            for i, label in enumerate(session_labels):
+                header_cols[i + 1].markdown(f"**{label}**")
+
+            for _, row in class_df.iterrows():
+                row_cols = st.columns(len(session_labels) + 1)
+                row_cols[0].write(row.get("name", ""))
+                for i in range(len(session_labels)):
+                    key = f"att_{sel_class}_{row.get('studentcode', '')}_{i}"
+                    row_cols[i + 1].checkbox("", key=key)
+
+            if st.button("Save attendance"):
+                records = []
+                for _, row in class_df.iterrows():
+                    s_code = row.get("studentcode", "")
+                    for i, label in enumerate(session_labels):
+                        key = f"att_{sel_class}_{s_code}_{i}"
+                        if st.session_state.get(key):
+                            records.append(
+                                {
+                                    "studentcode": s_code,
+                                    "classname": sel_class,
+                                    "level": sel_level,
+                                    "session_index": i,
+                                    "session_label": label,
+                                }
+                            )
+
+                if "save_attendance" in globals() and callable(save_attendance):
+                    save_attendance(records)
+                    st.success("Attendance saved.")
+                else:
+                    st.info("Persistence helper not configured.")
 
 
