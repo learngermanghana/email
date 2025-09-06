@@ -2018,13 +2018,41 @@ elif selected_tab == tab_titles[7]:
             except Exception:
                 st.info("Could not load existing attendance.")
 
-            data = {"Student": class_df["name"].tolist()}
+            # Ensure session labels incorporate any stored labels and sessions
+            max_existing = max((int(s) for s in existing_attendance.keys()), default=-1)
+            if max_existing + 1 > len(session_labels):
+                session_labels.extend(["" for _ in range(max_existing + 1 - len(session_labels))])
+            for i in range(len(session_labels)):
+                stored_label = existing_attendance.get(str(i), {}).get("label")
+                if stored_label:
+                    session_labels[i] = stored_label
+
+            # Merge student codes and names from roster and existing attendance
+            student_codes = list(class_df["studentcode"])
+            for session in existing_attendance.values():
+                for s_code in session.get("students", {}):
+                    if s_code not in student_codes:
+                        student_codes.append(s_code)
+
+            student_names = {row["studentcode"]: row["name"] for _, row in class_df.iterrows()}
+            for session in existing_attendance.values():
+                for s_code, s_data in session.get("students", {}).items():
+                    if s_data.get("name"):
+                        student_names[s_code] = s_data["name"]
+
+            data = {"Student": [student_names.get(code, "") for code in student_codes]}
             for i, label in enumerate(session_labels):
                 data[label] = [
-                    bool(existing_attendance.get(str(i), {}).get(s_code, False))
-                    for s_code in class_df["studentcode"]
+                    bool(
+                        existing_attendance.get(str(i), {})
+                        .get("students", {})
+                        .get(code, {})
+                        .get("present", False)
+                    )
+                    for code in student_codes
                 ]
-            att_df = pd.DataFrame(data, index=class_df["studentcode"])
+
+            att_df = pd.DataFrame(data, index=student_codes)
             att_df.index.name = "Student Code"
 
             edited_att_df = st.data_editor(
@@ -2040,10 +2068,17 @@ elif selected_tab == tab_titles[7]:
             )
 
             if st.button("Save attendance"):
-                attendance_map = {str(i): {} for i in range(len(session_labels))}
+                attendance_map = {}
+                for i, label in enumerate(session_labels):
+                    attendance_map[str(i)] = {"label": label, "students": {}}
+
                 for student_code, row in edited_att_df.iterrows():
+                    student_name = row["Student"]
                     for i, label in enumerate(session_labels):
-                        attendance_map[str(i)][student_code] = bool(row[label])
+                        attendance_map[str(i)]["students"][student_code] = {
+                            "name": student_name,
+                            "present": bool(row[label]),
+                        }
 
                 save_attendance_to_firestore(sel_class, attendance_map)
                 st.success("Attendance saved.")

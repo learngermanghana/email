@@ -21,27 +21,52 @@ def save_attendance_to_firestore(class_name: str, attendance_map: dict):
     class_name: str
         Name of the class grouping the sessions.
     attendance_map: dict
-        Mapping of session_id -> {student_code: present_bool}.
+        Mapping of ``session_id`` -> ``{"label": str, "students": {student_code: {"name": str, "present": bool}}}``.
     """
     db = _get_db()
     for session_id, session_data in attendance_map.items():
-        (db.collection("attendance")
-           .document(class_name)
-           .collection("sessions")
-           .document(str(session_id))
-           .set(session_data))
+        (
+            db.collection("attendance")
+            .document(class_name)
+            .collection("sessions")
+            .document(str(session_id))
+            .set(session_data)
+        )
 
 def load_attendance_from_firestore(class_name: str) -> dict:
     """Load attendance data for a class from Firestore.
 
-    Returns mapping of session_id -> {student_code: present_bool}.
+    Returns
+    -------
+    dict
+        Mapping of ``session_id`` -> ``{"label": str, "students": {student_code: {"name": str, "present": bool}}}``.
+
+    Notes
+    -----
+    Previously attendance was stored as ``{student_code: present_bool}``. This
+    loader converts that legacy format into the richer session representation to
+    keep backward compatibility with existing records.
     """
     db = _get_db()
-    docs = (db.collection("attendance")
-              .document(class_name)
-              .collection("sessions")
-              .stream())
+    docs = (
+        db.collection("attendance")
+        .document(class_name)
+        .collection("sessions")
+        .stream()
+    )
     result = {}
     for doc in docs:
-        result[doc.id] = doc.to_dict() or {}
+        data = doc.to_dict() or {}
+        if "students" in data:
+            result[doc.id] = data
+        else:
+            # Legacy format without labels or nested student data
+            result[doc.id] = {
+                "label": data.get("label", ""),
+                "students": {
+                    s_code: {"name": "", "present": present}
+                    for s_code, present in data.items()
+                    if s_code != "label"
+                },
+            }
     return result
