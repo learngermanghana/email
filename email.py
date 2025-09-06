@@ -1953,8 +1953,6 @@ elif selected_tab == tab_titles[6]:
 
 # ==== TAB 7: CLASS ATTENDANCE ====
 elif selected_tab == tab_titles[7]:
-    import pandas as pd
-
     st.title("📘 Class Attendance")
 
     df_students = pd.read_csv(STUDENTS_CSV_URL, dtype=str)
@@ -2000,28 +1998,32 @@ elif selected_tab == tab_titles[7]:
             except Exception:
                 st.info("Could not load existing attendance.")
 
-            header_cols = st.columns(len(session_labels) + 1)
-            header_cols[0].markdown("**Student**")
+            data = {"Student": class_df["name"].tolist()}
             for i, label in enumerate(session_labels):
-                header_cols[i + 1].markdown(f"**{label}**")
+                data[label] = [
+                    bool(existing_attendance.get(str(i), {}).get(s_code, False))
+                    for s_code in class_df["studentcode"]
+                ]
+            att_df = pd.DataFrame(data, index=class_df["studentcode"])
+            att_df.index.name = "Student Code"
 
-            for _, row in class_df.iterrows():
-                row_cols = st.columns(len(session_labels) + 1)
-                row_cols[0].write(row.get("name", ""))
-                s_code = row.get("studentcode", "")
-                for i in range(len(session_labels)):
-                    key = f"att_{sel_class}_{s_code}_{i}"
-                    checked = existing_attendance.get(str(i), {}).get(s_code, False)
-                    row_cols[i + 1].checkbox("", key=key, value=checked)
+            edited_att_df = st.data_editor(
+                att_df,
+                column_config={
+                    "Student": st.column_config.TextColumn("Student", disabled=True),
+                    **{
+                        label: st.column_config.CheckboxColumn(label)
+                        for label in session_labels
+                    },
+                },
+                use_container_width=True,
+            )
 
             if st.button("Save attendance"):
-                attendance_map = {}
-                for _, row in class_df.iterrows():
-                    s_code = row.get("studentcode", "")
-                    for i in range(len(session_labels)):
-                        key = f"att_{sel_class}_{s_code}_{i}"
-                        present = bool(st.session_state.get(key))
-                        attendance_map.setdefault(str(i), {})[s_code] = present
+                attendance_map = {str(i): {} for i in range(len(session_labels))}
+                for student_code, row in edited_att_df.iterrows():
+                    for i, label in enumerate(session_labels):
+                        attendance_map[str(i)][student_code] = bool(row[label])
 
                 save_attendance_to_firestore(sel_class, attendance_map)
                 st.success("Attendance saved.")
