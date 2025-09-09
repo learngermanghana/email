@@ -1,5 +1,5 @@
 import streamlit as st
-from datetime import date
+from datetime import date, timedelta
 import firebase_admin
 from firebase_admin import credentials, firestore
 import smtplib
@@ -15,13 +15,14 @@ def _get_db():
         _db = firestore.client()
     return _db
 
-def add_task(description: str, assignee: str, week: str):
+def add_task(description: str, assignee: str, week: str, due: str | None = None):
     db = _get_db()
     db.collection("tasks").add(
         {
             "description": description,
             "assignee": assignee,
             "week": week,
+            "due": due,
             "completed": False,
         }
     )
@@ -63,29 +64,32 @@ def notify_assignee(email: str, subject: str, body: str):
 st.title("📝 Weekly Team Tasks")
 
 selected_week = st.date_input("Select week", value=date.today())
+selected_week_start = selected_week - timedelta(days=selected_week.weekday())
 
 with st.form("task_form", clear_on_submit=True):
     desc = st.text_input("Task description")
     assignee = st.text_input("Assignee")
-    due = st.date_input("Due date/Week", value=selected_week)
+    due = st.date_input("Due date", value=selected_week)
     notify = st.checkbox("Email assignee", value=False)
     submitted = st.form_submit_button("Add task")
 
 if submitted and desc and assignee:
-    week_str = due.isoformat()
-    add_task(desc, assignee, week_str)
+    week_start = due - timedelta(days=due.weekday())
+    week_str = week_start.isoformat()
+    due_str = due.isoformat()
+    add_task(desc, assignee, week_str, due_str)
     if notify:
         notify_assignee(
             assignee,
             "New task assigned",
-            f"'{desc}' due {week_str}",
+            f"'{desc}' due {due_str}",
         )
     st.success("Task added!")
 
-st.subheader(f"Tasks for {selected_week.isoformat()}")
-for task in load_tasks(selected_week.isoformat()):
+st.subheader(f"Tasks for week of {selected_week_start.isoformat()}")
+for task in load_tasks(selected_week_start.isoformat()):
     checked = st.checkbox(
-        f"{task['description']} - {task['assignee']} (due {task['week']})",
+        f"{task['description']} - {task['assignee']} (due {task.get('due', task['week'])})",
         value=task.get("completed", False),
         key=task["id"],
     )
