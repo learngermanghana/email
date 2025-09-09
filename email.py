@@ -35,8 +35,14 @@ REF_ANSWERS_SHEET_ID = "1CtNlidMfmE836NBh5FmEF5tls9sLmMmkkhewMTQjkBo"
 
 STUDENTS_CSV_URL = f"https://docs.google.com/spreadsheets/d/{STUDENTS_SHEET_ID}/export?format=csv"
 REF_ANSWERS_CSV_URL = f"https://docs.google.com/spreadsheets/d/{REF_ANSWERS_SHEET_ID}/export?format=csv"
-PENDING_SHEET_ID = "1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo"
-PENDING_CSV_URL = f"https://docs.google.com/spreadsheets/d/{PENDING_SHEET_ID}/export?format=csv"
+
+SOCIAL_LINKS = {
+    "Website": SCHOOL_WEBSITE,
+    "Phone": SCHOOL_PHONE,
+    "Facebook": "https://www.facebook.com/learngermanghana",
+    "Instagram": "https://www.instagram.com/learngermanghana",
+    "YouTube": "https://www.youtube.com/@learngermanghana",
+}
 
 # ==== EMAIL CONFIGURATION ====
 
@@ -320,13 +326,6 @@ def load_ref_answers():
         raise Exception("No 'assignment' column found in reference answers sheet.")
     return df
 
-@st.cache_data(ttl=300, show_spinner="Loading pending students...")
-def load_pending_students():
-    df = pd.read_csv(PENDING_CSV_URL, dtype=str)
-    df = normalize_columns(df)
-    df_display = df.copy()
-    df_search = df.copy()
-    return df_display, df_search
 
 # Optional: SQLite or other local storage helpers here (for local persistence if desired)
 # @st.cache_resource
@@ -430,7 +429,7 @@ RAW_SCHEDULE_B1 = [
 ]
 # ==== TABS SETUP ====
 tab_titles = [
-    "📝 Pending",                # 0
+    "ℹ️ About Us",                # 0
     "👩‍🎓 All Students",           # 1
     "📲 Reminders",              # 2
     "📄 Contract",               # 3
@@ -447,430 +446,24 @@ selected_tab = st.sidebar.radio("Navigate", tab_titles,
                                 index=st.session_state.get("active_tab", 3))
 st.session_state["active_tab"] = tab_titles.index(selected_tab)
 
-# ==== TAB 0: PENDING STUDENTS (REWRITTEN) ====
+# ==== TAB 0: ABOUT US ====
 if selected_tab == tab_titles[0]:
-    import os
-    import re
-    import json
-    import requests
-    import pandas as pd
-    from datetime import date, timedelta
-    import streamlit as st
-
-    st.title("🕒 Pending Students (Form Responses ➜ Review, Edit, Send)")
-
-    # ---------- CONFIG ----------
-    # Form responses (pending)
-    PENDING_SHEET_ID = "1HwB2yCW782pSn6UPRU2J2jUGUhqnGyxu0tOXi0F0Azo"
-    PENDING_CSV_URL = f"https://docs.google.com/spreadsheets/d/{PENDING_SHEET_ID}/export?format=csv"
-
-    # Apps Script Web App endpoint set via Streamlit secrets or environment variable
-    APPS_SCRIPT_WEBAPP_URL = (
-        st.secrets.get("apps_script", {}).get("pending_to_main_webapp_url")
-        or os.getenv("PENDING_TO_MAIN_WEBAPP_URL")
-        or ""
+    st.title("ℹ️ About Us")
+    st.markdown(
+        "This page stores key contact and social media links for the team."
+    )
+    social_df = pd.DataFrame(
+        [(k, v) for k, v in SOCIAL_LINKS.items()],
+        columns=["Platform", "Link"],
+    )
+    st.dataframe(social_df, use_container_width=True)
+    st.download_button(
+        "⬇️ Download socials as CSV",
+        social_df.to_csv(index=False),
+        file_name="socials.csv",
+        mime="text/csv",
     )
 
-    # The exact target columns (order matters; must match Apps Script REQUIRED_HEADERS)
-    TARGET_COLUMNS = [
-        "Name", "Phone", "Location", "Level", "Paid", "Balance",
-        "ContractStart", "ContractEnd", "StudentCode", "Email",
-        "Emergency Contact (Phone Number)", "Status", "EnrollDate", "ClassName"
-    ]
-
-    # ---------- LOCAL HELPERS (safe fallbacks) ----------
-    def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
-        if 'normalize_columns' in globals() and callable(normalize_columns):
-            return normalize_columns(df)
-        df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
-        return df
-
-    def _col_lookup(df: pd.DataFrame, key: str, default=None):
-        if 'col_lookup' in globals() and callable(col_lookup):
-            return col_lookup(df, key, default)
-        k = key.lower().replace(" ", "").replace("_", "")
-        for c in df.columns:
-            if c.lower().replace(" ", "").replace("_", "") == k:
-                return c
-        return default
-
-    def _clean_phone_gh(phone):
-        # Prefer your global clean_phone if present
-        if 'clean_phone' in globals() and callable(clean_phone):
-            return clean_phone(phone)
-        digits = re.sub(r"\D", "", str(phone or ""))
-        if len(digits) == 9 and digits[0] in {"2", "5", "9"}:
-            digits = "0" + digits
-        if digits.startswith("0") and len(digits) == 10:
-            return "233" + digits[1:]
-        if digits.startswith("233") and len(digits) == 12:
-            return digits
-        return None
-
-    def _to_float(s, default=0.0):
-        try:
-            return float(str(s).replace(",", "").strip())
-        except Exception:
-            return default
-
-    def _parse_date_iso(s):
-        """Return ISO yyyy-mm-dd or '' if invalid/empty."""
-        ts = pd.to_datetime(s, errors="coerce")
-        return ts.date().isoformat() if pd.notna(ts) else ""
-
-    def _first_nonempty(d: dict, *keys):
-        for k in keys:
-            v = d.get(k, "")
-            if v not in (None, ""):
-                return v
-        return ""
-
-    @st.cache_data(ttl=0, show_spinner="Loading pending form submissions...")
-    def load_pending():
-        df = pd.read_csv(PENDING_CSV_URL, dtype=str)
-
-        # Some Google Sheets exports may end up with numeric column headers
-        # ("1", "2", ...). When this happens the actual headers are usually
-        # contained in the first row of data.  Detect this situation and fix
-        # up the DataFrame so downstream lookups work as expected.
-        if all(str(c).strip().isdigit() for c in df.columns):
-            first_row = [str(x).strip() for x in df.iloc[0].tolist()]
-
-            # If the first row looks like actual headers (contains any
-            # non-numeric values) use it as such; otherwise fall back to an
-            # explicit mapping against TARGET_COLUMNS.
-            if any(not re.fullmatch(r"\d+", h or "") for h in first_row):
-                df = df[1:].rename(columns={df.columns[i]: first_row[i] for i in range(len(first_row))})
-            else:
-                mapping = {
-                    col: TARGET_COLUMNS[i]
-                    for i, col in enumerate(df.columns[: len(TARGET_COLUMNS)])
-                }
-                df = df.rename(columns=mapping)
-
-        # Normalize after any renaming so column lookups succeed later.
-        df = _normalize_columns(df)
-
-        # Replace empty strings with NA and drop rows where all fields are NA
-        df = df.replace("", pd.NA).dropna(how="all")
-
-        return df
-
-    def map_pending_row_to_target(src: dict) -> dict:
-        """
-        Build a single row in the TARGET_COLUMNS shape from a raw pending row.
-        We try flexible key matching for robustness.
-        """
-        # Flexible column candidates:
-        name   = _first_nonempty(src, _col_lookup_df.get("name",""), _col_lookup_df.get("full_name",""))
-        phone  = _first_nonempty(src, _col_lookup_df.get("phone",""), _col_lookup_df.get("phone_number",""))
-        email  = _first_nonempty(src, _col_lookup_df.get("email",""), _col_lookup_df.get("email_address",""))
-        loc    = _first_nonempty(src, _col_lookup_df.get("location",""), _col_lookup_df.get("city",""))
-        level  = _first_nonempty(src, _col_lookup_df.get("level",""), _col_lookup_df.get("class",""))
-        paid   = _first_nonempty(src, _col_lookup_df.get("paid",""), _col_lookup_df.get("amount_paid",""))
-        bal    = _first_nonempty(src, _col_lookup_df.get("balance",""), _col_lookup_df.get("outstanding",""))
-        cstart = _first_nonempty(src, _col_lookup_df.get("contractstart",""), _col_lookup_df.get("start_date",""))
-        cend   = _first_nonempty(src, _col_lookup_df.get("contractend",""), _col_lookup_df.get("end_date",""))
-        code   = _first_nonempty(src, _col_lookup_df.get("studentcode",""), _col_lookup_df.get("student_code",""), _col_lookup_df.get("code",""))
-        ecand  = _first_nonempty(
-            src,
-            _col_lookup_df.get("emergency_contact_phone_number",""),
-            _col_lookup_df.get("emergency_contact",""),
-            _col_lookup_df.get("emergency",""),
-            _col_lookup_df.get("guardian_phone",""),
-        )
-        status = _first_nonempty(src, _col_lookup_df.get("status",""))
-        enroll = _first_nonempty(src, _col_lookup_df.get("enrolldate",""), _col_lookup_df.get("enroll_date",""), _col_lookup_df.get("registration_date",""))
-        cname  = _first_nonempty(src, _col_lookup_df.get("classname",""), _col_lookup_df.get("class_name",""), _col_lookup_df.get("course",""))
-
-        # Coercions/cleanups
-        phone_norm = _clean_phone_gh(phone) or ""
-        ec_norm    = _clean_phone_gh(ecand) or ""
-
-        paid_f = _to_float(paid, 0.0)
-        bal_f  = _to_float(bal, 0.0)
-
-        cs_iso = _parse_date_iso(cstart)
-        ce_iso = _parse_date_iso(cend)
-        en_iso = _parse_date_iso(enroll) or date.today().isoformat()
-
-        # If no contract end but we have start, default +30 days
-        if not ce_iso and cs_iso:
-            try:
-                y, m, d = [int(x) for x in cs_iso.split("-")]
-                ce_iso = (date(y, m, d) + timedelta(days=30)).isoformat()
-            except Exception:
-                ce_iso = ""
-
-        level_up = str(level).upper().strip() if level else ""
-
-        # Build target
-        row = {
-            "Name": str(name).strip(),
-            "Phone": phone_norm,
-            "Location": str(loc).strip(),
-            "Level": level_up,
-            "Paid": paid_f,
-            "Balance": bal_f,
-            "ContractStart": cs_iso,
-            "ContractEnd": ce_iso,
-            "StudentCode": str(code).strip(),
-            "Email": str(email).strip(),
-            "Emergency Contact (Phone Number)": ec_norm,
-            "Status": str(status or "Active").strip(),
-            "EnrollDate": en_iso,
-            "ClassName": str(cname or level_up).strip(),
-        }
-        # Only keep required keys & order
-        return {k: row.get(k, "") for k in TARGET_COLUMNS}
-
-    def post_rows(rows: list) -> tuple[bool, str, dict | None]:
-        if not APPS_SCRIPT_WEBAPP_URL:
-            st.error(
-                "Apps Script Web App URL is not configured. Set the 'apps_script.pending_to_main_webapp_url' "
-                "secret or the 'PENDING_TO_MAIN_WEBAPP_URL' environment variable."
-            )
-            return False, "Apps Script Web App URL is not configured.", None
-        try:
-            url = APPS_SCRIPT_WEBAPP_URL
-            api_key = (
-                st.secrets.get("apps_script", {}).get("app_key")
-                or os.getenv("APP_KEY")
-                or ""
-            )
-            if api_key:
-                sep = "&" if "?" in url else "?"
-                url = f"{url}{sep}key={api_key}"
-            resp = requests.post(url, json={"rows": rows}, timeout=30)
-            # Apps Script can't set HTTP status reliably; parse JSON payload
-            try:
-                data = resp.json()
-            except Exception:
-                data = {"ok": False, "error": f"Non-JSON response (HTTP {resp.status_code})"}
-            if data.get("ok"):
-                return True, "OK", data
-            else:
-                # Include body snippet for debugging
-                return False, data.get("error") or f"HTTP {resp.status_code}: {resp.text[:300]}", data
-        except Exception as e:
-            return False, f"Request failed: {e}", None
-
-    # ---------- UI: Load + Review ----------
-    df_pending = load_pending()
-    pending_count = len(df_pending)
-    st.metric("Pending students", pending_count)
-    if df_pending.empty:
-        st.info("No pending form submissions found yet.")
-        st.stop()
-
-    # Resolve column lookups once
-    _col_lookup_df = {}
-    for k in [
-        "name","full_name","phone","phone_number","email","email_address","location","city","class","level",
-        "paid","amount_paid","balance","outstanding","contractstart","start_date","contractend","end_date",
-        "studentcode","student_code","code","classname","class_name","course",
-        "emergency_contact_phone_number","emergency_contact","emergency","guardian_phone",
-        "status","enrolldate","enroll_date","registration_date"
-    ]:
-        _col_lookup_df[k] = _col_lookup(df_pending, k, default=None)
-
-    # Free-text search over the raw pending table (to quickly find a form)
-    st.markdown("### 1️⃣ Review those who filled the form")
-    search = st.text_input("🔍 Search any field (name, email, phone, etc.)", "")
-    view_df = df_pending.copy()
-    if search:
-        s = search.strip().lower()
-        view_df = view_df[view_df.apply(lambda r: s in str(r.to_dict()).lower(), axis=1)]
-    # Reorder/subset columns to mirror TARGET_COLUMNS where possible
-    view_col_candidates = {
-        "Name": ["name", "full_name"],
-        "Phone": ["phone", "phone_number"],
-        "Location": ["location", "city"],
-        "Level": ["level", "class"],
-        "Paid": ["paid", "amount_paid"],
-        "Balance": ["balance", "outstanding"],
-        "ContractStart": ["contractstart", "start_date"],
-        "ContractEnd": ["contractend", "end_date"],
-        "StudentCode": ["studentcode", "student_code", "code"],
-        "Email": ["email", "email_address"],
-        "Emergency Contact (Phone Number)": [
-            "emergency_contact_phone_number",
-            "emergency_contact",
-            "emergency",
-            "guardian_phone",
-        ],
-        "Status": ["status"],
-        "EnrollDate": ["enrolldate", "enroll_date", "registration_date"],
-        "ClassName": ["classname", "class_name", "course"],
-    }
-    view_columns = []
-    for tgt in TARGET_COLUMNS:
-        for cand in view_col_candidates.get(tgt, []):
-            col = _col_lookup_df.get(cand)
-            if col:
-                view_columns.append(col)
-                break
-    # Place any remaining columns after the target-ordered ones
-    remaining_cols = [c for c in view_df.columns if c not in view_columns]
-    view_df = view_df[view_columns + remaining_cols]
-
-    st.caption(f"Showing {len(view_df)} of {pending_count} pending rows.")
-    cols_to_show = st.multiselect(
-        "Columns to display", view_df.columns.tolist(), default=view_columns or view_df.columns.tolist()
-    )
-    with st.expander("Show raw pending rows", expanded=False):
-        st.dataframe(view_df[cols_to_show], use_container_width=True, height=320)
-
-    # ---------- Build editable TARGET table ----------
-    st.markdown("### 2️⃣ Edit student info (normalized to main sheet columns)")
-    mapped_rows = [map_pending_row_to_target(r._asdict() if hasattr(r, "_asdict") else r)
-                   for r in view_df.to_dict(orient="records")]
-
-    edit_df = pd.DataFrame(mapped_rows, columns=TARGET_COLUMNS)
-
-    for col in ["ContractStart", "ContractEnd", "EnrollDate"]:
-        edit_df[col] = pd.to_datetime(edit_df[col], errors="coerce")
-    edit_df["EnrollDate"].fillna(pd.Timestamp.today().normalize(), inplace=True)
-
-    if not all(pd.api.types.is_datetime64_ns_dtype(edit_df[col]) for col in ["ContractStart", "ContractEnd", "EnrollDate"]):
-        raise TypeError("Date columns must be datetime64[ns]")
-
-    # Add a selection column for sending
-    edit_df.insert(0, "Select", True)
-
-    # Helpful defaults: if both Phone and Email are blank, de-select (won't pass validation)
-    edit_df.loc[(edit_df["Phone"] == "") & (edit_df["Email"] == ""), "Select"] = False
-
-    edited = st.data_editor(
-        edit_df,
-        use_container_width=True,
-        height=460,
-        column_config={
-            "Select": st.column_config.CheckboxColumn("Select", help="Tick rows to send", default=True),
-            "Paid": st.column_config.NumberColumn("Paid (GHS)", step=1.0, format="%.2f"),
-            "Balance": st.column_config.NumberColumn("Balance (GHS)", step=1.0, format="%.2f"),
-            "ContractStart": st.column_config.DateColumn("ContractStart"),
-            "ContractEnd": st.column_config.DateColumn("ContractEnd"),
-            "EnrollDate": st.column_config.DateColumn("EnrollDate"),
-        },
-        key="pending_editor_new",
-    )
-
-    # ---------- Validation preview ----------
-    st.markdown("### 3️⃣ Validate & Send to Main Sheet")
-
-    # Build payload from the edited table
-    to_send = []
-    problems = []
-    for idx, r in edited.iterrows():
-        if not r.get("Select", False):
-            continue
-
-        # Ensure minimal validity
-        name = str(r.get("Name", "")).strip()
-        phone = str(r.get("Phone", "")).strip()
-        email = str(r.get("Email", "")).strip()
-
-        if not name:
-            problems.append(f"Row {idx+1}: Name is required.")
-            continue
-        if not (phone or email):
-            problems.append(f"Row {idx+1}: Provide at least Phone or Email.")
-            continue
-
-        # Clean/normalize values
-        phone_norm = _clean_phone_gh(phone) or ""
-        ec_norm    = _clean_phone_gh(r.get("Emergency Contact (Phone Number)", "")) or ""
-
-        paid_f = _to_float(r.get("Paid", 0))
-        bal_f  = _to_float(r.get("Balance", 0))
-
-        cs_iso = _parse_date_iso(r.get("ContractStart", ""))
-        ce_iso = _parse_date_iso(r.get("ContractEnd", ""))
-        en_iso = _parse_date_iso(r.get("EnrollDate", "")) or date.today().isoformat()
-
-        # If only start provided, auto-fill end = start + 30 days
-        if cs_iso and not ce_iso:
-            y, m, d = [int(x) for x in cs_iso.split("-")]
-            ce_iso = (date(y, m, d) + timedelta(days=30)).isoformat()
-
-        row_out = {
-            "Name": name,
-            "Phone": phone_norm,
-            "Location": str(r.get("Location", "")).strip(),
-            "Level": str(r.get("Level", "")).upper().strip(),
-            "Paid": paid_f,
-            "Balance": bal_f,
-            "ContractStart": cs_iso,
-            "ContractEnd": ce_iso,
-            "StudentCode": str(r.get("StudentCode", "")).strip(),
-            "Email": email,
-            "Emergency Contact (Phone Number)": ec_norm,
-            "Status": str(r.get("Status", "") or "Active").strip(),
-            "EnrollDate": en_iso,
-            "ClassName": str(r.get("ClassName", "")).strip(),
-        }
-        # Keep order strictly
-        row_out = {k: row_out.get(k, "") for k in TARGET_COLUMNS}
-        to_send.append(row_out)
-
-    if problems:
-        st.warning("Please fix these issues before sending:")
-        for p in problems:
-            st.markdown(f"- {p}")
-
-    with st.expander("Preview JSON payload", expanded=False):
-        st.code(json.dumps({"rows": to_send}, ensure_ascii=False, indent=2))
-
-    if not APPS_SCRIPT_WEBAPP_URL:
-        st.error(
-            "Apps Script Web App URL is not configured. Set the 'apps_script.pending_to_main_webapp_url' "
-            "secret or the 'PENDING_TO_MAIN_WEBAPP_URL' environment variable."
-        )
-
-    left, right = st.columns([1,1])
-    with left:
-        send_btn = st.button(
-            "🚚 Send selected to Main Sheet",
-            type="primary",
-            disabled=(len(to_send) == 0 or not APPS_SCRIPT_WEBAPP_URL),
-        )
-    with right:
-        st.download_button(
-            "⬇️ Download edited CSV",
-            pd.DataFrame(to_send, columns=TARGET_COLUMNS).to_csv(index=False),
-            file_name="pending_to_send.csv",
-            disabled=(len(to_send) == 0),
-        )
-
-    if send_btn:
-        with st.status("Sending rows to Apps Script…", expanded=True) as status:
-            ok, msg, data = post_rows(to_send)
-            if ok:
-                st.success(f"✅ Sent {len(to_send)} row(s).")
-                if data and "results" in data:
-                    st.json(data["results"])
-                status.update(label="Done", state="complete")
-
-                # Refresh main list & optionally jump to All Students tab
-                try:
-                    load_students.clear()
-                except Exception:
-                    pass
-                try:
-                    df_students = load_students()
-                except Exception:
-                    pass
-
-                if st.button("👀 View in All Students"):
-                    st.session_state["active_tab"] = 1
-                    st.rerun()
-            else:
-                st.error(f"❌ Failed to send: {msg}")
-
-
-
-# ==== TAB 1: ALL STUDENTS ====
 elif selected_tab == tab_titles[1]:
     st.title("👩‍🎓 All Students")
 
