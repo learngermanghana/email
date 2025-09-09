@@ -17,7 +17,7 @@ Tasks persist in Firestore under the `tasks` collection with fields `description
 
 ## Social Media Templates
 
-Run `streamlit run social_templates.py` to manage reusable social media templates.
+Launch the app with `streamlit run email.py` and open the **Social Templates** page to manage reusable social media templates.
 
 The page lets you:
 
