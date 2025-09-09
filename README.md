@@ -6,7 +6,7 @@ The application provides an **About Us** tab that stores key contact and social 
 
 ## Weekly Team Tasks
 
-Run `streamlit run todo.py` to manage weekly team tasks.
+Launch the main app with `streamlit run email.py` and open the **📝 Weekly Tasks** tab to manage weekly team tasks.
 
 The page lets you:
 
