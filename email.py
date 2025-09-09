@@ -513,10 +513,12 @@ elif selected_tab == tab_titles[2]:
     df["days_left"] = (df["due_date"] - pd.Timestamp.today()).dt.days
 
     # --- Financial Summary ---
-    m1, m2, m3 = st.columns(3)
+    # Previous layout displayed three metrics for totals collected and outstanding.
+    # Only show the total number of students for a simplified summary.
+    (m1,) = st.columns(1)
     m1.metric("Total Students", len(df))
-    m2.metric("Total Collected (GHS)", f"{df['paid'].sum():,.2f}")
-    m3.metric("Total Outstanding (GHS)", f"{df[bal_col].sum():,.2f}")
+    # m2.metric("Total Collected (GHS)", f"{df['paid'].sum():,.2f}")
+    # m3.metric("Total Outstanding (GHS)", f"{df[bal_col].sum():,.2f}")
 
     st.markdown("---")
 
