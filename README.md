@@ -14,3 +14,15 @@ The page lets you:
 - Mark tasks complete from an interactive checklist.
 
 Tasks persist in Firestore under the `tasks` collection with fields `description`, `assignee`, `week` (ISO date), and `completed`. Configure `st.secrets["firebase"]` for database access. If SMTP details are provided in `st.secrets`, assignees receive email notifications when tasks are created or updated.
+
+## Social Media Templates
+
+Run `streamlit run social_templates.py` to manage reusable social media templates.
+
+The page lets you:
+
+- Save template title, platform, and content.
+- View existing templates in a table.
+- Delete templates you no longer need.
+
+Templates persist in Firestore under the `templates` collection with fields `title`, `platform`, and `content`.
