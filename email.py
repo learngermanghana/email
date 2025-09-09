@@ -1685,13 +1685,13 @@ elif selected_tab == tab_titles[7]:
 elif selected_tab == tab_titles[8]:
     st.title("📝 Weekly Tasks")
 
-    selected_week = st.date_input("Select week", value=date.today())
+    selected_week = st.date_input("Select week", value=date.today(), key="weekly_tasks_week")
     selected_week_start = selected_week - timedelta(days=selected_week.weekday())
 
     with st.form("task_form", clear_on_submit=True):
         desc = st.text_input("Task description")
         assignee = st.text_input("Assignee")
-        due = st.date_input("Due date", value=selected_week)
+        due = st.date_input("Due date", value=selected_week, key="weekly_tasks_due")
         notify = st.checkbox("Email assignee", value=False)
         submitted = st.form_submit_button("Add task")
 
