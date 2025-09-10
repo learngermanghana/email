@@ -1476,6 +1476,13 @@ elif selected_tab == tab_titles[6]:
             df["date"] = pd.to_datetime(df["date"], errors="coerce")
         return df
 
+    if st.button("🔄 Refresh data"):
+        load_assignment_scores.clear()
+        if hasattr(st, "rerun"):
+            st.rerun()
+        else:  # pragma: no cover - fallback for older Streamlit
+            st.experimental_rerun()
+
     df_scores = load_assignment_scores()
     if df_scores is None or df_scores.empty:
         st.info("No assignment score data available.")
