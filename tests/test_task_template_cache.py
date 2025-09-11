@@ -21,17 +21,34 @@ def test_load_tasks_cache_and_clears_on_add():
     db = MagicMock()
     coll = db.collection.return_value
     where = coll.where.return_value
-    where.stream.return_value = [_doc({"description": "t1", "assignee": "a1", "week": "w1"}, "id1")]
+    select = where.select.return_value
+    select.stream.return_value = [_doc({"description": "t1", "assignee": "a1", "week": "w1", "due": "d1", "completed": False}, "id1")]
     with patch("todo._get_db", return_value=db):
         first = todo.load_tasks("w1")
         second = todo.load_tasks("w1")
         assert first == second
-        assert where.stream.call_count == 1
+        assert select.stream.call_count == 1
+        where.select.assert_called_once_with([
+            "description",
+            "assignee",
+            "week",
+            "due",
+            "completed",
+        ])
 
-        where.stream.return_value = [_doc({"description": "t2", "assignee": "a2", "week": "w1"}, "id2")]
+        select.stream.return_value = [_doc({"description": "t2", "assignee": "a2", "week": "w1", "due": "d", "completed": False}, "id2")]
         todo.add_task("t2", "a2", "w1", "d")
         refreshed = todo.load_tasks("w1")
-    assert refreshed == [{"description": "t2", "assignee": "a2", "week": "w1", "id": "id2"}]
+    assert refreshed == [
+        {
+            "description": "t2",
+            "assignee": "a2",
+            "week": "w1",
+            "due": "d",
+            "completed": False,
+            "id": "id2",
+        }
+    ]
 
 
 def test_update_task_clears_cache():
@@ -47,14 +64,16 @@ def test_load_templates_cache_and_clears_on_add():
     social_templates.load_templates.clear()
     db = MagicMock()
     coll = db.collection.return_value
-    coll.stream.return_value = [_doc({"title": "tmp1", "platform": "p1", "content": "c1"}, "id1")]
+    select = coll.select.return_value
+    select.stream.return_value = [_doc({"title": "tmp1", "platform": "p1", "content": "c1"}, "id1")]
     with patch("social_templates._get_db", return_value=db):
         first = social_templates.load_templates()
         second = social_templates.load_templates()
         assert first == second
-        assert coll.stream.call_count == 1
+        assert select.stream.call_count == 1
+        coll.select.assert_called_once_with(["title", "platform", "content"])
 
-        coll.stream.return_value = [_doc({"title": "tmp2", "platform": "p2", "content": "c2"}, "id2")]
+        select.stream.return_value = [_doc({"title": "tmp2", "platform": "p2", "content": "c2"}, "id2")]
         social_templates.add_template("tmp2", "p2", "c2")
         refreshed = social_templates.load_templates()
     assert refreshed == [{"title": "tmp2", "platform": "p2", "content": "c2", "id": "id2"}]

@@ -29,7 +29,11 @@ def add_template(title: str, platform: str, content: str):
 def load_templates():
     """Return all templates stored in Firestore."""
     db = _get_db()
-    docs = db.collection("templates").stream()
+    docs = (
+        db.collection("templates")
+        .select(["title", "platform", "content"])
+        .stream()
+    )
     templates = []
     for doc in docs:
         data = doc.to_dict() or {}
