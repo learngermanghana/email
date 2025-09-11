@@ -32,7 +32,7 @@ def test_load_tasks_snapshot_updates_state_and_reruns():
 
     query.on_snapshot.side_effect = on_snapshot
     with patch("todo._get_db", return_value=db), patch(
-        "streamlit.experimental_rerun", create=True
+        "streamlit.rerun", create=True
     ) as rerun:
         assert todo.load_tasks("w1") == []
         callback_holder["cb"](
@@ -74,7 +74,7 @@ def test_load_tasks_replaces_listener_on_week_change():
     listener2 = MagicMock()
     query.on_snapshot.side_effect = [listener1, listener2]
     with patch("todo._get_db", return_value=db), patch(
-        "streamlit.experimental_rerun", create=True
+        "streamlit.rerun", create=True
     ):
         todo.load_tasks("w1")
         todo.load_tasks("w2")
@@ -97,7 +97,7 @@ def test_load_templates_snapshot_updates_state_and_reruns():
 
     query.on_snapshot.side_effect = on_snapshot
     with patch("social_templates._get_db", return_value=db), patch(
-        "streamlit.experimental_rerun", create=True
+        "streamlit.rerun", create=True
     ) as rerun:
         assert social_templates.load_templates() == []
         callback_holder["cb"](

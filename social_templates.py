@@ -39,7 +39,7 @@ def load_templates():
                 data["id"] = doc.id
                 templates.append(data)
             state["templates"] = templates
-            st.experimental_rerun()
+            st.rerun()
 
         state["template_listener"] = query.on_snapshot(on_snapshot)
 
