@@ -14,7 +14,6 @@ with st.sidebar:
 
 if submitted and title and platform and content:
     add_template(title, platform, content)
-    st.experimental_rerun()
 
 templates = load_templates()
 if templates:
@@ -32,6 +31,5 @@ if templates:
     if to_delete:
         for template_id in to_delete:
             delete_template(template_id)
-        st.experimental_rerun()
 else:
     st.info("No templates yet.")

@@ -6,6 +6,7 @@ import smtplib
 
 _db = None
 
+
 def _get_db():
     global _db
     if _db is None:
@@ -14,6 +15,7 @@ def _get_db():
             firebase_admin.initialize_app(cred)
         _db = firestore.client()
     return _db
+
 
 def add_task(description: str, assignee: str, week: str, due: str | None = None):
     db = _get_db()
@@ -26,28 +28,42 @@ def add_task(description: str, assignee: str, week: str, due: str | None = None)
             "completed": False,
         }
     )
-    load_tasks.clear()
 
-@st.cache_data(ttl=60)
+
 def load_tasks(week: str):
+    """Listen for tasks for ``week`` and return cached results."""
     db = _get_db()
-    docs = (
-        db.collection("tasks")
-        .where("week", "==", week)
-        .select(["description", "assignee", "week", "due", "completed"])
-        .stream()
-    )
-    tasks = []
-    for doc in docs:
-        data = doc.to_dict() or {}
-        data["id"] = doc.id
-        tasks.append(data)
-    return tasks
+    state = st.session_state
+
+    # If the week changed, remove any existing listener
+    if state.get("task_listener_week") != week:
+        listener = state.get("task_listener")
+        if listener:
+            listener.unsubscribe()
+        query = (
+            db.collection("tasks")
+            .where("week", "==", week)
+            .select(["description", "assignee", "week", "due", "completed"])
+        )
+
+        def on_snapshot(col_snapshot, changes, read_time):
+            tasks = []
+            for doc in col_snapshot:
+                data = doc.to_dict() or {}
+                data["id"] = doc.id
+                tasks.append(data)
+            state["tasks"] = tasks
+            st.experimental_rerun()
+
+        state["task_listener"] = query.on_snapshot(on_snapshot)
+        state["task_listener_week"] = week
+
+    return state.get("tasks", [])
+
 
 def update_task(task_id: str, updates: dict):
     db = _get_db()
     db.collection("tasks").document(task_id).update(updates)
-    load_tasks.clear()
 
 def notify_assignee(email: str, subject: str, body: str):
     try:

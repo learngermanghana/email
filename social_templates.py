@@ -22,31 +22,34 @@ def add_template(title: str, platform: str, content: str):
     db.collection("templates").add(
         {"title": title, "platform": platform, "content": content}
     )
-    load_templates.clear()
 
 
-@st.cache_data(ttl=60)
 def load_templates():
-    """Return all templates stored in Firestore."""
+    """Return all templates stored in Firestore using a snapshot listener."""
     db = _get_db()
-    docs = (
-        db.collection("templates")
-        .select(["title", "platform", "content"])
-        .stream()
-    )
-    templates = []
-    for doc in docs:
-        data = doc.to_dict() or {}
-        data["id"] = doc.id
-        templates.append(data)
-    return templates
+    state = st.session_state
+
+    if "template_listener" not in state:
+        query = db.collection("templates").select(["title", "platform", "content"])
+
+        def on_snapshot(col_snapshot, changes, read_time):
+            templates = []
+            for doc in col_snapshot:
+                data = doc.to_dict() or {}
+                data["id"] = doc.id
+                templates.append(data)
+            state["templates"] = templates
+            st.experimental_rerun()
+
+        state["template_listener"] = query.on_snapshot(on_snapshot)
+
+    return state.get("templates", [])
 
 
 def delete_template(template_id: str):
     """Delete a template by document id."""
     db = _get_db()
     db.collection("templates").document(template_id).delete()
-    load_templates.clear()
 
 
 if __name__ == "__main__":
