@@ -309,8 +309,14 @@ def wrap_template_lines(text: str, limit: int = AGREEMENT_LINE_LIMIT):
 # ==== END OF STAGE 1 ====
 
 # ==== DATA LOADING HELPERS & CACHING ====
+# Allow cache TTL to be configured via ``st.secrets['cache_ttl']``
+try:
+    CACHE_TTL = int(st.secrets.get("cache_ttl", 300))
+except Exception:  # pragma: no cover - fallback when secrets aren't available
+    CACHE_TTL = 300
 
-@st.cache_data(ttl=300, show_spinner="Loading student data...")
+
+@st.cache_data(ttl=CACHE_TTL, show_spinner="Loading student data...")
 def load_students():
     df = pd.read_csv(STUDENTS_CSV_URL, dtype=str)
     df = normalize_columns(df)
@@ -319,7 +325,7 @@ def load_students():
         df = df.rename(columns={"student_code": "studentcode"})
     return df
 
-@st.cache_data(ttl=300, show_spinner="Loading reference answers...")
+@st.cache_data(ttl=CACHE_TTL, show_spinner="Loading reference answers...")
 def load_ref_answers():
     df = pd.read_csv(REF_ANSWERS_CSV_URL, dtype=str)
     df = normalize_columns(df)
@@ -339,6 +345,12 @@ def load_ref_answers():
 # ==== SESSION STATE INITIALIZATION ====
 if "tabs_loaded" not in st.session_state:
     st.session_state["tabs_loaded"] = False
+
+# ==== MANUAL CACHE REFRESH ====
+if st.button("Refresh data"):
+    load_students.clear()
+    load_ref_answers.clear()
+    st.experimental_rerun()
 
 # ==== LOAD MAIN DATAFRAMES ONCE ====
 df_students = load_students()
