@@ -1565,6 +1565,7 @@ elif selected_tab == tab_titles[5]:
 # ==== TAB 6: LEADERSHIP BOARD ====
 elif selected_tab == tab_titles[6]:
     st.title("🏆 Student Leadership Board")
+    st.autorefresh(interval=60_000, key="leaderboard_refresh")
 
     # --- Config: the sheet you gave me (converted to CSV export) ---
     ASSIGNMENTS_CSV_URL = (
@@ -1585,7 +1586,7 @@ elif selected_tab == tab_titles[6]:
             if any(c.startswith(x) for x in cands): return c
         return None
 
-    @st.cache_data(ttl=300, show_spinner="Loading assignment scores...")
+    @st.cache_data(ttl=60, show_spinner="Loading assignment scores...")
     def load_assignment_scores():
         df = read_csv_with_retry(ASSIGNMENTS_CSV_URL, dtype=str)
         df = _normalize_columns(df)
@@ -1618,13 +1619,6 @@ elif selected_tab == tab_titles[6]:
         if "date" in df.columns:
             df["date"] = pd.to_datetime(df["date"], errors="coerce")
         return df
-
-    if st.button("🔄 Refresh data"):
-        load_assignment_scores.clear()
-        if hasattr(st, "rerun"):
-            st.rerun()
-        else:  # pragma: no cover - fallback for older Streamlit
-            st.experimental_rerun()
 
     df_scores = load_assignment_scores()
     if df_scores is None or df_scores.empty:
