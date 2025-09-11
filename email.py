@@ -2,6 +2,8 @@
 import os
 import re
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 import tempfile
 import urllib.parse
 from datetime import datetime, date, timedelta
@@ -94,6 +96,52 @@ def load_email_config():
 
 SENDER_EMAIL, SMTP_HOST, SMTP_PORT, SMTP_USE_TLS, SMTP_USERNAME, SMTP_PASSWORD = load_email_config()
 
+# --- HTTP session with retries ---
+DEFAULT_TIMEOUT = 10
+
+
+def _requests_retry_session(
+    retries=3,
+    backoff_factor=0.5,
+    status_forcelist=(429, 500, 502, 503, 504),
+):
+    retry = Retry(
+        total=retries,
+        read=retries,
+        connect=retries,
+        backoff_factor=backoff_factor,
+        status_forcelist=status_forcelist,
+        allowed_methods=["GET"],
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session = requests.Session()
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
+
+HTTP_SESSION = _requests_retry_session()
+
+
+def fetch_url(url, timeout=DEFAULT_TIMEOUT):
+    """Fetch ``url`` returning raw bytes or ``None`` on failure."""
+    try:
+        resp = HTTP_SESSION.get(url, timeout=timeout)
+        resp.raise_for_status()
+        return resp.content
+    except Exception as exc:  # pragma: no cover - network errors
+        st.warning(f"Failed to fetch {url}: {exc}")
+        return None
+
+
+def read_csv_with_retry(url, **kwargs):
+    """Read CSV from ``url`` using the retry-enabled session."""
+    content = fetch_url(url)
+    if content is None:
+        st.warning(f"Unable to load data from {url}")
+        return pd.DataFrame()
+    return pd.read_csv(BytesIO(content), **kwargs)
+
 # ==== UNIVERSAL HELPERS ====
 
 def col_lookup(df: pd.DataFrame, name: str, default=None) -> str:
@@ -165,16 +213,13 @@ def fetch_assets(url_map: dict) -> dict:
     if not url_map:
         return results
     with ThreadPoolExecutor() as executor:
-        future_to_key = {executor.submit(requests.get, url): key for key, url in url_map.items()}
+        future_to_key = {executor.submit(fetch_url, url): key for key, url in url_map.items()}
         for future in as_completed(future_to_key):
             key = future_to_key[future]
             try:
-                resp = future.result()
-                if getattr(resp, "status_code", 0) == 200:
-                    results[key] = resp.content
-                else:
-                    results[key] = None
-            except Exception:
+                results[key] = future.result()
+            except Exception as exc:  # pragma: no cover - should be handled in fetch_url
+                st.warning(f"Failed to fetch {key}: {exc}")
                 results[key] = None
     return results
 
@@ -350,7 +395,7 @@ except Exception:  # pragma: no cover - fallback when secrets aren't available
 
 @st.cache_data(ttl=CACHE_TTL, show_spinner="Loading student data...")
 def load_students():
-    df = pd.read_csv(STUDENTS_CSV_URL, dtype=str)
+    df = read_csv_with_retry(STUDENTS_CSV_URL, dtype=str)
     df = normalize_columns(df)
     # Standardize any known column name variants
     if "student_code" in df.columns:
@@ -359,7 +404,7 @@ def load_students():
 
 @st.cache_data(ttl=CACHE_TTL, show_spinner="Loading reference answers...")
 def load_ref_answers():
-    df = pd.read_csv(REF_ANSWERS_CSV_URL, dtype=str)
+    df = read_csv_with_retry(REF_ANSWERS_CSV_URL, dtype=str)
     df = normalize_columns(df)
     if "assignment" not in df.columns:
         raise Exception("No 'assignment' column found in reference answers sheet.")
@@ -385,11 +430,15 @@ if st.button("Refresh data"):
     st.experimental_rerun()
 
 # ==== LOAD MAIN DATAFRAMES ONCE ====
-with ThreadPoolExecutor() as executor:
-    student_future = executor.submit(load_students)
-    ref_future = executor.submit(load_ref_answers)
-    df_students = student_future.result()
-    df_ref_answers = ref_future.result()
+if os.getenv("EMAIL_SKIP_PRELOAD") == "1":
+    df_students = pd.DataFrame()
+    df_ref_answers = pd.DataFrame()
+else:
+    with ThreadPoolExecutor() as executor:
+        student_future = executor.submit(load_students)
+        ref_future = executor.submit(load_ref_answers)
+        df_students = student_future.result()
+        df_ref_answers = ref_future.result()
 
 # ==== UNIVERSAL VARIABLES (for later use) ====
 LEVELS = sorted(df_students["level"].dropna().unique().tolist()) if "level" in df_students.columns else []
@@ -785,7 +834,7 @@ elif selected_tab == tab_titles[3]:
         "https://docs.google.com/spreadsheets/d/"
         "12NXf5FeVHr7JJT47mRHh7Jp-TC1yhPS7ZG6nzZVTt1U/export?format=csv"
     )
-    df = pd.read_csv(google_csv)
+    df = read_csv_with_retry(google_csv)
     df = normalize_columns(df)
 
     if df.empty:
@@ -1538,7 +1587,7 @@ elif selected_tab == tab_titles[6]:
 
     @st.cache_data(ttl=300, show_spinner="Loading assignment scores...")
     def load_assignment_scores():
-        df = pd.read_csv(ASSIGNMENTS_CSV_URL, dtype=str)
+        df = read_csv_with_retry(ASSIGNMENTS_CSV_URL, dtype=str)
         df = _normalize_columns(df)
 
         # Try to find expected columns with forgiving matching
@@ -1673,7 +1722,7 @@ elif selected_tab == tab_titles[6]:
 elif selected_tab == tab_titles[7]:
     st.title("📘 Class Attendance")
 
-    df_students = pd.read_csv(STUDENTS_CSV_URL, dtype=str)
+    df_students = read_csv_with_retry(STUDENTS_CSV_URL, dtype=str)
     df_students = normalize_columns(df_students)
 
     if df_students.empty:
