@@ -22,7 +22,6 @@ from io import BytesIO
 from utils import safe_pdf
 from pdf_utils import generate_receipt_and_contract_pdf
 from attendance_utils import save_attendance_to_firestore, load_attendance_from_firestore
-from todo import add_task, load_tasks, update_task, notify_assignee
 
 # ==== CONSTANTS ====
 SCHOOL_NAME = "Learn Language Education Academy"
@@ -534,7 +533,6 @@ tab_titles = [
     "📧 Course",                 # 5
     "🏆 Leadership Board",       # 6
     "📘 Class Attendance",       # 7
-    "📝 Weekly Tasks"            # 8
 ]
 
 if "active_tab" not in st.session_state:
@@ -1823,48 +1821,5 @@ elif selected_tab == tab_titles[7]:
 
                 save_attendance_to_firestore(sel_class, attendance_map)
                 st.success("Attendance saved.")
-
-
-# ==== TAB 8: WEEKLY TASKS ====
-elif selected_tab == tab_titles[8]:
-    st.title("📝 Weekly Tasks")
-
-    selected_week = st.date_input("Select week", value=date.today(), key="weekly_tasks_week")
-    selected_week_start = selected_week - timedelta(days=selected_week.weekday())
-
-    with st.form("task_form", clear_on_submit=True):
-        desc = st.text_input("Task description")
-        assignee = st.text_input("Assignee")
-        due = st.date_input("Due date", value=selected_week, key="weekly_tasks_due")
-        notify = st.checkbox("Email assignee", value=False)
-        submitted = st.form_submit_button("Add task")
-
-    if submitted and desc and assignee:
-        week_start = due - timedelta(days=due.weekday())
-        week_str = week_start.isoformat()
-        due_str = due.isoformat()
-        add_task(desc, assignee, week_str, due_str)
-        if notify:
-            notify_assignee(
-                assignee,
-                "New task assigned",
-                f"'{desc}' due {due_str}",
-            )
-        st.success("Task added!")
-
-    st.subheader(f"Tasks for week of {selected_week_start.isoformat()}")
-    for task in load_tasks(selected_week_start.isoformat()):
-        checked = st.checkbox(
-            f"{task['description']} - {task['assignee']} (due {task.get('due', task['week'])})",
-            value=task.get("completed", False),
-            key=task["id"],
-        )
-        if checked != task.get("completed", False):
-            update_task(task["id"], {"completed": checked})
-            notify_assignee(
-                task["assignee"],
-                "Task updated",
-                f"'{task['description']}' marked {'complete' if checked else 'incomplete'}",
-            )
 
 
