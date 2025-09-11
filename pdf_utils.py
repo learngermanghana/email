@@ -44,13 +44,26 @@ def generate_receipt_and_contract_pdf(
     pdf = FPDF()
     pdf.add_page()
 
-    pdf.set_font("Arial", size=14)
+    # Register a Unicode-capable font so we can display characters
+    # beyond the limited Latin-1 set.  If the font file is missing
+    # we silently fall back to the built-in fonts.
+    try:
+        pdf.add_font("DejaVu", "", "font/DejaVuSans.ttf", uni=True)
+        # Register the same file for bold and italic variants so that
+        # style changes do not trigger missing font errors even if the
+        # visual appearance remains regular.
+        pdf.add_font("DejaVu", "B", "font/DejaVuSans.ttf", uni=True)
+        pdf.add_font("DejaVu", "I", "font/DejaVuSans.ttf", uni=True)
+        pdf.set_font("DejaVu", size=14)
+    except Exception:
+        pdf.set_font("Arial", size=14)
+
     pdf.cell(200, 10, safe_pdf(f"{school_name} Payment Receipt"), ln=True, align="C")
-    pdf.set_font("Arial", 'B', size=12)
+    pdf.set_font(pdf.font_family, 'B', size=12)
     pdf.set_text_color(0, 128, 0)
     pdf.cell(200, 10, safe_pdf(payment_status), ln=True, align="C")
     pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Arial", size=12)
+    pdf.set_font(pdf.font_family, size=12)
     pdf.ln(10)
     pdf.cell(200, 10, safe_pdf(f"Name: {student_row.get('Name','')}"), ln=True)
     pdf.cell(200, 10, safe_pdf(f"Student Code: {student_row.get('StudentCode','')}"), ln=True)
@@ -66,12 +79,16 @@ def generate_receipt_and_contract_pdf(
     pdf.cell(0, 10, safe_pdf("Thank you for your payment!"), ln=True)
     pdf.cell(0, 10, safe_pdf("Signed: Felix Asadu"), ln=True)
     pdf.ln(15)
-    pdf.set_font("Arial", size=14)
+    pdf.set_font(pdf.font_family, size=14)
     pdf.cell(200, 10, safe_pdf(f"{school_name} Student Contract"), ln=True, align="C")
-    pdf.set_font("Arial", size=12)
+    pdf.set_font(pdf.font_family, size=12)
     pdf.ln(10)
     try:
-        pdf.multi_cell(0, 10, safe_pdf(filled), wrapmode=WrapMode.CHAR)
+        # Build the notes string and sanitize it so only Latin-1
+        # characters are sent to the PDF engine.  Characters outside
+        # the range are replaced with '?' by ``safe_pdf``.
+        notes_to_show = safe_pdf(filled)
+        pdf.multi_cell(0, 10, notes_to_show, wrapmode=WrapMode.CHAR)
     except FPDFException:
         pdf.set_text_color(255, 0, 0)
         pdf.multi_cell(0, 10, safe_pdf("Error: Unable to wrap contract text."))
@@ -79,7 +96,7 @@ def generate_receipt_and_contract_pdf(
     pdf.ln(10)
     pdf.cell(0, 10, safe_pdf("Signed: Felix Asadu"), ln=True)
     pdf.set_y(-15)
-    pdf.set_font("Arial", "I", 8)
+    pdf.set_font(pdf.font_family, "I", 8)
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
     pdf.cell(0, 10, safe_pdf(f"Generated on {now_str}"), align="C")
 
