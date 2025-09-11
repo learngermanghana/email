@@ -26,7 +26,9 @@ def add_task(description: str, assignee: str, week: str, due: str | None = None)
             "completed": False,
         }
     )
+    load_tasks.clear()
 
+@st.cache_data(ttl=60)
 def load_tasks(week: str):
     db = _get_db()
     docs = db.collection("tasks").where("week", "==", week).stream()
@@ -40,6 +42,7 @@ def load_tasks(week: str):
 def update_task(task_id: str, updates: dict):
     db = _get_db()
     db.collection("tasks").document(task_id).update(updates)
+    load_tasks.clear()
 
 def notify_assignee(email: str, subject: str, body: str):
     try:
