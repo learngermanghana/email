@@ -3,6 +3,7 @@ import pandas as pd
 import importlib.util
 import sys
 from pathlib import Path
+import os
 
 # Ensure repository root is on sys.path for module dependencies
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -25,7 +26,11 @@ def test_refresh_button_clears_caches():
         "assignment": ["a0"],
     })
 
-    with patch("pandas.read_csv", return_value=initial_df):
+    def fake_radio(label, options, **kwargs):
+        return options[0]
+
+    with patch.dict(os.environ, {"EMAIL_SKIP_PRELOAD": "1"}), \
+         patch("streamlit.sidebar.radio", side_effect=fake_radio):
         spec.loader.exec_module(email_module)
 
     # Ensure starting from a clean cache
@@ -42,7 +47,7 @@ def test_refresh_button_clears_caches():
             return df_ref1
         return pd.DataFrame()
 
-    with patch.object(email_module.pd, "read_csv", side_effect=first_read_csv):
+    with patch.object(email_module, "read_csv_with_retry", side_effect=first_read_csv):
         first_students = email_module.load_students()
         first_ref = email_module.load_ref_answers()
 
@@ -56,7 +61,7 @@ def test_refresh_button_clears_caches():
             return df_ref2
         return pd.DataFrame()
 
-    with patch.object(email_module.pd, "read_csv", side_effect=second_read_csv):
+    with patch.object(email_module, "read_csv_with_retry", side_effect=second_read_csv):
         # Cached data should still reflect first dataset
         cached_students = email_module.load_students()
         cached_ref = email_module.load_ref_answers()
@@ -68,7 +73,7 @@ def test_refresh_button_clears_caches():
     email_module.load_students.clear()
     email_module.load_ref_answers.clear()
 
-    with patch.object(email_module.pd, "read_csv", side_effect=second_read_csv):
+    with patch.object(email_module, "read_csv_with_retry", side_effect=second_read_csv):
         refreshed_students = email_module.load_students()
         refreshed_ref = email_module.load_ref_answers()
 
