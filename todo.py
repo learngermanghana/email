@@ -31,7 +31,12 @@ def add_task(description: str, assignee: str, week: str, due: str | None = None)
 @st.cache_data(ttl=60)
 def load_tasks(week: str):
     db = _get_db()
-    docs = db.collection("tasks").where("week", "==", week).stream()
+    docs = (
+        db.collection("tasks")
+        .where("week", "==", week)
+        .select(["description", "assignee", "week", "due", "completed"])
+        .stream()
+    )
     tasks = []
     for doc in docs:
         data = doc.to_dict() or {}

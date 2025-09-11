@@ -1,0 +1,13 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /tasks/{taskId} {
+      allow read: if request.query.selectFields.hasOnly(['description','assignee','week','due','completed']);
+      allow write: if true;
+    }
+    match /templates/{templateId} {
+      allow read: if request.query.selectFields.hasOnly(['title','platform','content']);
+      allow write: if true;
+    }
+  }
+}
