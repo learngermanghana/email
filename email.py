@@ -15,6 +15,11 @@ import textwrap
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import pandas as pd
 import streamlit as st
+try:
+    from streamlit_autorefresh import st_autorefresh
+except Exception:  # pragma: no cover - fallback if package missing
+    def st_autorefresh(*args, **kwargs):
+        return None
 from fpdf import FPDF, HTMLMixin
 import qrcode
 from PIL import Image  # For logo image handling
@@ -1563,7 +1568,7 @@ elif selected_tab == tab_titles[5]:
 # ==== TAB 6: LEADERSHIP BOARD ====
 elif selected_tab == tab_titles[6]:
     st.title("🏆 Student Leadership Board")
-    st.autorefresh(interval=60_000, key="leaderboard_refresh")
+    st_autorefresh(interval=60_000, key="leaderboard_refresh")
 
     # --- Config: the sheet you gave me (converted to CSV export) ---
     ASSIGNMENTS_CSV_URL = (
