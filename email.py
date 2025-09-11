@@ -430,7 +430,7 @@ RAW_SCHEDULE_B1 = [
 ]
 # ==== TABS SETUP ====
 tab_titles = [
-    "ℹ️ About Us",                # 0
+    "📅 Contract Alerts",         # 0
     "👩‍🎓 All Students",           # 1
     "📲 Reminders",              # 2
     "📄 Contract",               # 3
@@ -448,23 +448,53 @@ selected_tab = st.sidebar.radio("Navigate", tab_titles,
                                 index=st.session_state.get("active_tab", 3))
 st.session_state["active_tab"] = tab_titles.index(selected_tab)
 
-# ==== TAB 0: ABOUT US ====
+# ==== TAB 0: CONTRACT ALERTS ====
 if selected_tab == tab_titles[0]:
-    st.title("ℹ️ About Us")
-    st.markdown(
-        "This page stores key contact and social media links for the team."
-    )
-    social_df = pd.DataFrame(
-        [(k, v) for k, v in SOCIAL_LINKS.items()],
-        columns=["Platform", "Link"],
-    )
-    st.dataframe(social_df, use_container_width=True)
-    st.download_button(
-        "⬇️ Download socials as CSV",
-        social_df.to_csv(index=False),
-        file_name="socials.csv",
-        mime="text/csv",
-    )
+    st.title("📅 Contract Alerts")
+
+    end_col = col_lookup(df_students, "contractend")
+    name_col = col_lookup(df_students, "name")
+
+    if end_col and end_col in df_students.columns:
+        df = df_students[[name_col, end_col]].copy()
+        df[end_col] = pd.to_datetime(df[end_col], errors="coerce")
+        today = pd.to_datetime(date.today())
+        df["days_remaining"] = (df[end_col] - today).dt.days
+
+        threshold = st.number_input(
+            "Show contracts ending within N days", min_value=1, value=30
+        )
+
+        ends_soon = df[df["days_remaining"].between(0, threshold)].sort_values(
+            "days_remaining"
+        )
+        ended = df[df["days_remaining"] < 0].sort_values("days_remaining")
+
+        st.subheader("Contracts Ending Soon")
+        if ends_soon.empty:
+            st.info("No contracts ending soon.")
+        else:
+            st.dataframe(ends_soon, use_container_width=True)
+            st.download_button(
+                "⬇️ Download Ending Soon CSV",
+                ends_soon.to_csv(index=False),
+                file_name="contracts_ending_soon.csv",
+                mime="text/csv",
+            )
+
+        st.subheader("Contracts Ended")
+        if ended.empty:
+            st.info("No ended contracts.")
+        else:
+            st.dataframe(ended, use_container_width=True)
+            st.download_button(
+                "⬇️ Download Ended Contracts CSV",
+                ended.to_csv(index=False),
+                file_name="contracts_ended.csv",
+                mime="text/csv",
+            )
+    else:
+        st.info("No contract end data available.")
 
 elif selected_tab == tab_titles[1]:
     st.title("👩‍🎓 All Students")

@@ -1,8 +1,8 @@
 # email
 
-## About Us Page
+## Contract Alerts Page
 
-The application provides an **About Us** tab that stores key contact and social media information for the team. Links can be viewed in the app or downloaded as a CSV for quick reference.
+The application provides a **Contract Alerts** tab that highlights students whose contracts are ending soon or have already ended. You can adjust the alert window and download the results as CSV files for quick follow-up.
 
 ## Weekly Team Tasks
 
