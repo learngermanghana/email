@@ -53,7 +53,7 @@ def load_tasks(week: str):
                 data["id"] = doc.id
                 tasks.append(data)
             state["tasks"] = tasks
-            st.experimental_rerun()
+            st.rerun()
 
         state["task_listener"] = query.on_snapshot(on_snapshot)
         state["task_listener_week"] = week

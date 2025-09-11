@@ -427,7 +427,7 @@ if "tabs_loaded" not in st.session_state:
 if st.button("Refresh data"):
     load_students.clear()
     load_ref_answers.clear()
-    st.experimental_rerun()
+    st.rerun()
 
 # ==== LOAD MAIN DATAFRAMES ONCE ====
 if os.getenv("EMAIL_SKIP_PRELOAD") == "1":
