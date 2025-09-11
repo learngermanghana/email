@@ -200,6 +200,38 @@ def strip_leading_number(text):
     return re.sub(r"^\s*\d+[\.\)]?\s*", "", text).strip()
 
 
+def rank_students(df_level: pd.DataFrame, min_assign: int) -> pd.DataFrame:
+    """Aggregate assignment scores and count completions for ranking.
+
+    Parameters
+    ----------
+    df_level : pd.DataFrame
+        DataFrame filtered for a single class level containing at least
+        ``studentcode``, ``name``, ``assignment`` and ``score`` columns.
+    min_assign : int
+        Minimum number of assignments required to appear in the ranking.
+
+    Returns
+    -------
+    pd.DataFrame
+        Ranked results with columns ``studentcode``, ``name``,
+        ``total_score``, ``completed`` and ``Rank``.
+    """
+    df = df_level.copy()
+    df["assignment"] = df["assignment"].astype(str).str.strip().str.lower()
+    grouped = (
+        df.groupby(["studentcode", "name"], as_index=False)
+        .agg(
+            total_score=("score", "sum"),
+            completed=("assignment", "count"),
+        )
+    )
+    ranked = grouped[grouped["completed"] >= int(min_assign)].copy()
+    ranked = ranked.sort_values(["total_score", "completed"], ascending=[False, False]).reset_index(drop=True)
+    ranked["Rank"] = ranked.index + 1
+    return ranked
+
+
 def fetch_assets(url_map: dict) -> dict:
     """Download multiple URLs concurrently.
 
@@ -1668,26 +1700,14 @@ elif selected_tab == tab_titles[6]:
             df_level["studentcode"].astype(str).str.lower().str.contains(q, na=False)
         ]
 
-    # --- OLD LOGIC: group, require ≥ min assignments, rank by total_score then completed ---
     if df_level.empty:
         st.info("No rows after filtering.")
         st.stop()
 
-    grouped = (
-        df_level
-        .groupby(["studentcode", "name"], as_index=False)
-        .agg(
-            total_score=("score", "sum"),
-            completed=("assignment", "nunique")
-        )
-    )
-    ranked = grouped[grouped["completed"] >= int(min_assign)].copy()
+    ranked = rank_students(df_level, min_assign)
     if ranked.empty:
         st.info("No students meet the minimum assignments requirement.")
         st.stop()
-
-    ranked = ranked.sort_values(["total_score", "completed"], ascending=[False, False]).reset_index(drop=True)
-    ranked["Rank"] = ranked.index + 1
 
     # Show your rank if known
     your_rank_text = ""

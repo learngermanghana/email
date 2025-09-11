@@ -1,5 +1,6 @@
 __pycache__/
 *.pdf
 *.csv
+!tests/data/leaderboard_sample.csv
 .env
 *.env
