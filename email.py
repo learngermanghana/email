@@ -10,6 +10,7 @@ from email.message import EmailMessage
 import base64
 import textwrap
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import pandas as pd
 import streamlit as st
 from fpdf import FPDF, HTMLMixin
@@ -145,6 +146,37 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
 def strip_leading_number(text):
     """Remove leading digits, dots, spaces (for question/answer lists)."""
     return re.sub(r"^\s*\d+[\.\)]?\s*", "", text).strip()
+
+
+def fetch_assets(url_map: dict) -> dict:
+    """Download multiple URLs concurrently.
+
+    Parameters
+    ----------
+    url_map: dict
+        Mapping of logical name -> URL to fetch.
+
+    Returns
+    -------
+    dict
+        Mapping of logical name -> bytes content (or ``None`` if download failed).
+    """
+    results = {}
+    if not url_map:
+        return results
+    with ThreadPoolExecutor() as executor:
+        future_to_key = {executor.submit(requests.get, url): key for key, url in url_map.items()}
+        for future in as_completed(future_to_key):
+            key = future_to_key[future]
+            try:
+                resp = future.result()
+                if getattr(resp, "status_code", 0) == 200:
+                    results[key] = resp.content
+                else:
+                    results[key] = None
+            except Exception:
+                results[key] = None
+    return results
 
 
 # The legacy Stage 2 tests expect these helpers to exist at module level.
@@ -353,8 +385,11 @@ if st.button("Refresh data"):
     st.experimental_rerun()
 
 # ==== LOAD MAIN DATAFRAMES ONCE ====
-df_students = load_students()
-df_ref_answers = load_ref_answers()
+with ThreadPoolExecutor() as executor:
+    student_future = executor.submit(load_students)
+    ref_future = executor.submit(load_ref_answers)
+    df_students = student_future.result()
+    df_ref_answers = ref_future.result()
 
 # ==== UNIVERSAL VARIABLES (for later use) ====
 LEVELS = sorted(df_students["level"].dropna().unique().tolist()) if "level" in df_students.columns else []
@@ -892,9 +927,10 @@ elif selected_tab == tab_titles[3]:
                 logo_path = cached_logo_path
             else:
                 try:
-                    response = requests.get(logo_url)
-                    if response.status_code == 200:
-                        img = Image.open(BytesIO(response.content)).convert("RGB")
+                    assets = fetch_assets({"logo": logo_url})
+                    content = assets.get("logo")
+                    if content:
+                        img = Image.open(BytesIO(content)).convert("RGB")
                         img.save(cached_logo_path)
                         logo_path = cached_logo_path
                     else:
@@ -1066,21 +1102,37 @@ elif selected_tab == tab_titles[4]:
     signature_file = st.file_uploader(
         "Signature Image (optional)", type=["png", "jpg", "jpeg"], key="sig_up"
     )
-
-    # Prepare temp path for optional watermark (only used for enrollment letters)
-    watermark_file_path = None
+    asset_urls = {}
     if msg_type == "Letter of Enrollment":
-        try:
-            import requests
-            from PIL import Image
-            from io import BytesIO
+        asset_urls["watermark"] = watermark_drive_url
+    if not logo_file:
+        asset_urls["logo"] = logo_url
 
-            resp = requests.get(watermark_drive_url)
-            if resp.status_code == 200:
-                img = Image.open(BytesIO(resp.content))
-                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-                img.save(tmp.name)
-                watermark_file_path = tmp.name
+    fetched_assets = fetch_assets(asset_urls) if asset_urls else {}
+
+    logo_path = None
+    if logo_file:
+        ext = logo_file.name.split(".")[-1]
+        tmp_logo = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
+        tmp_logo.write(logo_file.read())
+        tmp_logo.close()
+        logo_path = tmp_logo.name
+    elif fetched_assets.get("logo"):
+        try:
+            img = Image.open(BytesIO(fetched_assets["logo"])).convert("RGB")
+            tmp_logo = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+            img.save(tmp_logo.name)
+            logo_path = tmp_logo.name
+        except Exception:
+            logo_path = None
+
+    watermark_file_path = None
+    if fetched_assets.get("watermark"):
+        try:
+            img = Image.open(BytesIO(fetched_assets["watermark"]))
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+            img.save(tmp.name)
+            watermark_file_path = tmp.name
         except Exception:
             watermark_file_path = None
 
@@ -1189,11 +1241,11 @@ elif selected_tab == tab_titles[4]:
 
         class LetterPDF(FPDF):
             def header(self):
-                if logo_file:
-                    ext = logo_file.name.split('.')[-1]
-                    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
-                    tmp.write(logo_file.read()); tmp.close()
-                    self.image(tmp.name, x=10, y=8, w=28)
+                if logo_path:
+                    try:
+                        self.image(logo_path, x=10, y=8, w=28)
+                    except Exception:
+                        pass
                 self.set_font('Arial', 'B', 16)
                 self.cell(0, 9, safe_pdf(SCHOOL_NAME), ln=True, align='C')
                 self.set_font('Arial', '', 11)
