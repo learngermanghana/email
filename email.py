@@ -1605,7 +1605,7 @@ elif selected_tab == tab_titles[6]:
     # --- Config: the sheet you gave me (converted to CSV export) ---
     ASSIGNMENTS_CSV_URL = (
         "https://docs.google.com/spreadsheets/d/"
-        "1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/export?format=csv&gid=2121051612"
+        "1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/gviz/tq?tqx=out:csv&tq=select%20*&gid=2121051612"
     )
 
     # --- Helpers (reuse your style) ---
