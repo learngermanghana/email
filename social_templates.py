@@ -22,8 +22,10 @@ def add_template(title: str, platform: str, content: str):
     db.collection("templates").add(
         {"title": title, "platform": platform, "content": content}
     )
+    load_templates.clear()
 
 
+@st.cache_data(ttl=60)
 def load_templates():
     """Return all templates stored in Firestore."""
     db = _get_db()
@@ -40,6 +42,7 @@ def delete_template(template_id: str):
     """Delete a template by document id."""
     db = _get_db()
     db.collection("templates").document(template_id).delete()
+    load_templates.clear()
 
 
 if __name__ == "__main__":
