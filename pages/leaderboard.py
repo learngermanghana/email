@@ -29,7 +29,7 @@ def load_leaderboard() -> pd.DataFrame:
 
 if st.button("Refresh leaderboard"):
     load_leaderboard.clear()
-    st.experimental_rerun()
+    st.rerun()
 
 leaderboard_df = load_leaderboard()
 
