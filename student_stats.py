@@ -31,11 +31,16 @@ def load_and_rank_students(
     students_csv: str,
     assignments_csv: Optional[str] = None,
     firestore_collection: Optional[str] = None,
+    *,
+    min_assignments: int = 3,
 ) -> pd.DataFrame:
     """Load student and assignment data and produce ranked results.
 
     Exactly one of ``assignments_csv`` or ``firestore_collection`` must be
     provided.
+
+    Students with fewer than ``min_assignments`` completed assignments are
+    excluded from the results.
 
     Parameters
     ----------
@@ -46,11 +51,14 @@ def load_and_rank_students(
         ``score`` and optionally ``level``.
     firestore_collection:
         Name of a Firestore collection containing assignment documents.
+    min_assignments:
+        Minimum number of assignments a student must have completed to appear
+        on the leaderboard.
 
     Returns
     -------
     ``pandas.DataFrame`` with columns ``StudentCode``, ``Level``,
-    ``assignment_count``, ``total_score`` and ``rank``.
+    ``assignments_count``, ``total_score`` and ``rank``.
     """
 
     if bool(assignments_csv) == bool(firestore_collection):
@@ -77,7 +85,7 @@ def load_and_rank_students(
         .reset_index()
     )
 
-    summary = summary[summary["assignments_count"] >= 3]
+    summary = summary[summary["assignments_count"] >= min_assignments]
 
     summary["rank"] = summary.groupby("Level")["total_score"].rank(
         ascending=False, method="dense"
