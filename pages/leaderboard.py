@@ -10,7 +10,10 @@ st.title("\U0001F3C6 Leaderboard")
 def load_leaderboard() -> pd.DataFrame:
     """Load ranked student results."""
     students_csv = st.secrets.get("students_csv", "students.csv")
-    assignments_csv = st.secrets.get("assignments_csv")
+    assignments_csv = st.secrets.get(
+        "assignments_csv",
+        "https://docs.google.com/spreadsheets/d/1BRb8p3Rq0VpFCLSwL4eS9tSgXBo9hSWzfW_J_7W36NQ/gviz/tq?tqx=out:csv&tq=select%20*&gid=2121051612",
+    )
     firestore_collection = st.secrets.get("assignments_collection")
     try:
         return load_and_rank_students(
