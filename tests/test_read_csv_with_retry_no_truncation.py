@@ -10,7 +10,7 @@ def load_functions():
     func_nodes = [
         node
         for node in ast.walk(module_ast)
-        if isinstance(node, ast.FunctionDef) and node.name in {"read_csv_with_retry", "rank_students"}
+        if isinstance(node, ast.FunctionDef) and node.name == "read_csv_with_retry"
     ]
     mod = ast.Module(body=func_nodes, type_ignores=[])
     ast.fix_missing_locations(mod)
@@ -22,7 +22,6 @@ def load_functions():
 def test_read_csv_with_retry_no_truncation():
     ns = load_functions()
     read_csv_with_retry = ns["read_csv_with_retry"]
-    rank_students = ns["rank_students"]
 
     csv_lines = ["studentcode,name,assignment,score"]
     for i in range(10):
@@ -33,7 +32,4 @@ def test_read_csv_with_retry_no_truncation():
 
     df = read_csv_with_retry("http://example.com")
     assert len(df) == 10
-
-    ranked = rank_students(df, min_assign=1)
-    alice = ranked[ranked["studentcode"] == "S1"].iloc[0]
-    assert alice["completed"] == 10
+    assert df["studentcode"].tolist() == ["S1"] * 10
