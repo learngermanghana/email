@@ -20,6 +20,7 @@ def load_leaderboard() -> pd.DataFrame:
             students_csv=students_csv,
             assignments_csv=assignments_csv,
             firestore_collection=firestore_collection,
+            min_assignments=3,
         )
     except Exception as exc:  # pragma: no cover - network / config errors
         st.error(f"Failed to load leaderboard: {exc}")
