@@ -1,5 +1,7 @@
 import pandas as pd
-from typing import Optional
+from typing import Optional, Tuple, Union
+
+from config import ASSIGNMENT_LINKS
 
 try:
     import firebase_admin
@@ -31,7 +33,8 @@ def load_and_rank_students(
     students_csv: str,
     assignments_csv: Optional[str] = None,
     firestore_collection: Optional[str] = None,
-) -> pd.DataFrame:
+    return_assignments: bool = False,
+) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.DataFrame]]:
     """Load student and assignment data and produce ranked results.
 
     Exactly one of ``assignments_csv`` or ``firestore_collection`` must be
@@ -51,6 +54,10 @@ def load_and_rank_students(
     -------
     ``pandas.DataFrame`` with columns ``StudentCode``, ``Level``,
     ``assignment_count``, ``total_score`` and ``rank``.
+
+    If ``return_assignments`` is ``True`` an additional DataFrame containing
+    per-assignment records (including an ``assignment_link`` column) is
+    returned as a second element of the tuple.
     """
 
     if bool(assignments_csv) == bool(firestore_collection):
@@ -63,6 +70,10 @@ def load_and_rank_students(
         assignments_df = pd.read_csv(assignments_csv)
     else:
         assignments_df = _load_assignments_from_firestore(firestore_collection)
+
+    assignments_df["assignment_link"] = assignments_df["assignment"].map(
+        ASSIGNMENT_LINKS
+    )
 
     merged = assignments_df.merge(
         student_levels,
@@ -83,4 +94,10 @@ def load_and_rank_students(
         ascending=False, method="dense"
     )
 
-    return summary.sort_values(["Level", "rank", "StudentCode"]).reset_index(drop=True)
+    summary = summary.sort_values(["Level", "rank", "StudentCode"]).reset_index(
+        drop=True
+    )
+
+    if return_assignments:
+        return summary, merged
+    return summary
