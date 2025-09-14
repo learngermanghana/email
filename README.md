@@ -15,3 +15,7 @@ The page lets you:
 - Delete templates you no longer need.
 
 Templates persist in Firestore under the `templates` collection with fields `title`, `platform`, and `content`.
+
+## Removed Features
+
+The leaderboard page and associated student statistics functionality have been removed.
