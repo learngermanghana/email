@@ -1,12 +1,4 @@
 {
-  "indexes": [
-    {
-      "collectionGroup": "tasks",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {"fieldPath": "week", "order": "ASCENDING"}
-      ]
-    }
-  ],
+  "indexes": [],
   "fieldOverrides": []
 }
