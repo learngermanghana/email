@@ -181,9 +181,22 @@ def _dedupe_latest_attempt(scores_df: pd.DataFrame) -> pd.DataFrame:
     kept = tmp.loc[keep_idx].drop(columns=["_AssignmentKey"])
     return kept
 
-def _levels_list(df: pd.DataFrame) -> list[str]:
-    levels = sorted(x for x in df["Level"].dropna().unique() if str(x).strip() != "")
-    return levels or ["A1", "A2"]
+def compute_level_list(scores_df: pd.DataFrame) -> list[str]:
+    """Return the sorted list of non-empty level codes present in *scores_df*."""
+    if "Level" not in scores_df.columns:
+        return []
+
+    levels = (
+        scores_df["Level"]
+        .dropna()
+        .astype(str)
+        .str.strip()
+        .replace("", pd.NA)
+        .dropna()
+        .str.upper()
+        .unique()
+    )
+    return sorted(levels.tolist())
 
 def compute_leaderboard(scores_df: pd.DataFrame, *, level: str | None, min_assignments: int) -> pd.DataFrame:
     df = scores_df.copy()
@@ -249,7 +262,7 @@ else:
     st.caption("Live data from sheet • Some rows have no date")
 
 # Detect levels present
-levels = _levels_list(scores_raw)
+levels = compute_level_list(scores_raw)
 
 tabs = st.tabs(["All Levels"] + levels)
 
