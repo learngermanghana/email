@@ -198,14 +198,62 @@ def compute_level_list(scores_df: pd.DataFrame) -> list[str]:
     )
     return sorted(levels.tolist())
 
-def compute_leaderboard(scores_df: pd.DataFrame, *, level: str | None, min_assignments: int) -> pd.DataFrame:
+def compute_leaderboard(
+    scores_df: pd.DataFrame,
+    *,
+    level: str | None,
+    start: datetime | pd.Timestamp | None = None,
+    end: datetime | pd.Timestamp | None = None,
+    search: str | None = None,
+    min_assignments: int | None = None,
+) -> pd.DataFrame:
+    """Aggregate leaderboard stats for *scores_df* applying optional filters."""
+
+    column_order = [
+        "Rank",
+        "Student",
+        "StudentCode",
+        "Level",
+        "TotalMarks",
+        "AssignmentsCompleted",
+        "AverageScore",
+        "LastActivity",
+    ]
+
     df = scores_df.copy()
 
-    if level:
-        df = df[df["Level"] == level.upper()]
+    if df.empty:
+        return pd.DataFrame(columns=column_order)
+
+    # Normalize filters
+    level_filter = level.upper() if level else None
+    start_ts = pd.to_datetime(start) if start is not None else None
+    end_ts = pd.to_datetime(end) if end is not None else None
+    search_term = search.strip() if isinstance(search, str) else ""
+
+    if level_filter:
+        df = df[df["Level"].astype(str).str.upper() == level_filter]
+
+    if start_ts is not None:
+        df = df[df["Date"] >= start_ts]
+
+    if end_ts is not None:
+        df = df[df["Date"] < end_ts]
+
+    if search_term:
+        escaped = re.escape(search_term)
+        name_match = df["Name"].astype(str).str.contains(escaped, case=False, na=False, regex=True)
+        code_match = df["StudentCode"].astype(str).str.contains(escaped, case=False, na=False, regex=True)
+        df = df[name_match | code_match]
+
+    if df.empty:
+        return pd.DataFrame(columns=column_order)
 
     # Deduplicate multiple attempts of same assignment
     kept = _dedupe_latest_attempt(df)
+
+    if kept.empty:
+        return pd.DataFrame(columns=column_order)
 
     # Aggregate per student
     base = kept.copy()
@@ -225,28 +273,27 @@ def compute_leaderboard(scores_df: pd.DataFrame, *, level: str | None, min_assig
             AverageScore=("Score", "mean"),
             LastActivity=("Date", "max"),
             Level=("Level", lambda s: s.mode().iat[0] if not s.mode().empty else (s.iloc[0] if len(s) else None)),
-            Student=("Name",  lambda s: s.mode().iat[0] if not s.mode().empty else (s.iloc[0] if len(s) else "")),
+            Student=("Name", lambda s: s.mode().iat[0] if not s.mode().empty else (s.iloc[0] if len(s) else "")),
         )
         .reset_index()
         .merge(completed, on="StudentCode", how="left")
     )
 
-    # Apply qualifying rule
-    agg = agg[agg["AssignmentsCompleted"].fillna(0) >= int(min_assignments)]
+    if agg.empty:
+        return pd.DataFrame(columns=column_order)
+
+    agg["AssignmentsCompleted"] = agg["AssignmentsCompleted"].fillna(0).astype(int)
+
+    if min_assignments is not None:
+        agg = agg[agg["AssignmentsCompleted"] >= int(min_assignments)]
 
     if agg.empty:
-        return pd.DataFrame(columns=[
-            "Rank", "Student", "StudentCode", "Level",
-            "TotalMarks", "AssignmentsCompleted", "AverageScore", "LastActivity"
-        ])
+        return pd.DataFrame(columns=column_order)
 
     agg["AverageScore"] = agg["AverageScore"].round(2)
     agg = agg.sort_values(["TotalMarks", "LastActivity"], ascending=[False, False]).reset_index(drop=True)
     agg.insert(0, "Rank", agg.index + 1)
-    agg = agg[[
-        "Rank", "Student", "StudentCode", "Level",
-        "TotalMarks", "AssignmentsCompleted", "AverageScore", "LastActivity",
-    ]]
+    agg = agg[column_order]
     return agg
 
 # ──────────────────────────────────────────────────────────────────────────────
