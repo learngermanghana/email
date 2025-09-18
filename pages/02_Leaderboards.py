@@ -166,16 +166,16 @@ def _canon_assignment(s: str | None) -> str:
 
 def _dedupe_latest_attempt(scores_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Keep only the latest attempt per (StudentCode, AssignmentKey).
-    If same date appears twice, keep the higher score.
+    Keep only the best attempt per (StudentCode, AssignmentKey).
+    Prefer higher scores; break score ties by the most recent date.
     """
     tmp = scores_df.copy()
     tmp["_AssignmentKey"] = tmp["Assignment"].apply(_canon_assignment)
 
-    # Order so that the last row per group is kept:
-    #   1) by Date ascending (latest is last)
-    #   2) by Score ascending (higher last if same date)
-    tmp = tmp.sort_values(["Date", "Score"], ascending=[True, True])
+    # Order so that the last row per group is the preferred attempt:
+    #   1) by Score ascending (highest score is last)
+    #   2) by Date ascending (latest is last when scores tie)
+    tmp = tmp.sort_values(["Score", "Date"], ascending=[True, True])
 
     keep_idx = tmp.groupby(["StudentCode", "_AssignmentKey"], dropna=False).tail(1).index
     kept = tmp.loc[keep_idx].drop(columns=["_AssignmentKey"])
