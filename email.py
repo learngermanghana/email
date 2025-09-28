@@ -196,6 +196,47 @@ def strip_leading_number(text):
 
 
 
+def compute_days_and_message(days_left_value, balance_display):
+    """Return a tuple of ``(days, message)`` for reminder templates.
+
+    ``days`` is an ``int`` when ``days_left_value`` is numeric, otherwise the
+    string ``"N/A"`` to keep downstream formatting safe.
+    """
+
+    fallback_days = "N/A"
+    fallback_msg = (
+        "Please review your account and reach out if you have any questions "
+        "about your balance."
+    )
+
+    if pd.isna(days_left_value):
+        return fallback_days, fallback_msg
+
+    try:
+        numeric_value = float(days_left_value)
+    except (TypeError, ValueError):
+        return fallback_days, fallback_msg
+
+    if pd.isna(numeric_value):
+        return fallback_days, fallback_msg
+
+    days_int = int(numeric_value)
+    if days_int >= 0:
+        message = (
+            f"You have {days_int} {'day' if days_int == 1 else 'days'} left to "
+            f"settle the {balance_display} balance."
+        )
+    else:
+        overdue_days = abs(days_int)
+        message = (
+            "Your payment is overdue by "
+            f"{overdue_days} {'day' if overdue_days == 1 else 'days'}. "
+            "Please settle as soon as possible."
+        )
+
+    return days_int, message
+
+
 def fetch_assets(url_map: dict) -> dict:
     """Download multiple URLs concurrently.
 
@@ -715,11 +756,7 @@ elif selected_tab == tab_titles[2]:
         bal = f"GHS {row[bal_col]:,.2f}"
 
         due = row["due_date_str"]
-        days = int(row["days_left"])
-        if days >= 0:
-            msg = f"You have {days} {'day' if days == 1 else 'days'} left to settle the {bal} balance."
-        else:
-            msg = f"Your payment is overdue by {abs(days)} {'day' if abs(days)==1 else 'days'}. Please settle as soon as possible."
+        days, msg = compute_days_and_message(row["days_left"], bal)
         text = wa_template.format(
             name=row[name_col],
             level=row["level"],
