@@ -266,9 +266,44 @@ def fetch_assets(url_map: dict) -> dict:
 
 
 # The legacy Stage 2 tests expect these helpers to exist at module level.
+def parse_datetime_flex(value):
+    """Parse ``value`` into a :class:`pandas.Timestamp` with flexible formats."""
+
+    if value is None:
+        return pd.NaT
+
+    if isinstance(value, pd.Timestamp):
+        return value
+
+    if isinstance(value, datetime):
+        return pd.Timestamp(value)
+
+    text = str(value).strip()
+    if not text:
+        return pd.NaT
+
+    ts = pd.to_datetime(text, errors="coerce")
+    if pd.notna(ts):
+        return ts
+
+    normalized = text.replace("T", " ").strip()
+    normalized = re.sub(r"[A-Za-z]+$", "", normalized).strip()
+    if "." in normalized:
+        normalized = normalized.split(".", 1)[0]
+
+    for fmt in ("%m/%d/%Y %H:%M:%S", "%m/%d/%Y %H:%M", "%m/%d/%Y"):
+        try:
+            return pd.Timestamp(datetime.strptime(normalized, fmt))
+        except ValueError:
+            continue
+
+    return pd.NaT
+
+
 def parse_date_flex(value, default=""):
     """Parse ``value`` into ``YYYY-MM-DD`` or return ``default`` if invalid."""
-    ts = pd.to_datetime(value, errors="coerce")
+    parser = globals().get("parse_datetime_flex")
+    ts = parser(value) if callable(parser) else pd.to_datetime(value, errors="coerce")
     if pd.notna(ts):
         return ts.date().isoformat()
     return default
@@ -671,7 +706,7 @@ elif selected_tab == tab_titles[2]:
     # --- Clean Data Types ---
     df[bal_col] = pd.to_numeric(df[bal_col], errors="coerce").fillna(0)
     df["paid"] = pd.to_numeric(df["paid"], errors="coerce").fillna(0)
-    df["contractstart"] = pd.to_datetime(df["contractstart"], errors="coerce")
+    df["contractstart"] = df["contractstart"].apply(parse_datetime_flex)
     df[phone_col] = df[phone_col].astype(str).str.replace(r"[^\d+]", "", regex=True)
 
     # --- Calculate Due Date & Days Left ---
@@ -900,12 +935,16 @@ elif selected_tab == tab_titles[3]:
 
     default_paid    = float(row.get("paid", 0))
     default_balance = float(row.get("balance", 0))
-    default_start = pd.to_datetime(row.get("contractstart", ""), errors="coerce").date()
-    if pd.isnull(default_start):
+    default_start_ts = parse_datetime_flex(row.get("contractstart", ""))
+    if pd.isna(default_start_ts):
         default_start = date.today()
-    default_end = pd.to_datetime(row.get("contractend", ""), errors="coerce").date()
-    if pd.isnull(default_end):
+    else:
+        default_start = default_start_ts.date()
+    default_end_ts = parse_datetime_flex(row.get("contractend", ""))
+    if pd.isna(default_end_ts):
         default_end = default_start + timedelta(days=30)
+    else:
+        default_end = default_end_ts.date()
 
     st.subheader("Receipt Details")
     paid_input    = st.number_input("Amount Paid (GHS)", min_value=0.0, value=default_paid, step=1.0)
@@ -1156,8 +1195,15 @@ elif selected_tab == tab_titles[4]:
     student_name = student_row.get("name", "")
     student_level = student_row.get("level", "")
     student_email = student_row.get("email", "")
-    enrollment_start = pd.to_datetime(student_row.get("contractstart", date.today()), errors="coerce").date()
-    enrollment_end   = pd.to_datetime(student_row.get("contractend",   date.today()), errors="coerce").date()
+    enrollment_start_ts = parse_datetime_flex(student_row.get("contractstart", date.today()))
+    if pd.isna(enrollment_start_ts):
+        enrollment_start_ts = pd.Timestamp(date.today())
+    enrollment_start = enrollment_start_ts.date()
+
+    enrollment_end_ts = parse_datetime_flex(student_row.get("contractend", date.today()))
+    if pd.isna(enrollment_end_ts):
+        enrollment_end_ts = enrollment_start_ts + pd.Timedelta(days=30)
+    enrollment_end = enrollment_end_ts.date()
     payment       = float(student_row.get("paid", 0))
     balance       = float(student_row.get("balance", 0))
     payment_status = "Full Payment" if balance == 0 else "Installment Plan"
