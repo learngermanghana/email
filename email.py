@@ -469,14 +469,31 @@ except Exception:  # pragma: no cover - fallback when secrets aren't available
     CACHE_TTL = 300
 
 
-@st.cache_data(ttl=CACHE_TTL, show_spinner="Loading student data...")
-def load_students():
-    df = read_csv_with_retry(STUDENTS_CSV_URL, dtype=str)
+def _prepare_students_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalize student DataFrame column names and values."""
+
     df = normalize_columns(df)
+
     # Standardize any known column name variants
     if "student_code" in df.columns:
         df = df.rename(columns={"student_code": "studentcode"})
+
+    # Trim key string columns to avoid duplicate class entries caused by stray whitespace
+    for col in ["classname", "level", "name", "studentcode"]:
+        if col in df.columns:
+            df[col] = df[col].astype(str).str.strip()
+
+    # Keep levels in a consistent format for grouping/selection
+    if "level" in df.columns:
+        df["level"] = df["level"].str.upper()
+
     return df
+
+
+@st.cache_data(ttl=CACHE_TTL, show_spinner="Loading student data...")
+def load_students():
+    df = read_csv_with_retry(STUDENTS_CSV_URL, dtype=str)
+    return _prepare_students_df(df)
 
 @st.cache_data(ttl=CACHE_TTL, show_spinner="Loading reference answers...")
 def load_ref_answers():
@@ -1647,8 +1664,7 @@ elif selected_tab == tab_titles[5]:
 elif selected_tab == tab_titles[6]:
     st.title("📘 Class Attendance")
 
-    df_students = read_csv_with_retry(STUDENTS_CSV_URL, dtype=str)
-    df_students = normalize_columns(df_students)
+    df_students = load_students()
 
     if df_students.empty:
         st.info("No student data available.")
