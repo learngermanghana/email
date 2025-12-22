@@ -481,7 +481,8 @@ def _prepare_students_df(df: pd.DataFrame) -> pd.DataFrame:
     # Trim key string columns to avoid duplicate class entries caused by stray whitespace
     for col in ["classname", "level", "name", "studentcode"]:
         if col in df.columns:
-            df[col] = df[col].astype(str).str.strip()
+            # Avoid propagating missing values as the literal string "nan"
+            df[col] = df[col].fillna("").astype(str).str.strip()
 
     # Keep levels in a consistent format for grouping/selection
     if "level" in df.columns:
