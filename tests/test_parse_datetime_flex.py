@@ -32,3 +32,9 @@ def test_parse_date_flex_handles_datetime_with_time():
 def test_parse_datetime_flex_returns_nat_for_invalid():
     ts = namespace["parse_datetime_flex"]("not a date")
     assert pd.isna(ts)
+
+
+def test_parse_datetime_flex_accepts_iso_with_z_suffix():
+    ts = namespace["parse_datetime_flex"]("2025-12-21T22:08:01.624Z")
+    assert pd.notna(ts)
+    assert ts == pd.Timestamp("2025-12-21 22:08:01.624000+00:00")
