@@ -282,6 +282,20 @@ def parse_datetime_flex(value):
     if not text:
         return pd.NaT
 
+    # ISO 8601 strings with ``Z`` or timezone offsets (e.g. 2025-12-21T22:08:01.624Z)
+    iso_text = text
+    iso_match = re.match(
+        r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})$",
+        iso_text,
+    )
+    if iso_match:
+        # Normalize trailing ``Z`` to an explicit UTC offset to help older parsers.
+        if iso_text.endswith("Z"):
+            iso_text = iso_text[:-1] + "+00:00"
+        ts = pd.to_datetime(iso_text, errors="coerce")
+        if pd.notna(ts):
+            return ts
+
     ts = pd.to_datetime(text, errors="coerce")
     if pd.notna(ts):
         return ts
@@ -1773,4 +1787,3 @@ elif selected_tab == tab_titles[6]:
 
                 save_attendance_to_firestore(sel_class, attendance_map)
                 st.success("Attendance saved.")
-
