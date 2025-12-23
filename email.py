@@ -724,7 +724,9 @@ elif selected_tab == tab_titles[2]:
     # --- Clean Data Types ---
     df[bal_col] = pd.to_numeric(df[bal_col], errors="coerce").fillna(0)
     df["paid"] = pd.to_numeric(df["paid"], errors="coerce").fillna(0)
-    df["contractstart"] = df["contractstart"].apply(parse_datetime_flex)
+    df["contractstart"] = pd.to_datetime(
+        df["contractstart"].apply(parse_datetime_flex), errors="coerce"
+    )
     df[phone_col] = df[phone_col].astype(str).str.replace(r"[^\d+]", "", regex=True)
 
     # --- Calculate Due Date & Days Left ---
@@ -1771,5 +1773,4 @@ elif selected_tab == tab_titles[6]:
 
                 save_attendance_to_firestore(sel_class, attendance_map)
                 st.success("Attendance saved.")
-
 
