@@ -1315,6 +1315,18 @@ elif selected_tab == tab_titles[4]:
     payment_amount = None
     payment_date = None
     if msg_type == "Letter of Enrollment":
+        level_learning_focus = {
+            "A1": "basic German foundations such as introductions, everyday vocabulary, and simple sentence structures",
+            "A2": "elementary German skills including routine conversations, personal topics, and common expressions",
+            "B1": "pre‑intermediate German for workplace and daily interactions with clearer narrative skills",
+            "B2": "intermediate German covering detailed discussions, opinions, and more complex texts",
+            "C1": "advanced German with academic-style reading, writing, and nuanced communication",
+            "C2": "near-native fluency emphasizing precision, idiomatic usage, and advanced comprehension",
+        }
+        learning_focus = level_learning_focus.get(
+            str(student_level).strip().upper(), "German language studies aligned to the student's current level"
+        )
+
         def _get_student_field(key, fallback="Not provided", formatter=None):
             col = col_lookup(df_students, key)
             if not col:
@@ -1356,7 +1368,7 @@ elif selected_tab == tab_titles[4]:
         body_default = (
             "To Whom It May Concern,<br><br>"
             f"This letter confirms that <strong>{student_name}</strong> (Student Code: {student_code_display}) is officially enrolled in the <strong>{student_level or 'current'}</strong> program at Learn Language Education Academy. "
-            f"The student is registered under the class name {class_name_display} with a status of {status_display}. "
+            f"The student is registered under the class name {class_name_display} with a status of {status_display}, and the learning focus at this level covers {learning_focus}. "
             f"The enrollment period runs from {enrollment_start:%B %d, %Y} to {enrollment_end:%B %d, %Y}, with contract dates on record from {contract_start_display} to {contract_end_display} and an enrollment date recorded as {enroll_date_display}. "
             f"Primary contact details are phone: {phone_display}, email: {email_display}, and location: {location_display}; the emergency contact on record is {emergency_contact}. "
             f"Payment status is noted as {payment_status} with GHS {payment:,.2f} paid and a remaining balance of GHS {balance:,.2f}. "
