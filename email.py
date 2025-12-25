@@ -1315,11 +1315,72 @@ elif selected_tab == tab_titles[4]:
     payment_amount = None
     payment_date = None
     if msg_type == "Letter of Enrollment":
+        def _get_student_field(key, fallback="Not provided", formatter=None):
+            col = col_lookup(df_students, key)
+            if not col:
+                return fallback
+            val = student_row.get(col, fallback)
+            if pd.isna(val):
+                return fallback
+            if formatter:
+                try:
+                    return formatter(val)
+                except Exception:
+                    return fallback
+            return val
+
+        def _format_date_field(key, fallback):
+            def _formatter(v):
+                ts = parse_datetime_flex(v)
+                return ts.strftime("%B %d, %Y") if pd.notna(ts) else fallback
+
+            return _get_student_field(key, fallback=fallback, formatter=_formatter)
+
+        phone_display = _get_student_field("phone")
+        email_display = _get_student_field("email")
+        location_display = _get_student_field("location")
+        emergency_contact = _get_student_field("emergency contact (phone number)")
+        status_display = _get_student_field("status", fallback="Enrolled")
+        class_name_display = _get_student_field("classname")
+        enroll_date_display = _format_date_field(
+            "enrolldate", fallback=enrollment_start.strftime("%B %d, %Y")
+        )
+        contract_start_display = _format_date_field(
+            "contractstart", fallback=enrollment_start.strftime("%B %d, %Y")
+        )
+        contract_end_display = _format_date_field(
+            "contractend", fallback=enrollment_end.strftime("%B %d, %Y")
+        )
+        student_code_display = student_code or "Not provided"
+
         body_default = (
-            f"To Whom It May Concern,<br><br>"
-            f"{student_name} is officially enrolled in {student_level} at Learn Language Education Academy.<br>"
-            f"Enrollment valid from {enrollment_start:%m/%d/%Y} to {enrollment_end:%m/%d/%Y}.<br><br>"
-            f"Business Reg No: {BUSINESS_REG}.<br><br>"
+            "To Whom It May Concern,<br><br>"
+            f"This letter confirms that <strong>{student_name}</strong> (Student Code: {student_code_display}) "
+            f"is officially enrolled in the <strong>{student_level or 'current'}</strong> program at Learn Language Education Academy.<br><br>"
+            "Enrollment details:<br>"
+            "<ul>"
+            f"<li><strong>Class name:</strong> {class_name_display}</li>"
+            f"<li><strong>Status:</strong> {status_display}</li>"
+            f"<li><strong>Enrollment period:</strong> {enrollment_start:%B %d, %Y} to {enrollment_end:%B %d, %Y}</li>"
+            f"<li><strong>Contract dates on record:</strong> {contract_start_display} to {contract_end_display}</li>"
+            f"<li><strong>Enrollment date recorded:</strong> {enroll_date_display}</li>"
+            "</ul>"
+            "Student & guardian contact information:<br>"
+            "<ul>"
+            f"<li><strong>Phone:</strong> {phone_display}</li>"
+            f"<li><strong>Email:</strong> {email_display}</li>"
+            f"<li><strong>Location:</strong> {location_display}</li>"
+            f"<li><strong>Emergency contact:</strong> {emergency_contact}</li>"
+            "</ul>"
+            "Payment overview:<br>"
+            "<ul>"
+            f"<li><strong>Payment status:</strong> {payment_status}</li>"
+            f"<li><strong>Amount paid:</strong> GHS {payment:,.2f}</li>"
+            f"<li><strong>Balance remaining:</strong> GHS {balance:,.2f}</li>"
+            "</ul>"
+            f"For quick verification, the student's portal link is {student_link}.<br><br>"
+            f"Business Reg No: {BUSINESS_REG}.<br>"
+            "Please contact us if you need any clarification or further documentation.<br><br>"
         )
         email_subject = st.text_input("Subject", value=f"{msg_type} - {student_name}", key="email_subject")
         email_body = st.text_area("Email Body (HTML supported)", value=body_default, key="email_body", height=220)
