@@ -1315,11 +1315,66 @@ elif selected_tab == tab_titles[4]:
     payment_amount = None
     payment_date = None
     if msg_type == "Letter of Enrollment":
+        level_learning_focus = {
+            "A1": "basic German foundations such as introductions, everyday vocabulary, and simple sentence structures",
+            "A2": "elementary German skills including routine conversations, personal topics, and common expressions",
+            "B1": "pre‑intermediate German for workplace and daily interactions with clearer narrative skills",
+            "B2": "intermediate German covering detailed discussions, opinions, and more complex texts",
+            "C1": "advanced German with academic-style reading, writing, and nuanced communication",
+            "C2": "near-native fluency emphasizing precision, idiomatic usage, and advanced comprehension",
+        }
+        learning_focus = level_learning_focus.get(
+            str(student_level).strip().upper(), "German language studies aligned to the student's current level"
+        )
+
+        def _get_student_field(key, fallback="Not provided", formatter=None):
+            col = col_lookup(df_students, key)
+            if not col:
+                return fallback
+            val = student_row.get(col, fallback)
+            if pd.isna(val):
+                return fallback
+            if formatter:
+                try:
+                    return formatter(val)
+                except Exception:
+                    return fallback
+            return val
+
+        def _format_date_field(key, fallback):
+            def _formatter(v):
+                ts = parse_datetime_flex(v)
+                return ts.strftime("%B %d, %Y") if pd.notna(ts) else fallback
+
+            return _get_student_field(key, fallback=fallback, formatter=_formatter)
+
+        phone_display = _get_student_field("phone")
+        email_display = _get_student_field("email")
+        location_display = _get_student_field("location")
+        emergency_contact = _get_student_field("emergency contact (phone number)")
+        status_display = _get_student_field("status", fallback="Enrolled")
+        class_name_display = _get_student_field("classname")
+        enroll_date_display = _format_date_field(
+            "enrolldate", fallback=enrollment_start.strftime("%B %d, %Y")
+        )
+        contract_start_display = _format_date_field(
+            "contractstart", fallback=enrollment_start.strftime("%B %d, %Y")
+        )
+        contract_end_display = _format_date_field(
+            "contractend", fallback=enrollment_end.strftime("%B %d, %Y")
+        )
+        student_code_display = student_code or "Not provided"
+
         body_default = (
-            f"To Whom It May Concern,<br><br>"
-            f"{student_name} is officially enrolled in {student_level} at Learn Language Education Academy.<br>"
-            f"Enrollment valid from {enrollment_start:%m/%d/%Y} to {enrollment_end:%m/%d/%Y}.<br><br>"
-            f"Business Reg No: {BUSINESS_REG}.<br><br>"
+            "To Whom It May Concern,<br><br>"
+            f"This letter confirms that <strong>{student_name}</strong> (Student Code: {student_code_display}) is officially enrolled in the <strong>{student_level or 'current'}</strong> program at Learn Language Education Academy. "
+            f"The student is registered under the class name {class_name_display} with a status of {status_display}, and the learning focus at this level covers {learning_focus}. "
+            "This class follows a hybrid model, supporting in-person learning with online components for select practice sessions to maximize flexibility and engagement. "
+            f"The enrollment period runs from {enrollment_start:%B %d, %Y} to {enrollment_end:%B %d, %Y}, with contract dates on record from {contract_start_display} to {contract_end_display} and an enrollment date recorded as {enroll_date_display}. "
+            f"Primary contact details are phone: {phone_display}, email: {email_display}, and location: {location_display}; the emergency contact on record is {emergency_contact}. "
+            f"Payment status is noted as {payment_status} with GHS {payment:,.2f} paid and a remaining balance of GHS {balance:,.2f}. "
+            f"For quick verification, the student's portal link is {student_link}. "
+            f"Business Reg No: {BUSINESS_REG}. Please contact us if you need any clarification or further documentation.<br><br>"
         )
         email_subject = st.text_input("Subject", value=f"{msg_type} - {student_name}", key="email_subject")
         email_body = st.text_area("Email Body (HTML supported)", value=body_default, key="email_body", height=220)
