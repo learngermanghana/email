@@ -1367,13 +1367,12 @@ elif selected_tab == tab_titles[4]:
 
         body_default = (
             "To Whom It May Concern,<br><br>"
-            f"This letter confirms that <strong>{student_name}</strong> (Student Code: {student_code_display}) is officially enrolled in the <strong>{student_level or 'current'}</strong> program at Learn Language Education Academy.<br><br>"
-            f"{student_name} is registered under the class name {class_name_display} with a status of {status_display}, and the learning focus at this level covers {learning_focus}. "
-            "This class follows a hybrid model, supporting in-person learning with online components for select practice sessions to maximize flexibility and engagement.<br><br>"
-            f"The enrollment period runs from {enrollment_start:%B %d, %Y} to {enrollment_end:%B %d, %Y}. "
-            f"Contract dates on record are {contract_start_display} to {contract_end_display}, and the enrollment date is recorded as {enroll_date_display}.<br><br>"
-            f"Primary contact details are phone: {phone_display}, email: {email_display}, and location: {location_display}; the emergency contact on record is {emergency_contact}.<br><br>"
-            f"Payment status is noted as {payment_status} with GHS {payment:,.2f} paid and a remaining balance of GHS {balance:,.2f}.<br><br>"
+            f"This letter confirms that <strong>{student_name}</strong> (Student Code: {student_code_display}) is officially enrolled in the <strong>{student_level or 'current'}</strong> program at Learn Language Education Academy. "
+            f"The student is registered under the class name {class_name_display} with a status of {status_display}, and the learning focus at this level covers {learning_focus}. "
+            f"The enrollment period runs from {enrollment_start:%B %d, %Y} to {enrollment_end:%B %d, %Y}, with contract dates on record from {contract_start_display} to {contract_end_display} and an enrollment date recorded as {enroll_date_display}. "
+            f"Primary contact details are phone: {phone_display}, email: {email_display}, and location: {location_display}; the emergency contact on record is {emergency_contact}. "
+            f"Payment status is noted as {payment_status} with GHS {payment:,.2f} paid and a remaining balance of GHS {balance:,.2f}. "
+            f"For quick verification, the student's portal link is {student_link}. "
             f"Business Reg No: {BUSINESS_REG}. Please contact us if you need any clarification or further documentation.<br><br>"
         )
         email_subject = st.text_input("Subject", value=f"{msg_type} - {student_name}", key="email_subject")
