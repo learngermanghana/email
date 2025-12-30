@@ -1566,6 +1566,7 @@ elif selected_tab == tab_titles[5]:
     import textwrap
     from datetime import date, timedelta
     from fpdf import FPDF
+    import json
 
     st.markdown("""
     <div style='background:#e3f2fd;padding:1.2em 1em 0.8em 1em;border-radius:12px;margin-bottom:1em'>
@@ -1673,6 +1674,32 @@ elif selected_tab == tab_titles[5]:
         "📁 TXT Download",
         txt,
         file_name=f"{file_prefix}.txt"
+    )
+
+    json_rows = [
+        {
+            "week": row["Week"],
+            "day": row["Day"],
+            "date": row["Date"],
+            "date_iso": dates[i].isoformat(),
+            "topic": row["Topic"],
+        }
+        for i, row in enumerate(rows)
+    ]
+    schedule_payload = {
+        "course_level": selected_level,
+        "start_date": start_date.isoformat(),
+        "total_sessions": total_sessions,
+        "holidays": [d.isoformat() for d in holiday_dates],
+        "sessions": json_rows,
+    }
+    schedule_json = json.dumps(schedule_payload, ensure_ascii=False, indent=2)
+
+    st.download_button(
+        "🧾 JSON Download",
+        schedule_json,
+        file_name=f"{file_prefix}.json",
+        mime="application/json"
     )
 
     # ---- PDF download (reliable logic, like Send Email tab) ----
