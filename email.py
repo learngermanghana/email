@@ -1841,13 +1841,14 @@ elif selected_tab == tab_titles[6]:
             att_df = pd.DataFrame(data, index=student_codes)
             att_df.index.name = "Student Code"
 
-            editor_key = "attendance_editor"
+            editor_widget_key = "attendance_editor"
+            editor_data_key = "attendance_editor_data"
             editor_class_key = "attendance_editor_class"
             if (
-                editor_key not in st.session_state
+                editor_data_key not in st.session_state
                 or st.session_state.get(editor_class_key) != sel_class
             ):
-                st.session_state[editor_key] = att_df
+                st.session_state[editor_data_key] = att_df
                 st.session_state[editor_class_key] = sel_class
 
             bulk_label = st.selectbox(
@@ -1856,11 +1857,11 @@ elif selected_tab == tab_titles[6]:
                 key="attendance_bulk_label",
             )
             if st.button("Mark everyone present"):
-                st.session_state[editor_key][bulk_label] = True
+                st.session_state[editor_data_key][bulk_label] = True
 
             edited_att_df = st.data_editor(
-                st.session_state[editor_key],
-                key=editor_key,
+                st.session_state[editor_data_key],
+                key=editor_widget_key,
                 column_config={
                     "Student": st.column_config.TextColumn("Student", disabled=True),
                     **{
@@ -1870,6 +1871,7 @@ elif selected_tab == tab_titles[6]:
                 },
                 use_container_width=True,
             )
+            st.session_state[editor_data_key] = edited_att_df
 
             if st.button("Save attendance"):
                 attendance_map = {}
