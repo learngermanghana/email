@@ -1813,6 +1813,11 @@ elif selected_tab == tab_titles[6]:
                 if stored_label:
                     session_labels[i] = stored_label
 
+            session_ids = [f"session_{i}" for i in range(len(session_labels))]
+            session_display_labels = {}
+            for i, label in enumerate(session_labels):
+                session_display_labels[session_ids[i]] = label or f"Session {i + 1}"
+
             # Merge student codes and names from roster and existing attendance
             student_codes = list(class_df["studentcode"])
             for session in existing_attendance.values():
@@ -1827,8 +1832,8 @@ elif selected_tab == tab_titles[6]:
                         student_names[s_code] = s_data["name"]
 
             data = {"Student": [student_names.get(code, "") for code in student_codes]}
-            for i, label in enumerate(session_labels):
-                data[label] = [
+            for i, session_id in enumerate(session_ids):
+                data[session_id] = [
                     bool(
                         existing_attendance.get(str(i), {})
                         .get("students", {})
@@ -1844,12 +1849,15 @@ elif selected_tab == tab_titles[6]:
             editor_widget_key = "attendance_editor"
             editor_data_key = "attendance_editor_data"
             editor_class_key = "attendance_editor_class"
+            editor_sessions_key = "attendance_editor_sessions"
             if (
                 editor_data_key not in st.session_state
                 or st.session_state.get(editor_class_key) != sel_class
+                or st.session_state.get(editor_sessions_key) != session_ids
             ):
                 st.session_state[editor_data_key] = att_df
                 st.session_state[editor_class_key] = sel_class
+                st.session_state[editor_sessions_key] = session_ids
 
             view_mode = st.radio(
                 "Attendance view",
@@ -1861,27 +1869,35 @@ elif selected_tab == tab_titles[6]:
             if view_mode == "Focus on a session":
                 focus_label = st.selectbox(
                     "Select session to edit",
-                    session_labels,
+                    session_ids,
                     key="attendance_focus_label",
+                    format_func=lambda session_id: session_display_labels.get(
+                        session_id, session_id
+                    ),
                 )
 
             bulk_label = st.selectbox(
                 "Mark everyone present for session",
-                session_labels,
+                session_ids,
                 key="attendance_bulk_label",
+                format_func=lambda session_id: session_display_labels.get(
+                    session_id, session_id
+                ),
             )
             if st.button("Mark everyone present"):
                 st.session_state[editor_data_key][bulk_label] = True
 
             if view_mode == "Focus on a session" and focus_label:
-                focus_editor_key = f"{editor_widget_key}_focus_{session_labels.index(focus_label)}"
+                focus_editor_key = f"{editor_widget_key}_focus_{focus_label}"
                 focus_df = st.session_state[editor_data_key][["Student", focus_label]]
                 edited_focus_df = st.data_editor(
                     focus_df,
                     key=focus_editor_key,
                     column_config={
                         "Student": st.column_config.TextColumn("Student", disabled=True),
-                        focus_label: st.column_config.CheckboxColumn(focus_label),
+                        focus_label: st.column_config.CheckboxColumn(
+                            session_display_labels.get(focus_label, focus_label)
+                        ),
                     },
                     use_container_width=True,
                 )
@@ -1893,8 +1909,10 @@ elif selected_tab == tab_titles[6]:
                     column_config={
                         "Student": st.column_config.TextColumn("Student", disabled=True),
                         **{
-                            label: st.column_config.CheckboxColumn(label)
-                            for label in session_labels
+                            session_id: st.column_config.CheckboxColumn(
+                                session_display_labels.get(session_id, session_id)
+                            )
+                            for session_id in session_ids
                         },
                     },
                     use_container_width=True,
@@ -1909,9 +1927,10 @@ elif selected_tab == tab_titles[6]:
                 for student_code, row in st.session_state[editor_data_key].iterrows():
                     student_name = row["Student"]
                     for i, label in enumerate(session_labels):
+                        session_id = session_ids[i]
                         attendance_map[str(i)]["students"][student_code] = {
                             "name": student_name,
-                            "present": bool(row[label]),
+                            "present": bool(row[session_id]),
                         }
 
                 save_attendance_to_firestore(sel_class, attendance_map)
