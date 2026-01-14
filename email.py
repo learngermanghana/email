@@ -1851,6 +1851,20 @@ elif selected_tab == tab_titles[6]:
                 st.session_state[editor_data_key] = att_df
                 st.session_state[editor_class_key] = sel_class
 
+            view_mode = st.radio(
+                "Attendance view",
+                ["All sessions", "Focus on a session"],
+                key="attendance_view_mode",
+                horizontal=True,
+            )
+            focus_label = None
+            if view_mode == "Focus on a session":
+                focus_label = st.selectbox(
+                    "Select session to edit",
+                    session_labels,
+                    key="attendance_focus_label",
+                )
+
             bulk_label = st.selectbox(
                 "Mark everyone present for session",
                 session_labels,
@@ -1859,26 +1873,40 @@ elif selected_tab == tab_titles[6]:
             if st.button("Mark everyone present"):
                 st.session_state[editor_data_key][bulk_label] = True
 
-            edited_att_df = st.data_editor(
-                st.session_state[editor_data_key],
-                key=editor_widget_key,
-                column_config={
-                    "Student": st.column_config.TextColumn("Student", disabled=True),
-                    **{
-                        label: st.column_config.CheckboxColumn(label)
-                        for label in session_labels
+            if view_mode == "Focus on a session" and focus_label:
+                focus_editor_key = f"{editor_widget_key}_focus_{session_labels.index(focus_label)}"
+                focus_df = st.session_state[editor_data_key][["Student", focus_label]]
+                edited_focus_df = st.data_editor(
+                    focus_df,
+                    key=focus_editor_key,
+                    column_config={
+                        "Student": st.column_config.TextColumn("Student", disabled=True),
+                        focus_label: st.column_config.CheckboxColumn(focus_label),
                     },
-                },
-                use_container_width=True,
-            )
-            st.session_state[editor_data_key] = edited_att_df
+                    use_container_width=True,
+                )
+                st.session_state[editor_data_key][focus_label] = edited_focus_df[focus_label]
+            else:
+                edited_att_df = st.data_editor(
+                    st.session_state[editor_data_key],
+                    key=f"{editor_widget_key}_all",
+                    column_config={
+                        "Student": st.column_config.TextColumn("Student", disabled=True),
+                        **{
+                            label: st.column_config.CheckboxColumn(label)
+                            for label in session_labels
+                        },
+                    },
+                    use_container_width=True,
+                )
+                st.session_state[editor_data_key] = edited_att_df
 
             if st.button("Save attendance"):
                 attendance_map = {}
                 for i, label in enumerate(session_labels):
                     attendance_map[str(i)] = {"label": label, "students": {}}
 
-                for student_code, row in edited_att_df.iterrows():
+                for student_code, row in st.session_state[editor_data_key].iterrows():
                     student_name = row["Student"]
                     for i, label in enumerate(session_labels):
                         attendance_map[str(i)]["students"][student_code] = {
