@@ -1847,6 +1847,7 @@ elif selected_tab == tab_titles[6]:
             att_df.index.name = "Student Code"
 
             editor_widget_key = "attendance_editor"
+            editor_widget_key_all = f"{editor_widget_key}_all"
             editor_data_key = "attendance_editor_data"
             editor_class_key = "attendance_editor_class"
             editor_sessions_key = "attendance_editor_sessions"
@@ -1858,6 +1859,7 @@ elif selected_tab == tab_titles[6]:
                 st.session_state[editor_data_key] = att_df
                 st.session_state[editor_class_key] = sel_class
                 st.session_state[editor_sessions_key] = session_ids
+                st.session_state.pop(editor_widget_key_all, None)
 
             view_mode = st.radio(
                 "Attendance view",
@@ -1886,6 +1888,7 @@ elif selected_tab == tab_titles[6]:
             )
             if st.button("Mark everyone present"):
                 st.session_state[editor_data_key][bulk_label] = True
+                st.session_state[editor_widget_key_all] = st.session_state[editor_data_key]
 
             if view_mode == "Focus on a session" and focus_label:
                 focus_editor_key = f"{editor_widget_key}_focus_{focus_label}"
@@ -1902,10 +1905,11 @@ elif selected_tab == tab_titles[6]:
                     use_container_width=True,
                 )
                 st.session_state[editor_data_key][focus_label] = edited_focus_df[focus_label]
+                st.session_state[editor_widget_key_all] = st.session_state[editor_data_key]
             else:
                 edited_att_df = st.data_editor(
                     st.session_state[editor_data_key],
-                    key=f"{editor_widget_key}_all",
+                    key=editor_widget_key_all,
                     column_config={
                         "Student": st.column_config.TextColumn("Student", disabled=True),
                         **{
@@ -1918,6 +1922,7 @@ elif selected_tab == tab_titles[6]:
                     use_container_width=True,
                 )
                 st.session_state[editor_data_key] = edited_att_df
+                st.session_state[editor_widget_key_all] = edited_att_df
 
             if st.button("Save attendance"):
                 attendance_map = {}
