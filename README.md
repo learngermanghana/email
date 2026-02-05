@@ -8,6 +8,7 @@ Available pages:
 
 - **Course schedule generator** for A1/A2/B1, with TXT/JSON/PDF downloads.
 - **Class attendance** tracking with Firestore-backed persistence.
+- **Announcement creator** for publishing Firestore announcements.
 
 ## Firestore Announcement Writing Guide (External Streamlit Page)
 
