@@ -21,7 +21,7 @@ def save_attendance_to_firestore(class_name: str, attendance_map: dict):
     class_name: str
         Name of the class grouping the sessions.
     attendance_map: dict
-        Mapping of ``session_id`` -> ``{"label": str, "students": {student_code: {"name": str, "present": bool}}}``.
+        Mapping of ``session_id`` -> ``{"title": str, "date": str, "students": {student_code: {"name": str, "present": bool}}}``.
     """
     db = _get_db()
     for session_id, session_data in attendance_map.items():
@@ -39,7 +39,7 @@ def load_attendance_from_firestore(class_name: str) -> dict:
     Returns
     -------
     dict
-        Mapping of ``session_id`` -> ``{"label": str, "students": {student_code: {"name": str, "present": bool}}}``.
+        Mapping of ``session_id`` -> ``{"title": str, "date": str, "students": {student_code: {"name": str, "present": bool}}}``.
 
     Notes
     -----
@@ -58,15 +58,22 @@ def load_attendance_from_firestore(class_name: str) -> dict:
     for doc in docs:
         data = doc.to_dict() or {}
         if "students" in data:
-            result[doc.id] = data
+            title = data.get("title") or data.get("label", "")
+            result[doc.id] = {
+                "title": title,
+                "date": data.get("date", ""),
+                "students": data.get("students", {}),
+            }
         else:
             # Legacy format without labels or nested student data
+            title = data.get("title") or data.get("label", "")
             result[doc.id] = {
-                "label": data.get("label", ""),
+                "title": title,
+                "date": data.get("date", ""),
                 "students": {
                     s_code: {"name": "", "present": present}
                     for s_code, present in data.items()
-                    if s_code != "label"
+                    if s_code not in {"label", "title", "date"}
                 },
             }
     return result
