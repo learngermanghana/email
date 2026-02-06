@@ -74,7 +74,8 @@ def test_round_trip_save_and_load(monkeypatch):
 
     attendance_map = {
         "0": {
-            "label": "Week 1: Grammar",
+            "title": "Week 1: Grammar",
+            "date": "2026-02-12",
             "students": {
                 "S1": {"name": "Alice", "present": True},
                 "S2": {"name": "Bob", "present": False},
@@ -95,11 +96,11 @@ def test_load_legacy_format(monkeypatch):
     loaded = attendance_utils.load_attendance_from_firestore("classA")
     assert loaded == {
         "0": {
-            "label": "",
+            "title": "",
+            "date": "",
             "students": {
                 "S1": {"name": "", "present": True},
                 "S2": {"name": "", "present": False},
             },
         }
     }
-

@@ -877,12 +877,12 @@ elif selected_tab == tab_titles[1]:
         }
         schedule = schedule_map.get(sel_level.upper(), [])
 
-        session_labels = []
+        session_titles = []
         for week, topics in schedule:
             for topic in topics:
-                session_labels.append(f"{week}: {topic}")
+                session_titles.append(f"{week}: {topic}")
 
-        if not session_labels:
+        if not session_titles:
             st.info("No schedule defined for this level.")
         else:
             st.write("### Attendance")
@@ -892,19 +892,26 @@ elif selected_tab == tab_titles[1]:
             except Exception:
                 st.info("Could not load existing attendance.")
 
-            # Ensure session labels incorporate any stored labels and sessions
+            session_dates = ["" for _ in range(len(session_titles))]
+            # Ensure session titles incorporate any stored titles and sessions
             max_existing = max((int(s) for s in existing_attendance.keys()), default=-1)
-            if max_existing + 1 > len(session_labels):
-                session_labels.extend(["" for _ in range(max_existing + 1 - len(session_labels))])
-            for i in range(len(session_labels)):
-                stored_label = existing_attendance.get(str(i), {}).get("label")
-                if stored_label:
-                    session_labels[i] = stored_label
+            if max_existing + 1 > len(session_titles):
+                extra_sessions = max_existing + 1 - len(session_titles)
+                session_titles.extend(["" for _ in range(extra_sessions)])
+                session_dates.extend(["" for _ in range(extra_sessions)])
+            for i in range(len(session_titles)):
+                stored_session = existing_attendance.get(str(i), {})
+                stored_title = stored_session.get("title") or stored_session.get("label")
+                if stored_title:
+                    session_titles[i] = stored_title
+                stored_date = stored_session.get("date")
+                if stored_date:
+                    session_dates[i] = stored_date
 
-            session_ids = [f"session_{i}" for i in range(len(session_labels))]
+            session_ids = [f"session_{i}" for i in range(len(session_titles))]
             session_display_labels = {}
-            for i, label in enumerate(session_labels):
-                session_display_labels[session_ids[i]] = label or f"Session {i + 1}"
+            for i, title in enumerate(session_titles):
+                session_display_labels[session_ids[i]] = title or f"Session {i + 1}"
 
             # Merge student codes and names from roster and existing attendance
             student_codes = list(class_df["studentcode"])
@@ -938,6 +945,7 @@ elif selected_tab == tab_titles[1]:
             editor_data_key = "attendance_editor_data"
             editor_class_key = "attendance_editor_class"
             editor_sessions_key = "attendance_editor_sessions"
+            editor_dates_key = "attendance_editor_dates"
             if (
                 editor_data_key not in st.session_state
                 or st.session_state.get(editor_class_key) != sel_class
@@ -946,6 +954,7 @@ elif selected_tab == tab_titles[1]:
                 st.session_state[editor_data_key] = att_df
                 st.session_state[editor_class_key] = sel_class
                 st.session_state[editor_sessions_key] = session_ids
+                st.session_state[editor_dates_key] = session_dates
 
             view_mode = st.radio(
                 "Attendance view",
@@ -963,6 +972,14 @@ elif selected_tab == tab_titles[1]:
                         session_id, session_id
                     ),
                 )
+                focus_index = session_ids.index(focus_label)
+                date_key = f"{editor_widget_key}_date_{focus_label}"
+                focus_date = st.text_input(
+                    "Session date (YYYY-MM-DD)",
+                    value=st.session_state[editor_dates_key][focus_index],
+                    key=date_key,
+                )
+                st.session_state[editor_dates_key][focus_index] = focus_date
 
             bulk_label = st.selectbox(
                 "Mark everyone present for session",
@@ -1009,12 +1026,16 @@ elif selected_tab == tab_titles[1]:
 
             if st.button("Save attendance"):
                 attendance_map = {}
-                for i, label in enumerate(session_labels):
-                    attendance_map[str(i)] = {"label": label, "students": {}}
+                for i, title in enumerate(session_titles):
+                    attendance_map[str(i)] = {
+                        "title": title,
+                        "date": st.session_state[editor_dates_key][i],
+                        "students": {},
+                    }
 
                 for student_code, row in st.session_state[editor_data_key].iterrows():
                     student_name = row["Student"]
-                    for i, label in enumerate(session_labels):
+                    for i, title in enumerate(session_titles):
                         session_id = session_ids[i]
                         attendance_map[str(i)]["students"][student_code] = {
                             "name": student_name,
