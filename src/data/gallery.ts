@@ -8,41 +8,41 @@ export const galleryItems: GalleryItem[] = [
   {
     title: 'Soft glam bridal finish',
     category: 'Bridal / Makeup Looks',
-    image: '/uploads/gallery/soft-glam-bridal-finish.svg'
+    image: '/uploads/gallery/WhatsApp Image 2026-03-21 at 18.04.48.jpeg'
   },
   {
     title: 'Student practical facial session',
     category: 'Student Practical Work',
-    image: '/uploads/gallery/student-practical-facial-session.svg'
+    image: '/uploads/gallery/WhatsApp Image 2026-03-21 at 18.04.48 (1).jpeg'
   },
   {
     title: 'Hair styling workshop',
     category: 'Classroom Training',
-    image: '/uploads/gallery/hair-styling-workshop.svg'
+    image: '/uploads/gallery/WhatsApp Image 2026-03-21 at 18.04.48 (2).jpeg'
   },
   {
     title: 'Braids and protective styling',
     category: 'Hair Work',
-    image: '/uploads/gallery/braids-and-protective-styling.svg'
+    image: '/uploads/gallery/WhatsApp Image 2026-03-21 at 18.04.49.jpeg'
   },
   {
     title: 'Nail artistry practice',
     category: 'Student Practical Work',
-    image: '/uploads/gallery/nail-artistry-practice.svg'
+    image: '/uploads/gallery/WhatsApp Image 2026-03-21 at 18.04.49 (1).jpeg'
   },
   {
     title: 'Editorial make-up look',
     category: 'Bridal / Makeup Looks',
-    image: '/uploads/gallery/editorial-make-up-look.svg'
+    image: '/uploads/gallery/WhatsApp Image 2026-03-21 at 18.04.49 (2).jpeg'
   },
   {
     title: 'Salon workstation training',
     category: 'Classroom Training',
-    image: '/uploads/gallery/salon-workstation-training.svg'
+    image: '/uploads/gallery/WhatsApp Image 2026-03-21 at 18.04.50.jpeg'
   },
   {
     title: 'Elegant hair finish',
     category: 'Hair Work',
-    image: '/uploads/gallery/elegant-hair-finish.svg'
+    image: '/uploads/gallery/WhatsApp Image 2026-03-21 at 18.04.50 (1).jpeg'
   }
 ];
