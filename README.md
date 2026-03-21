@@ -44,15 +44,22 @@ public/
 
 ## Registration data (Firestore)
 
-Set these environment variables in `.env.local` (and in Vercel project settings) for the `/register` form to save data with Firebase Admin (server-side):
+Set **server-side** Firebase credentials in `.env.local` (and in Vercel project settings) for the `/register` form to save data:
 
 ```bash
+# Option A: individual variables
 FIREBASE_PROJECT_ID=your-firebase-project-id
 FIREBASE_CLIENT_EMAIL=your-service-account-client-email
 FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+
+# Option B: full JSON as one variable
+FIREBASE_SERVICE_ACCOUNT_JSON='{"project_id":"...","client_email":"...","private_key":"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"}'
 ```
 
-Use a Firebase service account with access to Firestore. Because writes happen on the server, Firestore client rules will no longer block submissions with 403 errors.
+Notes:
+- `NEXT_PUBLIC_FIREBASE_API_KEY` and other `NEXT_PUBLIC_*` values are for browser SDK use and are **not enough** for secure server writes.
+- The server also accepts common aliases (`GOOGLE_CLOUD_PROJECT`, `GCLOUD_PROJECT`, `FIREBASE_ADMIN_CLIENT_EMAIL`, `FIREBASE_ADMIN_PRIVATE_KEY`, `GOOGLE_CLIENT_EMAIL`, `GOOGLE_PRIVATE_KEY`) to simplify Vercel setups.
+- Use a Firebase service account with access to Firestore.
 
 ## Build for production
 
