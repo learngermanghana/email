@@ -2,47 +2,14 @@ import Image from 'next/image';
 import { ButtonLink } from '@/components/button-link';
 import { CourseCard } from '@/components/course-card';
 import { GalleryGrid } from '@/components/gallery-grid';
-import { ProductCard } from '@/components/product-card';
 import { SectionHeading } from '@/components/section-heading';
 import { TestimonialCard } from '@/components/testimonial-card';
 import { UpcomingClassesSection } from '@/components/upcoming-classes-section';
 import { courses } from '@/data/courses';
-import { homepageImages, photoUploadSteps, uploadFolders } from '@/data/media-library';
-import { products } from '@/data/products';
+import { homepageImages } from '@/data/media-library';
 import { testimonials } from '@/data/testimonials';
 import { siteConfig } from '@/data/site';
 import { createWhatsAppLink } from '@/lib/whatsapp';
-
-const coreValues = [
-  {
-    title: 'Innovation',
-    copy: 'We embrace modern beauty techniques, emerging trends, and forward-thinking teaching methods that keep our students ahead.'
-  },
-  {
-    title: 'Excellence',
-    copy: 'We pursue high standards in training, mentorship, presentation, and student outcomes across every programme.'
-  },
-  {
-    title: 'Empowerment',
-    copy: 'We equip aspiring beauty professionals with the practical skills and mindset to build meaningful careers.'
-  },
-  {
-    title: 'Creativity',
-    copy: 'We encourage artistic expression and originality so students can shape looks, services, and brands with confidence.'
-  },
-  {
-    title: 'Confidence',
-    copy: 'We create a supportive learning environment that helps every student grow their technical ability and self-belief.'
-  },
-  {
-    title: 'Global competence',
-    copy: 'We train students to compete in an evolving beauty and wellness industry with a broad, professional perspective.'
-  },
-  {
-    title: 'Industry relevance',
-    copy: 'Our training stays connected to real client needs, current salon practice, and the professional tools used in the field.'
-  }
-] as const;
 
 export default function HomePage() {
   return (
@@ -145,36 +112,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="section-shell pb-8">
-        <div className="grid gap-8 lg:grid-cols-2">
-          <article className="rounded-4xl border border-black/5 bg-white p-8 shadow-card">
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-gold">Vision</p>
-            <p className="mt-4 text-lg leading-8 text-charcoal/75">{siteConfig.vision}</p>
-          </article>
-          <article className="rounded-4xl border border-black/5 bg-white p-8 shadow-card">
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-gold">Mission</p>
-            <p className="mt-4 text-lg leading-8 text-charcoal/75">{siteConfig.mission}</p>
-          </article>
-        </div>
-      </section>
-
-      <section className="section-shell py-12">
-        <SectionHeading
-          eyebrow="Core values"
-          title="The principles that shape how we train, mentor, and prepare future beauty professionals."
-          description="Our values guide every learning experience, from classroom delivery to practical studio work and student support."
-          align="center"
-        />
-        <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {coreValues.map((value) => (
-            <article key={value.title} className="rounded-4xl border border-black/5 bg-white p-8 shadow-card">
-              <h3 className="text-xl font-semibold text-charcoal">{value.title}</h3>
-              <p className="mt-3 text-sm leading-7 text-charcoal/70">{value.copy}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
       <section className="section-shell py-8">
         <SectionHeading
           eyebrow="Courses preview"
@@ -194,43 +131,6 @@ export default function HomePage() {
       <section className="mt-20 bg-section-glow py-20">
         <div className="section-shell">
           <SectionHeading
-            eyebrow="Photo updates"
-            title="A simple upload structure for homepage, courses, products, and gallery photos."
-            description="Every public-facing image now lives in a dedicated uploads folder so your team can replace photos without hunting through the codebase."
-          />
-          <div className="mt-10 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-            <div className="grid gap-4 sm:grid-cols-2">
-              {uploadFolders.map((folder) => (
-                <article key={folder.folder} className="rounded-4xl border border-black/5 bg-white p-6 shadow-card">
-                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-gold">{folder.name}</p>
-                  <p className="mt-3 font-mono text-sm text-charcoal">{folder.folder}</p>
-                  <p className="mt-3 text-sm leading-7 text-charcoal/70">{folder.usage}</p>
-                </article>
-              ))}
-            </div>
-            <article className="rounded-4xl border border-black/5 bg-white p-8 shadow-card">
-              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-gold">How to upload new photos</p>
-              <ol className="mt-5 space-y-4 text-sm leading-7 text-charcoal/75">
-                {photoUploadSteps.map((step, index) => (
-                  <li key={step} className="flex gap-4">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blush font-semibold text-charcoal">
-                      {index + 1}
-                    </span>
-                    <span>{step}</span>
-                  </li>
-                ))}
-              </ol>
-              <p className="mt-6 rounded-3xl bg-nude px-4 py-3 text-sm text-charcoal/75">
-                Need to change image names too? Update the matching data file and the new photo will appear automatically.
-              </p>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section className="mt-20 bg-section-glow py-20">
-        <div className="section-shell">
-          <SectionHeading
             eyebrow="Upcoming classes"
             title="Reserve your next start date with confidence."
             description="Discover upcoming cohorts for full programs and short courses, with limited slots and flexible weekday or weekend options."
@@ -238,28 +138,6 @@ export default function HomePage() {
           <div className="mt-10">
             <UpcomingClassesSection preview />
           </div>
-        </div>
-      </section>
-
-      <section className="section-shell py-20">
-        <SectionHeading
-          eyebrow="Why choose us"
-          title="A calm, polished learning environment designed for growth."
-          description="We balance professionalism and warmth with structured practical work, supportive tutors, and business-ready beauty education."
-          align="center"
-        />
-        <div className="mt-10 grid gap-6 md:grid-cols-3">
-          {[
-            ['Practical first', 'Hands-on demonstrations and student practice are woven into every program.'],
-            ['Career-focused', 'Courses help students prepare for salon work, freelance services, and entrepreneurial growth.'],
-            ['Easy support', 'Quick WhatsApp admissions and enquiry flows make it easy to connect with our team.']
-          ].map(([title, copy]) => (
-            <article key={title} className="rounded-4xl border border-black/5 bg-white p-8 text-center shadow-card">
-              <div className="mx-auto h-14 w-14 rounded-2xl bg-blush" />
-              <h3 className="mt-6 text-xl font-semibold text-charcoal">{title}</h3>
-              <p className="mt-3 text-sm leading-7 text-charcoal/70">{copy}</p>
-            </article>
-          ))}
         </div>
       </section>
 
@@ -314,24 +192,6 @@ export default function HomePage() {
         </div>
         <div className="mt-8">
           <ButtonLink href="/gallery" variant="secondary">Browse full gallery</ButtonLink>
-        </div>
-      </section>
-
-      <section className="bg-section-glow py-20">
-        <div className="section-shell">
-          <SectionHeading
-            eyebrow="Products preview"
-            title="Sample beauty products students and clients can enquire about."
-            description="Product cards now point to the dedicated uploads/products folder, making replacements straightforward for your team."
-          />
-          <div className="mt-10 grid gap-6 lg:grid-cols-3">
-            {products.slice(0, 3).map((product) => (
-              <ProductCard key={product.name} product={product} />
-            ))}
-          </div>
-          <div className="mt-8">
-            <ButtonLink href="/products" variant="secondary">View sample products</ButtonLink>
-          </div>
         </div>
       </section>
 
