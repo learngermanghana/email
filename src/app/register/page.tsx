@@ -4,7 +4,7 @@ import { SectionHeading } from '@/components/section-heading';
 
 export const metadata: Metadata = {
   title: 'Register',
-  description: 'Register your interest in beauty therapy, hairdressing, massage therapy, and other cosmetology courses in Tema through our WhatsApp-ready admissions form.'
+  description: 'Register your interest in beauty therapy, hairdressing, massage therapy, and other cosmetology courses in Tema through our secure online admissions form.'
 };
 
 export default function RegisterPage() {
@@ -15,13 +15,13 @@ export default function RegisterPage() {
           <SectionHeading
             eyebrow="Registration"
             title="Take the next step toward your beauty career."
-            description="Complete the form below and continue straight to WhatsApp with your details prefilled. It is a premium, low-friction admissions flow built for quick responses."
+            description="Complete the form below and we will save your registration details immediately for admissions follow-up."
           />
           <div className="rounded-4xl border border-black/5 bg-nude/70 p-7 text-sm leading-7 text-charcoal/75 shadow-card">
             <p className="font-semibold text-charcoal">What happens next?</p>
             <ul className="mt-4 space-y-3">
               <li>• You fill in your course interest and preferred start month.</li>
-              <li>• WhatsApp opens with your details prefilled for quick follow-up.</li>
+              <li>• Your registration is saved permanently in our admissions database.</li>
               <li>• Our admissions team confirms availability and next steps.</li>
             </ul>
           </div>
