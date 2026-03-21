@@ -14,7 +14,7 @@ export default function CoursesPage() {
       <SectionHeading
         eyebrow="Courses"
         title="Explore professional beauty training designed for beginners and aspiring experts."
-        description="Choose from full cosmetology programs and flexible short courses created for beauty entrepreneurs, salon professionals, and learners who want practical, elegant training in Tema."
+        description="Choose from full cosmetology programs and flexible short courses created for beauty entrepreneurs, salon professionals, and learners who want practical, elegant training in Tema. Each course card now has its own upload-ready image slot in public/uploads/courses."
       />
       <div className="mt-10 grid gap-6 xl:grid-cols-2">
         {courses.map((course) => (

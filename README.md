@@ -22,6 +22,11 @@ src/
   lib/
 public/
   images/
+  uploads/
+    homepage/
+    courses/
+    products/
+    gallery/
 ```
 
 ## Local setup
@@ -66,6 +71,17 @@ Update these files to manage the main site content:
 - Gallery items: `src/data/gallery.ts`
 - Testimonials: `src/data/testimonials.ts`
 - Business details and navigation: `src/data/site.ts`
+
+## Uploading photos
+
+All editable site photos now live in `public/uploads/` so it is easier to replace them without searching through the app.
+
+- Homepage photos: `public/uploads/homepage/`
+- Course photos: `public/uploads/courses/`
+- Product photos: `public/uploads/products/`
+- Gallery photos: `public/uploads/gallery/`
+
+If you keep the same file names, you only need to replace the image file. If you want a new file name, update the matching data file as well. See `docs/photo-upload-guide.md` for the full workflow.
 
 ## Future integrations
 

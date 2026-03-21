@@ -4,7 +4,7 @@ import { SectionHeading } from '@/components/section-heading';
 
 export const metadata: Metadata = {
   title: 'Gallery',
-  description: 'Browse placeholder beauty school imagery for student practical work, bridal make-up looks, classroom training, and hair work.'
+  description: 'Browse beauty school imagery for student practical work, bridal make-up looks, classroom training, and hair work.'
 };
 
 export default function GalleryPage() {
@@ -13,7 +13,7 @@ export default function GalleryPage() {
       <SectionHeading
         eyebrow="Gallery"
         title="An elegant gallery layout ready for your student work and signature looks."
-        description="These polished placeholder visuals are grouped into clear beauty-school categories so it is easy to swap in your own photography later."
+        description="Gallery cards now read from public/uploads/gallery, so you can refresh school photography by replacing image files in one place."
       />
       <div className="mt-10">
         <GalleryGrid />

@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { ButtonLink } from '@/components/button-link';
 import { CourseCard } from '@/components/course-card';
 import { GalleryGrid } from '@/components/gallery-grid';
@@ -6,6 +7,7 @@ import { SectionHeading } from '@/components/section-heading';
 import { TestimonialCard } from '@/components/testimonial-card';
 import { UpcomingClassesSection } from '@/components/upcoming-classes-section';
 import { courses } from '@/data/courses';
+import { homepageImages, photoUploadSteps, uploadFolders } from '@/data/media-library';
 import { products } from '@/data/products';
 import { testimonials } from '@/data/testimonials';
 import { siteConfig } from '@/data/site';
@@ -46,7 +48,7 @@ export default function HomePage() {
   return (
     <div>
       <section className="bg-hero-glow">
-        <div className="section-shell grid gap-12 py-20 lg:grid-cols-[1.15fr_0.85fr] lg:items-center lg:py-28">
+        <div className="section-shell grid gap-12 py-20 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:py-28">
           <div className="space-y-8">
             <div className="space-y-5">
               <p className="text-sm font-semibold uppercase tracking-[0.32em] text-gold">Elegant beauty education in Tema</p>
@@ -76,22 +78,50 @@ export default function HomePage() {
               ))}
             </div>
           </div>
-          <div className="rounded-[2.5rem] border border-white/70 bg-white/80 p-8 shadow-soft backdrop-blur">
-            <div className="rounded-[2rem] bg-gradient-to-br from-blush via-white to-nude p-8">
-              <p className="text-sm font-semibold uppercase tracking-[0.3em] text-gold">Why students choose us</p>
-              <div className="mt-6 space-y-5 text-charcoal/75">
-                <div>
-                  <h2 className="text-2xl font-semibold text-charcoal">Refined training for modern beauty professionals.</h2>
-                  <p className="mt-3 text-base leading-7">Our school combines practical studio sessions, expert-led instruction, and a polished learning experience that helps students train confidently and launch beautifully.</p>
+          <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="overflow-hidden rounded-[2.5rem] border border-white/70 bg-white/80 shadow-soft backdrop-blur">
+              <div className="relative aspect-[4/5]">
+                <Image
+                  src={homepageImages.hero.src}
+                  alt={homepageImages.hero.alt}
+                  fill
+                  priority
+                  className="object-cover"
+                  sizes="(min-width: 1024px) 32vw, 100vw"
+                />
+              </div>
+            </div>
+            <div className="space-y-5">
+              <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card backdrop-blur">
+                <p className="text-sm font-semibold uppercase tracking-[0.3em] text-gold">Why students choose us</p>
+                <div className="mt-5 space-y-4 text-charcoal/75">
+                  <div>
+                    <h2 className="text-2xl font-semibold text-charcoal">Refined training for modern beauty professionals.</h2>
+                    <p className="mt-3 text-base leading-7">
+                      Our school combines practical studio sessions, expert-led instruction, and a polished learning experience that helps students train confidently and launch beautifully.
+                    </p>
+                  </div>
+                  <ul className="space-y-3 text-sm leading-7">
+                    <li>• Small-group instruction with personal guidance.</li>
+                    <li>• Premium course mix covering salon, spa, grooming, and creative skills.</li>
+                    <li>• Fast WhatsApp registration flow for quick admissions support.</li>
+                  </ul>
+                  <ButtonLink href="/courses" variant="ghost" className="px-0 font-semibold">
+                    Explore our courses →
+                  </ButtonLink>
                 </div>
-                <ul className="space-y-4 text-sm leading-7">
-                  <li>• Small-group instruction with personal guidance.</li>
-                  <li>• Premium course mix covering salon, spa, grooming, and creative skills.</li>
-                  <li>• Fast WhatsApp registration flow for quick admissions support.</li>
-                </ul>
-                <ButtonLink href="/courses" variant="ghost" className="px-0 font-semibold">
-                  Explore our courses →
-                </ButtonLink>
+              </div>
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                {homepageImages.highlights.map((item) => (
+                  <div key={item.title} className="overflow-hidden rounded-[2rem] border border-white/70 bg-white/80 shadow-card backdrop-blur">
+                    <div className="relative aspect-[4/3]">
+                      <Image src={item.src} alt={item.alt} fill className="object-cover" sizes="(min-width: 1280px) 16vw, (min-width: 640px) 50vw, 100vw" />
+                    </div>
+                    <div className="p-4">
+                      <p className="text-sm font-semibold text-charcoal">{item.title}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -99,11 +129,20 @@ export default function HomePage() {
       </section>
 
       <section className="section-shell py-20">
-        <SectionHeading
-          eyebrow="About the school"
-          title="A premium cosmetology school in Tema focused on beauty, skill, and confidence."
-          description={`${siteConfig.shortName} blends practical learning with a polished student experience. Our programs are designed for aspiring beauty professionals, entrepreneurs, and career changers who want elegant, industry-ready training in Ghana.`}
-        />
+        <div className="grid gap-8 lg:grid-cols-[1fr_1.05fr] lg:items-center">
+          <div>
+            <SectionHeading
+              eyebrow="About the school"
+              title="A premium cosmetology school in Tema focused on beauty, skill, and confidence."
+              description={`${siteConfig.shortName} blends practical learning with a polished student experience. Our programs are designed for aspiring beauty professionals, entrepreneurs, and career changers who want elegant, industry-ready training in Ghana.`}
+            />
+          </div>
+          <div className="overflow-hidden rounded-4xl border border-black/5 bg-white shadow-card">
+            <div className="relative aspect-[16/10] bg-gradient-to-br from-blush via-white to-nude">
+              <Image src={homepageImages.about.src} alt={homepageImages.about.alt} fill className="object-cover" sizes="(min-width: 1024px) 40vw, 100vw" />
+            </div>
+          </div>
+        </div>
       </section>
 
       <section className="section-shell pb-8">
@@ -149,6 +188,43 @@ export default function HomePage() {
         </div>
         <div className="mt-8">
           <ButtonLink href="/courses" variant="secondary">View all courses</ButtonLink>
+        </div>
+      </section>
+
+      <section className="mt-20 bg-section-glow py-20">
+        <div className="section-shell">
+          <SectionHeading
+            eyebrow="Photo updates"
+            title="A simple upload structure for homepage, courses, products, and gallery photos."
+            description="Every public-facing image now lives in a dedicated uploads folder so your team can replace photos without hunting through the codebase."
+          />
+          <div className="mt-10 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+            <div className="grid gap-4 sm:grid-cols-2">
+              {uploadFolders.map((folder) => (
+                <article key={folder.folder} className="rounded-4xl border border-black/5 bg-white p-6 shadow-card">
+                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-gold">{folder.name}</p>
+                  <p className="mt-3 font-mono text-sm text-charcoal">{folder.folder}</p>
+                  <p className="mt-3 text-sm leading-7 text-charcoal/70">{folder.usage}</p>
+                </article>
+              ))}
+            </div>
+            <article className="rounded-4xl border border-black/5 bg-white p-8 shadow-card">
+              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-gold">How to upload new photos</p>
+              <ol className="mt-5 space-y-4 text-sm leading-7 text-charcoal/75">
+                {photoUploadSteps.map((step, index) => (
+                  <li key={step} className="flex gap-4">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blush font-semibold text-charcoal">
+                      {index + 1}
+                    </span>
+                    <span>{step}</span>
+                  </li>
+                ))}
+              </ol>
+              <p className="mt-6 rounded-3xl bg-nude px-4 py-3 text-sm text-charcoal/75">
+                Need to change image names too? Update the matching data file and the new photo will appear automatically.
+              </p>
+            </article>
+          </div>
         </div>
       </section>
 
@@ -231,7 +307,7 @@ export default function HomePage() {
         <SectionHeading
           eyebrow="Student work"
           title="A glimpse into practical sessions, polished beauty looks, and classroom energy."
-          description="The gallery is structured so you can easily replace the current placeholder visuals with future student work and school photography."
+          description="The gallery now reads from the dedicated public/uploads/gallery folder so future student work is simple to refresh."
         />
         <div className="mt-10">
           <GalleryGrid limit={4} />
@@ -246,7 +322,7 @@ export default function HomePage() {
           <SectionHeading
             eyebrow="Products preview"
             title="Sample beauty products students and clients can enquire about."
-            description="This sample product section is ready to evolve into a fuller store experience later, with Paystack or Firebase integrations when you are ready."
+            description="Product cards now point to the dedicated uploads/products folder, making replacements straightforward for your team."
           />
           <div className="mt-10 grid gap-6 lg:grid-cols-3">
             {products.slice(0, 3).map((product) => (
@@ -262,8 +338,8 @@ export default function HomePage() {
       <section className="section-shell py-20">
         <SectionHeading
           eyebrow="Testimonials"
-          title="What students love about the experience."
-          description="These testimonials are sample content and can be replaced with verified student stories later."
+          title="What students and clients love about the Make Up & More experience."
+          description="Social proof builds confidence and shows the elegant learning experience your school delivers."
           align="center"
         />
         <div className="mt-10 grid gap-6 lg:grid-cols-3">
