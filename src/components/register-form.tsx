@@ -55,7 +55,9 @@ export function RegisterForm() {
       });
 
       if (!response.ok) {
-        throw new Error(`Firestore save failed with status ${response.status}`);
+        const payload = (await response.json().catch(() => null)) as { reason?: string } | null;
+        const reason = payload?.reason ? ` (${payload.reason})` : '';
+        throw new Error(`Registration save failed with status ${response.status}${reason}`);
       }
 
       setForm(initialState);
