@@ -9,7 +9,7 @@ A premium, conversion-focused beauty school website built with Next.js App Route
 - SEO-friendly metadata for all core routes.
 - Reusable WhatsApp CTA helpers for course, class, and product enquiries.
 - Static local data files for courses, upcoming classes, gallery content, testimonials, and products.
-- Registration form writes submissions to a Firestore `registrations` collection via the Firestore REST API.
+- Registration form initializes a Paystack payment and only writes successful registrations to Firestore.
 - Sitemap and robots support for better search indexing readiness.
 
 ## Project structure
@@ -42,11 +42,17 @@ public/
 3. Open [http://localhost:3000](http://localhost:3000).
 
 
-## Registration data (Firestore)
+## Registration payment + data save (Paystack + Firestore)
 
-Set **server-side** Firebase credentials in `.env.local` (and in Vercel project settings) for the `/register` form to save data:
+Set **server-side** Paystack and Firebase credentials in `.env.local` (and in Vercel project settings) for the `/register` form to process payment and save data:
 
 ```bash
+# Paystack
+NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=pk_test_xxx
+PAYSTACK_SECRET_KEY=sk_test_xxx
+# Optional, defaults to 500000 (GHS 5,000.00 if your Paystack account uses pesewas)
+REGISTRATION_FEE_KOBO=500000
+
 # Option A: individual variables
 FIREBASE_PROJECT_ID=your-firebase-project-id
 FIREBASE_CLIENT_EMAIL=your-service-account-client-email
@@ -57,6 +63,7 @@ FIREBASE_SERVICE_ACCOUNT_JSON='{"project_id":"...","client_email":"...","private
 ```
 
 Notes:
+- Registration is written to Firestore **only after** a successful Paystack verification.
 - `NEXT_PUBLIC_FIREBASE_API_KEY` and other `NEXT_PUBLIC_*` values are for browser SDK use and are **not enough** for secure server writes.
 - The server also accepts common aliases (`GOOGLE_CLOUD_PROJECT`, `GCLOUD_PROJECT`, `FIREBASE_ADMIN_CLIENT_EMAIL`, `FIREBASE_ADMIN_PRIVATE_KEY`, `GOOGLE_CLIENT_EMAIL`, `GOOGLE_PRIVATE_KEY`) to simplify Vercel setups.
 - Use a Firebase service account with access to Firestore.

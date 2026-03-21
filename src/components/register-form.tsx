@@ -1,7 +1,8 @@
 'use client';
 
 import type { FormEvent, ReactNode } from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { courses } from '@/data/courses';
 import { upcomingClasses } from '@/data/upcoming-classes';
 
@@ -24,13 +25,15 @@ const initialState: FormState = {
 };
 
 export function RegisterForm() {
+  const searchParams = useSearchParams();
   const [form, setForm] = useState<FormState>(initialState);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
 
   const helperText = useMemo(
-    () => 'Submitting this form securely saves your registration so our admissions team can follow up quickly.',
+    () => 'Submitting this form takes you to secure payment. After successful payment, we automatically save your registration for admissions follow-up.',
     []
   );
   const classDatesByCourse = useMemo(() => {
@@ -40,6 +43,46 @@ export function RegisterForm() {
     }, {});
   }, []);
   const selectedCourseDates = form.course ? classDatesByCourse[form.course] ?? [] : [];
+
+  useEffect(() => {
+    const status = searchParams.get('status');
+    const reference = searchParams.get('reference') || searchParams.get('trxref');
+
+    if (status !== 'success' || !reference || isVerifyingPayment || success) {
+      return;
+    }
+
+    async function verifyAndSave() {
+      setIsVerifyingPayment(true);
+      setError('');
+
+      try {
+        const response = await fetch('/api/registrations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ paymentReference: reference })
+        });
+
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => null)) as { reason?: string } | null;
+          const reason = payload?.reason ? ` (${payload.reason})` : '';
+          throw new Error(`Registration save failed with status ${response.status}${reason}`);
+        }
+
+        setForm(initialState);
+        setSuccess('Payment successful! Your registration has been submitted.');
+      } catch (verificationError) {
+        console.error(verificationError);
+        setError('Payment went through, but we could not finalize your registration. Please contact support with your payment reference.');
+      } finally {
+        setIsVerifyingPayment(false);
+      }
+    }
+
+    void verifyAndSave();
+  }, [isVerifyingPayment, searchParams, success]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -54,7 +97,7 @@ export function RegisterForm() {
     setSuccess('');
 
     try {
-      const response = await fetch('/api/registrations', {
+      const response = await fetch('/api/payments/initialize', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -64,19 +107,23 @@ export function RegisterForm() {
 
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as { reason?: string } | null;
-        if (payload?.reason === 'config_missing') {
-          throw new Error('Registration form is not configured on the server yet. Please contact support.');
+        if (payload?.reason === 'payment_config_missing') {
+          throw new Error('Payment is not configured on the server yet. Please contact support.');
         }
 
         const reason = payload?.reason ? ` (${payload.reason})` : '';
-        throw new Error(`Registration save failed with status ${response.status}${reason}`);
+        throw new Error(`Payment initialization failed with status ${response.status}${reason}`);
       }
 
-      setForm(initialState);
-      setSuccess('Thanks! Your registration has been submitted successfully.');
+      const payload = (await response.json()) as { authorizationUrl?: string };
+      if (!payload.authorizationUrl) {
+        throw new Error('Payment authorization link was not returned by the server.');
+      }
+
+      window.location.assign(payload.authorizationUrl);
     } catch (submissionError) {
       console.error(submissionError);
-      setError('Could not submit your registration right now. Please try again in a moment.');
+      setError('Could not start payment right now. Please try again in a moment.');
     } finally {
       setIsSubmitting(false);
     }
@@ -132,8 +179,12 @@ export function RegisterForm() {
       </div>
       {error ? <p className="mt-4 text-sm font-medium text-rose-700">{error}</p> : null}
       {success ? <p className="mt-4 text-sm font-medium text-emerald-700">{success}</p> : null}
-      <button type="submit" disabled={isSubmitting} className="mt-8 inline-flex rounded-full bg-charcoal px-6 py-3 text-sm font-medium text-white transition hover:bg-charcoal/90 disabled:cursor-not-allowed disabled:opacity-70">
-        {isSubmitting ? 'Submitting...' : 'Submit registration'}
+      <button
+        type="submit"
+        disabled={isSubmitting || isVerifyingPayment}
+        className="mt-8 inline-flex rounded-full bg-charcoal px-6 py-3 text-sm font-medium text-white transition hover:bg-charcoal/90 disabled:cursor-not-allowed disabled:opacity-70"
+      >
+        {isSubmitting ? 'Redirecting to payment...' : isVerifyingPayment ? 'Finalizing registration...' : 'Pay & submit registration'}
       </button>
     </form>
   );

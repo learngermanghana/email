@@ -1,17 +1,13 @@
 import { NextResponse } from 'next/server';
 import { FirestoreSaveError, saveRegistration } from '@/lib/server/firestore';
+import { PaymentError, verifyPayment } from '@/lib/server/payments';
 
 type RegistrationPayload = {
-  fullName?: string;
-  phone?: string;
-  email?: string;
-  course?: string;
-  startMonth?: string;
-  message?: string;
+  paymentReference?: string;
 };
 
 function validate(payload: RegistrationPayload) {
-  return Boolean(payload.fullName && payload.phone && payload.email && payload.course && payload.startMonth);
+  return Boolean(payload.paymentReference);
 }
 
 export async function POST(request: Request) {
@@ -22,19 +18,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields.' }, { status: 400 });
     }
 
+    const payment = await verifyPayment(payload.paymentReference!);
+
     await saveRegistration({
-      fullName: payload.fullName!,
-      phone: payload.phone!,
-      email: payload.email!,
-      course: payload.course!,
-      startMonth: payload.startMonth!,
-      message: payload.message || '',
-      submittedAtIso: new Date().toISOString()
+      fullName: payment.metadata.fullName,
+      phone: payment.metadata.phone,
+      email: payment.metadata.email,
+      course: payment.metadata.course,
+      startMonth: payment.metadata.startMonth,
+      message: payment.metadata.message || '',
+      submittedAtIso: payment.paidAtIso
     });
 
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error('Registration save failed', error);
+    if (error instanceof PaymentError) {
+      return NextResponse.json({ error: 'Could not verify payment.', reason: error.reason }, { status: error.status });
+    }
+
     if (error instanceof FirestoreSaveError) {
       return NextResponse.json({ error: 'Could not save registration at the moment.', reason: error.reason }, { status: error.status });
     }
