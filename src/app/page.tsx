@@ -11,6 +11,37 @@ import { testimonials } from '@/data/testimonials';
 import { siteConfig } from '@/data/site';
 import { createWhatsAppLink } from '@/lib/whatsapp';
 
+const coreValues = [
+  {
+    title: 'Innovation',
+    copy: 'We embrace modern beauty techniques, emerging trends, and forward-thinking teaching methods that keep our students ahead.'
+  },
+  {
+    title: 'Excellence',
+    copy: 'We pursue high standards in training, mentorship, presentation, and student outcomes across every programme.'
+  },
+  {
+    title: 'Empowerment',
+    copy: 'We equip aspiring beauty professionals with the practical skills and mindset to build meaningful careers.'
+  },
+  {
+    title: 'Creativity',
+    copy: 'We encourage artistic expression and originality so students can shape looks, services, and brands with confidence.'
+  },
+  {
+    title: 'Confidence',
+    copy: 'We create a supportive learning environment that helps every student grow their technical ability and self-belief.'
+  },
+  {
+    title: 'Global competence',
+    copy: 'We train students to compete in an evolving beauty and wellness industry with a broad, professional perspective.'
+  },
+  {
+    title: 'Industry relevance',
+    copy: 'Our training stays connected to real client needs, current salon practice, and the professional tools used in the field.'
+  }
+] as const;
+
 export default function HomePage() {
   return (
     <div>
@@ -75,6 +106,36 @@ export default function HomePage() {
         />
       </section>
 
+      <section className="section-shell pb-8">
+        <div className="grid gap-8 lg:grid-cols-2">
+          <article className="rounded-4xl border border-black/5 bg-white p-8 shadow-card">
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-gold">Vision</p>
+            <p className="mt-4 text-lg leading-8 text-charcoal/75">{siteConfig.vision}</p>
+          </article>
+          <article className="rounded-4xl border border-black/5 bg-white p-8 shadow-card">
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-gold">Mission</p>
+            <p className="mt-4 text-lg leading-8 text-charcoal/75">{siteConfig.mission}</p>
+          </article>
+        </div>
+      </section>
+
+      <section className="section-shell py-12">
+        <SectionHeading
+          eyebrow="Core values"
+          title="The principles that shape how we train, mentor, and prepare future beauty professionals."
+          description="Our values guide every learning experience, from classroom delivery to practical studio work and student support."
+          align="center"
+        />
+        <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          {coreValues.map((value) => (
+            <article key={value.title} className="rounded-4xl border border-black/5 bg-white p-8 shadow-card">
+              <h3 className="text-xl font-semibold text-charcoal">{value.title}</h3>
+              <p className="mt-3 text-sm leading-7 text-charcoal/70">{value.copy}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
       <section className="section-shell py-8">
         <SectionHeading
           eyebrow="Courses preview"
@@ -123,6 +184,46 @@ export default function HomePage() {
               <p className="mt-3 text-sm leading-7 text-charcoal/70">{copy}</p>
             </article>
           ))}
+        </div>
+      </section>
+
+      <section className="bg-section-glow py-20">
+        <div className="section-shell">
+          <SectionHeading
+            eyebrow="Follow our school"
+            title="Stay connected through our latest beauty training updates and student highlights."
+            description="Follow us on Instagram and TikTok to see practical class moments, school updates, and trend-driven beauty inspiration."
+            align="center"
+          />
+          <div className="mt-10 grid gap-6 md:grid-cols-2">
+            {[
+              {
+                name: 'Instagram',
+                handle: '@makeupnmoreschool',
+                href: siteConfig.instagram,
+                copy: 'Scan the Instagram QR shared by the school or tap through here to explore visual highlights and updates.'
+              },
+              {
+                name: 'TikTok',
+                handle: '@makeupnmoreschool',
+                href: siteConfig.tiktok,
+                copy: 'Watch short-form beauty content, training snippets, and fresh looks from Make Up & More School.'
+              }
+            ].map((social) => (
+              <a
+                key={social.name}
+                href={social.href}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-4xl border border-black/5 bg-white p-8 shadow-card transition hover:-translate-y-1"
+              >
+                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-gold">{social.name}</p>
+                <h3 className="mt-4 text-2xl font-semibold text-charcoal">{social.handle}</h3>
+                <p className="mt-3 text-sm leading-7 text-charcoal/70">{social.copy}</p>
+                <p className="mt-6 font-medium text-charcoal">Visit profile →</p>
+              </a>
+            ))}
+          </div>
         </div>
       </section>
 
