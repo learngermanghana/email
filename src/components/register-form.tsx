@@ -3,7 +3,6 @@
 import type { FormEvent, ReactNode } from 'react';
 import { useMemo, useState } from 'react';
 import { courses } from '@/data/courses';
-import { createWhatsAppLink } from '@/lib/whatsapp';
 
 type FormState = {
   fullName: string;
@@ -26,32 +25,70 @@ const initialState: FormState = {
 export function RegisterForm() {
   const [form, setForm] = useState<FormState>(initialState);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const helperText = useMemo(
-    () => 'Submitting this form opens WhatsApp with your details prefilled so our admissions team can respond faster.',
+    () => 'Submitting this form securely saves your registration so our admissions team can follow up quickly.',
     []
   );
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!form.fullName || !form.phone || !form.email || !form.course || !form.startMonth) {
-      setError('Please complete all required fields before continuing to WhatsApp.');
+      setError('Please complete all required fields before submitting.');
+      setSuccess('');
       return;
     }
 
-    const message = [
-      'Hello Make Up & More, I want to register for a course.',
-      `Full name: ${form.fullName}`,
-      `Phone: ${form.phone}`,
-      `Email: ${form.email}`,
-      `Course interested in: ${form.course}`,
-      `Preferred start month: ${form.startMonth}`,
-      `Message: ${form.message || 'No extra message yet.'}`
-    ].join('\n');
+    const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+    const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
 
-    window.open(createWhatsAppLink(message), '_blank', 'noopener,noreferrer');
+    if (!projectId || !apiKey) {
+      setError('Registration is temporarily unavailable. Firebase configuration is missing.');
+      setSuccess('');
+      return;
+    }
+
+    setIsSubmitting(true);
     setError('');
+    setSuccess('');
+
+    try {
+      const response = await fetch(
+        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/registrations?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            fields: {
+              fullName: { stringValue: form.fullName },
+              phone: { stringValue: form.phone },
+              email: { stringValue: form.email },
+              course: { stringValue: form.course },
+              startMonth: { stringValue: form.startMonth },
+              message: { stringValue: form.message || '' },
+              submittedAtIso: { stringValue: new Date().toISOString() }
+            }
+          })
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Firestore save failed with status ${response.status}`);
+      }
+
+      setForm(initialState);
+      setSuccess('Thanks! Your registration has been submitted successfully.');
+    } catch (submissionError) {
+      console.error(submissionError);
+      setError('Could not submit your registration right now. Please try again in a moment.');
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -83,8 +120,9 @@ export function RegisterForm() {
         </Field>
       </div>
       {error ? <p className="mt-4 text-sm font-medium text-rose-700">{error}</p> : null}
-      <button type="submit" className="mt-8 inline-flex rounded-full bg-charcoal px-6 py-3 text-sm font-medium text-white transition hover:bg-charcoal/90">
-        Continue to WhatsApp
+      {success ? <p className="mt-4 text-sm font-medium text-emerald-700">{success}</p> : null}
+      <button type="submit" disabled={isSubmitting} className="mt-8 inline-flex rounded-full bg-charcoal px-6 py-3 text-sm font-medium text-white transition hover:bg-charcoal/90 disabled:cursor-not-allowed disabled:opacity-70">
+        {isSubmitting ? 'Submitting...' : 'Submit registration'}
       </button>
     </form>
   );
