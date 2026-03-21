@@ -21,6 +21,7 @@ export async function POST(request: Request) {
     const payment = await verifyPayment(payload.paymentReference!);
 
     await saveRegistration({
+      paymentReference: payment.reference,
       fullName: payment.metadata.fullName,
       phone: payment.metadata.phone,
       email: payment.metadata.email,

@@ -1,6 +1,7 @@
 import { createSign } from 'node:crypto';
 
 type RegistrationPayload = {
+  paymentReference: string;
   fullName: string;
   phone: string;
   email: string;
@@ -170,17 +171,19 @@ async function getAccessToken(config: ServiceAccountConfig) {
 export async function saveRegistration(payload: RegistrationPayload) {
   const config = getFirebaseConfig();
   const accessToken = await getAccessToken(config);
+  const encodedReference = encodeURIComponent(payload.paymentReference);
 
   const response = await fetch(
-    `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents/registrations`,
+    `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents/registrations/${encodedReference}`,
     {
-      method: 'POST',
+      method: 'PATCH',
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         fields: {
+          paymentReference: { stringValue: payload.paymentReference },
           fullName: { stringValue: payload.fullName },
           phone: { stringValue: payload.phone },
           email: { stringValue: payload.email },
