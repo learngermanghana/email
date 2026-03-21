@@ -7,6 +7,14 @@ export type RegistrationMetadata = {
   message: string;
 };
 
+function hasRequiredMetadata(metadata: RegistrationMetadata | undefined): metadata is RegistrationMetadata {
+  if (!metadata) {
+    return false;
+  }
+
+  return Boolean(metadata.fullName && metadata.phone && metadata.email && metadata.course && metadata.startMonth);
+}
+
 type InitializeResponse = {
   status: boolean;
   message: string;
@@ -20,6 +28,7 @@ type VerifyResponse = {
   status: boolean;
   message: string;
   data?: {
+    reference?: string;
     status: string;
     paid_at?: string;
     metadata?: RegistrationMetadata;
@@ -125,11 +134,14 @@ export async function verifyPayment(reference: string) {
     throw new PaymentError('Payment was not successful.', 402, 'payment_not_successful');
   }
 
-  if (!result.data.metadata) {
+  if (!hasRequiredMetadata(result.data.metadata)) {
     throw new PaymentError('Payment metadata is missing.', 400, 'payment_metadata_missing');
   }
 
+  const verifiedReference = result.data.reference || reference;
+
   return {
+    reference: verifiedReference,
     metadata: result.data.metadata,
     paidAtIso: result.data.paid_at || new Date().toISOString()
   };
