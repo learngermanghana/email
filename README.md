@@ -44,14 +44,15 @@ public/
 
 ## Registration data (Firestore)
 
-Set these environment variables in `.env.local` (and in Vercel project settings) for the `/register` form to save data:
+Set these environment variables in `.env.local` (and in Vercel project settings) for the `/register` form to save data with Firebase Admin (server-side):
 
 ```bash
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-firebase-project-id
-NEXT_PUBLIC_FIREBASE_API_KEY=your-web-api-key
+FIREBASE_PROJECT_ID=your-firebase-project-id
+FIREBASE_CLIENT_EMAIL=your-service-account-client-email
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 ```
 
-Also ensure your Firestore rules allow document creation for the registration flow you want to support.
+Use a Firebase service account with access to Firestore. Because writes happen on the server, Firestore client rules will no longer block submissions with 403 errors.
 
 ## Build for production
 
