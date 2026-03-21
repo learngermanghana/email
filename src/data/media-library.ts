@@ -1,21 +1,21 @@
 export const homepageImages = {
   hero: {
-    src: '/uploads/homepage/hero-training.svg',
+    src: '/uploads/homepage/WhatsApp Image 2026-03-21 at 18.01.12.jpeg',
     alt: 'Students training in a beauty classroom'
   },
   about: {
-    src: '/uploads/homepage/about-school.svg',
+    src: '/uploads/homepage/WhatsApp Image 2026-03-21 at 18.01.13.jpeg',
     alt: 'Beauty school workstation and practical setup'
   },
   highlights: [
     {
       title: 'Bridal beauty looks',
-      src: '/uploads/homepage/highlight-bridal.svg',
+      src: '/uploads/homepage/WhatsApp Image 2026-03-21 at 18.01.13 (1).jpeg',
       alt: 'Bridal make-up finish'
     },
     {
       title: 'Facial practicals',
-      src: '/uploads/homepage/highlight-facial.svg',
+      src: '/uploads/homepage/WhatsApp Image 2026-03-21 at 18.01.12 (2).jpeg',
       alt: 'Facial practical session'
     }
   ]
