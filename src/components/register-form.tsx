@@ -56,6 +56,10 @@ export function RegisterForm() {
 
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as { reason?: string } | null;
+        if (payload?.reason === 'config_missing') {
+          throw new Error('Registration form is not configured on the server yet. Please contact support.');
+        }
+
         const reason = payload?.reason ? ` (${payload.reason})` : '';
         throw new Error(`Registration save failed with status ${response.status}${reason}`);
       }

@@ -14,6 +14,12 @@ type AccessTokenResponse = {
   access_token: string;
 };
 
+type ServiceAccountConfig = {
+  projectId: string;
+  clientEmail: string;
+  privateKey: string;
+};
+
 export class FirestoreSaveError extends Error {
   readonly status: number;
   readonly reason: string;
@@ -28,16 +34,11 @@ export class FirestoreSaveError extends Error {
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const FIRESTORE_SCOPE = 'https://www.googleapis.com/auth/datastore';
+const SERVICE_ACCOUNT_JSON_ENV = 'FIREBASE_SERVICE_ACCOUNT_JSON';
 
-function requiredEnv(name: string) {
-  const value = process.env[name];
-
-  if (!value) {
-    throw new FirestoreSaveError(`Missing environment variable: ${name}`, 503, 'config_missing');
-  }
-
-  return value;
-}
+const PROJECT_ID_ENV_NAMES = ['FIREBASE_PROJECT_ID', 'GOOGLE_CLOUD_PROJECT', 'GCLOUD_PROJECT', 'NEXT_PUBLIC_FIREBASE_PROJECT_ID'];
+const CLIENT_EMAIL_ENV_NAMES = ['FIREBASE_CLIENT_EMAIL', 'FIREBASE_ADMIN_CLIENT_EMAIL', 'GOOGLE_CLIENT_EMAIL'];
+const PRIVATE_KEY_ENV_NAMES = ['FIREBASE_PRIVATE_KEY', 'FIREBASE_ADMIN_PRIVATE_KEY', 'GOOGLE_PRIVATE_KEY'];
 
 function normalizePrivateKey(rawKey: string) {
   const unquotedKey =
@@ -63,15 +64,81 @@ function signJwt(unsignedToken: string, privateKey: string) {
   return signer.sign(privateKey, 'base64url');
 }
 
-async function getAccessToken() {
-  const clientEmail = requiredEnv('FIREBASE_CLIENT_EMAIL');
-  const privateKey = normalizePrivateKey(requiredEnv('FIREBASE_PRIVATE_KEY'));
+function getFirstDefinedValue(names: string[]) {
+  for (const name of names) {
+    const value = process.env[name];
+    if (value) {
+      return value;
+    }
+  }
+
+  return '';
+}
+
+function parseServiceAccountJson(rawJson: string) {
+  try {
+    const parsed = JSON.parse(rawJson) as { project_id?: string; client_email?: string; private_key?: string };
+
+    return {
+      projectId: parsed.project_id || '',
+      clientEmail: parsed.client_email || '',
+      privateKey: parsed.private_key || ''
+    };
+  } catch {
+    throw new FirestoreSaveError(
+      `${SERVICE_ACCOUNT_JSON_ENV} is not valid JSON.`,
+      503,
+      'config_missing'
+    );
+  }
+}
+
+function getFirebaseConfig() {
+  const serviceAccountJson = process.env[SERVICE_ACCOUNT_JSON_ENV];
+  const fromJson = serviceAccountJson ? parseServiceAccountJson(serviceAccountJson) : null;
+
+  const projectId = fromJson?.projectId || getFirstDefinedValue(PROJECT_ID_ENV_NAMES);
+  const clientEmail = fromJson?.clientEmail || getFirstDefinedValue(CLIENT_EMAIL_ENV_NAMES);
+  const privateKey = normalizePrivateKey(fromJson?.privateKey || getFirstDefinedValue(PRIVATE_KEY_ENV_NAMES));
+
+  const missing: string[] = [];
+
+  if (!projectId) {
+    missing.push(`project id (${PROJECT_ID_ENV_NAMES.join(' | ')})`);
+  }
+
+  if (!clientEmail) {
+    missing.push(
+      `service account client email (${CLIENT_EMAIL_ENV_NAMES.join(' | ')})`
+    );
+  }
+
+  if (!privateKey) {
+    missing.push(`service account private key (${PRIVATE_KEY_ENV_NAMES.join(' | ')})`);
+  }
+
+  if (missing.length > 0) {
+    throw new FirestoreSaveError(
+      `Missing Firebase server configuration: ${missing.join(', ')}. You can also provide ${SERVICE_ACCOUNT_JSON_ENV}.`,
+      503,
+      'config_missing'
+    );
+  }
+
+  return {
+    projectId,
+    clientEmail,
+    privateKey
+  } satisfies ServiceAccountConfig;
+}
+
+async function getAccessToken(config: ServiceAccountConfig) {
   const issuedAt = Math.floor(Date.now() / 1000);
 
   const header = base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
   const payload = base64url(
     JSON.stringify({
-      iss: clientEmail,
+      iss: config.clientEmail,
       scope: FIRESTORE_SCOPE,
       aud: TOKEN_URL,
       iat: issuedAt,
@@ -79,7 +146,7 @@ async function getAccessToken() {
     })
   );
   const unsignedToken = `${header}.${payload}`;
-  const signature = signJwt(unsignedToken, privateKey);
+  const signature = signJwt(unsignedToken, config.privateKey);
   const assertion = `${unsignedToken}.${signature}`;
 
   const tokenResponse = await fetch(TOKEN_URL, {
@@ -101,11 +168,11 @@ async function getAccessToken() {
 }
 
 export async function saveRegistration(payload: RegistrationPayload) {
-  const projectId = requiredEnv('FIREBASE_PROJECT_ID');
-  const accessToken = await getAccessToken();
+  const config = getFirebaseConfig();
+  const accessToken = await getAccessToken(config);
 
   const response = await fetch(
-    `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/registrations`,
+    `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents/registrations`,
     {
       method: 'POST',
       headers: {
