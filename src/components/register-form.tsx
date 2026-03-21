@@ -3,6 +3,7 @@
 import type { FormEvent, ReactNode } from 'react';
 import { useMemo, useState } from 'react';
 import { courses } from '@/data/courses';
+import { upcomingClasses } from '@/data/upcoming-classes';
 
 type FormState = {
   fullName: string;
@@ -32,6 +33,13 @@ export function RegisterForm() {
     () => 'Submitting this form securely saves your registration so our admissions team can follow up quickly.',
     []
   );
+  const classDatesByCourse = useMemo(() => {
+    return upcomingClasses.reduce<Record<string, string[]>>((accumulator, item) => {
+      accumulator[item.name] = accumulator[item.name] ? [...accumulator[item.name], item.startDate] : [item.startDate];
+      return accumulator;
+    }, {});
+  }, []);
+  const selectedCourseDates = form.course ? classDatesByCourse[form.course] ?? [] : [];
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -88,15 +96,35 @@ export function RegisterForm() {
           <input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} className="input" />
         </Field>
         <Field label="Course interested in" required>
-          <select value={form.course} onChange={(event) => setForm({ ...form, course: event.target.value })} className="input">
+          <select
+            value={form.course}
+            onChange={(event) => setForm({ ...form, course: event.target.value, startMonth: '' })}
+            className="input"
+          >
             <option value="">Select a course</option>
             {courses.map((course) => (
               <option key={course.slug} value={course.name}>{course.name}</option>
             ))}
           </select>
         </Field>
-        <Field label="Preferred start month" required>
-          <input value={form.startMonth} onChange={(event) => setForm({ ...form, startMonth: event.target.value })} placeholder="e.g. May 2026" className="input" />
+        <Field label="Preferred start date" required>
+          <select
+            value={form.startMonth}
+            onChange={(event) => setForm({ ...form, startMonth: event.target.value })}
+            className="input"
+            disabled={!form.course || selectedCourseDates.length === 0}
+          >
+            <option value="">
+              {!form.course
+                ? 'Select a course first'
+                : selectedCourseDates.length === 0
+                  ? 'No upcoming class dates listed'
+                  : 'Select a start date'}
+            </option>
+            {selectedCourseDates.map((date) => (
+              <option key={date} value={date}>{date}</option>
+            ))}
+          </select>
         </Field>
         <Field label="Message">
           <input value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} placeholder="Tell us about your goals or preferred schedule." className="input" />
