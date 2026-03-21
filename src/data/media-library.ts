@@ -1,6 +1,6 @@
 export const homepageImages = {
   hero: {
-    src: '/uploads/homepage/WhatsApp Image 2026-03-21 at 18.01.12.jpeg',
+    src: '/uploads/homepage/WhatsApp Image 2026-03-21 at 18.01.12 (3).jpeg',
     alt: 'Students training in a beauty classroom'
   },
   about: {
