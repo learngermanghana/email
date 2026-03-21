@@ -41,41 +41,18 @@ export function RegisterForm() {
       setSuccess('');
       return;
     }
-
-    const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-    const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-
-    if (!projectId || !apiKey) {
-      setError('Registration is temporarily unavailable. Firebase configuration is missing.');
-      setSuccess('');
-      return;
-    }
-
     setIsSubmitting(true);
     setError('');
     setSuccess('');
 
     try {
-      const response = await fetch(
-        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/registrations?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            fields: {
-              fullName: { stringValue: form.fullName },
-              phone: { stringValue: form.phone },
-              email: { stringValue: form.email },
-              course: { stringValue: form.course },
-              startMonth: { stringValue: form.startMonth },
-              message: { stringValue: form.message || '' },
-              submittedAtIso: { stringValue: new Date().toISOString() }
-            }
-          })
-        }
-      );
+      const response = await fetch('/api/registrations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(form)
+      });
 
       if (!response.ok) {
         throw new Error(`Firestore save failed with status ${response.status}`);
