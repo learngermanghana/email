@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { RegisterForm } from '@/components/register-form';
 import { SectionHeading } from '@/components/section-heading';
 
@@ -15,18 +16,21 @@ export default function RegisterPage() {
           <SectionHeading
             eyebrow="Registration"
             title="Take the next step toward your beauty career."
-            description="Complete the form below and we will save your registration details immediately for admissions follow-up."
+            description="Complete the form below, pay securely, and we will save your registration details for admissions follow-up."
           />
           <div className="rounded-4xl border border-black/5 bg-nude/70 p-7 text-sm leading-7 text-charcoal/75 shadow-card">
             <p className="font-semibold text-charcoal">What happens next?</p>
             <ul className="mt-4 space-y-3">
               <li>• You fill in your course interest and preferred start month.</li>
-              <li>• Your registration is saved permanently in our admissions database.</li>
+              <li>• You complete secure payment for your registration.</li>
+              <li>• Once payment succeeds, your registration is saved permanently in our admissions database.</li>
               <li>• Our admissions team confirms availability and next steps.</li>
             </ul>
           </div>
         </div>
-        <RegisterForm />
+        <Suspense fallback={<div className="rounded-[2rem] border border-black/5 bg-white p-8 shadow-soft sm:p-10">Loading registration form...</div>}>
+          <RegisterForm />
+        </Suspense>
       </div>
     </div>
   );
