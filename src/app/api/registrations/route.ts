@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { saveRegistration } from '@/lib/server/firestore';
+import { FirestoreSaveError, saveRegistration } from '@/lib/server/firestore';
 
 type RegistrationPayload = {
   fullName?: string;
@@ -35,6 +35,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error('Registration save failed', error);
-    return NextResponse.json({ error: 'Could not save registration at the moment.' }, { status: 500 });
+    if (error instanceof FirestoreSaveError) {
+      return NextResponse.json({ error: 'Could not save registration at the moment.', reason: error.reason }, { status: error.status });
+    }
+
+    return NextResponse.json({ error: 'Could not save registration at the moment.', reason: 'unexpected_error' }, { status: 500 });
   }
 }

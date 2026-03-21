@@ -14,6 +14,18 @@ type AccessTokenResponse = {
   access_token: string;
 };
 
+export class FirestoreSaveError extends Error {
+  readonly status: number;
+  readonly reason: string;
+
+  constructor(message: string, status: number, reason: string) {
+    super(message);
+    this.name = 'FirestoreSaveError';
+    this.status = status;
+    this.reason = reason;
+  }
+}
+
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const FIRESTORE_SCOPE = 'https://www.googleapis.com/auth/datastore';
 
@@ -21,10 +33,19 @@ function requiredEnv(name: string) {
   const value = process.env[name];
 
   if (!value) {
-    throw new Error(`Missing environment variable: ${name}`);
+    throw new FirestoreSaveError(`Missing environment variable: ${name}`, 503, 'config_missing');
   }
 
   return value;
+}
+
+function normalizePrivateKey(rawKey: string) {
+  const unquotedKey =
+    (rawKey.startsWith('"') && rawKey.endsWith('"')) || (rawKey.startsWith("'") && rawKey.endsWith("'"))
+      ? rawKey.slice(1, -1)
+      : rawKey;
+
+  return unquotedKey.replace(/\\n/g, '\n');
 }
 
 function base64url(input: string) {
@@ -44,7 +65,7 @@ function signJwt(unsignedToken: string, privateKey: string) {
 
 async function getAccessToken() {
   const clientEmail = requiredEnv('FIREBASE_CLIENT_EMAIL');
-  const privateKey = requiredEnv('FIREBASE_PRIVATE_KEY').replace(/\\n/g, '\n');
+  const privateKey = normalizePrivateKey(requiredEnv('FIREBASE_PRIVATE_KEY'));
   const issuedAt = Math.floor(Date.now() / 1000);
 
   const header = base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
@@ -72,7 +93,7 @@ async function getAccessToken() {
 
   if (!tokenResponse.ok) {
     const errorText = await tokenResponse.text();
-    throw new Error(`Token request failed (${tokenResponse.status}): ${errorText}`);
+    throw new FirestoreSaveError(`Token request failed (${tokenResponse.status}): ${errorText}`, 502, 'token_request_failed');
   }
 
   const tokenData = (await tokenResponse.json()) as AccessTokenResponse;
@@ -107,6 +128,10 @@ export async function saveRegistration(payload: RegistrationPayload) {
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Firestore request failed (${response.status}): ${errorText}`);
+    throw new FirestoreSaveError(
+      `Firestore request failed (${response.status}): ${errorText}`,
+      502,
+      'firestore_write_failed'
+    );
   }
 }
