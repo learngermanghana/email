@@ -38,6 +38,22 @@ export default function ContactPage() {
               </dd>
             </div>
             <div>
+              <dt className="font-semibold text-charcoal">Instagram</dt>
+              <dd>
+                <Link href={siteConfig.instagram} target="_blank" rel="noreferrer" className="text-charcoal underline decoration-gold underline-offset-4">
+                  Follow @makeupnmoreschool
+                </Link>
+              </dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-charcoal">TikTok</dt>
+              <dd>
+                <Link href={siteConfig.tiktok} target="_blank" rel="noreferrer" className="text-charcoal underline decoration-gold underline-offset-4">
+                  Watch @makeupnmoreschool
+                </Link>
+              </dd>
+            </div>
+            <div>
               <dt className="font-semibold text-charcoal">Facebook</dt>
               <dd>
                 <Link href={siteConfig.facebook} target="_blank" rel="noreferrer" className="text-charcoal underline decoration-gold underline-offset-4">
@@ -56,9 +72,18 @@ export default function ContactPage() {
           </dl>
         </section>
         <section className="rounded-4xl border border-dashed border-black/10 bg-nude/60 p-8 shadow-card">
-          <h2 className="text-2xl font-semibold text-charcoal">Map / embed placeholder</h2>
-          <div className="mt-6 flex min-h-[320px] items-center justify-center rounded-[2rem] border border-dashed border-charcoal/15 bg-white/60 p-6 text-center text-sm leading-7 text-charcoal/65">
-            Replace this section with a Google Maps or other location embed when ready for production publishing.
+          <h2 className="text-2xl font-semibold text-charcoal">Social profiles</h2>
+          <div className="mt-6 space-y-5 rounded-[2rem] border border-dashed border-charcoal/15 bg-white/60 p-6 text-sm leading-7 text-charcoal/65">
+            <p>Stay connected with the school through our official social platforms for updates, beauty inspiration, and classroom highlights.</p>
+            <div className="space-y-3">
+              <Link href={siteConfig.instagram} target="_blank" rel="noreferrer" className="block font-medium text-charcoal underline decoration-gold underline-offset-4">
+                Instagram: @makeupnmoreschool
+              </Link>
+              <Link href={siteConfig.tiktok} target="_blank" rel="noreferrer" className="block font-medium text-charcoal underline decoration-gold underline-offset-4">
+                TikTok: @makeupnmoreschool
+              </Link>
+            </div>
+            <p>If you would like the Instagram QR code displayed on the website as an image, add the source file to the project and it can be embedded here.</p>
           </div>
         </section>
       </div>

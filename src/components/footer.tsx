@@ -30,6 +30,12 @@ export function Footer() {
           <Link href={createWhatsAppLink('Hello Make Up & More, I want to make an enquiry.')} target="_blank" rel="noreferrer" className="block transition hover:text-white">
             WhatsApp Admissions
           </Link>
+          <Link href={siteConfig.instagram} target="_blank" rel="noreferrer" className="block transition hover:text-white">
+            Instagram @makeupnmoreschool
+          </Link>
+          <Link href={siteConfig.tiktok} target="_blank" rel="noreferrer" className="block transition hover:text-white">
+            TikTok @makeupnmoreschool
+          </Link>
           <Link href={siteConfig.facebook} target="_blank" rel="noreferrer" className="block transition hover:text-white">
             Facebook Community
           </Link>
