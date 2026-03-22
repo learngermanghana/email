@@ -52,6 +52,8 @@ NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=pk_test_xxx
 PAYSTACK_SECRET_KEY=sk_test_xxx
 # Optional, defaults to 500000 (GHS 5,000.00 if your Paystack account uses pesewas)
 REGISTRATION_FEE_KOBO=500000
+# Optional, defaults to GHS
+PAYSTACK_CURRENCY=GHS
 
 # Option A: individual variables
 FIREBASE_PROJECT_ID=your-firebase-project-id
@@ -64,6 +66,7 @@ FIREBASE_SERVICE_ACCOUNT_JSON='{"project_id":"...","client_email":"...","private
 
 Notes:
 - Registration is written to Firestore **only after** a successful Paystack verification.
+- The server validates the verified Paystack transaction status, amount, currency, and customer email before saving a registration.
 - `NEXT_PUBLIC_FIREBASE_API_KEY` and other `NEXT_PUBLIC_*` values are for browser SDK use and are **not enough** for secure server writes.
 - The server also accepts common aliases (`GOOGLE_CLOUD_PROJECT`, `GCLOUD_PROJECT`, `FIREBASE_ADMIN_CLIENT_EMAIL`, `FIREBASE_ADMIN_PRIVATE_KEY`, `GOOGLE_CLIENT_EMAIL`, `GOOGLE_PRIVATE_KEY`) to simplify Vercel setups.
 - Use a Firebase service account with access to Firestore.
