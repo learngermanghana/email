@@ -25,7 +25,7 @@ export const upcomingClasses: UpcomingClass[] = [
   {
     id: 'hairdressing-april',
     name: 'Hairdressing',
-    image: '/uploads/courses/hairdressing.jpeg',
+    image: '/uploads/homepage/hairdressing.jpeg',
     imageAlt: 'Hairdressing class with mannequin practice',
     startDate: '20 April 2026',
     duration: '9 months',
@@ -36,7 +36,7 @@ export const upcomingClasses: UpcomingClass[] = [
   {
     id: 'massage-therapy-may',
     name: 'Massage Therapy',
-    image: '/uploads/courses/WhatsApp Image 2026-03-21 at 17.57.50 (1).jpeg',
+    image: '/uploads/homepage/MAssage therepy.jpeg',
     imageAlt: 'Massage therapy demonstration during class',
     startDate: '5 May 2026',
     duration: '3 months',
