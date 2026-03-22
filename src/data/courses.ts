@@ -33,7 +33,7 @@ export const courses: Course[] = [
     duration: '9 months',
     summary: 'Build salon confidence in styling, braiding, extensions, treatments, and foundational theory.',
     category: 'Full Program',
-    image: '/uploads/courses/WhatsApp Image 2026-03-21 at 17.57.49 (1).jpeg',
+    image: '/uploads/courses/Beading7.jpeg',
     imageAlt: 'Hairdressing braids practice',
     modules: [
       'Anatomy & Physiology',
@@ -62,7 +62,7 @@ export const courses: Course[] = [
     duration: '6 weeks',
     summary: 'Learn premium fascinator and hat construction for modern fashion and occasion wear.',
     category: 'Short Course',
-    image: '/uploads/courses/WhatsApp Image 2026-03-21 at 17.57.50 (1).jpeg',
+    image: '/uploads/courses/Millinery.jpeg',
     imageAlt: 'Creative beauty styling image used for millinery course',
     modules: ['Fabric accessories', 'Fascinator', 'Hats', 'Hatinators']
   },
@@ -72,7 +72,7 @@ export const courses: Course[] = [
     duration: '4 weeks',
     summary: 'Create sellable handcrafted accessories with practical beading techniques.',
     category: 'Short Course',
-    image: '/uploads/courses/WhatsApp Image 2026-03-21 at 17.57.50 (2).jpeg',
+    image: '/uploads/courses/Beading7.jpeg',
     imageAlt: 'Beading starter kit materials',
     modules: ['Necklace', 'Bags', 'Slippers']
   },
@@ -82,7 +82,7 @@ export const courses: Course[] = [
     duration: '3 days',
     summary: 'A polished finishing course for confidence, etiquette, and image-ready presentation.',
     category: 'Short Course',
-    image: '/uploads/courses/WhatsApp Image 2026-03-21 at 17.57.51.jpeg',
+    image: '/uploads/courses/Personal Grooming .jpeg',
     imageAlt: 'Elegant beauty finish for grooming course'
   },
   {
