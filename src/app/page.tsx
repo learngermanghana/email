@@ -218,7 +218,7 @@ export default function HomePage() {
               <p className="mt-4 text-base leading-8 text-white/70">Speak with admissions, reserve a slot, or submit your registration details today. We are ready to guide you toward the right course path.</p>
             </div>
             <div className="flex flex-wrap gap-4">
-              <ButtonLink href="/register" className="bg-white text-charcoal hover:bg-nude">Register now</ButtonLink>
+              <ButtonLink href="/register" className="border border-white/15 bg-white/10 text-white hover:bg-white/20">Register now</ButtonLink>
               <ButtonLink href="/contact" variant="ghost" className="border border-white/15 text-white hover:bg-white/10">Contact us</ButtonLink>
             </div>
           </div>
