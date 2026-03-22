@@ -33,7 +33,7 @@ export const courses: Course[] = [
     duration: '9 months',
     summary: 'Build salon confidence in styling, braiding, extensions, treatments, and foundational theory.',
     category: 'Full Program',
-    image: '/uploads/courses/Beading7.jpeg',
+    image: '/uploads/homepage/hairdressing.jpeg',
     imageAlt: 'Hairdressing braids practice',
     modules: [
       'Anatomy & Physiology',
@@ -52,7 +52,7 @@ export const courses: Course[] = [
     duration: '3 months',
     summary: 'Train in therapeutic touch with industry-relevant massage techniques and client care.',
     category: 'Full Program',
-    image: '/uploads/courses/WhatsApp Image 2026-03-21 at 17.57.50.jpeg',
+    image: '/uploads/homepage/MAssage therepy.jpeg',
     imageAlt: 'Massage therapy facial training setup',
     modules: ['Deep tissue', 'Shiatsu', 'Swedish', 'Trigger point massage', 'Personalised massage therapy']
   },
