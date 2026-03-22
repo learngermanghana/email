@@ -30,7 +30,12 @@ type VerifyResponse = {
   data?: {
     reference?: string;
     status: string;
+    amount?: number;
+    currency?: string;
     paid_at?: string;
+    customer?: {
+      email?: string;
+    };
     metadata?: RegistrationMetadata;
   };
 };
@@ -39,7 +44,9 @@ const PAYSTACK_BASE_URL = 'https://api.paystack.co';
 const PAYSTACK_SECRET_KEY_ENV = 'PAYSTACK_SECRET_KEY';
 const PAYSTACK_PUBLIC_KEY_ENV = 'NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY';
 const REGISTRATION_AMOUNT_KOBO_ENV = 'REGISTRATION_FEE_KOBO';
+const PAYSTACK_CURRENCY_ENV = 'PAYSTACK_CURRENCY';
 const DEFAULT_REGISTRATION_AMOUNT_KOBO = 500000;
+const DEFAULT_PAYSTACK_CURRENCY = 'GHS';
 
 export class PaymentError extends Error {
   readonly status: number;
@@ -57,7 +64,9 @@ function getPaymentConfig() {
   const secretKey = process.env[PAYSTACK_SECRET_KEY_ENV];
   const publicKey = process.env[PAYSTACK_PUBLIC_KEY_ENV];
   const amountRaw = process.env[REGISTRATION_AMOUNT_KOBO_ENV];
+  const currencyRaw = process.env[PAYSTACK_CURRENCY_ENV];
   const amountKobo = Number(amountRaw || DEFAULT_REGISTRATION_AMOUNT_KOBO);
+  const currency = (currencyRaw || DEFAULT_PAYSTACK_CURRENCY).trim().toUpperCase();
 
   if (!secretKey || !publicKey) {
     throw new PaymentError(
@@ -75,7 +84,15 @@ function getPaymentConfig() {
     );
   }
 
-  return { secretKey, amountKobo };
+  if (!currency) {
+    throw new PaymentError(
+      `${PAYSTACK_CURRENCY_ENV} must be a valid ISO currency code.`,
+      503,
+      'payment_config_invalid'
+    );
+  }
+
+  return { secretKey, amountKobo, currency };
 }
 
 export async function initializeRegistrationPayment(metadata: RegistrationMetadata, callbackUrl: string) {
@@ -90,6 +107,7 @@ export async function initializeRegistrationPayment(metadata: RegistrationMetada
     body: JSON.stringify({
       email: metadata.email,
       amount: config.amountKobo,
+      currency: config.currency,
       callback_url: callbackUrl,
       metadata
     })
@@ -136,6 +154,18 @@ export async function verifyPayment(reference: string) {
 
   if (!hasRequiredMetadata(result.data.metadata)) {
     throw new PaymentError('Payment metadata is missing.', 400, 'payment_metadata_missing');
+  }
+
+  if (result.data.amount !== config.amountKobo) {
+    throw new PaymentError('Payment amount mismatch.', 400, 'payment_amount_mismatch');
+  }
+
+  if ((result.data.currency || '').toUpperCase() !== config.currency) {
+    throw new PaymentError('Payment currency mismatch.', 400, 'payment_currency_mismatch');
+  }
+
+  if ((result.data.customer?.email || '').toLowerCase() !== result.data.metadata.email.toLowerCase()) {
+    throw new PaymentError('Payment email mismatch.', 400, 'payment_email_mismatch');
   }
 
   const verifiedReference = result.data.reference || reference;
