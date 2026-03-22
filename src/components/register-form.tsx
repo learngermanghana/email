@@ -47,8 +47,14 @@ export function RegisterForm() {
   useEffect(() => {
     const status = searchParams.get('status');
     const reference = searchParams.get('reference') || searchParams.get('trxref');
+    const normalizedStatus = status?.toLowerCase();
 
-    if (status !== 'success' || !reference || isVerifyingPayment || success) {
+    if (!reference || isVerifyingPayment || success) {
+      return;
+    }
+
+    if (normalizedStatus && normalizedStatus !== 'success') {
+      setError('Payment was not completed. Please try again or contact support if you were charged.');
       return;
     }
 
