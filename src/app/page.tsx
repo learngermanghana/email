@@ -46,14 +46,14 @@ export default function HomePage() {
             </div>
           </div>
           <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="overflow-hidden rounded-[2.5rem] border border-white/70 bg-white/80 shadow-soft backdrop-blur">
+            <div className="overflow-hidden rounded-[2.5rem] border border-white/70 bg-white/90 shadow-soft backdrop-blur">
               <div className="relative aspect-[4/5]">
                 <Image
                   src={homepageImages.hero.src}
                   alt={homepageImages.hero.alt}
                   fill
                   priority
-                  className="object-cover"
+                  className="object-contain"
                   sizes="(min-width: 1024px) 32vw, 100vw"
                 />
               </div>
