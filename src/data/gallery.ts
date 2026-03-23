@@ -1,48 +1,60 @@
+import { readdir } from 'node:fs/promises';
+import path from 'node:path';
+
 export type GalleryItem = {
   title: string;
   category: string;
   image: string;
 };
 
-export const galleryItems: GalleryItem[] = [
-  {
-    title: 'Soft glam bridal finish',
-    category: 'Bridal / Makeup Looks',
-    image: '/uploads/gallery/WhatsApp Image 2026-03-21 at 18.04.48.jpeg'
-  },
-  {
-    title: 'Student practical facial session',
-    category: 'Student Practical Work',
-    image: '/uploads/gallery/WhatsApp Image 2026-03-21 at 18.04.48 (1).jpeg'
-  },
-  {
-    title: 'Hair styling workshop',
-    category: 'Classroom Training',
-    image: '/uploads/gallery/WhatsApp Image 2026-03-21 at 18.04.48 (2).jpeg'
-  },
-  {
-    title: 'Braids and protective styling',
-    category: 'Hair Work',
-    image: '/uploads/gallery/WhatsApp Image 2026-03-21 at 18.04.49.jpeg'
-  },
-  {
-    title: 'Nail artistry practice',
-    category: 'Student Practical Work',
-    image: '/uploads/gallery/WhatsApp Image 2026-03-21 at 18.04.49 (1).jpeg'
-  },
-  {
-    title: 'Editorial make-up look',
-    category: 'Bridal / Makeup Looks',
-    image: '/uploads/gallery/WhatsApp Image 2026-03-21 at 18.04.49 (2).jpeg'
-  },
-  {
-    title: 'Salon workstation training',
-    category: 'Classroom Training',
-    image: '/uploads/gallery/WhatsApp Image 2026-03-21 at 18.04.50.jpeg'
-  },
-  {
-    title: 'Elegant hair finish',
-    category: 'Hair Work',
-    image: '/uploads/gallery/WhatsApp Image 2026-03-21 at 18.04.50 (1).jpeg'
+const GALLERY_DIR = path.join(process.cwd(), 'public/uploads/gallery');
+const GALLERY_WEB_PATH = '/uploads/gallery';
+
+function normalizeTitle(filename: string) {
+  return filename
+    .replace(/\.[^.]+$/, '')
+    .replace(/^WhatsApp Image \d{4}-\d{2}-\d{2} at /, '')
+    .replace(/\s*\(\d+\)$/, '')
+    .replace(/[._-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function toTitleCase(value: string) {
+  return value
+    .split(' ')
+    .filter(Boolean)
+    .map((word) => word[0].toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function inferCategory(filename: string) {
+  const value = filename.toLowerCase();
+
+  if (value.includes('bridal') || value.includes('makeup') || value.includes('make-up')) {
+    return 'Bridal / Makeup Looks';
   }
-];
+
+  if (value.includes('hair') || value.includes('braid')) {
+    return 'Hair Work';
+  }
+
+  if (value.includes('workshop') || value.includes('workstation') || value.includes('class')) {
+    return 'Classroom Training';
+  }
+
+  return 'Student Practical Work';
+}
+
+export async function getGalleryItems() {
+  const entries = await readdir(GALLERY_DIR, { withFileTypes: true });
+
+  return entries
+    .filter((entry) => entry.isFile() && /\.(jpe?g|png|webp|avif|svg)$/i.test(entry.name))
+    .map((entry) => ({
+      title: toTitleCase(normalizeTitle(entry.name)),
+      category: inferCategory(entry.name),
+      image: `${GALLERY_WEB_PATH}/${entry.name}`
+    }))
+    .sort((a, b) => a.title.localeCompare(b.title));
+}
