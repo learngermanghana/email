@@ -4,19 +4,19 @@ export const homepageImages = {
     alt: 'Students training in a beauty classroom'
   },
   about: {
-    src: '/uploads/homepage/WhatsApp Image 2026-03-21 at 18.01.13.jpeg',
-    alt: 'Beauty school workstation and practical setup'
+    src: '/uploads/homepage/Personal grooming class 3.jpeg',
+    alt: 'Students during a personal grooming practical class'
   },
   highlights: [
     {
-      title: 'Bridal beauty looks',
-      src: '/uploads/homepage/WhatsApp Image 2026-03-21 at 18.01.13 (1).jpeg',
-      alt: 'Bridal make-up finish'
+      title: 'Personal grooming class',
+      src: '/uploads/homepage/Personal grooming class.jpeg',
+      alt: 'Students attending a personal grooming lesson'
     },
     {
-      title: 'Facial practicals',
-      src: '/uploads/homepage/WhatsApp Image 2026-03-21 at 18.01.12 (2).jpeg',
-      alt: 'Facial practical session'
+      title: 'Corporate grooming practical',
+      src: '/uploads/homepage/personal grooming class 2.jpeg',
+      alt: 'Personal and corporate grooming practice session'
     }
   ]
 } as const;
