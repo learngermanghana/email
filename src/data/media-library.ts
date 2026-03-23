@@ -18,6 +18,48 @@ export const homepageImages = {
       src: '/uploads/homepage/WhatsApp Image 2026-03-21 at 18.01.12 (2).jpeg',
       alt: 'Facial practical session'
     }
+  ],
+  braids: [
+    {
+      title: 'Classic braid practical',
+      src: '/uploads/homepage/hairdressing braids 1.jpeg',
+      alt: 'Student braid practical look 1'
+    },
+    {
+      title: 'Protective braid styling',
+      src: '/uploads/homepage/hairdressing braids 2.jpeg',
+      alt: 'Student braid practical look 2'
+    },
+    {
+      title: 'Neat sectioning and braid finish',
+      src: '/uploads/homepage/hairdressing braids 3.jpeg',
+      alt: 'Student braid practical look 3'
+    },
+    {
+      title: 'Braids with polished parting',
+      src: '/uploads/homepage/hairdressing braids 4.jpeg',
+      alt: 'Student braid practical look 4'
+    },
+    {
+      title: 'Salon-ready braid result',
+      src: '/uploads/homepage/hairdressing braids 5.jpeg',
+      alt: 'Student braid practical look 5'
+    },
+    {
+      title: 'Protective style presentation',
+      src: '/uploads/homepage/hairdressing braids 6.jpeg',
+      alt: 'Student braid practical look 6'
+    },
+    {
+      title: 'Advanced braid pattern',
+      src: '/uploads/homepage/hairdressig braids 7.jpeg',
+      alt: 'Student braid practical look 7'
+    },
+    {
+      title: 'Detailed braid technique',
+      src: '/uploads/homepage/hairdressing braids 8.jpeg',
+      alt: 'Student braid practical look 8'
+    }
   ]
 } as const;
 

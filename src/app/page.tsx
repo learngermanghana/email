@@ -114,6 +114,32 @@ export default function HomePage() {
 
       <section className="section-shell py-8">
         <SectionHeading
+          eyebrow="Hairdressing braids"
+          title="Explore our latest braid practical looks from class sessions."
+          description="We have added all eight new braid photos from the homepage uploads folder to showcase student hairdressing work."
+        />
+        <div className="mt-10 grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+          {homepageImages.braids.map((item) => (
+            <figure key={item.title} className="overflow-hidden rounded-4xl border border-black/5 bg-white shadow-card">
+              <div className="relative aspect-[4/5] bg-gradient-to-br from-white via-nude to-blush">
+                <Image
+                  src={item.src}
+                  alt={item.alt}
+                  fill
+                  className="object-cover transition duration-500 hover:scale-105"
+                  sizes="(min-width: 1280px) 25vw, (min-width: 640px) 50vw, 100vw"
+                />
+              </div>
+              <figcaption className="p-5">
+                <p className="text-base font-medium text-charcoal">{item.title}</p>
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      </section>
+
+      <section className="section-shell py-8">
+        <SectionHeading
           eyebrow="Courses preview"
           title="Signature programs and flexible beauty short courses."
           description="From beauty therapy training in Ghana to hairdressing school pathways in Tema, our curriculum supports both career-track students and quick-skill learners."
