@@ -82,8 +82,8 @@ export const courses: Course[] = [
     duration: '3 days',
     summary: 'A polished finishing course for confidence, etiquette, and image-ready presentation.',
     category: 'Short Course',
-    image: '/uploads/courses/Personal Grooming .jpeg',
-    imageAlt: 'Elegant beauty finish for grooming course'
+    image: '/uploads/homepage/Personal grooming class.jpeg',
+    imageAlt: 'Students in personal and corporate grooming training'
   },
   {
     slug: 'short-courses',
