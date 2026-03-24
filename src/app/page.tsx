@@ -70,9 +70,12 @@ export default function HomePage() {
                   </div>
                   <ul className="space-y-3 text-sm leading-7">
                     <li>• Small-group instruction with personal guidance.</li>
-                    <li>• Premium course mix covering salon, spa, grooming, and creative skills.</li>
+                    <li>• Premuim course mix covering beauty Therapy, spa therapy, hair technology, grooming and other creative skills.</li>
                     <li>• Fast WhatsApp registration flow for quick admissions support.</li>
                   </ul>
+                  <p className="text-sm leading-7 text-charcoal/75">
+                    The Courses are researched and updated quarterly to include new trends in the beauty and wellness industry
+                  </p>
                   <ButtonLink href="/courses" variant="ghost" className="px-0 font-semibold">
                     Explore our courses →
                   </ButtonLink>
