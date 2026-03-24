@@ -104,10 +104,14 @@ export default function HomePage() {
               description={`${siteConfig.shortName} blends practical learning with a polished student experience. Our programs are designed for aspiring beauty professionals, entrepreneurs, and career changers who want elegant, industry-ready training in Ghana.`}
             />
           </div>
-          <div className="overflow-hidden rounded-4xl border border-black/5 bg-white shadow-card">
-            <div className="relative aspect-[16/10] bg-gradient-to-br from-blush via-white to-nude">
-              <Image src={homepageImages.about.src} alt={homepageImages.about.alt} fill className="object-cover" sizes="(min-width: 1024px) 40vw, 100vw" />
-            </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {[homepageImages.about.primary, homepageImages.about.secondary].map((item) => (
+              <div key={item.src} className="overflow-hidden rounded-4xl border border-black/5 bg-white shadow-card">
+                <div className="relative aspect-[4/5] bg-gradient-to-br from-blush via-white to-nude">
+                  <Image src={item.src} alt={item.alt} fill className="object-cover" sizes="(min-width: 1024px) 20vw, 100vw" />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
