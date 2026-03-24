@@ -21,44 +21,44 @@ export const homepageImages = {
   ],
   braids: [
     {
-      title: 'Classic makeup practical',
+      title: 'Braids practical look 1',
       src: '/uploads/homepage/hairdressing braids 1.jpeg',
+      alt: 'Student braids practical look 1'
+    },
+    {
+      title: 'Braids practical look 2',
+      src: '/uploads/homepage/hairdressing braids 2.jpeg',
+      alt: 'Student braids practical look 2'
+    },
+    {
+      title: 'Braids practical look 3',
+      src: '/uploads/homepage/hairdressing braids 3.jpeg',
+      alt: 'Student braids practical look 3'
+    },
+    {
+      title: 'Braids practical look 4',
+      src: '/uploads/homepage/hairdressing braids 4.jpeg',
+      alt: 'Student braids practical look 4'
+    },
+    {
+      title: 'Makeup practical look 1',
+      src: '/uploads/homepage/hairdressing braids 5.jpeg',
       alt: 'Student makeup practical look 1'
     },
     {
-      title: 'Beauty practical session',
-      src: '/uploads/homepage/hairdressing braids 2.jpeg',
+      title: 'Makeup practical look 2',
+      src: '/uploads/homepage/hairdressing braids 6.jpeg',
       alt: 'Student makeup practical look 2'
     },
     {
-      title: 'Focused product application',
-      src: '/uploads/homepage/hairdressing braids 3.jpeg',
+      title: 'Makeup practical look 3',
+      src: '/uploads/homepage/hairdressig braids 7.jpeg',
       alt: 'Student makeup practical look 3'
     },
     {
-      title: 'Detailed classroom technique',
-      src: '/uploads/homepage/hairdressing braids 4.jpeg',
-      alt: 'Student makeup practical look 4'
-    },
-    {
-      title: 'Salon-ready makeup result',
-      src: '/uploads/homepage/hairdressing braids 5.jpeg',
-      alt: 'Student makeup practical look 5'
-    },
-    {
-      title: 'Makeup practical in progress',
-      src: '/uploads/homepage/hairdressing braids 6.jpeg',
-      alt: 'Student makeup practical look 6'
-    },
-    {
-      title: 'Advanced makeup practice',
-      src: '/uploads/homepage/hairdressig braids 7.jpeg',
-      alt: 'Student makeup practical look 7'
-    },
-    {
-      title: 'Detailed makeup finishing',
+      title: 'Makeup practical look 4',
       src: '/uploads/homepage/hairdressing braids 8.jpeg',
-      alt: 'Student makeup practical look 8'
+      alt: 'Student makeup practical look 4'
     }
   ]
 } as const;
