@@ -118,9 +118,9 @@ export default function HomePage() {
 
       <section className="section-shell py-8">
         <SectionHeading
-          eyebrow="Makeup practicals"
-          title="Explore our latest makeup practical looks from class sessions."
-          description="These eight photos showcase hands-on makeup training from our classroom practical sessions."
+          eyebrow="Braids & makeup practicals"
+          title="Explore our latest braids and makeup practical looks from class sessions."
+          description="The first four photos highlight braiding practice, and the next four feature makeup practical work from class sessions."
         />
         <div className="mt-10 grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
           {homepageImages.braids.map((item) => (
