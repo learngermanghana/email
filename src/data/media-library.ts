@@ -21,44 +21,44 @@ export const homepageImages = {
   ],
   braids: [
     {
-      title: 'Classic braid practical',
+      title: 'Classic makeup practical',
       src: '/uploads/homepage/hairdressing braids 1.jpeg',
-      alt: 'Student braid practical look 1'
+      alt: 'Student makeup practical look 1'
     },
     {
-      title: 'Protective braid styling',
+      title: 'Beauty practical session',
       src: '/uploads/homepage/hairdressing braids 2.jpeg',
-      alt: 'Student braid practical look 2'
+      alt: 'Student makeup practical look 2'
     },
     {
-      title: 'Neat sectioning and braid finish',
+      title: 'Focused product application',
       src: '/uploads/homepage/hairdressing braids 3.jpeg',
-      alt: 'Student braid practical look 3'
+      alt: 'Student makeup practical look 3'
     },
     {
-      title: 'Braids with polished parting',
+      title: 'Detailed classroom technique',
       src: '/uploads/homepage/hairdressing braids 4.jpeg',
-      alt: 'Student braid practical look 4'
+      alt: 'Student makeup practical look 4'
     },
     {
-      title: 'Salon-ready braid result',
+      title: 'Salon-ready makeup result',
       src: '/uploads/homepage/hairdressing braids 5.jpeg',
-      alt: 'Student braid practical look 5'
+      alt: 'Student makeup practical look 5'
     },
     {
-      title: 'Protective style presentation',
+      title: 'Makeup practical in progress',
       src: '/uploads/homepage/hairdressing braids 6.jpeg',
-      alt: 'Student braid practical look 6'
+      alt: 'Student makeup practical look 6'
     },
     {
-      title: 'Advanced braid pattern',
+      title: 'Advanced makeup practice',
       src: '/uploads/homepage/hairdressig braids 7.jpeg',
-      alt: 'Student braid practical look 7'
+      alt: 'Student makeup practical look 7'
     },
     {
-      title: 'Detailed braid technique',
+      title: 'Detailed makeup finishing',
       src: '/uploads/homepage/hairdressing braids 8.jpeg',
-      alt: 'Student braid practical look 8'
+      alt: 'Student makeup practical look 8'
     }
   ]
 } as const;
