@@ -9,6 +9,14 @@ export type GalleryItem = {
 
 const GALLERY_DIR = path.join(process.cwd(), 'public/uploads/gallery');
 const GALLERY_WEB_PATH = '/uploads/gallery';
+const EXCLUDED_GALLERY_FILES = new Set([
+  'editorial-make-up-look.svg',
+  'elegant-hair-finish.svg',
+  'hair-styling-workshop.svg',
+  'nail-artistry-practice.svg',
+  'salon-workstation-training.svg',
+  'soft-glam-bridal-finish.svg'
+]);
 
 function normalizeTitle(filename: string) {
   return filename
@@ -50,7 +58,12 @@ export async function getGalleryItems() {
   const entries = await readdir(GALLERY_DIR, { withFileTypes: true });
 
   return entries
-    .filter((entry) => entry.isFile() && /\.(jpe?g|png|webp|avif|svg)$/i.test(entry.name))
+    .filter(
+      (entry) =>
+        entry.isFile() &&
+        /\.(jpe?g|png|webp|avif|svg)$/i.test(entry.name) &&
+        !EXCLUDED_GALLERY_FILES.has(entry.name)
+    )
     .map((entry) => ({
       title: toTitleCase(normalizeTitle(entry.name)),
       category: inferCategory(entry.name),
