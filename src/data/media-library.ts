@@ -4,8 +4,14 @@ export const homepageImages = {
     alt: 'Students training in a beauty classroom'
   },
   about: {
-    src: '/uploads/homepage/Personal grooming class 3.jpeg',
-    alt: 'Students during a personal grooming practical class'
+    primary: {
+      src: '/uploads/homepage/massage 1.jpeg',
+      alt: 'Students in a massage therapy practical session'
+    },
+    secondary: {
+      src: '/uploads/homepage/massage 2.jpeg',
+      alt: 'Hands-on massage training in class'
+    }
   },
   highlights: [
     {
